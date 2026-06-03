@@ -1,7 +1,8 @@
 {
-  "version": "1.0",
+  "version": "1.1",
   "name": "AI Agent Threat Matrix",
   "created": "2026-03-24",
+  "updated": "2026-06-03",
   "tactics": [
     {
       "id": "reconnaissance",
@@ -1269,6 +1270,111 @@
         "11.3",
         "11.4"
       ]
+    },
+    {
+      "id": "T-2009",
+      "name": "Parser Differential Exploitation",
+      "tactic": "initial-access",
+      "description": "Exploit differences in how parsers (JSON, YAML, markdown) interpret the same input to bypass security controls",
+      "evidenceTier": "validated",
+      "attackClass": "PARSER-DIFFERENTIAL",
+      "hmaChecks": [
+        "PARSE-001",
+        "PARSE-002",
+        "PARSE-003",
+        "PARSE-004",
+        "PARSE-005",
+        "PARSE-006",
+        "PARSE-007",
+        "PARSE-008",
+        "PARSE-009",
+        "PARSE-010"
+      ],
+      "dvaaValidation": "parser-differential-json",
+      "oasbControls": [
+        "3.1",
+        "3.2",
+        "8.1"
+      ]
+    },
+    {
+      "id": "T-4007",
+      "name": "Tool Impersonation and Squatting",
+      "tactic": "privilege-escalation",
+      "description": "Impersonate, shadow, or squat on legitimate MCP tools to intercept agent actions or escalate capabilities",
+      "evidenceTier": "validated",
+      "attackClass": "FAKETOOL-INJECT",
+      "hmaChecks": [
+        "FAKETOOL-001",
+        "FAKETOOL-002",
+        "FAKETOOL-003",
+        "FAKETOOL-004",
+        "FAKETOOL-005",
+        "FAKETOOL-006",
+        "FAKETOOL-007",
+        "FAKETOOL-008",
+        "FAKETOOL-009",
+        "FAKETOOL-010"
+      ],
+      "dvaaValidation": "fake-tool-squatting",
+      "oasbControls": [
+        "2.2",
+        "2.3",
+        "6.2"
+      ]
+    },
+    {
+      "id": "T-6007",
+      "name": "Persistent Agent State Manipulation",
+      "tactic": "persistence",
+      "description": "Attacks that persist across agent sessions via memory poisoning, state tampering, and cached context injection",
+      "evidenceTier": "validated",
+      "attackClass": "PERSIST-STATE",
+      "hmaChecks": [
+        "PERSIST-001",
+        "PERSIST-002",
+        "PERSIST-003",
+        "PERSIST-004",
+        "PERSIST-005",
+        "PERSIST-006",
+        "PERSIST-007",
+        "PERSIST-008",
+        "PERSIST-009",
+        "PERSIST-010"
+      ],
+      "dvaaValidation": "persistent-agent-memory-poison",
+      "oasbControls": [
+        "8.1",
+        "8.2",
+        "4.3"
+      ]
+    },
+    {
+      "id": "T-7007",
+      "name": "Context Assembly Pipeline Attack",
+      "tactic": "collection",
+      "description": "Attacks targeting the system prompt assembly pipeline where individual components combine into exploitable injections",
+      "evidenceTier": "validated",
+      "attackClass": "ASSEMBLY-INJECT",
+      "hmaChecks": [
+        "LIFECYCLE-001",
+        "LIFECYCLE-002",
+        "LIFECYCLE-003",
+        "LIFECYCLE-004",
+        "LIFECYCLE-005",
+        "LIFECYCLE-006",
+        "LIFECYCLE-007",
+        "LIFECYCLE-008",
+        "LIFECYCLE-009",
+        "LIFECYCLE-010"
+      ],
+      "dvaaValidation": "context-lifecycle-split-injection, context-lifecycle-displacement, context-lifecycle-priority-hijack",
+      "oasbControls": [
+        "3.1",
+        "3.2",
+        "8.1",
+        "8.2"
+      ]
     }
   ],
   "attackClasses": [
@@ -1855,6 +1961,62 @@
         "SANDBOX-005"
       ],
       "category": "sandbox"
+    },
+    {
+      "id": "PARSER-DIFFERENTIAL",
+      "name": "Parser Differential Exploitation",
+      "description": "Exploits differences between parser implementations to bypass security controls",
+      "techniques": [
+        "T-2009"
+      ],
+      "hmaChecks": [
+        "PARSE-001",
+        "PARSE-002",
+        "PARSE-003"
+      ],
+      "category": "infrastructure"
+    },
+    {
+      "id": "FAKETOOL-INJECT",
+      "name": "Tool Impersonation and Injection",
+      "description": "MCP tool impersonation, squatting, and schema poisoning attacks",
+      "techniques": [
+        "T-4007"
+      ],
+      "hmaChecks": [
+        "FAKETOOL-001",
+        "FAKETOOL-002",
+        "FAKETOOL-003"
+      ],
+      "category": "supply-chain"
+    },
+    {
+      "id": "PERSIST-STATE",
+      "name": "Persistent State Manipulation",
+      "description": "Cross-session persistence via memory poisoning, state tampering, and cached context injection",
+      "techniques": [
+        "T-6007"
+      ],
+      "hmaChecks": [
+        "PERSIST-001",
+        "PERSIST-002",
+        "PERSIST-003"
+      ],
+      "category": "supply-chain"
+    },
+    {
+      "id": "ASSEMBLY-INJECT",
+      "name": "Context Assembly Pipeline Injection",
+      "description": "Attacks targeting the system prompt assembly process where components combine into exploitable injections",
+      "techniques": [
+        "T-7007"
+      ],
+      "hmaChecks": [
+        "LIFECYCLE-001",
+        "LIFECYCLE-002",
+        "LIFECYCLE-003"
+      ],
+      "category": "governance"
     }
   ],
   "attackPaths": [

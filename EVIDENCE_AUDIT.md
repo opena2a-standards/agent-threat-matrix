@@ -41,8 +41,9 @@ OBSERVED and VALIDATED only. Flag THEORETICAL for future research.
 | T-2006 | Unicode/Encoding Bypass | OBSERVED | os-info-checker npm attack (May 2025) — real supply chain attack using Unicode steganography. |
 | T-2007 | Multi-Turn Manipulation | VALIDATED | DVAA multi-turn challenges. Academic research on gradual jailbreaking. |
 | T-2008 | System Prompt Boundary Bypass | VALIDATED | DVAA L3-04. Boundary confusion between system and user messages. |
+| T-2009 | Parser Differential Exploitation | VALIDATED | DVAA parser-differential-json scenario; PARSE-001..010 HMA checks exist. VALIDATED. |
 
-**Verdict: 4 OBSERVED, 4 VALIDATED, 0 THEORETICAL. All publishable.**
+**Verdict: 4 OBSERVED, 5 VALIDATED, 0 THEORETICAL. All publishable.**
 
 ---
 
@@ -71,8 +72,9 @@ OBSERVED and VALIDATED only. Flag THEORETICAL for future research.
 | T-4004 | Delegation Abuse | VALIDATED | DVAA delegation-privilege-escalation scenario. |
 | T-4005 | Policy Bypass via Encoding | VALIDATED | Extension of T-2006 (Unicode bypass). Demonstrated against regex-based filters. |
 | T-4006 | Safety Instruction Displacement | VALIDATED | Extension of T-2004 (context overflow). DVAA L2-07. |
+| T-4007 | Tool Impersonation and Squatting | VALIDATED | DVAA fake-tool-squatting scenario; FAKETOOL-001..010 HMA checks exist. VALIDATED. |
 
-**Verdict: 0 OBSERVED, 6 VALIDATED, 0 THEORETICAL. All publishable (lab-proven).**
+**Verdict: 0 OBSERVED, 7 VALIDATED, 0 THEORETICAL. All publishable (lab-proven).**
 
 ---
 
@@ -101,8 +103,9 @@ OBSERVED and VALIDATED only. Flag THEORETICAL for future research.
 | T-6004 | Skill/Plugin Backdoor | VALIDATED | DVAA skill-backdoor-install scenario. |
 | T-6005 | Scheduled Task Injection | OBSERVED | OpenClaw heartbeat mechanism confirmed (RQ-OC-001 investigation — local fs only, not remote, but persistence mechanism exists). NemoClaw H-007. |
 | T-6006 | Tool Registration Persistence | VALIDATED | DVAA L2-08 (PluginBot malicious tool registration). |
+| T-6007 | Persistent Agent State Manipulation | VALIDATED | DVAA persistent-agent-memory-poison scenario; PERSIST-001..010 HMA checks exist. VALIDATED. |
 
-**Verdict: 2 OBSERVED, 4 VALIDATED, 0 THEORETICAL. All publishable.**
+**Verdict: 2 OBSERVED, 5 VALIDATED, 0 THEORETICAL. All publishable.**
 
 ---
 
@@ -116,8 +119,9 @@ OBSERVED and VALIDATED only. Flag THEORETICAL for future research.
 | T-7004 | Memory Dump | VALIDATED | DVAA MemoryBot memory enumeration. |
 | T-7005 | Configuration Harvesting | OBSERVED | OpenClaw config.get returns full config including tokens. NemoClaw world-readable config files. |
 | T-7006 | PII Discovery | VALIDATED | DVAA LegacyBot leaks PII (SSN data). |
+| T-7007 | Context Assembly Pipeline Attack | VALIDATED | DVAA context-lifecycle-split-injection / displacement / priority-hijack scenarios; LIFECYCLE-001..010 HMA checks exist. VALIDATED. |
 
-**Verdict: 1 OBSERVED, 5 VALIDATED, 0 THEORETICAL. All publishable.**
+**Verdict: 1 OBSERVED, 6 VALIDATED, 0 THEORETICAL. All publishable.**
 
 ---
 
@@ -159,20 +163,20 @@ OBSERVED and VALIDATED only. Flag THEORETICAL for future research.
 
 | Evidence Tier | Count | Percentage |
 |--------------|-------|------------|
-| OBSERVED (real-world) | 16 | 28% |
-| VALIDATED (lab-proven) | 38 | 67% |
+| OBSERVED (real-world) | 16 | 26% |
+| VALIDATED (lab-proven) | 42 | 69% |
 | THEORETICAL | 3 | 5% |
-| **Total** | **57** | **100%** |
+| **Total** | **61** | **100%** |
 
 ### Decisions
 
-**Publish all 57 techniques.** 95% are OBSERVED or VALIDATED. The 3 THEORETICAL techniques (T-8003, T-9004, T-9005) are well-understood traditional techniques adapted to agent context. MITRE ATT&CK includes adapted techniques when the attack vector is clear.
+**Publish all 61 techniques.** 95% are OBSERVED or VALIDATED. The 3 THEORETICAL techniques (T-8003, T-9004, T-9005) are well-understood traditional techniques adapted to agent context. MITRE ATT&CK includes adapted techniques when the attack vector is clear.
 
 **Mark evidence tier on each technique page.** This is transparency that MITRE doesn't even do (they mix observed and theoretical without explicit labeling). Our evidence labeling is a differentiator.
 
 ### Attack Classes Audit
 
-All 34 attack classes contain at least one OBSERVED or VALIDATED technique. No attack class is purely theoretical. The NemoClaw-specific classes (5 classes) are all backed by the 10 confirmed code-level vulnerabilities.
+All 40 attack classes contain at least one OBSERVED or VALIDATED technique. No attack class is purely theoretical. The NemoClaw-specific classes (5 classes) are all backed by the 10 confirmed code-level vulnerabilities.
 
 ### Gaps Identified
 
