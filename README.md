@@ -2,7 +2,7 @@
 
 A structured framework for classifying, detecting, and defending against attacks on AI agent systems.
 
-**Version 1.0** | March 2026 | [OpenA2A](https://opena2a.org)
+**Version 1.1** | June 2026 | [OpenA2A](https://opena2a.org)
 
 ---
 
@@ -10,7 +10,7 @@ A structured framework for classifying, detecting, and defending against attacks
 
 AI agents operate differently from traditional software. They make decisions based on natural language, delegate actions to tools with varying trust levels, communicate with other agents via open protocols, and maintain persistent memory that can be poisoned. These properties create attack surfaces that existing frameworks do not adequately model.
 
-The **AI Agent Threat Matrix** classifies attacks against AI agent systems into 9 tactics and 57 techniques, organized by kill chain stage. Every technique is grounded in observed adversary behavior or validated in a controlled lab environment. Every technique maps to automated detection, a reproducible lab scenario, and a defensive control.
+The **AI Agent Threat Matrix** classifies attacks against AI agent systems into 9 tactics and 61 techniques, organized by kill chain stage. Every technique is grounded in observed adversary behavior or validated in a controlled lab environment. Every technique maps to automated detection, a reproducible lab scenario, and a defensive control.
 
 ### What This Covers (and What It Doesn't)
 
@@ -48,7 +48,7 @@ The Agent Threat Matrix is designed to work **alongside** these frameworks, not 
 | [Exfiltration](tactics/exfiltration.md) | 8 | 6 | Transfer collected data out of target environment |
 | [Impact](tactics/impact.md) | 9 | 6 | Modify data, deploy malicious code, or disrupt services |
 
-**57 techniques** across 9 tactics. **34 attack classes** grouping related techniques. **16 techniques with real-world evidence**. **38 techniques validated in controlled lab environments**. **3 techniques adapted from traditional environments** (marked as such).
+**61 techniques** across 9 tactics. **40 attack classes** grouping related techniques. **16 techniques with real-world evidence**. **42 techniques validated in controlled lab environments**. **3 techniques adapted from traditional environments** (marked as such).
 
 ---
 
@@ -58,8 +58,8 @@ Every technique in this matrix is assigned an evidence tier:
 
 | Tier | Meaning | Count |
 |------|---------|-------|
-| **Observed** | Confirmed in real-world production systems | 16 (28%) |
-| **Validated** | Reproduced in controlled lab environment (DVAA) | 38 (67%) |
+| **Observed** | Confirmed in real-world production systems | 16 (26%) |
+| **Validated** | Reproduced in controlled lab environment (DVAA) | 42 (69%) |
 | **Adapted** | Well-understood traditional technique applied to agent context, not yet observed agent-specifically | 3 (5%) |
 
 We do not publish purely theoretical techniques. Every entry has either a real-world observation, a reproducible lab scenario, or an established traditional precedent.
@@ -83,11 +83,11 @@ See [cross-references/](cross-references/) for detailed mapping documents.
 
 ---
 
-## Attack Classes (34)
+## Attack Classes (40)
 
 Attack classes group related techniques by the underlying vulnerability pattern:
 
-### Governance (10 classes)
+### Governance (11 classes)
 | Class | Description | Techniques |
 |-------|-------------|------------|
 | SOUL-POISON | Malicious instructions injected into governance files at write-time | T-2001, T-2003, T-2007, T-2008 |
@@ -100,8 +100,9 @@ Attack classes group related techniques by the underlying vulnerability pattern:
 | SOUL-DELEGATE | Delegation without authorization chain verification | T-4001 |
 | SOUL-IMPERSONATE | False capability claims beyond authorization | T-4002 |
 | SOUL-HV | Harm avoidance override variants (4 sub-types) | T-2001, T-2003 |
+| ASSEMBLY-INJECT | Targeting the system-prompt assembly pipeline where components combine into exploitable injections | T-7007 |
 
-### Supply Chain (8 classes)
+### Supply Chain (11 classes)
 | Class | Description | Real-World Evidence |
 |-------|-------------|-------------------|
 | UNICODE-STEGO | Invisible Unicode encoding instructions in source code | os-info-checker npm attack (May 2025) |
@@ -112,8 +113,11 @@ Attack classes group related techniques by the underlying vulnerability pattern:
 | SKILL-FRONTMATTER | YAML metadata injection bypassing content filters | DVAA PluginBot |
 | SKILL-EXFIL | Skill exfiltrates data outside declared tool boundaries | DVAA tool chain scenarios |
 | ORG-SKILL-SPREAD | Compromised admin skill propagates organization-wide | ClawHavoc campaign patterns |
+| SUPPLY-CHAIN-INSTALL | Unsigned installation scripts executed without integrity verification — curl\|sh without checksum | — |
+| FAKETOOL-INJECT | MCP tool impersonation, squatting, and schema poisoning attacks | — |
+| PERSIST-STATE | Cross-session persistence via memory poisoning, state tampering, and cached context injection | — |
 
-### Infrastructure (8 classes)
+### Infrastructure (10 classes)
 | Class | Description | Real-World Evidence |
 |-------|-------------|-------------------|
 | GATEWAY-EXPLOIT | Misconfigured API gateways exposing agent infrastructure | ~75K OpenClaw gateways unauthenticated |
@@ -124,6 +128,8 @@ Attack classes group related techniques by the underlying vulnerability pattern:
 | CODE-INJECTION | Command injection via unsanitized inputs | NemoClaw C-001, C-002 |
 | INTEGRITY-BYPASS | Digest/hash bypass on empty or missing values | NemoClaw C-005 |
 | TOCTOU-RACE | Time-of-check-time-of-use race in verification pipelines | NemoClaw C-006 |
+| A2A-EXPOSE | Agent-to-Agent protocol endpoints publicly discoverable without access control | — |
+| PARSER-DIFFERENTIAL | Exploits differences between parser implementations to bypass security controls | — |
 
 ### NemoClaw-Specific (5 classes)
 | Class | Description | Evidence |
@@ -211,7 +217,7 @@ When referencing individual techniques:
 > AI Agent Threat Matrix T-2001 (Direct Prompt Injection). OpenA2A, 2026. https://threats.opena2a.org/techniques/T-2001
 
 When referencing the framework:
-> OpenA2A. "AI Agent Threat Matrix v1.0." March 2026. https://threats.opena2a.org
+> OpenA2A. "AI Agent Threat Matrix v1.1." June 2026. https://threats.opena2a.org
 
 ---
 
