@@ -2,7 +2,7 @@
 
 A structured framework for classifying, detecting, and defending against attacks on AI agent systems.
 
-**Version 1.1** | June 2026 | [OpenA2A](https://opena2a.org)
+**Version 1.1** | June 2026 | [Threats Matrix](https://threats.opena2a.org) | [OpenA2A](https://opena2a.org)
 
 ---
 
