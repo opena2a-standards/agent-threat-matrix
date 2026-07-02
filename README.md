@@ -39,12 +39,12 @@ The Agent Threat Matrix is designed to work **alongside** these frameworks, not 
 | Tactic | Kill Chain Stage | Techniques | Description |
 |--------|-----------------|------------|-------------|
 | [Reconnaissance](tactics/reconnaissance.md) | 1 | 7 | Map the target agent's attack surface, capabilities, and behavioral boundaries |
-| [Initial Access](tactics/initial-access.md) | 2 | 8 | Gain control over agent behavior through prompt manipulation or input exploitation |
+| [Initial Access](tactics/initial-access.md) | 2 | 9 | Gain control over agent behavior through prompt manipulation or input exploitation |
 | [Credential Harvest](tactics/credential-harvest.md) | 3 | 6 | Extract API keys, tokens, and credentials from agent context and connected services |
-| [Privilege Escalation](tactics/privilege-escalation.md) | 4 | 6 | Escalate capabilities beyond declared scope or bypass authorization |
+| [Privilege Escalation](tactics/privilege-escalation.md) | 4 | 7 | Escalate capabilities beyond declared scope or bypass authorization |
 | [Lateral Movement](tactics/lateral-movement.md) | 5 | 6 | Pivot from compromised agent to connected services or other agents |
-| [Persistence](tactics/persistence.md) | 6 | 6 | Establish persistent access surviving restarts and session changes |
-| [Collection](tactics/collection.md) | 7 | 6 | Gather and stage data from databases, file systems, and APIs |
+| [Persistence](tactics/persistence.md) | 6 | 7 | Establish persistent access surviving restarts and session changes |
+| [Collection](tactics/collection.md) | 7 | 7 | Gather and stage data from databases, file systems, and APIs |
 | [Exfiltration](tactics/exfiltration.md) | 8 | 6 | Transfer collected data out of target environment |
 | [Impact](tactics/impact.md) | 9 | 6 | Modify data, deploy malicious code, or disrupt services |
 

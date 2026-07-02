@@ -1,5 +1,23 @@
 # Changelog
 
+## v1.1 — 2026-06-04
+
+### Added
+
+- 4 lab-validated techniques, each backed by a DVAA scenario and an HMA check family: T-2009 (Parser Differential Exploitation), T-4007 (Tool Impersonation and Squatting), T-6007 (Persistent Agent State Manipulation), T-7007 (Context Assembly Pipeline).
+- 4 corresponding attack classes (40 total).
+
+### Changed
+
+- Technique count reconciled to 61 across 9 tactics; evidence tiers 16 observed / 42 validated / 3 adapted. Observed count unchanged: exposure-sweep signals are not wild-observed attacks.
+- README attack-class tables reconciled (previously undercounted by 2).
+
+### Fixed (2026-07-02)
+
+- README Matrix Overview per-tactic technique counts summed to 57; corrected to match the 61 techniques in `matrix.json` (initial-access 9, privilege-escalation 7, persistence 7, collection 7).
+- All 9 `tactics/*.md` pages shipped empty technique tables; now populated from `matrix.json` (ID, name, evidence tier, attack class) with links to each technique page.
+- EVIDENCE_AUDIT.md anticipated-pushback item still cited 57 techniques; updated to 61.
+
 ## v1.0 — 2026-03-24
 
 ### Initial Release

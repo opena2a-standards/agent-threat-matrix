@@ -190,6 +190,6 @@ All 40 attack classes contain at least one OBSERVED or VALIDATED technique. No a
 
 2. "Your technique IDs don't follow MITRE's format." Response: Intentional. T-XYYY (where X = stage) vs MITRE's TXXXX (sequential). Our format encodes the kill chain stage in the ID, which is more useful for practitioners.
 
-3. "57 techniques across 9 stages is dense for a first release." Response: MITRE ATT&CK v1 (2015) had ~100 techniques. Our 57 is reasonable for a domain-specific matrix. The agent attack surface is genuinely this broad.
+3. "61 techniques across 9 stages is dense for an early release." Response: MITRE ATT&CK v1 (2015) had ~100 techniques. Our 61 is reasonable for a domain-specific matrix. The agent attack surface is genuinely this broad.
 
 4. "Some techniques overlap across stages." Response: Acknowledged. T-2004 (Context Window Exploitation) and T-4006 (Safety Instruction Displacement) are related but occur at different kill chain stages with different attacker goals. MITRE has similar overlaps (T1059 Command and Scripting Interpreter appears in Execution but enables techniques in many other tactics).
