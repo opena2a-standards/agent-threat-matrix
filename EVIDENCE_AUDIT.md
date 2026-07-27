@@ -193,3 +193,40 @@ All 40 attack classes contain at least one OBSERVED or VALIDATED technique. No a
 3. "61 techniques across 9 stages is dense for an early release." Response: MITRE ATT&CK v1 (2015) had ~100 techniques. Our 61 is reasonable for a domain-specific matrix. The agent attack surface is genuinely this broad.
 
 4. "Some techniques overlap across stages." Response: Acknowledged. T-2004 (Context Window Exploitation) and T-4006 (Safety Instruction Displacement) are related but occur at different kill chain stages with different attacker goals. MITRE has similar overlaps (T1059 Command and Scripting Interpreter appears in Execution but enables techniques in many other tactics).
+
+---
+
+## Honeypot-Derived Evidence: What It Proves and What It Does Not
+
+As of 2026-07-27 the AgentPwn honeypot fleet contributes live evidence to the published
+Attack Prevalence Index at [threats.opena2a.org](https://threats.opena2a.org). Those counts
+are real observations of agents in the wild, not lab reproductions — but they are attributed
+at **site level**, and that distinction changes what may honestly be claimed from them.
+
+**What the telemetry is.** A trap page publishes an injection. When an agent follows it, the
+honeypot records the interaction and a canary fires. Over the trailing 30 days that is 7,125
+interactions from `agentpwn.com`.
+
+**How it is attributed.** `agentpwn.com` is mapped to five technique classes (T-2001, T-2002,
+T-2003, T-2004, T-8002) because its trap pages cover those classes. Every qualifying
+interaction therefore produces one evidence row per mapped technique: 7,125 interactions
+become 35,625 evidence rows, and all five techniques report an identical count of 7,125.
+
+**The consequence, stated plainly.** Those are not five independent measurements. They are
+one population of 7,125 agent-follow events, counted five ways. A reader who takes
+"T-2004: 7,125" as 7,125 confirmed context-window exploitations would be wrong. The honest
+reading is: 7,125 agents followed an injection on a site whose traps span these five classes.
+
+**Why no evidence tier was upgraded on this basis.** T-2004 (Context Window Exploitation) and
+T-8002 (HTTP Callback) remain VALIDATED, not OBSERVED, despite carrying thousands of rows
+each. Site-level attribution cannot establish that any individual agent performed *that*
+technique, and this audit's OBSERVED tier means confirmation of the specific behaviour in a
+real-world system. Promoting a tier on fan-out counts would manufacture precision the
+measurement does not have. These tiers move when payload-level attribution — mapping a
+specific fired canary to the specific injection class it carried — is in place, which is
+tracked separately.
+
+**Reading the index correctly.** Treat the per-technique number as prevalence of the
+*class of trap* an agent engaged with, not as a per-technique incident count, until
+attribution granularity improves. The count of distinct interactions, not the sum of
+evidence rows, is the population size.
