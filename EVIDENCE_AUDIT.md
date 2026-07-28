@@ -5,11 +5,16 @@ We apply three evidence tiers:
 
 - **OBSERVED**: Confirmed in real-world production systems (NemoClaw findings, exposure sweeps, npm attacks)
 - **VALIDATED**: Reproducible in controlled lab environment (DVAA challenges, HMA scan results)
-- **THEORETICAL**: Plausible but no real-world observation or lab reproduction yet
+- **ADAPTED**: A well-understood traditional technique applied to the agent context, with a
+  clear attack vector but no agent-specific observation or lab reproduction yet
 
-MITRE publishes THEORETICAL techniques only when the attack vector is well-understood
-and the technique fills a gap in the matrix. We should be more conservative: publish
-OBSERVED and VALIDATED only. Flag THEORETICAL for future research.
+We do not publish purely theoretical techniques. Where this audit assessed a technique as
+theoretical, the outcome was either to establish an agent-specific basis for it or to label
+it ADAPTED and say so on the technique page — never to publish it unmarked. MITRE includes
+adapted techniques when the attack vector is clear; the difference is that we label them.
+
+These three tier names are the ones that ship: `evidenceTier` in `matrix.json` takes exactly
+`observed`, `validated` or `adapted`, and every technique page carries the same value.
 
 ---
 
@@ -25,7 +30,7 @@ OBSERVED and VALIDATED only. Flag THEORETICAL for future research.
 | T-1006 | Agent Card Discovery | OBSERVED | First A2A agent cards found in the wild during March 2026 sweep. ClawGrid marketplace. |
 | T-1007 | Context Window Probing | VALIDATED | DVAA LongwindBot (3008) demonstrates context overflow. |
 
-**Verdict: 2 OBSERVED, 5 VALIDATED, 0 THEORETICAL. All publishable.**
+**Verdict: 2 OBSERVED, 5 VALIDATED, 0 ADAPTED. All publishable.**
 
 ---
 
@@ -43,7 +48,7 @@ OBSERVED and VALIDATED only. Flag THEORETICAL for future research.
 | T-2008 | System Prompt Boundary Bypass | VALIDATED | DVAA L3-04. Boundary confusion between system and user messages. |
 | T-2009 | Parser Differential Exploitation | VALIDATED | DVAA parser-differential-json scenario; PARSE-001..010 HMA checks exist. VALIDATED. |
 
-**Verdict: 4 OBSERVED, 5 VALIDATED, 0 THEORETICAL. All publishable.**
+**Verdict: 4 OBSERVED, 5 VALIDATED, 0 ADAPTED. All publishable.**
 
 ---
 
@@ -58,7 +63,7 @@ OBSERVED and VALIDATED only. Flag THEORETICAL for future research.
 | T-3005 | Configuration File Access | OBSERVED | OpenClaw config.get returns Discord/Slack/Telegram tokens. 199 .env directory listings (Mar 2026). |
 | T-3006 | Context Window Credential Leak | VALIDATED | DVAA LegacyBot has credentials in system prompt with no isolation. |
 
-**Verdict: 3 OBSERVED, 3 VALIDATED, 0 THEORETICAL. All publishable.**
+**Verdict: 3 OBSERVED, 3 VALIDATED, 0 ADAPTED. All publishable.**
 
 ---
 
@@ -74,7 +79,7 @@ OBSERVED and VALIDATED only. Flag THEORETICAL for future research.
 | T-4006 | Safety Instruction Displacement | VALIDATED | Extension of T-2004 (context overflow). DVAA L2-07. |
 | T-4007 | Tool Impersonation and Squatting | VALIDATED | DVAA fake-tool-squatting scenario; FAKETOOL-001..010 HMA checks exist. VALIDATED. |
 
-**Verdict: 0 OBSERVED, 7 VALIDATED, 0 THEORETICAL. All publishable (lab-proven).**
+**Verdict: 0 OBSERVED, 7 VALIDATED, 0 ADAPTED. All publishable (lab-proven).**
 
 ---
 
@@ -89,7 +94,7 @@ OBSERVED and VALIDATED only. Flag THEORETICAL for future research.
 | T-5005 | Database Pivoting | VALIDATED | DVAA DataBot SQL injection enables database-level pivoting. |
 | T-5006 | Internal API Discovery | VALIDATED | Network scanning from agent position. Standard lateral movement technique. |
 
-**Verdict: 1 OBSERVED, 5 VALIDATED, 0 THEORETICAL. All publishable.**
+**Verdict: 1 OBSERVED, 5 VALIDATED, 0 ADAPTED. All publishable.**
 
 ---
 
@@ -105,7 +110,7 @@ OBSERVED and VALIDATED only. Flag THEORETICAL for future research.
 | T-6006 | Tool Registration Persistence | VALIDATED | DVAA L2-08 (PluginBot malicious tool registration). |
 | T-6007 | Persistent Agent State Manipulation | VALIDATED | DVAA persistent-agent-memory-poison scenario; PERSIST-001..010 HMA checks exist. VALIDATED. |
 
-**Verdict: 2 OBSERVED, 5 VALIDATED, 0 THEORETICAL. All publishable.**
+**Verdict: 2 OBSERVED, 5 VALIDATED, 0 ADAPTED. All publishable.**
 
 ---
 
@@ -121,7 +126,7 @@ OBSERVED and VALIDATED only. Flag THEORETICAL for future research.
 | T-7006 | PII Discovery | VALIDATED | DVAA LegacyBot leaks PII (SSN data). |
 | T-7007 | Context Assembly Pipeline Attack | VALIDATED | DVAA context-lifecycle-split-injection / displacement / priority-hijack scenarios; LIFECYCLE-001..010 HMA checks exist. VALIDATED. |
 
-**Verdict: 1 OBSERVED, 6 VALIDATED, 0 THEORETICAL. All publishable.**
+**Verdict: 1 OBSERVED, 6 VALIDATED, 0 ADAPTED. All publishable.**
 
 ---
 
@@ -131,14 +136,14 @@ OBSERVED and VALIDATED only. Flag THEORETICAL for future research.
 |----|-----------|--------------|---------------|
 | T-8001 | Email Exfiltration | VALIDATED | DVAA ToolBot send_email tool with no recipient validation. |
 | T-8002 | HTTP Callback | VALIDATED | DVAA ToolBot fetch_url to external endpoint with no egress filtering. |
-| T-8003 | DNS Exfiltration | THEORETICAL | Plausible but not demonstrated in DVAA or observed in the wild for AI agents specifically. Standard technique from traditional environments. |
+| T-8003 | DNS Exfiltration | ADAPTED | Plausible but not demonstrated in DVAA or observed in the wild for AI agents specifically. Standard technique from traditional environments. |
 | T-8004 | Tool Chain Exfiltration | VALIDATED | DVAA L3-06 (read_file + fetch_url chain). |
 | T-8005 | Conversation Exfiltration | VALIDATED | All DVAA agents — data extracted via conversation responses. |
 | T-8006 | Webhook Exfiltration | OBSERVED | NemoClaw H-007 (Telegram Bot API pre-allowed in sandbox policy). OpenClaw pre-allows messaging APIs. |
 
-**Verdict: 1 OBSERVED, 4 VALIDATED, 1 THEORETICAL.**
+**Verdict: 1 OBSERVED, 4 VALIDATED, 1 ADAPTED.**
 
-**T-8003 (DNS Exfiltration) is the only THEORETICAL technique.** It's a well-understood traditional technique adapted to agent context. Decision: include but mark as "adapted from traditional environments — not yet observed in AI agent-specific deployments." MITRE includes adapted techniques when the attack vector is clear.
+**T-8003 (DNS Exfiltration) is the only technique in this stage without an agent-specific basis.** It's a well-understood traditional technique applied to the agent context. Decision taken and applied: publish it as **ADAPTED**, marked on the technique page as "adapted from traditional environments — not yet observed in AI agent-specific deployments." MITRE includes adapted techniques when the attack vector is clear.
 
 ---
 
@@ -149,13 +154,13 @@ OBSERVED and VALIDATED only. Flag THEORETICAL for future research.
 | T-9001 | Data Manipulation | VALIDATED | DVAA ToolBot write_file and DataBot SQL injection. NemoClaw C-005 (digest bypass enables blueprint tampering). |
 | T-9002 | Service Disruption | VALIDATED | Resource exhaustion via context flooding. Standard DoS techniques applied to agents. |
 | T-9003 | Malicious Code Deployment | OBSERVED | NemoClaw C-003 (curl|sh without checksum). Supply chain attacks deploying backdoors. |
-| T-9004 | Multi-Agent Consensus Manipulation | THEORETICAL | Plausible in multi-agent voting systems but not observed. DVAA consensus-manipulation scenario exists but is synthetic. |
-| T-9005 | Reputation Poisoning | THEORETICAL | Plausible output manipulation but not observed in production AI agent context specifically. |
+| T-9004 | Multi-Agent Consensus Manipulation | ADAPTED | Plausible in multi-agent voting systems but not observed. DVAA consensus-manipulation scenario exists but is synthetic. |
+| T-9005 | Reputation Poisoning | ADAPTED | Plausible output manipulation but not observed in production AI agent context specifically. |
 | T-9006 | Supply Chain Compromise | OBSERVED | os-info-checker npm attack (May 2025). ClawHavoc campaign. NemoClaw C-003, C-005, C-006. |
 
-**Verdict: 2 OBSERVED, 2 VALIDATED, 2 THEORETICAL.**
+**Verdict: 2 OBSERVED, 2 VALIDATED, 2 ADAPTED.**
 
-**T-9004 (Multi-Agent Consensus Manipulation) and T-9005 (Reputation Poisoning) are THEORETICAL.** Both are plausible but lack specific evidence in AI agent deployments. Decision: include with "adapted/projected" label, or hold for a future version when evidence exists.
+**T-9004 (Multi-Agent Consensus Manipulation) and T-9005 (Reputation Poisoning) lack agent-specific evidence.** Both are plausible but have no observation in AI agent deployments. Decision taken and applied: publish both as **ADAPTED** rather than holding them, so the gap is stated on the page instead of the technique being absent.
 
 ---
 
@@ -165,12 +170,12 @@ OBSERVED and VALIDATED only. Flag THEORETICAL for future research.
 |--------------|-------|------------|
 | OBSERVED (real-world) | 16 | 26% |
 | VALIDATED (lab-proven) | 42 | 69% |
-| THEORETICAL | 3 | 5% |
+| ADAPTED (traditional, labelled) | 3 | 5% |
 | **Total** | **61** | **100%** |
 
 ### Decisions
 
-**Publish all 61 techniques.** 95% are OBSERVED or VALIDATED. The 3 THEORETICAL techniques (T-8003, T-9004, T-9005) are well-understood traditional techniques adapted to agent context. MITRE ATT&CK includes adapted techniques when the attack vector is clear.
+**Publish all 61 techniques.** 95% are OBSERVED or VALIDATED. The 3 ADAPTED techniques (T-8003, T-9004, T-9005) are well-understood traditional techniques applied to the agent context. MITRE ATT&CK includes adapted techniques when the attack vector is clear; the difference is that ours carry the label.
 
 **Mark evidence tier on each technique page.** This is transparency that MITRE doesn't even do (they mix observed and theoretical without explicit labeling). Our evidence labeling is a differentiator.
 
