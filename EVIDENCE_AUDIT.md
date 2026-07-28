@@ -198,35 +198,75 @@ All 40 attack classes contain at least one OBSERVED or VALIDATED technique. No a
 
 ## Honeypot-Derived Evidence: What It Proves and What It Does Not
 
-As of 2026-07-27 the AgentPwn honeypot fleet contributes live evidence to the published
-Attack Prevalence Index at [threats.opena2a.org](https://threats.opena2a.org). Those counts
-are real observations of agents in the wild, not lab reproductions — but they are attributed
-at **site level**, and that distinction changes what may honestly be claimed from them.
+The AgentPwn honeypot fleet contributes live evidence to the published Attack Prevalence
+Index at [threats.opena2a.org](https://threats.opena2a.org). These are real events from the
+open internet, not lab reproductions. They are also not per-technique incident counts, and
+the gap between those two statements is what this section exists to state.
 
-**What the telemetry is.** A trap page publishes an injection. When an agent follows it, the
-honeypot records the interaction and a canary fires. Over the trailing 30 days that is 7,125
-interactions from `agentpwn.com`.
+**What the telemetry is.** A trap page publishes an injection carrying a canary URL. When a
+client fetches that URL, the honeypot records the fetch and resolves the canary token back to
+the payload it was embedded in. Figures below come from
+`GET /api/v1/intelligence/attack-prevalence`. That endpoint reports a **rolling 30-day
+window**, so every absolute count here is a snapshot that moves daily as fires age out —
+quote the endpoint, not this page, for a current number. Snapshot of 2026-07-28: roughly
+7,300 evidence records across roughly 7,100 distinct fires.
 
-**How it is attributed.** `agentpwn.com` is mapped to five technique classes (T-2001, T-2002,
-T-2003, T-2004, T-8002) because its trap pages cover those classes. Every qualifying
-interaction therefore produces one evidence row per mapped technique: 7,125 interactions
-become 35,625 evidence rows, and all five techniques report an identical count of 7,125.
+**How it is attributed.** Attribution is payload-level. A canary token is a deterministic
+hash of `(salt, category, tier, date)`, so it resolves to exactly one `(category, tier)`,
+which resolves to exactly one payload and one technique. One fire produces one evidence row.
+The 1:1 property is enforced by a unique index on the `(category, tier)` join key, not merely
+observed to hold — a duplicate mapping would fan a single fire across several techniques,
+which is the failure mode the constraint exists to prevent.
 
-**The consequence, stated plainly.** Those are not five independent measurements. They are
-one population of 7,125 agent-follow events, counted five ways. A reader who takes
-"T-2004: 7,125" as 7,125 confirmed context-window exploitations would be wrong. The honest
-reading is: 7,125 agents followed an injection on a site whose traps span these five classes.
+This replaced an earlier site-level scheme in which `agentpwn.com` was mapped to five
+technique classes and every qualifying interaction wrote one row per mapped technique. Under
+that scheme 7,125 interactions became 35,625 rows and all five techniques reported an
+identical 7,125 — one population counted five ways. Two things distinguish the current
+scheme, and both are stable properties rather than snapshot figures: the row-to-fire ratio is
+about **1.03**, not 5.00, and the per-technique counts are **differentiated** rather than
+identical. On the 2026-07-28 snapshot the leaders were T-2007 805, T-2001 762, T-2003 615,
+T-2006 501, T-4007 422, T-6004 407, T-2004 328, T-8002 315, across 26 techniques.
+
+**What a fire does not prove.** A canary fetch records that a client followed an embedded
+link. It is not, by itself, proof that an *agent* obeyed an *injection*:
+
+- **Client type is not currently gated.** The evidence rows are written without filtering on
+  the client classification, even though that classification is captured and stored
+  (`llm_agent`, `llm_crawler`, `browser`, `scanner`, `http_client`, `sdk_client`, `unknown`,
+  each at `verified` or `claimed` confidence). A crawler indexing a trap page and an agent
+  obeying its injection both land in the count. The current mix is unmeasured and should not
+  be assumed.
+- **Confidence is asymmetric.** `verified` means the source IP fell inside an LLM provider's
+  published egress range, which the caller cannot forge. `claimed` means the User-Agent said
+  so, which it can. Only the former should carry weight.
+- **Tokens can be replayed.** A canary URL is public once fetched, so a count is a
+  directional prevalence signal, not a tamper-proof tally.
+- **Recovered history has a hard ceiling.** Fires predating the client-classification columns
+  can be retro-classified only from the stored User-Agent, at `claimed` confidence. The raw
+  IP is deliberately never retained, so `verified` classification is permanently unavailable
+  for those rows.
 
 **Why no evidence tier was upgraded on this basis.** T-2004 (Context Window Exploitation) and
-T-8002 (HTTP Callback) remain VALIDATED, not OBSERVED, despite carrying thousands of rows
-each. Site-level attribution cannot establish that any individual agent performed *that*
-technique, and this audit's OBSERVED tier means confirmation of the specific behaviour in a
-real-world system. Promoting a tier on fan-out counts would manufacture precision the
-measurement does not have. These tiers move when payload-level attribution — mapping a
-specific fired canary to the specific injection class it carried — is in place, which is
-tracked separately.
+T-8002 (HTTP Callback) remain VALIDATED rather than OBSERVED. Payload-level attribution
+removed the original objection — a count is no longer one population counted five ways — but
+OBSERVED means the specific behaviour was confirmed in a real-world system, and an ungated
+fetch count cannot separate an agent that obeyed an injection from a crawler that followed a
+link. Promoting a tier on volume alone would reproduce the old error in a subtler form.
 
-**Reading the index correctly.** Treat the per-technique number as prevalence of the
-*class of trap* an agent engaged with, not as a per-technique incident count, until
-attribution granularity improves. The count of distinct interactions, not the sum of
-evidence rows, is the population size.
+What each technique still needs is different:
+
+- **T-8002 (HTTP Callback)** is the nearer case. A fetch by a client verifiably inside a
+  provider's egress range *is* an outbound callback to an attacker-designated URL. Once the
+  evidence is gated on a verified agent classification, the surviving count supports OBSERVED
+  on its merits rather than on its size.
+- **T-2004 (Context Window Exploitation)** needs more than a gated fetch. A fire shows an
+  agent followed a link embedded in a context-dilution payload; it does not isolate dilution
+  as the cause, because there is no control arm. A tier-stratified comparison within the same
+  category — do higher-dilution tiers convert at a materially different rate than tier 1? —
+  would establish that the mechanism does measurable work.
+
+**Reading the index correctly.** Each per-technique number is a count of distinct canary
+fires attributed to one payload of that technique class, over the trailing 30 days, before
+client-type gating. Read it as prevalence of engagement with that technique's traps. Do not
+read it as a count of confirmed compromises, and do not sum evidence rows to get a population
+size — use the distinct-fire count.
