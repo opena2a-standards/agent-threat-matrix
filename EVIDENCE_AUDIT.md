@@ -205,46 +205,85 @@ the gap between those two statements is what this section exists to state.
 
 **What the telemetry is.** A trap page publishes an injection carrying a canary URL. When a
 client fetches that URL, the honeypot records the fetch and resolves the canary token back to
-the payload it was embedded in. Figures below come from
-`GET /api/v1/intelligence/attack-prevalence`. That endpoint reports a **rolling 30-day
-window**, so every absolute count here is a snapshot that moves daily as fires age out —
-quote the endpoint, not this page, for a current number. Snapshot of 2026-07-28: roughly
-7,300 evidence records across roughly 7,100 distinct fires.
+the payload it was embedded in.
 
-**How it is attributed.** Attribution is payload-level. A canary token is a deterministic
-hash of `(salt, category, tier, date)`, so it resolves to exactly one `(category, tier)`,
-which resolves to exactly one payload and one technique. One fire produces one evidence row.
-The 1:1 property is enforced by a unique index on the `(category, tier)` join key, not merely
-observed to hold — a duplicate mapping would fan a single fire across several techniques,
-which is the failure mode the constraint exists to prevent.
+Two different figures appear below and they are not interchangeable. Published counts come
+from `GET /api/v1/intelligence/attack-prevalence`, which reports a **rolling 30-day window**
+— those move daily as fires age out, so quote the endpoint, not this page, for a current
+number (a 2026-07-28 pull gave roughly 7,300 evidence records over roughly 7,100 distinct
+fires). Structural figures — ratios, mix percentages, per-classifier totals — are measured
+directly against the full evidence corpus on the stated date and are cited because the
+*proportions* are stable, not because the absolutes are.
+
+**How it is attributed.** Attribution is payload-level *when the token carries a tier*. A
+canary token is a deterministic hash of `(salt, category, tier, date)`, so it resolves to one
+`(category, tier)`, which resolves to one payload and one technique. That path is genuinely
+1:1 and the property is enforced, not merely observed: a partial unique index on
+`(category, tier) WHERE tier IS NOT NULL` makes a duplicate mapping unrepresentable.
+Measured 2026-07-28, it holds exactly — 10,970 rows across 10,970 distinct fires, ratio
+1.000, spanning 26 techniques.
 
 This replaced an earlier site-level scheme in which `agentpwn.com` was mapped to five
 technique classes and every qualifying interaction wrote one row per mapped technique. Under
 that scheme 7,125 interactions became 35,625 rows and all five techniques reported an
-identical 7,125 — one population counted five ways. Two things distinguish the current
-scheme, and both are stable properties rather than snapshot figures: the row-to-fire ratio is
-about **1.03**, not 5.00, and the per-technique counts are **differentiated** rather than
-identical. On the 2026-07-28 snapshot the leaders were T-2007 805, T-2001 762, T-2003 615,
-T-2006 501, T-4007 422, T-6004 407, T-2004 328, T-8002 315, across 26 techniques.
+identical 7,125 — one population counted five ways.
+
+**That fan-out is not fully gone, and the residue should be read as a known defect.** Some
+lures are hand-slugged rather than hashed (`browser-verify`, `tool-*`, `trap-ci`,
+`cred-verify`, `badge`, `loop-test`). These resolve to a category but to no tier, so they
+fall outside the partial index and the writer falls back to a category-only lookup — which
+matches *every* technique that category maps to. Measured 2026-07-28: 121 such fires produced
+382 rows, a ratio of **3.157**, across 9 techniques.
+
+| Category | Fires | Rows | Ratio | Techniques |
+|---|---|---|---|---|
+| mcp-exploitation | 99 | 297 | 3.00 | T-1002, T-2005, T-4007 |
+| data-exfiltration | 19 | 76 | 4.00 | T-1003, T-3001, T-7004, T-8002 |
+| tool-shadow | 3 | 9 | 3.00 | T-4007, T-8004, T-9002 |
+
+So the blended row-to-fire ratio is about **1.02**, not 5.00 and not 1.00: 96.6% of rows are
+1:1, and the remaining 3.4% reproduce the original error at small scale. Do not read a
+per-technique count as a fire count without subtracting this class. The per-technique counts
+are otherwise **differentiated** rather than identical — one 2026-07-28 pull gave T-2007 800,
+T-2001 754, T-2003 615, T-2006 498, T-4007 418, T-6004 405, T-2004 330, T-8002 314 across 26
+techniques (these drift between pulls; the differentiation is the durable claim, not the
+digits).
 
 **What a fire does not prove.** A canary fetch records that a client followed an embedded
 link. It is not, by itself, proof that an *agent* obeyed an *injection*:
 
-- **Client type is not currently gated.** The evidence rows are written without filtering on
-  the client classification, even though that classification is captured and stored
-  (`llm_agent`, `llm_crawler`, `browser`, `scanner`, `http_client`, `sdk_client`, `unknown`,
-  each at `verified` or `claimed` confidence). A crawler indexing a trap page and an agent
-  obeying its injection both land in the count. The current mix is unmeasured and should not
-  be assumed.
-- **Confidence is asymmetric.** `verified` means the source IP fell inside an LLM provider's
-  published egress range, which the caller cannot forge. `claimed` means the User-Agent said
-  so, which it can. Only the former should carry weight.
+- **No client-type filter is applied at write time, and that is a deliberate decision rather
+  than an omission.** Five successive filters were built on this path and all five were
+  withdrawn as evasion primitives: User-Agent substring; `agent_type` (derived from the UA,
+  so the same defect one layer up); reverse DNS (resolved without forward confirmation, so a
+  VPS PTR record defeats it); source ASN (AS8075 is Azure and AS15169 is Google Cloud, so a
+  free-tier VM buys entry to "Bingbot's" ASN — and OpenAI publishes GPTBot egress inside
+  Azure space, so genuine GPTBot would have been excluded *as* Bingbot); and a canary-token
+  validity check believed to be a server-side HMAC, which on inspection tests only
+  `startsWith("apwn_") && length === 21` — a pure function of the URL the client requested.
+  Every one of these keys on something the client chooses, so each would have let an agent
+  delete its own evidence rather than remove noise. Crawlers are therefore **counted and
+  disclosed**, not filtered: over-counting a crawler is visible in the published client mix,
+  whereas suppressing an agent is invisible by construction.
+- **The classification that exists is almost entirely absent or spoofable.** The schema
+  admits `llm_agent`, `llm_crawler`, `browser`, `scanner`, `http_client`, `sdk_client` and
+  `unknown`, each at `verified` or `claimed` confidence. What is actually recorded is far
+  narrower. Measured 2026-07-28 over the 11,093 distinct fires behind the evidence corpus:
+  **80.5% unclassified**, 19.0% `browser/claimed`, 0.5% `llm_crawler/claimed`. Across every
+  interaction the honeypot has ever recorded — over 420,000 by that date, and still climbing —
+  `agent_type` has taken only three values: null, `browser` and `llm_crawler`. **`llm_agent`
+  has never been written once, and no interaction has ever reached `verified` confidence.**
+  Those two counts are exactly zero, not merely small. So the rule "only
+  `verified` should carry weight" currently resolves to "nothing carries weight", and the
+  index contains no fire that the honeypot itself classified as an agent.
+- **`browser` is a fallback, not a positive identification.** The classifier returns it
+  whenever the fingerprint looks human, so declared search and SEO crawlers land inside it.
 - **Tokens can be replayed.** A canary URL is public once fetched, so a count is a
   directional prevalence signal, not a tamper-proof tally.
 - **Recovered history has a hard ceiling.** Fires predating the client-classification columns
   can be retro-classified only from the stored User-Agent, at `claimed` confidence. The raw
   IP is deliberately never retained, so `verified` classification is permanently unavailable
-  for those rows.
+  for those rows — which is most of the corpus.
 
 **Why no evidence tier was upgraded on this basis.** T-2004 (Context Window Exploitation) and
 T-8002 (HTTP Callback) remain VALIDATED rather than OBSERVED. Payload-level attribution
@@ -253,20 +292,75 @@ OBSERVED means the specific behaviour was confirmed in a real-world system, and 
 fetch count cannot separate an agent that obeyed an injection from a crawler that followed a
 link. Promoting a tier on volume alone would reproduce the old error in a subtler form.
 
-What each technique still needs is different:
+Both techniques were then reassessed individually, against measurement rather than argument.
+Neither reassessment supports a promotion, and each fails for a different reason.
 
-- **T-8002 (HTTP Callback)** is the nearer case. A fetch by a client verifiably inside a
-  provider's egress range *is* an outbound callback to an attacker-designated URL. Once the
-  evidence is gated on a verified agent classification, the surviving count supports OBSERVED
-  on its merits rather than on its size.
-- **T-2004 (Context Window Exploitation)** needs more than a gated fetch. A fire shows an
-  agent followed a link embedded in a context-dilution payload; it does not isolate dilution
-  as the cause, because there is no control arm. A tier-stratified comparison within the same
-  category — do higher-dilution tiers convert at a materially different rate than tier 1? —
-  would establish that the mechanism does measurable work.
+**T-8002 (HTTP Callback): the channel that would justify OBSERVED is empty.** A callback is
+structurally the strongest signal the honeypot can collect — an outbound request to a URL
+that only the injected payload named, which is the technique's definition rather than a proxy
+for it. It is also not what T-8002's evidence is made of. Measured 2026-07-28, all 488
+T-8002 rows are canary fetches (469 payload-attributed, 19 from the category fan-out
+described above); **none is a callback.** The `payload_callback` event has fired **four times
+in the honeypot's lifetime**, against roughly 389,000 page visits and 11,296 canary fires:
 
-**Reading the index correctly.** Each per-technique number is a count of distinct canary
-fires attributed to one payload of that technique class, over the trailing 30 days, before
-client-type gating. Read it as prevalence of engagement with that technique's traps. Do not
-read it as a count of confirmed compromises, and do not sum evidence rows to get a population
-size — use the distinct-fire count.
+| Date | Category | Attack ID | User-Agent |
+|---|---|---|---|
+| 2026-03-27 | verification | VERIFY-001 | (none) |
+| 2026-03-27 | prompt-injection | APWN-PI-001 | (none) |
+| 2026-03-27 | prompt-injection | APWN-PI-003 | (none) |
+| 2026-07-07 | file-fetch | APWN-SMOKE-VERIFY | curl/8.7.1 |
+
+Three are first-day bring-up events and the fourth is our own smoke test. None is attributable
+to a third-party agent, and none produced a T-8002 row. T-8002 is therefore *further* from
+OBSERVED than its 488-row count suggests, not nearer: the count rests entirely on the
+ambiguous channel while the unambiguous one has no real-world observation at all.
+
+**T-2004 (Context Window Exploitation): the comparison cannot be computed, and that is the
+finding.** The objection to promoting T-2004 was that a fire shows an agent followed a link
+embedded in a context-dilution payload without isolating dilution as the cause. Settling that
+needs a conversion rate — fires over exposures — and **the honeypot records fires but never
+records exposures.** No serve or impression counter is kept per `(category, tier)`. The
+`page_visit` stream cannot substitute: it registers 114 `context-window` visits against 993
+`context-window` fires, so it is not the population the fires came from. Every other quantity
+derivable from the fire log — distinct tokens, active days, token-days — is itself a function
+of firing, so any rate built on one is circular.
+
+Two things can still be stated, and neither supports a promotion:
+
+- **Raw per-tier fire counts show no monotonic relationship with dilution.** `context-window`
+  tiers 1 through 5 recorded 253, 191, 221, 143 and 185 fires. The least-diluted arm fires
+  most, which is the wrong direction for the mechanism.
+- **Firing intensity is flat.** Measured as fires per token-day — the one normalisation not
+  confounded by how long a token stays in circulation — `context-window` runs 1.10, 1.09,
+  1.12, 1.07, 1.09 across tiers 1 to 5. Site-wide the quantity is very nearly a constant:
+  across all 48 `(category, tier)` cells it spans 1.07 to 1.18, median 1.13, standard
+  deviation 0.023. The `context-window` tiers sit inside that band and are unordered with
+  respect to tier. A dilution effect would have to appear as a tier-dependent departure from
+  the constant. None does.
+
+An earlier draft of this analysis normalised fires by distinct *token* rather than token-day
+and reported a tier gradient with a negative rank correlation. That metric was confounded and
+the conclusion drawn from it was wrong: a token's fire count is largely a function of how many
+days it remained in circulation (3.1 to 4.2 days on average, varying by tier), so the metric
+measured token longevity and not conversion. The gradient vanishes under the corrected
+normalisation. It is recorded here because the same mistake is easy to repeat against this
+dataset — any denominator taken from the fire log encodes the firing it is meant to normalise.
+
+What would still move each tier: for T-8002, real third-party callbacks, which need the
+channel to be exercised rather than analysed; for T-2004, a serve-side counter incrementing
+per `(category, tier)` whenever a payload is rendered, which is the missing denominator and a
+change to the honeypot rather than to this matrix. For both, a client signal the caller cannot
+choose. Two such signals are within reach in the honeypot and neither has yet reached the
+registry, so both would qualify zero rows today, which is the honest state:
+`attribution_confidence == "verified"` set by matching the source address against providers'
+*published* egress ranges, and forward-confirmed reverse DNS, which exists in the honeypot but
+is not threaded into telemetry.
+
+**Reading the index correctly.** Each per-technique number counts canary fires attributed to a
+payload of that technique class over the trailing 30 days, with no client-type filtering at
+any stage. Read it as prevalence of engagement with that technique's traps. Do not read it as
+a count of confirmed compromises; do not read it as a count of agents, since no row in it has
+ever been classified as one; and do not sum evidence rows to get a population size, because
+the 3.4% category-fan-out class counts one fire three or four times — use the distinct-fire
+count. The live response carries its own `clientMix` block and caveat stating these limits;
+that block, not this page, is the current figure.
