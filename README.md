@@ -10,7 +10,7 @@ A structured framework for classifying, detecting, and defending against attacks
 
 AI agents operate differently from traditional software. They make decisions based on natural language, delegate actions to tools with varying trust levels, communicate with other agents via open protocols, and maintain persistent memory that can be poisoned. These properties create attack surfaces that existing frameworks do not adequately model.
 
-The **AI Agent Threat Matrix** classifies attacks against AI agent systems into 9 tactics and 61 techniques, organized by kill chain stage. Every technique is grounded in observed adversary behavior or validated in a controlled lab environment. Every technique maps to automated detection, a reproducible lab scenario, and a defensive control.
+The **AI Agent Threat Matrix** classifies attacks against AI agent systems into 9 tactics and 61 techniques, organized by kill chain stage. Every technique carries an explicit evidence tier: observed in the wild, validated in a controlled lab environment, or adapted from a traditional environment and marked as such. Every technique maps to automated detection and a defensive control; 60 of the 61 also carry a reproducible lab scenario.
 
 ### What This Covers (and What It Doesn't)
 
