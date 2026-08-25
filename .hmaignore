@@ -1,0 +1,23 @@
+# This repository IS a threat-taxonomy corpus: every technique, attack class and
+# evidence note DESCRIBES an attack, so HMA's regex secret/pattern detectors fire
+# on the descriptive text itself. matrix.json:20, for example, is the
+# credential-harvest tactic description ("Extract API keys, tokens, and
+# credentials from agent context and connected services") — a definition of the
+# attack, not a hardcoded secret. The data is public, machine-curated taxonomy
+# and contains no credentials by construction.
+#
+# Same rationale as opena2a-registry/.hmaignore ("HMA's regex-based detector
+# fires on security docs that describe attack patterns"). Scope is the taxonomy
+# content only; scripts/ stays in scope so a real secret in maintenance code is
+# still caught.
+matrix.json
+README.md
+CHANGELOG.md
+CONTRIBUTING.md
+EVIDENCE_AUDIT.md
+attack-classes/
+techniques/
+tactics/
+cross-references/
+mitigations/
+evidence/

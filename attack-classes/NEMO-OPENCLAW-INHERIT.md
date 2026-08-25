@@ -1,6 +1,5 @@
 # NemoClaw OpenClaw Inheritance (NEMO-OPENCLAW-INHERIT)
 
-**Severity:** Medium
 **Category:** nemoclaw
 
 ## Description
@@ -11,6 +10,7 @@ Inherited OpenClaw flaws that survive NemoClaw sandboxing — heartbeat persiste
 
 | ID | Name | Tactic |
 |----|------|--------|
+| [T-1001](../techniques/T-1001.md) | Endpoint Enumeration | Reconnaissance |
 
 ## Detection
 

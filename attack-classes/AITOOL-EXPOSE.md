@@ -1,6 +1,5 @@
 # AI Tool Exposure (AITOOL-EXPOSE)
 
-**Severity:** Medium
 **Category:** infrastructure
 
 ## Description
@@ -11,6 +10,9 @@ AI development tools (Jupyter, MLflow, Gradio, Streamlit) exposed without authen
 
 | ID | Name | Tactic |
 |----|------|--------|
+| [T-1001](../techniques/T-1001.md) | Endpoint Enumeration | Reconnaissance |
+| [T-1004](../techniques/T-1004.md) | Security Level Probing | Reconnaissance |
+| [T-1005](../techniques/T-1005.md) | Capability Mapping | Reconnaissance |
 
 ## Detection
 

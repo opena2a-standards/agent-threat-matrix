@@ -1,6 +1,5 @@
 # Skill Memory Amplification (SKILL-MEM-AMP)
 
-**Severity:** Medium
 **Category:** supply-chain
 
 ## Description
@@ -11,6 +10,7 @@ Skill plants payload in agent memory that survives skill uninstall — cross-ses
 
 | ID | Name | Tactic |
 |----|------|--------|
+| [T-3004](../techniques/T-3004.md) | Memory Credential Mining | Credential Harvest |
 
 ## Detection
 

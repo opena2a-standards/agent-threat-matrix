@@ -1,6 +1,5 @@
 # Phantom Soul (PHANTOM-SOUL)
 
-**Severity:** Medium
 **Category:** governance
 
 ## Description
@@ -11,6 +10,7 @@ Agent deployed with zero behavioral constraints — no SOUL.md, no system prompt
 
 | ID | Name | Tactic |
 |----|------|--------|
+| [T-1006](../techniques/T-1006.md) | Agent Card Discovery | Reconnaissance |
 
 ## Detection
 

@@ -1,6 +1,5 @@
 # TOCTOU Race Condition (TOCTOU-RACE)
 
-**Severity:** Medium
 **Category:** infrastructure
 
 ## Description
@@ -11,6 +10,7 @@ Time-of-check-time-of-use race between verification and execution — swap windo
 
 | ID | Name | Tactic |
 |----|------|--------|
+| [T-9001](../techniques/T-9001.md) | Data Manipulation | Impact |
 
 ## Detection
 

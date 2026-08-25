@@ -1,6 +1,6 @@
-# OWASP Top 10 for LLM Applications (2025) -- Agent Threat Matrix Mapping
+# OWASP Top 10 for LLM Applications (2023) -- Agent Threat Matrix Mapping
 
-This document maps the [OWASP Top 10 for LLM Applications (2025)](https://owasp.org/www-project-top-10-for-large-language-model-applications/) to techniques in the AI Agent Threat Matrix (ATM). The purpose is not to suggest OWASP is incomplete -- it covers what it was designed to cover. The purpose is to show where OWASP's scope ends and the agent layer begins.
+This document maps the [OWASP Top 10 for LLM Applications (2023 edition)](https://owasp.org/www-project-top-10-for-large-language-model-applications/) to techniques in the AI Agent Threat Matrix (ATM). The purpose is not to suggest OWASP is incomplete -- it covers what it was designed to cover. The purpose is to show where OWASP's scope ends and the agent layer begins. A re-map to the 2025 edition, which reorganized the categories, is tracked as separate work.
 
 OWASP LLM Top 10 focuses on **LLM application security** -- the model, its inputs, its outputs, and its immediate integration surface. The Agent Threat Matrix focuses on **agent infrastructure** -- governance files, multi-agent protocols, skill supply chains, memory systems, and sandbox boundaries. The two frameworks are complementary.
 
@@ -121,9 +121,9 @@ The following attack classes are entirely outside OWASP LLM scope:
 
 | Metric | Count |
 |--------|-------|
-| Total ATM techniques | 57 |
+| Total ATM techniques | 61 |
 | Partially overlapping with OWASP LLM | ~25 |
-| Not covered by any OWASP LLM item | ~32 |
+| Not covered by any OWASP LLM item | ~36 |
 | OWASP items with no ATM overlap (model-layer) | 3 (LLM03, LLM04, LLM10) |
 
-The 32 techniques outside OWASP scope represent the agent infrastructure layer: governance manipulation, multi-agent protocol exploitation, memory persistence, skill supply chain attacks, sandbox escapes, and agent identity abuse. These are the attack surfaces that emerge when an LLM is embedded in an autonomous agent system with tools, memory, and inter-agent communication.
+The techniques outside OWASP scope represent the agent infrastructure layer: governance manipulation, multi-agent protocol exploitation, memory persistence, skill supply chain attacks, sandbox escapes, and agent identity abuse. These are the attack surfaces that emerge when an LLM is embedded in an autonomous agent system with tools, memory, and inter-agent communication.
