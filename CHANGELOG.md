@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- OASB control mappings for T-9001, T-9003, T-9004 and T-9005 re-derived from the full control text of the shipped 46-control OASB-1 set (Chief Architect review, 2026-08-25). Three name-match mappings were wrong (6.2 and 8.1 on T-9001 are component and conversation integrity, not data integrity; 7.4 on T-9005 is agent-to-agent logging, not output attribution) and two text-verified controls were missing (6.3 on T-9003, whose audit names the technique's own HEARTBEAT checks; 7.2 on T-9004). T-9001 is now 2.2, 2.3, 4.1, 4.2, 10.5; T-9003 adds 6.3; T-9004 adds 7.2; T-9005 is now 4.1, 4.4, 10.1, 10.2.
+- Technique pages: the `Attack Class` and `OASB Controls` lines are now derived from matrix.json (`scripts/check_technique_pages.py`, enforced in CI). Six pages still cited OASB 11.1-11.4, which do not exist in the shipped set; four pages carried a superseded attack class.
+
 ## v1.1 — 2026-06-04
 
 ### Added
