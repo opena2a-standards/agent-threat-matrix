@@ -1137,9 +1137,10 @@
       ],
       "dvaaValidation": "ToolBot write_file, DataBot SQL",
       "oasbControls": [
+        "2.2",
+        "2.3",
         "4.1",
-        "6.2",
-        "8.1",
+        "4.2",
         "10.5"
       ]
     },
@@ -1177,6 +1178,7 @@
       "oasbControls": [
         "6.1",
         "6.2",
+        "6.3",
         "9.1",
         "9.4",
         "10.3"
@@ -1195,6 +1197,7 @@
       "dvaaValidation": "consensus-manipulation",
       "oasbControls": [
         "7.1",
+        "7.2",
         "7.3",
         "10.2"
       ]
@@ -1211,7 +1214,8 @@
       ],
       "dvaaValidation": "malicious output generation",
       "oasbControls": [
-        "7.4",
+        "4.1",
+        "4.4",
         "10.1",
         "10.2"
       ]

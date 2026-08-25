@@ -31,6 +31,12 @@ jobs:
       - name: README claims match matrix.json
         run: python3 scripts/check_readme_claims.py
 
+      # The per-technique pages repeat two matrix.json fields (attack class, OASB
+      # controls) as prose. Both cited nonexistent OASB controls for five months,
+      # and correcting the data left the pages behind; keep them derived.
+      - name: Technique pages match matrix.json
+        run: python3 scripts/check_technique_pages.py
+
   live-api-drift:
     # The registry serves this matrix at api.oa2a.org and threats.opena2a.org
     # renders that payload. Version bumps originate HERE, so this is where the
