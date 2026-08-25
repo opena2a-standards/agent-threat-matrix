@@ -1,6 +1,5 @@
 # RAG Poisoning (RAG-POISON)
 
-**Severity:** Medium
 **Category:** supply-chain
 
 ## Description
@@ -11,8 +10,8 @@ Injecting malicious content into retrieval-augmented generation data sources
 
 | ID | Name | Tactic |
 |----|------|--------|
-| [T-2002](../techniques/T-2002.md) | Indirect Prompt Injection | initial-access |
-| [T-7006](../techniques/T-7006.md) | PII Discovery | collection |
+| [T-2002](../techniques/T-2002.md) | Indirect Prompt Injection | Initial Access |
+| [T-7006](../techniques/T-7006.md) | PII Discovery | Collection |
 
 ## Detection
 

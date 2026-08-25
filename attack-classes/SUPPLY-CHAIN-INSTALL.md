@@ -1,6 +1,5 @@
 # Supply Chain Install Attack (SUPPLY-CHAIN-INSTALL)
 
-**Severity:** Medium
 **Category:** supply-chain
 
 ## Description
@@ -11,6 +10,7 @@ Unsigned installation scripts executed without integrity verification — curl|s
 
 | ID | Name | Tactic |
 |----|------|--------|
+| [T-9003](../techniques/T-9003.md) | Malicious Code Deployment | Impact |
 
 ## Detection
 

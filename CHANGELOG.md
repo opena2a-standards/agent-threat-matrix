@@ -24,7 +24,7 @@
 
 - 9 tactics (kill chain stages)
 - 57 techniques with evidence classification
-- 34 attack classes
+- 36 attack classes
 - 4 documented attack paths
 - Cross-reference mappings to MITRE ATT&CK, MITRE ATLAS, and OWASP Top 10 for LLM
 - Gap analysis showing agent-layer coverage not addressed by existing frameworks

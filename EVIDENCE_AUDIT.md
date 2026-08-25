@@ -34,7 +34,7 @@ These three tier names are the ones that ship: `evidenceTier` in `matrix.json` t
 
 ---
 
-## Stage 2: Initial Access (8 Techniques)
+## Stage 2: Initial Access (9 Techniques)
 
 | ID | Technique | Evidence Tier | Justification |
 |----|-----------|--------------|---------------|
@@ -67,7 +67,7 @@ These three tier names are the ones that ship: `evidenceTier` in `matrix.json` t
 
 ---
 
-## Stage 4: Privilege Escalation (6 Techniques)
+## Stage 4: Privilege Escalation (7 Techniques)
 
 | ID | Technique | Evidence Tier | Justification |
 |----|-----------|--------------|---------------|
@@ -98,7 +98,7 @@ These three tier names are the ones that ship: `evidenceTier` in `matrix.json` t
 
 ---
 
-## Stage 6: Persistence (6 Techniques)
+## Stage 6: Persistence (7 Techniques)
 
 | ID | Technique | Evidence Tier | Justification |
 |----|-----------|--------------|---------------|
@@ -114,7 +114,7 @@ These three tier names are the ones that ship: `evidenceTier` in `matrix.json` t
 
 ---
 
-## Stage 7: Collection (6 Techniques)
+## Stage 7: Collection (7 Techniques)
 
 | ID | Technique | Evidence Tier | Justification |
 |----|-----------|--------------|---------------|

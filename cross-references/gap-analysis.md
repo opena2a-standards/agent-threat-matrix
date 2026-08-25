@@ -6,13 +6,16 @@ This document identifies the techniques in the AI Agent Threat Matrix (ATM) that
 
 ## Coverage Summary
 
+This page compares against the OWASP Top 10 for LLM Applications (2023 edition);
+a re-map to the 2025 edition is tracked separately.
+
 | Metric | Value |
 |--------|-------|
-| Total ATM techniques | 57 |
+| Total ATM techniques | 61 |
 | Partially covered by OWASP LLM Top 10 | ~25 |
 | Partially covered by MITRE ATLAS | ~20 |
 | Partially covered by at least one framework | ~30 |
-| **Not covered by either OWASP or ATLAS** | **~27** |
+| **Not covered by either OWASP or ATLAS** | **~31** |
 
 "Partially covered" means the existing framework addresses the general vulnerability class but not the agent-specific attack vector, detection method, or kill chain context that ATM provides.
 
@@ -20,7 +23,7 @@ This document identifies the techniques in the AI Agent Threat Matrix (ATM) that
 
 ## Techniques Not Covered by Either Framework
 
-These 27 techniques exist at the agent infrastructure layer -- between the model (ATLAS) and the application input/output (OWASP). They arise from properties unique to AI agent systems: governance files, persistent memory, tool ecosystems, multi-agent protocols, and sandbox boundaries.
+These techniques exist at the agent infrastructure layer -- between the model (ATLAS) and the application input/output (OWASP). They arise from properties unique to AI agent systems: governance files, persistent memory, tool ecosystems, multi-agent protocols, and sandbox boundaries.
 
 ### Reconnaissance
 
@@ -31,12 +34,19 @@ These 27 techniques exist at the agent infrastructure layer -- between the model
 | T-1006 | Agent Card Discovery | Discover agent capabilities via A2A protocol (/.well-known/agent.json) | Multi-agent protocol recon. A2A is a new protocol surface neither framework addresses. |
 | T-1007 | Context Window Probing | Measure an agent's token budget to plan context overflow attacks | Agent memory architecture recon. Context windows are an agent-specific constraint. |
 
+### Initial Access
+
+| ID | Technique | Description | Why It Falls in the Gap |
+|----|-----------|-------------|------------------------|
+| T-2009 | Parser Differential Exploitation | Exploit differences in how parsers (JSON, YAML, markdown) interpret the same input | Adjacent to OWASP LLM01 (prompt injection) but distinct: the attack targets parser disagreement, not the prompt. Flagged for review in a 2025 OWASP re-map. |
+
 ### Privilege Escalation
 
 | ID | Technique | Description | Why It Falls in the Gap |
 |----|-----------|-------------|------------------------|
 | T-4005 | Policy Bypass via Encoding | Use Unicode steganography to bypass regex-based governance filters | Governance enforcement bypass. Neither framework models natural language policy filters. |
 | T-4006 | Safety Instruction Displacement | Push safety instructions out of active context window via token flooding | Agent memory architecture attack. Context window management is agent-specific. |
+| T-4007 | Tool Impersonation and Squatting | Impersonate, shadow, or squat on legitimate MCP tools to intercept agent actions | Adjacent to OWASP LLM07 (insecure plugin design) but distinct: MCP tool identity and squatting are an agent tool-ecosystem surface. Flagged for review in a 2025 OWASP re-map. |
 
 ### Lateral Movement
 
@@ -57,6 +67,7 @@ These 27 techniques exist at the agent infrastructure layer -- between the model
 | T-6003 | Configuration Modification | Modify agent gateway or runtime configuration for persistent access | Agent infrastructure persistence. Traditional config modification exists in ATT&CK but not for agent gateways. |
 | T-6005 | Scheduled Task Injection | Inject instructions into heartbeat or periodic callback mechanisms | Agent heartbeat persistence. OpenClaw/NemoClaw heartbeat mechanism is agent-specific. |
 | T-6006 | Tool Registration Persistence | Register malicious tool in agent's tool catalog that persists across sessions | Agent tool ecosystem persistence. No equivalent in OWASP or ATLAS. |
+| T-6007 | Persistent Agent State Manipulation | Persist across sessions via memory poisoning, state tampering, and cached-context injection | Cross-session agent state persistence. Neither framework has a persistence concept for agent memory or cached context. |
 
 ### Collection
 
@@ -65,6 +76,7 @@ These 27 techniques exist at the agent infrastructure layer -- between the model
 | T-7002 | Database Extraction | Agent-initiated SQL injection for data collection | Agent SQL tool abuse. The agent's authorized database access creates a unique collection vector. |
 | T-7003 | API Data Harvesting | Use agent's authenticated API access to harvest data from connected services | Agent API scope abuse. Agents hold credentials for multiple services simultaneously. |
 | T-7004 | Memory Dump | Enumerate all entries in agent memory store | Agent memory as collection target. No equivalent in OWASP or ATLAS. |
+| T-7007 | Context Assembly Pipeline Attack | Target the system-prompt assembly pipeline where components combine into an exploitable prompt | Agent prompt-assembly surface. Neither framework models the component pipeline that builds an agent's context. |
 
 ### Exfiltration
 

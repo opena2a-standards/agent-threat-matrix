@@ -1,6 +1,5 @@
 # LLM Inference Exposure (LLM-EXPOSE)
 
-**Severity:** Medium
 **Category:** infrastructure
 
 ## Description
@@ -11,6 +10,8 @@ LLM inference endpoints exposed without authentication — allows arbitrary prom
 
 | ID | Name | Tactic |
 |----|------|--------|
+| [T-1001](../techniques/T-1001.md) | Endpoint Enumeration | Reconnaissance |
+| [T-1004](../techniques/T-1004.md) | Security Level Probing | Reconnaissance |
 
 ## Detection
 

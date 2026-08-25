@@ -154,10 +154,10 @@
       "tactic": "reconnaissance",
       "description": "Discover A2A agent cards to map agent identities, capabilities, and trust relationships",
       "evidenceTier": "observed",
-      "attackClass": "AGENT-IMPERSONATE",
+      "attackClass": "A2A-EXPOSE",
       "hmaChecks": [
-        "AIM-001",
-        "AIM-002"
+        "A2A-001",
+        "A2A-002"
       ],
       "dvaaValidation": "Orchestrator /a2a/agent-card",
       "oasbControls": [
@@ -633,10 +633,10 @@
       "tactic": "lateral-movement",
       "description": "Pivot from a compromised agent to other agents via A2A protocol connections",
       "evidenceTier": "validated",
-      "attackClass": "AGENT-IMPERSONATE",
+      "attackClass": "A2A-EXPOSE",
       "hmaChecks": [
-        "AIM-001",
-        "AIM-002"
+        "A2A-001",
+        "A2A-002"
       ],
       "dvaaValidation": "L4-02",
       "oasbControls": [
@@ -1137,15 +1137,10 @@
       ],
       "dvaaValidation": "ToolBot write_file, DataBot SQL",
       "oasbControls": [
-        "6.1",
+        "4.1",
         "6.2",
-        "6.3",
-        "6.4",
-        "6.5",
-        "11.1",
-        "11.2",
-        "11.3",
-        "11.4"
+        "8.1",
+        "10.5"
       ]
     },
     {
@@ -1154,21 +1149,17 @@
       "tactic": "impact",
       "description": "Disrupt agent services through resource exhaustion, infinite loops, or configuration corruption",
       "evidenceTier": "validated",
-      "attackClass": "NEMO-SUPPLY-CHAIN",
+      "attackClass": "ORG-SKILL-SPREAD",
       "hmaChecks": [
         "SUPPLY-001"
       ],
       "dvaaValidation": "resource exhaustion",
       "oasbControls": [
-        "6.1",
-        "6.2",
-        "6.3",
-        "6.4",
-        "6.5",
-        "11.1",
-        "11.2",
-        "11.3",
-        "11.4"
+        "9.2",
+        "9.4",
+        "10.2",
+        "10.3",
+        "10.5"
       ]
     },
     {
@@ -1186,13 +1177,9 @@
       "oasbControls": [
         "6.1",
         "6.2",
-        "6.3",
-        "6.4",
-        "6.5",
-        "11.1",
-        "11.2",
-        "11.3",
-        "11.4"
+        "9.1",
+        "9.4",
+        "10.3"
       ]
     },
     {
@@ -1207,15 +1194,9 @@
       ],
       "dvaaValidation": "consensus-manipulation",
       "oasbControls": [
-        "6.1",
-        "6.2",
-        "6.3",
-        "6.4",
-        "6.5",
-        "11.1",
-        "11.2",
-        "11.3",
-        "11.4"
+        "7.1",
+        "7.3",
+        "10.2"
       ]
     },
     {
@@ -1230,15 +1211,9 @@
       ],
       "dvaaValidation": "malicious output generation",
       "oasbControls": [
-        "6.1",
-        "6.2",
-        "6.3",
-        "6.4",
-        "6.5",
-        "11.1",
-        "11.2",
-        "11.3",
-        "11.4"
+        "7.4",
+        "10.1",
+        "10.2"
       ]
     },
     {
@@ -1247,7 +1222,7 @@
       "tactic": "impact",
       "description": "Compromise upstream dependencies, plugins, or MCP servers to affect all downstream agents",
       "evidenceTier": "observed",
-      "attackClass": "ORG-SKILL-SPREAD",
+      "attackClass": "NEMO-SUPPLY-CHAIN",
       "hmaChecks": [
         "SUPPLY-001",
         "SUPPLY-002",
@@ -1265,10 +1240,7 @@
         "6.3",
         "6.4",
         "6.5",
-        "11.1",
-        "11.2",
-        "11.3",
-        "11.4"
+        "10.5"
       ]
     },
     {
@@ -1386,7 +1358,8 @@
         "T-1006"
       ],
       "hmaChecks": [
-        "SOUL-OVERRIDE-001"
+        "SOUL-HB-001",
+        "SOUL-HB-002"
       ],
       "category": "governance"
     },
@@ -1398,7 +1371,8 @@
         "T-2008"
       ],
       "hmaChecks": [
-        "SOUL-OVERRIDE-001"
+        "SOUL-CB-001",
+        "SOUL-CB-002"
       ],
       "category": "governance"
     },
@@ -1411,7 +1385,8 @@
         "T-4001"
       ],
       "hmaChecks": [
-        "SOUL-OVERRIDE-001"
+        "SOUL-DH-001",
+        "SOUL-DH-002"
       ]
     },
     {
@@ -1424,7 +1399,8 @@
         "T-4006"
       ],
       "hmaChecks": [
-        "SOUL-OVERRIDE-001"
+        "SOUL-TH-003",
+        "SOUL-TH-004"
       ]
     },
     {
@@ -1435,7 +1411,11 @@
         "T-5002"
       ],
       "hmaChecks": [
-        "SOUL-OVERRIDE-001"
+        "CONFIG-006",
+        "SOUL-AS-001",
+        "SOUL-AS-002",
+        "SOUL-HT-001",
+        "SOUL-HT-002"
       ],
       "category": "governance"
     },
@@ -1448,7 +1428,8 @@
         "T-5002"
       ],
       "hmaChecks": [
-        "SOUL-OVERRIDE-001"
+        "SOUL-HO-001",
+        "SOUL-HO-002"
       ],
       "category": "governance"
     },
@@ -1461,7 +1442,10 @@
         "T-2003"
       ],
       "hmaChecks": [
-        "SOUL-OVERRIDE-001"
+        "SOUL-HV-001",
+        "SOUL-HV-002",
+        "SOUL-HV-003",
+        "SOUL-HV-004"
       ],
       "category": "governance"
     },
@@ -1473,7 +1457,7 @@
         "T-4002"
       ],
       "hmaChecks": [
-        "SOUL-OVERRIDE-001"
+        "SOUL-TH-005"
       ],
       "category": "governance"
     },
@@ -1490,12 +1474,30 @@
         "T-2008"
       ],
       "hmaChecks": [
-        "SOUL-OVERRIDE-001",
+        "CLAUDE-002",
+        "CLAUDE-003",
+        "CLAUDE-004",
+        "CLAUDE-006",
+        "CLAUDE-007",
+        "CONFIG-002",
+        "CONFIG-007",
         "PROMPT-001",
         "PROMPT-002",
         "PROMPT-003",
         "PROMPT-004",
-        "SOUL-OVERRIDE-001"
+        "SEM-INST-001",
+        "SEM-INST-002",
+        "SEM-INST-003",
+        "SEM-INST-004",
+        "SEM-PERM-001",
+        "SEM-PERM-002",
+        "SOUL-IH-001",
+        "SOUL-IH-002",
+        "SOUL-OVERRIDE-001",
+        "TOOL-001",
+        "TOOL-002",
+        "TOOL-003",
+        "TOOL-004"
       ]
     },
     {
@@ -1509,7 +1511,8 @@
         "T-2008"
       ],
       "hmaChecks": [
-        "SOUL-OVERRIDE-001"
+        "SOUL-TH-001",
+        "SOUL-TH-002"
       ],
       "category": "governance"
     },
@@ -1529,7 +1532,8 @@
         "HEARTBEAT-004",
         "HEARTBEAT-005",
         "HEARTBEAT-006",
-        "HEARTBEAT-007"
+        "SKILL-002",
+        "SKILL-003"
       ]
     },
     {
@@ -1545,6 +1549,8 @@
         "T-7004"
       ],
       "hmaChecks": [
+        "CLAUDE-005",
+        "CONFIG-005",
         "MEM-001",
         "MEM-002",
         "MEM-003",
@@ -1565,14 +1571,22 @@
         "T-9006"
       ],
       "hmaChecks": [
+        "CVE-001",
+        "CVE-002",
+        "CVE-003",
+        "CVE-004",
+        "DEP-001",
+        "DEP-002",
+        "DEP-003",
+        "DEP-004",
         "SUPPLY-001",
         "SUPPLY-002",
         "SUPPLY-003",
         "SUPPLY-004",
-        "DEP-001",
-        "DEP-002",
-        "DEP-003",
-        "DEP-004"
+        "SUPPLY-005",
+        "SUPPLY-006",
+        "SUPPLY-007",
+        "SUPPLY-008"
       ]
     },
     {
@@ -1601,14 +1615,22 @@
         "T-7003",
         "T-8001",
         "T-8002",
+        "T-8003",
         "T-8004",
         "T-8006"
       ],
       "hmaChecks": [
-        "SKILL-006",
+        "AST-EXFIL-001",
         "NET-001",
         "NET-002",
-        "NET-003"
+        "NET-003",
+        "NET-004",
+        "NET-005",
+        "NET-006",
+        "SKILL-006",
+        "SKILL-021",
+        "SKILL-022",
+        "SKILL-024"
       ]
     },
     {
@@ -1622,8 +1644,9 @@
         "T-6006"
       ],
       "hmaChecks": [
+        "ASKILL-002",
+        "HEARTBEAT-007",
         "SKILL-001",
-        "SKILL-002",
         "SKILL-004",
         "SKILL-005",
         "SKILL-007",
@@ -1631,7 +1654,11 @@
         "SKILL-009",
         "SKILL-010",
         "SKILL-011",
-        "SKILL-012"
+        "SKILL-012",
+        "SKILL-018",
+        "SKILL-019",
+        "SKILL-020",
+        "SKILL-023"
       ]
     },
     {
@@ -1684,8 +1711,8 @@
         "T-5002"
       ],
       "hmaChecks": [
-        "AIM-001",
-        "AIM-002"
+        "A2A-001",
+        "A2A-002"
       ],
       "category": "infrastructure"
     },
@@ -1699,10 +1726,10 @@
         "T-1005"
       ],
       "hmaChecks": [
-        "AUTH-001",
-        "AUTH-002",
-        "NET-001",
-        "ENV-001"
+        "AITOOL-001",
+        "AITOOL-002",
+        "AITOOL-003",
+        "AITOOL-004"
       ],
       "category": "infrastructure"
     },
@@ -1716,7 +1743,13 @@
         "T-9001"
       ],
       "hmaChecks": [
-        "DOCKERINJ-001"
+        "CODEINJ-001",
+        "DOCKERINJ-001",
+        "INJ-001",
+        "INJ-002",
+        "INJ-003",
+        "INJ-004",
+        "IO-002"
       ]
     },
     {
@@ -1728,6 +1761,9 @@
         "T-6003"
       ],
       "hmaChecks": [
+        "API-001",
+        "API-002",
+        "API-004",
         "GATEWAY-001",
         "GATEWAY-002",
         "GATEWAY-003",
@@ -1746,7 +1782,19 @@
         "T-9001"
       ],
       "hmaChecks": [
-        "INTEGRITY-001"
+        "AUDIT-001",
+        "AUDIT-002",
+        "AUDIT-003",
+        "AUDIT-004",
+        "INTEGRITY-001",
+        "LOG-001",
+        "LOG-002",
+        "LOG-003",
+        "LOG-004",
+        "RATE-001",
+        "RATE-002",
+        "RATE-003",
+        "RATE-004"
       ],
       "category": "infrastructure"
     },
@@ -1790,7 +1838,9 @@
         "MCP-008",
         "MCP-009",
         "MCP-010",
-        "MCP-011"
+        "MCP-011",
+        "MCP-SSE",
+        "MCP-TOOLS"
       ]
     },
     {
@@ -1810,15 +1860,55 @@
         "T-8005"
       ],
       "hmaChecks": [
+        "AGENT-CRED-001",
+        "API-003",
+        "API-KEY-EXPOSED",
+        "AUTH-001",
+        "AUTH-002",
+        "AUTH-003",
+        "AUTH-004",
+        "CLAUDE-001",
+        "CLAUDE-MD-EXPOSED",
+        "CLIPASS-001",
+        "CONFIG-001",
+        "CONFIG-004",
+        "CONFIG-009",
+        "CONFIG-EXPOSED",
         "CRED-001",
         "CRED-002",
         "CRED-003",
         "CRED-004",
+        "CURSOR-001",
+        "ENCRYPT-001",
+        "ENCRYPT-002",
+        "ENCRYPT-003",
+        "ENCRYPT-004",
+        "ENV-001",
+        "ENV-002",
+        "ENV-003",
+        "ENV-004",
+        "ENVLEAK-001",
+        "GIT-001",
+        "GIT-002",
+        "GIT-003",
+        "SEC-001",
+        "SEC-002",
+        "SEC-003",
+        "SEC-004",
+        "SEM-CRED-001",
+        "SEM-CRED-002",
+        "SEM-CRED-003",
+        "SEM-CRED-004",
+        "SESSION-001",
+        "SESSION-002",
+        "SESSION-003",
+        "SESSION-004",
+        "VSCODE-001",
+        "VSCODE-002",
+        "WEBCRED-001",
         "WEBEXPOSE-001",
         "WEBEXPOSE-002",
-        "WEBEXPOSE-003",
-        "AGENT-CRED-001",
-        "WEBCRED-001"
+        "WEBEXPOSE-003"
       ]
     },
     {
@@ -1843,9 +1933,12 @@
         "T-7005"
       ],
       "hmaChecks": [
-        "NEMO-001",
-        "NEMO-002",
-        "NEMO-003",
+        "HMA-NMC-001",
+        "HMA-NMC-002",
+        "HMA-NMC-003",
+        "HMA-NMC-004",
+        "HMA-NMC-005",
+        "HMA-NMC-006",
         "NEMO-004",
         "NEMO-007"
       ]
@@ -1860,12 +1953,15 @@
         "T-5001"
       ],
       "hmaChecks": [
-        "NEMO-004",
-        "NEMO-005",
-        "NEMO-006",
-        "NEMO-007",
-        "NEMO-008",
-        "NEMO-009"
+        "HMA-NMC-010",
+        "HMA-NMC-011",
+        "HMA-NMC-012",
+        "HMA-NMC-013",
+        "HMA-NMC-014",
+        "HMA-NMC-015",
+        "HMA-NMC-050",
+        "HMA-NMC-051",
+        "HMA-NMC-052"
       ],
       "category": "nemoclaw"
     },
@@ -1877,9 +1973,9 @@
         "T-1001"
       ],
       "hmaChecks": [
-        "NEMO-006",
-        "NEMO-007",
-        "NEMO-008",
+        "HMA-NMC-040",
+        "HMA-NMC-041",
+        "HMA-NMC-042",
         "NEMO-010"
       ],
       "category": "nemoclaw"
@@ -1893,13 +1989,27 @@
         "T-7001"
       ],
       "hmaChecks": [
-        "NEMO-003",
-        "NEMO-004",
-        "NEMO-005",
+        "CONFIG-003",
+        "CONFIG-008",
+        "HMA-NMC-030",
+        "HMA-NMC-031",
+        "HMA-NMC-032",
+        "HMA-NMC-033",
+        "HMA-NMC-034",
+        "IO-001",
+        "IO-003",
+        "IO-004",
         "NEMO-003",
         "NEMO-005",
         "NEMO-006",
-        "NEMO-008"
+        "NEMO-008",
+        "PERM-001",
+        "PERM-002",
+        "PERM-003",
+        "PROC-001",
+        "PROC-002",
+        "PROC-003",
+        "PROC-004"
       ]
     },
     {
@@ -1911,9 +2021,11 @@
         "T-9006"
       ],
       "hmaChecks": [
-        "NEMO-010",
-        "NEMO-001",
-        "NEMO-002",
+        "HMA-NMC-020",
+        "HMA-NMC-021",
+        "HMA-NMC-022",
+        "HMA-NMC-023",
+        "HMA-NMC-024",
         "NEMO-001",
         "NEMO-002",
         "NEMO-009"
@@ -1925,10 +2037,8 @@
       "description": "Impersonating trusted agents or administrative roles to gain unauthorized access",
       "category": "identity",
       "techniques": [
-        "T-1006",
         "T-4002",
-        "T-4004",
-        "T-5002"
+        "T-4004"
       ],
       "hmaChecks": [
         "AIM-001",
@@ -1958,7 +2068,13 @@
         "T-7001"
       ],
       "hmaChecks": [
-        "SANDBOX-005"
+        "SANDBOX-001",
+        "SANDBOX-002",
+        "SANDBOX-003",
+        "SANDBOX-004",
+        "SANDBOX-005",
+        "SEM-PERM-003",
+        "TMPPATH-001"
       ],
       "category": "sandbox"
     },
@@ -1972,7 +2088,14 @@
       "hmaChecks": [
         "PARSE-001",
         "PARSE-002",
-        "PARSE-003"
+        "PARSE-003",
+        "PARSE-004",
+        "PARSE-005",
+        "PARSE-006",
+        "PARSE-007",
+        "PARSE-008",
+        "PARSE-009",
+        "PARSE-010"
       ],
       "category": "infrastructure"
     },
@@ -1986,7 +2109,14 @@
       "hmaChecks": [
         "FAKETOOL-001",
         "FAKETOOL-002",
-        "FAKETOOL-003"
+        "FAKETOOL-003",
+        "FAKETOOL-004",
+        "FAKETOOL-005",
+        "FAKETOOL-006",
+        "FAKETOOL-007",
+        "FAKETOOL-008",
+        "FAKETOOL-009",
+        "FAKETOOL-010"
       ],
       "category": "supply-chain"
     },
@@ -2000,7 +2130,14 @@
       "hmaChecks": [
         "PERSIST-001",
         "PERSIST-002",
-        "PERSIST-003"
+        "PERSIST-003",
+        "PERSIST-004",
+        "PERSIST-005",
+        "PERSIST-006",
+        "PERSIST-007",
+        "PERSIST-008",
+        "PERSIST-009",
+        "PERSIST-010"
       ],
       "category": "supply-chain"
     },
@@ -2014,7 +2151,14 @@
       "hmaChecks": [
         "LIFECYCLE-001",
         "LIFECYCLE-002",
-        "LIFECYCLE-003"
+        "LIFECYCLE-003",
+        "LIFECYCLE-004",
+        "LIFECYCLE-005",
+        "LIFECYCLE-006",
+        "LIFECYCLE-007",
+        "LIFECYCLE-008",
+        "LIFECYCLE-009",
+        "LIFECYCLE-010"
       ],
       "category": "governance"
     }

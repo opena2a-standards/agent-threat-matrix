@@ -1,6 +1,5 @@
 # Soul Hijacking (SOUL-HIJACK)
 
-**Severity:** Medium
 **Category:** governance
 
 ## Description
@@ -11,6 +10,8 @@ External content achieving full override of agent behavioral constitution
 
 | ID | Name | Tactic |
 |----|------|--------|
+| [T-4002](../techniques/T-4002.md) | Admin Impersonation | Privilege Escalation |
+| [T-5002](../techniques/T-5002.md) | A2A Agent Pivoting | Lateral Movement |
 
 ## Detection
 

@@ -1,6 +1,5 @@
 # Soul Boundary Bypass (SOUL-BOUNDARY)
 
-**Severity:** Medium
 **Category:** governance
 
 ## Description
@@ -11,6 +10,7 @@ Exploiting ambiguous or incomplete constraint definitions to find unguarded acti
 
 | ID | Name | Tactic |
 |----|------|--------|
+| [T-2008](../techniques/T-2008.md) | System Prompt Boundary Bypass | Initial Access |
 
 ## Detection
 

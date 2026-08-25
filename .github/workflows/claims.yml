@@ -9,6 +9,10 @@ on:
   push:
     branches: [main]
   pull_request:
+  schedule:
+    # Daily drift check of the live registry against this repo's matrix.json.
+    # 06:50 UTC — after the registry's own data movements settle, off the :00 peak.
+    - cron: "50 6 * * *"
 
 permissions:
   contents: read
@@ -26,3 +30,22 @@ jobs:
 
       - name: README claims match matrix.json
         run: python3 scripts/check_readme_claims.py
+
+  live-api-drift:
+    # The registry serves this matrix at api.oa2a.org and threats.opena2a.org
+    # renders that payload. Version bumps originate HERE, so this is where the
+    # guard belongs: fail red when the live API's version, created date, or
+    # tactic/technique/class counts differ from matrix.json. Read-only — no
+    # secret in this public repo. A red run between a spec bump and the next
+    # registry import is the feature (the drift window made visible), not a flake.
+    name: Live registry matches matrix.json
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Live registry matches matrix.json
+        run: python3 scripts/check_live_api_drift.py

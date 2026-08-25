@@ -1,6 +1,5 @@
 # Unicode Steganography (UNICODE-STEGO)
 
-**Severity:** Medium
 **Category:** supply-chain
 
 ## Description
@@ -11,8 +10,8 @@ Using invisible Unicode characters, homoglyphs, and encoding tricks to bypass fi
 
 | ID | Name | Tactic |
 |----|------|--------|
-| [T-2006](../techniques/T-2006.md) | Unicode/Encoding Bypass | initial-access |
-| [T-4005](../techniques/T-4005.md) | Policy Bypass via Encoding | privilege-escalation |
+| [T-2006](../techniques/T-2006.md) | Unicode/Encoding Bypass | Initial Access |
+| [T-4005](../techniques/T-4005.md) | Policy Bypass via Encoding | Privilege Escalation |
 
 ## Detection
 
