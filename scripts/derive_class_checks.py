@@ -5,7 +5,7 @@ HackMyAgent's src/hardening/taxonomy.ts maps every shipped check ID to an
 attack-class ID and is the ground truth for check membership. The hand-curated
 class check lists in matrix.json drifted into three simultaneous wrong states
 (spec subset vs registry rows vs HMA truth) before this existed; class-level
-hmaChecks are DERIVED now (CSR ruling 2026-08-25) and must not be edited by
+hmaChecks are DERIVED now (ruled 2026-08-25; see CHANGELOG) and must not be edited by
 hand. Technique-level hmaChecks remain authored.
 
     python3 scripts/derive_class_checks.py [path-to-hackmyagent-checkout]
@@ -16,7 +16,7 @@ Rules:
   checks. Remove the shim when #626 is fixed.
 - Quarantine-and-report: a check whose HMA class is not one of the matrix's
   canonical classes is reported and left out, never silently minted into a new
-  class (new classes follow the CSR -> CDS -> Abdel proposal path).
+  class (new classes follow the taxonomy proposal path).
 """
 
 import json
