@@ -207,6 +207,8 @@ agent-threat-matrix/
 └── LICENSE                   # Apache-2.0
 ```
 
+`canonical-classes.json` maps the canonical attack classes to the technique ids in `matrix.json`, and is validated by `scripts/check_canonical_classes.py`.
+
 ---
 
 ## How to Cite
