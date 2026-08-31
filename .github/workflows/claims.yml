@@ -37,6 +37,12 @@ jobs:
       - name: Technique pages match matrix.json
         run: python3 scripts/check_technique_pages.py
 
+      # The cross-references/ overlap index partitions every technique into one of two
+      # published lists and renders its counts from matrix.json. Keep the partition and
+      # the counts derived: a hand-typed tally on these pages shipped once already.
+      - name: Cross-reference overlap index matches matrix.json
+        run: python3 scripts/check_cross_references.py
+
   live-api-drift:
     # The registry serves this matrix at api.oa2a.org and threats.opena2a.org
     # renders that payload. Version bumps originate HERE, so this is where the
