@@ -6,6 +6,8 @@
 
 - `canonical-classes.json`: the canonical attack classes resolved to `matrix.json` technique ids (authored mapping, ruled 2026-08-30). The class axis is behavior; `attackClass` in `matrix.json` is attack vector, and neither is derivable from the other. Each technique carries exactly one `primary` class, with `secondary` recording other classes its definition also satisfies; resolution uses `primary` only. `scripts/check_canonical_classes.py` enforces the shape: known class names, ids that exist in `matrix.json`, `primary` a partition of the technique ids, and per-class arrays sorted and disjoint.
 
+- `docs/cna/application-package.md`: prep-only package for the CVE Numbering Authority application under CSNP — scope statement, Root recommendation (Red Hat, MITRE TL-Root as fallback), the five prereqs, and the five filing steps with their refs. Every fact traces to the roadmap unit or to this repository; unknown values are explicit `PLACEHOLDER` markers. Nothing has been submitted: the filing, the Root contact and counsel sign-off are owner-retained.
+
 ### Changed
 
 - OASB control mappings for T-9001, T-9003, T-9004 and T-9005 re-derived from the full control text of the shipped 46-control OASB-1 set (Chief Architect review, 2026-08-25). Three name-match mappings were wrong (6.2 and 8.1 on T-9001 are component and conversation integrity, not data integrity; 7.4 on T-9005 is agent-to-agent logging, not output attribution) and two text-verified controls were missing (6.3 on T-9003, whose audit names the technique's own HEARTBEAT checks; 7.2 on T-9004). T-9001 is now 2.2, 2.3, 4.1, 4.2, 10.5; T-9003 adds 6.3; T-9004 adds 7.2; T-9005 is now 4.1, 4.4, 10.1, 10.2.
