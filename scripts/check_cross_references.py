@@ -47,7 +47,11 @@ NO_COUNTERPART_ROW_RE = re.compile(r"^\|\s*(T-\d{4})\s*\|")
 CLASS_ID_RE = re.compile(r"\b([A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+)\b")
 TILDE_DIGIT_RE = re.compile(r"~\d")
 HEADING_RE = re.compile(r"^#{1,6}\s")
-TABLE_SEP_RE = re.compile(r"^\s*\|[\s:|-]*-[\s:|-]*\|?\s*$")
+# A markdown table separator row: after optional leading whitespace a pipe, then only
+# separator characters, and at least one dash. Kept as a single-quantifier match plus a
+# membership test so it is linear -- an `X*-X*` form over a class that contains the dash
+# backtracks quadratically on a long crafted run of dashes.
+TABLE_SEP_RE = re.compile(r"^\s*\|[\s:|-]*$")
 
 # The section of CONTRIBUTING.md the C3/C4 failure text points a contributor at.
 PLACEMENT_SECTION = 'CONTRIBUTING.md, "Placing a new technique"'
@@ -112,7 +116,8 @@ def extract_block(text: str):
 def is_table_header_rows(lines):
     """Yield indices of lines that are markdown table header rows."""
     for i in range(len(lines) - 1):
-        if lines[i].lstrip().startswith("|") and TABLE_SEP_RE.match(lines[i + 1]):
+        nxt = lines[i + 1]
+        if lines[i].lstrip().startswith("|") and "-" in nxt and TABLE_SEP_RE.match(nxt):
             yield i
 
 
