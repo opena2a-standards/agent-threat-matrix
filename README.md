@@ -77,7 +77,7 @@ This matrix maps every technique to four external references:
 | [HackMyAgent](https://github.com/opena2a-org/hackmyagent) | Automated detection (310 static checks, 164 attack payloads) |
 | [DVAA](https://github.com/opena2a-org/damn-vulnerable-ai-agent) | Lab validation (21 vulnerable agents, 12 vulnerability categories) |
 | [OASB](https://oasb.ai) | Defensive controls (46 controls across 10 domains) |
-| MITRE ATT&CK / ATLAS / OWASP LLM | Gap analysis showing what existing frameworks cover and where the agent layer extends beyond them |
+| MITRE ATT&CK / ATLAS / OWASP LLM | An index of which techniques this repository's mapping documents name against each framework, and which they do not |
 
 See [cross-references/](cross-references/) for detailed mapping documents.
 

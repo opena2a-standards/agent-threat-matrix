@@ -1,6 +1,6 @@
 # MITRE ATLAS -- Agent Threat Matrix Mapping
 
-This document maps [MITRE ATLAS](https://atlas.mitre.org/) (Adversarial Threat Landscape for AI Systems) tactics to AI Agent Threat Matrix (ATM) tactics. ATLAS describes itself as covering the **ML system lifecycle** -- from data collection through model deployment. ATM covers the **agent infrastructure layer** -- from governance files through multi-agent communication. This mapping is an analyst reading that relates the two at the tactic grain; it names no technique ids.
+This document maps [MITRE ATLAS](https://atlas.mitre.org/) (Adversarial Threat Landscape for AI Systems) tactics to AI Agent Threat Matrix (ATM) tactics. ATLAS covers the **ML system lifecycle** -- from data collection through model deployment. ATM covers the **agent infrastructure layer** -- from governance files through multi-agent communication. The two frameworks address different layers of the same stack.
 
 ---
 
@@ -10,7 +10,7 @@ This document maps [MITRE ATLAS](https://atlas.mitre.org/) (Adversarial Threat L
 |-------------|---------------|---------|-------|
 | **Reconnaissance** | Reconnaissance (Stage 1) | High | Both cover target enumeration. ATLAS focuses on ML model and data recon. ATM focuses on agent endpoint enumeration, tool discovery, governance file extraction, agent card discovery, and context window probing. |
 | **Resource Development** | -- | None | ATLAS covers adversary infrastructure (acquiring compute, training shadow models). ATM does not model attacker-side resource acquisition. |
-| **Initial Access** | Initial Access (Stage 2) | Medium | ATLAS covers ML supply chain compromise and data poisoning as access vectors. ATM covers prompt injection variants, tool description injection, and Unicode encoding bypass -- all agent-input-specific. |
+| **Initial Access** | Initial Access (Stage 2) | Medium | ATLAS covers ML supply chain compromise and data poisoning as access vectors. ATM covers prompt injection variants (7 techniques), tool description injection, and Unicode encoding bypass -- all agent-input-specific. |
 | **ML Model Access** | -- | None | ATLAS covers white-box/black-box model access. ATM does not address model-level access -- it begins at the agent layer above the model. |
 | **Execution** | Privilege Escalation (Stage 4) | Low | ATLAS covers adversarial ML execution (trigger activation, backdoor inference). ATM covers capability override, admin impersonation, tool parameter injection, and delegation abuse -- all agent-runtime escalation. |
 | **Persistence** | Persistence (Stage 6) | Medium | ATLAS covers ML model poisoning persistence (backdoors in model weights). ATM covers agent-layer persistence: memory injection, self-replicating memory, config modification, skill backdoors, scheduled task injection, and tool registration persistence. |
@@ -22,7 +22,7 @@ This document maps [MITRE ATLAS](https://atlas.mitre.org/) (Adversarial Threat L
 
 ---
 
-## ATLAS areas with no ATM counterpart
+## What ATLAS Covers That ATM Does Not
 
 These are model-layer and ML-pipeline concerns outside the agent infrastructure scope.
 
@@ -35,17 +35,17 @@ These are model-layer and ML-pipeline concerns outside the agent infrastructure 
 | Data Poisoning | Manipulating datasets used for training or fine-tuning | Training pipeline, not agent operational layer |
 | Model Inversion | Extracting training data from model outputs | Model privacy, not agent infrastructure |
 | Resource Development | Adversary acquiring ML compute, shadow models, infrastructure | Attacker-side preparation, outside agent defensive scope |
-| ML Supply Chain | Compromised model registries, poisoned pre-trained models | Model distribution -- ATM names agent-level supply chain (skills, plugins, MCP servers) instead |
+| ML Supply Chain | Compromised model registries, poisoned pre-trained models | Model distribution -- ATM covers agent-level supply chain (skills, plugins, MCP servers) instead |
 
 ---
 
-## ATM areas with no ATLAS counterpart named in this mapping
+## What ATM Covers That ATLAS Does Not
 
 These are agent-infrastructure attack surfaces that emerge when an ML model is embedded in an autonomous agent system.
 
-### Governance attack classes
+### Governance Attacks (10 attack classes, no ATLAS equivalent)
 
-| Attack class | Description |
+| ATM Coverage | Description |
 |-------------|-------------|
 | SOUL-POISON | Malicious instructions injected into governance files (SOUL.md, CLAUDE.md) at write-time |
 | SOUL-DRIFT | Multi-turn sequences gradually eroding behavioral boundaries |
@@ -58,9 +58,9 @@ These are agent-infrastructure attack surfaces that emerge when an ML model is e
 | SOUL-IMPERSONATE | False capability claims beyond authorization |
 | SOUL-HV | Harm avoidance override variants |
 
-Governance files exist only in LLM-based agents that use natural language behavioral constraints; this attack class is named against no ATLAS area in this mapping.
+ATLAS has no concept of "governance files" because traditional ML systems do not use natural language behavioral constraints. This entire attack class is unique to LLM-based agents.
 
-### Agent memory attacks
+### Agent Memory Attacks (no ATLAS equivalent)
 
 | ATM Technique | Description |
 |--------------|-------------|
@@ -69,9 +69,9 @@ Governance files exist only in LLM-based agents that use natural language behavi
 | T-3004 Memory Credential Mining | Extracting credentials from agent memory stores |
 | T-7004 Memory Dump | Enumerating all entries in agent memory |
 
-ATLAS covers training data poisoning; runtime memory manipulation is a distinct agent persistence and collection surface, named against no ATLAS area in this mapping.
+ATLAS covers training data poisoning but not runtime memory manipulation. Agent memory is a distinct persistence and collection surface.
 
-### Multi-Agent Protocol Attacks
+### Multi-Agent Protocol Attacks (no ATLAS equivalent)
 
 | ATM Technique | Description |
 |--------------|-------------|
@@ -80,7 +80,7 @@ ATLAS covers training data poisoning; runtime memory manipulation is a distinct 
 | T-9004 Multi-Agent Consensus Manipulation | Poisoning voting/consensus mechanisms in multi-agent decision systems |
 | T-4004 Delegation Abuse | Exploiting agent-to-agent delegation without authorization chain verification |
 
-Multi-agent systems -- A2A protocol exploitation, agent identity attacks, and cross-agent lateral movement -- are named against no ATLAS area in this mapping.
+ATLAS does not model multi-agent systems. A2A protocol exploitation, agent identity attacks, and cross-agent lateral movement are outside its scope.
 
 ### Skill/Plugin Supply Chain (agent-specific)
 
@@ -91,18 +91,18 @@ Multi-agent systems -- A2A protocol exploitation, agent identity attacks, and cr
 | T-6006 Tool Registration Persistence | Malicious tool registered in agent's tool catalog |
 | T-5003 MCP Server Hopping | Pivoting between MCP servers in a tool chain |
 
-ATLAS covers the ML model supply chain. ATM names the agent skill/plugin supply chain -- a different layer with different attack vectors (YAML frontmatter injection, MCP tool registration, skill marketplace poisoning).
+ATLAS covers ML model supply chain. ATM covers agent skill/plugin supply chain -- a different layer with different attack vectors (YAML frontmatter injection, MCP tool registration, skill marketplace poisoning).
 
 ### Sandbox and Runtime Exploitation (agent-specific)
 
-| Attack class | Description |
+| ATM Coverage | Description |
 |-------------|-------------|
 | NEMO-SANDBOX-ESCAPE | Docker privileged mode, Landlock LSM degradation |
 | NEMO-OPENCLAW-INHERIT | Inherited platform flaws surviving sandboxing |
 | NEMO-NETWORK-EXPOSE | Network services bound to public interfaces |
 | NEMO-CRED-LEAK | Credential exposure in agent runtime configuration |
 
-Agent sandbox boundaries and runtime configuration security are infrastructure concerns specific to deployed agent systems, named against no ATLAS area in this mapping.
+ATLAS does not cover agent sandbox boundaries or runtime configuration security. These are infrastructure concerns specific to deployed agent systems.
 
 ### Agent-Specific Exfiltration Channels
 
@@ -112,7 +112,7 @@ Agent sandbox boundaries and runtime configuration security are infrastructure c
 | T-8005 Conversation Exfiltration | Data extracted through conversation responses to the requesting user |
 | T-8006 Webhook Exfiltration | Pre-allowed messaging APIs (Telegram, Slack) used from within sandboxed agents |
 
-ATLAS models data exfiltration at the ML pipeline level (stealing training data, extracting model weights). ATM names exfiltration through agent-specific channels that exist because agents have tool access and conversation interfaces.
+ATLAS models data exfiltration at the ML pipeline level (stealing training data, extracting model weights). ATM models exfiltration through agent-specific channels that exist because agents have tool access and conversation interfaces.
 
 ### Unicode Steganography (agent-specific application)
 
@@ -121,10 +121,16 @@ ATLAS models data exfiltration at the ML pipeline level (stealing training data,
 | T-2006 Unicode/Encoding Bypass | Invisible Unicode characters encoding instructions in source code or tool outputs |
 | T-4005 Policy Bypass via Encoding | Unicode steganography bypassing regex-based governance policy filters |
 
-Confirmed in the wild (os-info-checker npm attack, May 2025). Encoding-based attacks against natural language policy enforcement are named against no ATLAS area in this mapping.
+Confirmed in the wild (os-info-checker npm attack, May 2025). ATLAS does not cover encoding-based attacks against natural language policy enforcement.
 
 ---
 
 ## Summary
 
-The two readings are complementary. ATLAS covers model security from training through inference. ATM covers agent security from governance through multi-agent communication. An organization deploying AI agents draws on both: ATLAS for the model layer and ATM for the agent layer built on top of it.
+| Metric | Count |
+|--------|-------|
+| ATM techniques with partial ATLAS overlap | ~20 |
+| ATM techniques with no ATLAS equivalent | ~37 |
+| ATLAS areas with no ATM equivalent | 8 (all model-layer) |
+
+The two frameworks are complementary. ATLAS covers model security from training through inference. ATM covers agent security from governance through multi-agent communication. An organization deploying AI agents needs both: ATLAS for the model layer and ATM for the agent layer built on top of it.
