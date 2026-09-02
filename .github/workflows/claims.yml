@@ -43,6 +43,13 @@ jobs:
       - name: Cross-reference overlap index matches matrix.json
         run: python3 scripts/check_cross_references.py
 
+      # canonical-classes.json maps the behavior-axis classes onto matrix.json
+      # technique ids. The mapping is authored, not derived, so only its shape is
+      # enforceable: known class names, ids that exist, primary a partition,
+      # per-class arrays sorted and disjoint.
+      - name: Canonical classes match matrix.json
+        run: python3 scripts/check_canonical_classes.py
+
   live-api-drift:
     # The registry serves this matrix at api.oa2a.org and threats.opena2a.org
     # renders that payload. Version bumps originate HERE, so this is where the
