@@ -120,8 +120,14 @@ def _ac1_git_mv_history_preserved():
             ["git", "-C", str(ROOT), "rev-list", "--count", "HEAD"],
             capture_output=True, text=True, timeout=30,
         )
+        shallow = subprocess.run(
+            ["git", "-C", str(ROOT), "rev-parse", "--is-shallow-repository"],
+            capture_output=True, text=True, timeout=30,
+        )
     except (OSError, subprocess.SubprocessError):
         pytest.skip("git not available")
+    if shallow.stdout.strip() == "true":
+        pytest.skip("shallow checkout predates the rename commit")
     if count.stdout.strip().isdigit() and int(count.stdout.strip()) >= 2:
         assert "gap-analysis.md" in out.stdout, "git --follow must reach the old name"
 
