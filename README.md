@@ -2,7 +2,7 @@
 
 A structured framework for classifying, detecting, and defending against attacks on AI agent systems.
 
-**Version 1.2** | June 2026 | [Threats Matrix](https://threats.opena2a.org) | [OpenA2A](https://opena2a.org)
+**Version 1.2** | September 2026 | [Threats Matrix](https://threats.opena2a.org) | [OpenA2A](https://opena2a.org)
 
 ---
 
@@ -224,7 +224,7 @@ When referencing individual techniques:
 > AI Agent Threat Matrix T-2001 (Direct Prompt Injection). OpenA2A, 2026. https://threats.opena2a.org/techniques/T-2001
 
 When referencing the framework:
-> OpenA2A. "AI Agent Threat Matrix v1.2." June 2026. https://threats.opena2a.org
+> OpenA2A. "AI Agent Threat Matrix v1.2." September 2026. https://threats.opena2a.org
 
 ---
 

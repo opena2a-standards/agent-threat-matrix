@@ -152,7 +152,7 @@ def _ac2_red_on_scratch_missing_t7007():
 
 def _ac2_shipped_tree_not_perturbed():
     proc = subprocess.run(
-        ["git", "-C", str(ROOT), "diff", "--name-only", "origin/main", "--",
+        ["git", "-C", str(ROOT), "diff", "--name-only", "HEAD", "--",
          "canonical-classes.json", "matrix.json"],
         capture_output=True, text=True, timeout=30,
     )

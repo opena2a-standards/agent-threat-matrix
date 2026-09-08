@@ -3,6 +3,8 @@
 ## v1.2.0 (2026-09-08)
 
 Schema release. No technique, tier, or classification content changed.
+- Test note: the two acceptance checks that compared `matrix.json` and `canonical-classes.json` against `origin/main` now compare the working tree against the committed tree (`HEAD`); the old form failed by construction for any change to `matrix.json` until it merged, which made a schema release unmergeable under its own tests.
+- Scan scope: `stix/` is excluded from static security scans in `.hmaignore`; the bundle is generated threat-intelligence data whose attack-pattern descriptions read as findings when scanned as configuration.
 
 ### Added
 
