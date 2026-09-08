@@ -16,10 +16,19 @@ enriches at runtime (threat status, prevalence, evidence) are out of scope.
 """
 
 import json
+import os
 import sys
 import urllib.request
 
 API_URL = "https://api.oa2a.org/api/v1/threat-matrix"
+
+
+def _version_tuple(value) -> tuple:
+    """Parse "1.2" or "1.2.0" into a comparable tuple; anything unparseable sorts lowest."""
+    try:
+        return tuple(int(part) for part in str(value).split("."))
+    except (TypeError, ValueError):
+        return ()
 
 
 def main() -> int:
@@ -34,12 +43,26 @@ def main() -> int:
         return 1
 
     failures = []
+    notes = []
 
     for field in ("version", "created"):
         if live.get(field) != spec.get(field):
-            failures.append(
-                f"{field}: live API serves {live.get(field)!r}, matrix.json says {spec.get(field)!r}"
-            )
+            finding = f"{field}: live API serves {live.get(field)!r}, matrix.json says {spec.get(field)!r}"
+            # A pull request that releases a NEWER matrix version is ahead of the
+            # live registry by construction until the registry re-imports after
+            # the merge; on pull_request runs that one condition is reported, not
+            # failed. Every other drift (an older version, a changed created
+            # date, a count, a hollow class) still fails, and push and scheduled
+            # runs fail on the version too, because after a merge the registry
+            # is the thing that must catch up.
+            if (
+                field == "version"
+                and os.environ.get("GITHUB_EVENT_NAME") == "pull_request"
+                and _version_tuple(spec.get(field)) > _version_tuple(live.get(field))
+            ):
+                notes.append(finding + " (pending registry re-import after merge)")
+                continue
+            failures.append(finding)
 
     for coll in ("tactics", "techniques", "attackClasses", "attackPaths"):
         n_live, n_spec = len(live.get(coll) or []), len(spec.get(coll) or [])
@@ -56,14 +79,18 @@ def main() -> int:
             f"classes with empty techniques[] while techniques declare membership: {', '.join(hollow)}"
         )
 
+    for n_ in notes:
+        print(f"NOTE: {n_}")
+
     if failures:
         print(f"FAIL: live registry drifts from matrix.json ({len(failures)} finding(s)):")
         for f_ in failures:
             print(f"  - {f_}")
         return 1
 
+    qualifier = f" apart from {len(notes)} noted item(s)" if notes else ""
     print(
-        f"Live registry matches matrix.json: version {spec['version']}, "
+        f"Live registry matches matrix.json{qualifier}: version {spec['version']}, "
         f"{len(spec['tactics'])} tactics, {len(spec['techniques'])} techniques, "
         f"{len(spec['attackClasses'])} attack classes, {len(spec['attackPaths'])} attack paths."
     )

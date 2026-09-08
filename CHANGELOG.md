@@ -4,6 +4,7 @@
 
 Schema release. No technique, tier, or classification content changed.
 - Test note: the two acceptance checks that compared `matrix.json` and `canonical-classes.json` against `origin/main` now compare the working tree against the committed tree (`HEAD`); the old form failed by construction for any change to `matrix.json` until it merged, which made a schema release unmergeable under its own tests.
+- Drift check: on pull request runs, `scripts/check_live_api_drift.py` reports (and no longer fails on) a matrix version that is newer than the version the live registry serves, because a release is ahead of the registry by construction until the registry re-imports after the merge; every other drift still fails, and push and scheduled runs still fail on the version.
 - Scan scope: `stix/` is excluded from static security scans in `.hmaignore`; the bundle is generated threat-intelligence data whose attack-pattern descriptions read as findings when scanned as configuration.
 
 ### Added
