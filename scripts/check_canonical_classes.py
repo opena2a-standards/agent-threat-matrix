@@ -11,7 +11,7 @@ a question for the taxonomy, not a rewrite.
 Checks:
 
 - V1 the file parses; top-level keys and class names are exactly the expected sets
-- V2 every id matches ``T-NNNN`` and exists in matrix.json
+- V2 every id matches ``T-NNNN`` or ``T-NNNN.NNN`` and exists in matrix.json
 - V3 the primary arrays partition the matrix technique ids -- each id exactly once
 - V4 ``benign`` carries no ids at all
 - V5 per class, primary and secondary are disjoint, strictly ascending, duplicate-free
@@ -46,7 +46,7 @@ CLASS_NAMES = [
     "benign",
 ]
 
-ID_RE = re.compile(r"^T-[0-9]{4}$")
+ID_RE = re.compile(r"^T-[0-9]{4}(\.[0-9]{3})?$")
 
 ARRAYS = ("primary", "secondary")
 

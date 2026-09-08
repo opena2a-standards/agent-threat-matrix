@@ -1,0 +1,165 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://threats.opena2a.org/schema/threat-matrix-v1.2.schema.json",
+  "title": "AI Agent Threat Matrix 1.2",
+  "description": "Shape of matrix.json. Technique ids are T-NNNN, or T-NNNN.NNN for a sub-technique; sub-techniques sit flat in techniques[] and carry parentId. The nine technique fields required by 1.1 are unchanged and still required. Every field added in 1.2 is optional. scripts/validate_matrix.py checks this schema with an in-repo subset checker and then the cross-field rules the schema cannot express (see the x-semantic notes).",
+  "type": "object",
+  "required": ["version", "name", "created", "updated", "stixNamespace", "tactics", "techniques", "attackClasses", "attackPaths", "dataSources"],
+  "additionalProperties": false,
+  "properties": {
+    "version": { "const": "1.2" },
+    "name": { "type": "string" },
+    "created": { "$ref": "#/$defs/date" },
+    "updated": { "$ref": "#/$defs/date" },
+    "stixNamespace": {
+      "description": "UUID namespace for the deterministic STIX 2.1 ids in stix/agent-threat-matrix-bundle.json (uuid5 over this namespace and a canonical object name). Pinned: changing it changes every STIX id ever published.",
+      "const": "d43c7092-69ad-4822-b2cb-a48e459c4580"
+    },
+    "tactics": { "type": "array", "items": { "$ref": "#/$defs/tactic" } },
+    "techniques": { "type": "array", "items": { "$ref": "#/$defs/technique" } },
+    "attackClasses": { "type": "array", "items": { "$ref": "#/$defs/attackClass" } },
+    "attackPaths": { "type": "array", "items": { "$ref": "#/$defs/attackPath" } },
+    "dataSources": {
+      "description": "Registry of data sources a technique may cite in its dataSources array. May be empty.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/dataSource" }
+    }
+  },
+  "$defs": {
+    "date": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
+    "techniqueId": { "type": "string", "pattern": "^T-[0-9]{4}(\\.[0-9]{3})?$" },
+    "parentTechniqueId": { "type": "string", "pattern": "^T-[0-9]{4}$" },
+    "tacticId": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+    "attackClassId": { "type": "string", "pattern": "^[A-Z][A-Z0-9]*(-[A-Z0-9]+)*$" },
+    "semver": { "type": "string", "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$" },
+    "mappingRelationship": {
+      "description": "SKOS mapping relation between the matrix technique and the external technique.",
+      "enum": ["exactMatch", "closeMatch", "broadMatch", "narrowMatch", "relatedMatch"]
+    },
+    "tactic": {
+      "type": "object",
+      "required": ["id", "name", "order", "description"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/tacticId" },
+        "name": { "type": "string" },
+        "order": { "type": "integer" },
+        "description": { "type": "string" }
+      }
+    },
+    "technique": {
+      "type": "object",
+      "required": ["id", "name", "tactic", "description", "evidenceTier", "attackClass", "hmaChecks", "dvaaValidation", "oasbControls"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/techniqueId" },
+        "name": { "type": "string" },
+        "tactic": {
+          "$ref": "#/$defs/tacticId",
+          "x-semantic": "must be the id of an entry in tactics[]"
+        },
+        "description": { "type": "string" },
+        "evidenceTier": { "enum": ["observed", "validated", "adapted"] },
+        "attackClass": {
+          "$ref": "#/$defs/attackClassId",
+          "x-semantic": "must be the id of an entry in attackClasses[]"
+        },
+        "hmaChecks": { "type": "array", "items": { "type": "string" } },
+        "dvaaValidation": { "type": ["string", "null"], "description": "Null when the technique carries no lab scenario." },
+        "oasbControls": { "type": "array", "items": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+$" } },
+        "parentId": {
+          "$ref": "#/$defs/parentTechniqueId",
+          "x-semantic": "required if and only if id is dotted; must be the id of a technique in techniques[] and equal the part of id before the dot"
+        },
+        "attackMapping": { "type": "array", "items": { "$ref": "#/$defs/attackMappingEntry" } },
+        "atlasMapping": { "type": "array", "items": { "$ref": "#/$defs/atlasMappingEntry" } },
+        "dataSources": {
+          "type": "array",
+          "items": { "type": "string" },
+          "x-semantic": "every value must be the id of an entry in the top-level dataSources[] registry"
+        },
+        "evidence": { "type": "array", "items": { "$ref": "#/$defs/evidenceEntry" } },
+        "status": {
+          "description": "Absent means active.",
+          "enum": ["draft", "active", "deprecated"]
+        },
+        "replacedBy": {
+          "$ref": "#/$defs/techniqueId",
+          "x-semantic": "required if and only if status is deprecated; must be the id of a technique in techniques[]"
+        },
+        "version": {
+          "description": "Semantic version of this technique entry. Absent means 1.0.0.",
+          "$ref": "#/$defs/semver"
+        }
+      }
+    },
+    "attackMappingEntry": {
+      "type": "object",
+      "required": ["id", "relationship"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "pattern": "^T[0-9]{4}(\\.[0-9]{3})?$", "description": "MITRE ATT&CK technique or sub-technique id" },
+        "relationship": { "$ref": "#/$defs/mappingRelationship" },
+        "note": { "type": "string" }
+      }
+    },
+    "atlasMappingEntry": {
+      "type": "object",
+      "required": ["id", "relationship"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "pattern": "^AML\\.T[0-9]{4}(\\.[0-9]{3})?$", "description": "MITRE ATLAS technique or sub-technique id" },
+        "relationship": { "$ref": "#/$defs/mappingRelationship" },
+        "note": { "type": "string" }
+      }
+    },
+    "evidenceEntry": {
+      "type": "object",
+      "required": ["type", "reference", "date"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "description": "Kind of publicly resolvable source the reference points at.",
+          "enum": ["observation", "lab-reproduction", "publication", "advisory", "honeypot-telemetry"]
+        },
+        "reference": { "type": "string" },
+        "date": { "$ref": "#/$defs/date" },
+        "note": { "type": "string" }
+      }
+    },
+    "dataSource": {
+      "type": "object",
+      "required": ["id", "name", "description"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+        "name": { "type": "string" },
+        "description": { "type": "string" }
+      }
+    },
+    "attackClass": {
+      "type": "object",
+      "required": ["id", "name", "description", "techniques", "hmaChecks", "category"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/attackClassId" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "techniques": { "type": "array", "items": { "$ref": "#/$defs/techniqueId" } },
+        "hmaChecks": { "type": "array", "items": { "type": "string" } },
+        "category": { "type": "string" }
+      }
+    },
+    "attackPath": {
+      "type": "object",
+      "required": ["id", "name", "description", "techniques"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "techniques": { "type": "array", "items": { "$ref": "#/$defs/techniqueId" } }
+      }
+    }
+  }
+}
