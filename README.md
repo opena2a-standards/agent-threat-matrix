@@ -2,7 +2,7 @@
 
 A structured framework for classifying, detecting, and defending against attacks on AI agent systems.
 
-**Version 1.1** | June 2026 | [Threats Matrix](https://threats.opena2a.org) | [OpenA2A](https://opena2a.org)
+**Version 1.2** | June 2026 | [Threats Matrix](https://threats.opena2a.org) | [OpenA2A](https://opena2a.org)
 
 ---
 
@@ -198,6 +198,9 @@ agent-threat-matrix/
 ├── README.md                 # This document
 ├── EVIDENCE_AUDIT.md         # Evidence tier justification for every technique
 ├── matrix.json               # Machine-readable matrix (full data)
+├── technique-ids.json        # The technique id list, checked against matrix.json
+├── schema/                   # JSON Schema for matrix.json and the consumer-readiness gate
+├── stix/                     # STIX 2.1 bundle rendered from matrix.json
 ├── tactics/                  # One file per tactic (kill chain stage)
 ├── techniques/               # One file per technique (T-XXXX)
 ├── attack-classes/           # One file per attack class
@@ -209,6 +212,10 @@ agent-threat-matrix/
 
 `canonical-classes.json` maps the canonical attack classes to the technique ids in `matrix.json`, and is validated by `scripts/check_canonical_classes.py`.
 
+### Schema
+
+`matrix.json` follows `schema/threat-matrix-v1.2.schema.json` (JSON Schema 2020-12). `scripts/validate_matrix.py` checks the file against that schema and the rules the schema cannot state (ids resolve, `replacedBy` and `parentId` present exactly when required, `technique-ids.json` in sync) and runs in CI. Technique ids may take the form `T-NNNN.NNN` for a sub-technique, listed flat in `techniques` with a `parentId`; `schema/consumer-readiness.json` keeps dotted ids out of the file until the listed consumers accept them. `stix/agent-threat-matrix-bundle.json` is a STIX 2.1 rendering of the matrix produced by `scripts/generate_stix.py`, with deterministic object ids; the validator fails when the committed bundle differs from a fresh rendering. Evidence tiers are described in `docs/evidence-tiers.md`.
+
 ---
 
 ## How to Cite
@@ -217,7 +224,7 @@ When referencing individual techniques:
 > AI Agent Threat Matrix T-2001 (Direct Prompt Injection). OpenA2A, 2026. https://threats.opena2a.org/techniques/T-2001
 
 When referencing the framework:
-> OpenA2A. "AI Agent Threat Matrix v1.1." June 2026. https://threats.opena2a.org
+> OpenA2A. "AI Agent Threat Matrix v1.2." June 2026. https://threats.opena2a.org
 
 ---
 
