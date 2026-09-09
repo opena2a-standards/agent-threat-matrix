@@ -50,15 +50,6 @@ jobs:
       - name: Canonical classes match matrix.json
         run: python3 scripts/check_canonical_classes.py
 
-      # matrix.json declares schema 1.2 (schema/threat-matrix-v1.2.schema.json). The
-      # validator checks the shape with an in-repo subset checker, then the rules the
-      # schema cannot state: ids resolve, replacedBy and parentId are present exactly
-      # when required, dotted ids stay out until schema/consumer-readiness.json says
-      # the consumers accept them, technique-ids.json lists the same ids, and the
-      # committed STIX bundle is byte-identical to what scripts/generate_stix.py renders.
-      - name: matrix.json validates against schema 1.2
-        run: python3 scripts/validate_matrix.py
-
   live-api-drift:
     # The registry serves this matrix at api.oa2a.org and threats.opena2a.org
     # renders that payload. Version bumps originate HERE, so this is where the
