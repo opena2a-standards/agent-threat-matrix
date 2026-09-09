@@ -1,5 +1,27 @@
 # Changelog
 
+## v1.2.0 (2026-09-08)
+
+Schema release. No technique, tier, or classification content changed.
+- Test note: the two acceptance checks that compared `matrix.json` and `canonical-classes.json` against `origin/main` now compare the working tree against the committed tree (`HEAD`); the old form failed by construction for any change to `matrix.json` until it merged, which made a schema release unmergeable under its own tests.
+- Drift check: on pull request runs, `scripts/check_live_api_drift.py` reports (and no longer fails on) a matrix version that is newer than the version the live registry serves, because a release is ahead of the registry by construction until the registry re-imports after the merge; every other drift still fails, and push and scheduled runs still fail on the version.
+- Scan scope: `stix/` is excluded from static security scans in `.hmaignore`; the bundle is generated threat-intelligence data whose attack-pattern descriptions read as findings when scanned as configuration.
+
+### Added
+
+- `schema/threat-matrix-v1.2.schema.json`: JSON Schema (2020-12) for `matrix.json`. The nine technique fields of 1.1 are unchanged and still required; `evidenceTier` stays `observed`, `validated`, `adapted`. New optional technique fields: `attackMapping` and `atlasMapping` (external technique id plus a `relationship` of `exactMatch`, `closeMatch`, `broadMatch`, `narrowMatch` or `relatedMatch`), `dataSources` (ids from the new top-level `dataSources` registry), `evidence` (typed, dated references), `status` (`draft`, `active`, `deprecated`; absent means active), `replacedBy` (required exactly when deprecated), `version` (semver; absent means 1.0.0), and `parentId` (required exactly when the id is dotted). Technique ids may take the form `T-NNNN.NNN` for a sub-technique, listed flat in `techniques`.
+- `matrix.json`: `version` is `1.2`; new top-level `dataSources` registry (empty) and `stixNamespace`, the pinned UUID namespace for STIX ids.
+- `scripts/validate_matrix.py`: validates `matrix.json` against the schema with a standard library subset checker, then the rules the schema cannot state (tactic, attack class, data source, `replacedBy` and `parentId` resolve; `replacedBy` and `parentId` present exactly when required; `technique-ids.json` in sync; the STIX bundle byte-identical to a fresh rendering). Wired into the `readme-claims` CI job.
+- `schema/consumer-readiness.json`: the consumer-readiness gate. While `subTechniques` is false the validator rejects any dotted technique id, because the listed consumers (the aiis-signatures `technique_ids` pattern, the aim-sdk Python and TypeScript technique validators with their pinned 1.1 id set, and the registry telemetry handler id pattern) do not accept them yet.
+- `technique-ids.json`: the sorted technique id list with the matrix version, checked for equality against `matrix.json`.
+- `stix/agent-threat-matrix-bundle.json` and `scripts/generate_stix.py`: a STIX 2.1 bundle rendered from `matrix.json` with deterministic ids (uuid5 over `stixNamespace` and a canonical name): one tactic object per tactic, one attack pattern per technique with external references, one grouping per attack class, one course of action per OASB control, and `mitigates` and `subtechnique-of` relationships. The generator runs a structural self-check (unique ids, references resolve, common properties present).
+- `docs/evidence-tiers.md`: the three tiers as the README defines them, the `evidence` entry types, and the pending mapping table to the ARIA behavioral-sweep classes.
+
+### Changed
+
+- `scripts/check_canonical_classes.py` accepts `T-NNNN.NNN` ids alongside `T-NNNN`.
+- README states version 1.2 and gains a Schema subsection; the derived overlap-counts block in `cross-references/technique-overlap-index.md` now renders version 1.2.
+
 ## Unreleased
 
 ### Added

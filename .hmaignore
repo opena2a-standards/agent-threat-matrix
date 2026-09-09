@@ -21,3 +21,9 @@ tactics/
 cross-references/
 mitigations/
 evidence/
+
+# stix/ holds the STIX 2.1 bundle generated from matrix.json: attack-pattern objects whose
+# descriptions are the matrix technique texts (reconnaissance, credential harvest, exfiltration).
+# It is threat-intelligence data, not agent configuration; scanning it reads the described
+# techniques as findings; the same text is already excluded above for matrix.json and techniques/.
+stix/
