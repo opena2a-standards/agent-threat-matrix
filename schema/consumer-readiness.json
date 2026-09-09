@@ -1,0 +1,24 @@
+{
+  "subTechniques": false,
+  "note": "Dotted technique ids (T-NNNN.NNN) are rejected by scripts/validate_matrix.py until every consumer listed here accepts them.",
+  "consumers": [
+    {
+      "name": "aiis-signatures technique_ids item pattern",
+      "location": "aiis-signatures schema/aiis-v0.1.schema.json, properties.technique_ids.items.pattern",
+      "accepts": "^T-\\d{4}$",
+      "acceptsSubTechniques": false
+    },
+    {
+      "name": "aim-sdk technique validators (Python and TypeScript)",
+      "location": "agent-identity-management sdk/python/aim_sdk/telemetry/technique_mapping.py (TECHNIQUE_ID_RE, KNOWN_TECHNIQUE_IDS) and sdk/typescript/src/telemetry/technique-mapping.ts (TECHNIQUE_ID_RE, KNOWN_TECHNIQUE_IDS)",
+      "accepts": "^T-\\d{4}$ and a pinned id set snapshotted from matrix.json 1.1",
+      "acceptsSubTechniques": false
+    },
+    {
+      "name": "registry telemetry handler technique id pattern",
+      "location": "opena2a-registry internal/interfaces/http/handlers/telemetry_handler.go, techniqueIDPattern",
+      "accepts": "^T-\\d{1,6}$",
+      "acceptsSubTechniques": false
+    }
+  ]
+}

@@ -33,7 +33,7 @@ Rendered by `scripts/check_cross_references.py` from `matrix.json` and the mappi
 documents. Do not edit the block below by hand.
 
 <!-- BEGIN GENERATED: overlap-counts -->
-`matrix.json` version 1.1 holds 61 techniques. The mapping table in
+`matrix.json` version 1.2 holds 61 techniques. The mapping table in
 `owasp-llm-mapping.md` names 30 of them and does not name 31. `mitre-atlas-mapping.md`
 maps ATLAS tactics to ATM tactics and names no technique in its mapping table.
 <!-- END GENERATED: overlap-counts -->

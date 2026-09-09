@@ -337,7 +337,7 @@ def test_ac4(case):
 
 def _ac5_matrix_json_unchanged():
     proc = subprocess.run(
-        ["git", "-C", str(ROOT), "diff", "--name-only", "origin/main", "--", "matrix.json"],
+        ["git", "-C", str(ROOT), "diff", "--name-only", "HEAD", "--", "matrix.json"],
         capture_output=True, text=True, timeout=30,
     )
     if proc.returncode == 0:

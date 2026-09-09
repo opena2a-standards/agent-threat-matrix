@@ -1,8 +1,9 @@
 {
-  "version": "1.1",
+  "version": "1.2",
   "name": "AI Agent Threat Matrix",
   "created": "2026-03-24",
   "updated": "2026-06-03",
+  "stixNamespace": "d43c7092-69ad-4822-b2cb-a48e459c4580",
   "tactics": [
     {
       "id": "reconnaissance",
@@ -2217,5 +2218,6 @@
         "T-9006"
       ]
     }
-  ]
+  ],
+  "dataSources": []
 }
