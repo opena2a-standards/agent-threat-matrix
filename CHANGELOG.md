@@ -24,6 +24,10 @@ Schema release. No technique, tier, or classification content changed.
 
 ## Unreleased
 
+### Changed
+
+- `technique-ids.json`: `matrixCommit` is the 40-character sha of the commit whose `matrix.json` the id list indexes (it carried the placeholder `PENDING-AT-MERGE`). `scripts/validate_matrix.py` gains S11, which refuses any value that is not a 40-hex commit sha, and its summary line names the commit.
+
 ### Added
 
 - `canonical-classes.json`: the canonical attack classes resolved to `matrix.json` technique ids (authored mapping, ruled 2026-08-30). The class axis is behavior; `attackClass` in `matrix.json` is attack vector, and neither is derivable from the other. Each technique carries exactly one `primary` class, with `secondary` recording other classes its definition also satisfies; resolution uses `primary` only. `scripts/check_canonical_classes.py` enforces the shape: known class names, ids that exist in `matrix.json`, `primary` a partition of the technique ids, and per-class arrays sorted and disjoint.

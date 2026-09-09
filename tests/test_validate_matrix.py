@@ -219,6 +219,149 @@ def test_technique_ids_file_must_match():
     _red(mutate(fn), "S8 technique-ids.json ids differ from matrix.json: missing ['T-7007']")
 
 
+# --------------------------------------------------------------------------- ATM-07 (S11)
+
+SHA40_RE = r"^[0-9a-f]{40}$"
+
+
+def _shipped_matrix_commit() -> str:
+    return load(ROOT, "technique-ids.json")["matrixCommit"]
+
+
+def _ac1_shipped_matrix_commit_is_a_full_sha():
+    import re
+    value = _shipped_matrix_commit()
+    assert isinstance(value, str) and re.match(SHA40_RE, value), value
+    assert value != "PENDING-AT-MERGE"
+
+
+def _ac1_matrix_stix_and_schema_are_the_committed_bytes():
+    # The stamped sha indexes the committed matrix.json: the data files carry no
+    # uncommitted change alongside the stamp (skipped where the tree has no git).
+    proc = subprocess.run(["git", "-C", str(ROOT), "status", "--porcelain", "--",
+                           "matrix.json", "stix", "schema"],
+                          capture_output=True, text=True, timeout=30)
+    if proc.returncode == 0:
+        assert proc.stdout.strip() == "", proc.stdout
+
+
+AC1_CASES = [
+    ("ATM-07.AC1 shipped technique-ids.json matrixCommit is a 40-hex sha, not the placeholder",
+     _ac1_shipped_matrix_commit_is_a_full_sha),
+    ("ATM-07.AC1 matrix.json stix and schema carry no change beside the stamp",
+     _ac1_matrix_stix_and_schema_are_the_committed_bytes),
+]
+
+
+@pytest.mark.parametrize("case", [pytest.param(fn, id=name) for name, fn in AC1_CASES])
+def test_atm07_ac1(case):
+    case()
+
+
+def _plant_matrix_commit(value, present=True):
+    def fn(root):
+        ids = load(root, "technique-ids.json")
+        if present:
+            ids["matrixCommit"] = value
+        else:
+            ids.pop("matrixCommit", None)
+        dump(root, "technique-ids.json", ids)
+    return fn
+
+
+def _ac2_placeholder_is_refused():
+    _red(mutate(_plant_matrix_commit("PENDING-AT-MERGE")),
+         "S11 technique-ids.json matrixCommit 'PENDING-AT-MERGE' is not a 40-hex commit sha")
+
+
+def _ac2_truncated_sha_is_refused():
+    short = _shipped_matrix_commit()[:12]
+    _red(mutate(_plant_matrix_commit(short)),
+         f"S11 technique-ids.json matrixCommit {short!r} is not a 40-hex commit sha")
+
+
+def _ac2_missing_key_is_refused():
+    _red(mutate(_plant_matrix_commit(None, present=False)),
+         "S11 technique-ids.json matrixCommit None is not a 40-hex commit sha")
+
+
+def _ac2_non_string_is_refused():
+    _red(mutate(_plant_matrix_commit(1234567890123456789012345678901234567890)),
+         "S11 technique-ids.json matrixCommit 1234567890123456789012345678901234567890 "
+         "is not a 40-hex commit sha")
+
+
+AC2_CASES = [
+    ("ATM-07.AC2 PENDING-AT-MERGE planted turns the validator red with the S11 line",
+     _ac2_placeholder_is_refused),
+    ("ATM-07.AC2 a twelve-character abbreviation turns the validator red with the S11 line",
+     _ac2_truncated_sha_is_refused),
+    ("ATM-07.AC2 a missing matrixCommit key turns the validator red rendering None",
+     _ac2_missing_key_is_refused),
+    ("ATM-07.AC2 a non-string matrixCommit turns the validator red",
+     _ac2_non_string_is_refused),
+]
+
+
+@pytest.mark.parametrize("case", [pytest.param(fn, id=name) for name, fn in AC2_CASES])
+def test_atm07_ac2(case):
+    case()
+
+
+def _ac3_shipped_tree_green_and_summary_names_the_commit():
+    proc = run_validator(ROOT)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert proc.stdout.startswith(
+        "matrix.json validates against schema 1.2: 61 techniques (0 sub-techniques)")
+    head, _, tail = proc.stdout.partition("in sync")
+    assert tail, proc.stdout
+    assert _shipped_matrix_commit() in tail, proc.stdout
+
+
+def _ac3_s8_pin_still_fires_beside_s11():
+    def fn(root):
+        ids = load(root, "technique-ids.json")
+        ids["ids"].remove("T-7007")
+        ids["matrixCommit"] = "PENDING-AT-MERGE"
+        dump(root, "technique-ids.json", ids)
+    proc = mutate(fn)
+    _red(proc, "S8 technique-ids.json ids differ from matrix.json: missing ['T-7007']")
+    assert "S11 technique-ids.json matrixCommit 'PENDING-AT-MERGE'" in proc.stderr
+
+
+AC3_CASES = [
+    ("ATM-07.AC3 the shipped tree is green and the summary names the matrixCommit after in sync",
+     _ac3_shipped_tree_green_and_summary_names_the_commit),
+    ("ATM-07.AC3 the S8 red pin still fires with S11 in place",
+     _ac3_s8_pin_still_fires_beside_s11),
+]
+
+
+@pytest.mark.parametrize("case", [pytest.param(fn, id=name) for name, fn in AC3_CASES])
+def test_atm07_ac3(case):
+    case()
+
+
+def _ac4_readme_schema_paragraph_documents_matrix_commit():
+    text = (ROOT / "README.md").read_text(encoding="utf-8")
+    schema_section = text.split("### Schema", 1)[1].split("\n---", 1)[0]
+    sentence = next((s for s in schema_section.replace("\n", " ").split(". ")
+                     if "`matrixCommit`" in s), None)
+    assert sentence is not None, schema_section
+    assert "40-character" in sentence and "refuses" in sentence, sentence
+
+
+AC4_CASES = [
+    ("ATM-07.AC4 README Schema paragraph states matrixCommit is the 40-character sha the validator refuses otherwise",
+     _ac4_readme_schema_paragraph_documents_matrix_commit),
+]
+
+
+@pytest.mark.parametrize("case", [pytest.param(fn, id=name) for name, fn in AC4_CASES])
+def test_atm07_ac4(case):
+    case()
+
+
 def test_stix_bundle_must_be_byte_identical():
     def fn(root):
         path = root / "stix" / "agent-threat-matrix-bundle.json"
