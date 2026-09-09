@@ -50,6 +50,13 @@ jobs:
       - name: Canonical classes match matrix.json
         run: python3 scripts/check_canonical_classes.py
 
+      # ATTRIBUTION.md partitions every technique id into externally contributed or
+      # authored in-house, on the same terms as the cross-reference partition above.
+      # External entries must name the submission they arrived in: on a public record
+      # about named people, credit is recorded, never guessed.
+      - name: Attribution record partitions matrix.json
+        run: python3 scripts/check_attribution.py
+
   live-api-drift:
     # The registry serves this matrix at api.oa2a.org and threats.opena2a.org
     # renders that payload. Version bumps originate HERE, so this is where the
