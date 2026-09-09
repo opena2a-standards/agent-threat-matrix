@@ -1,0 +1,132 @@
+name: Technique submission
+description: >-
+  Propose a new technique for the AI Agent Threat Matrix. Every required field below is an
+  input the published evidence bar in CONTRIBUTING.md already demands.
+title: "[Technique] "
+labels: ["technique-submission"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before submitting, read CONTRIBUTING.md: the evidence requirements (we do not accept
+        purely theoretical techniques), the technique template, and the "Contributor credit"
+        and "Change control" sections. OpenA2A decides what enters the matrix; a submission
+        creates no entitlement to inclusion, and the decision — accept, edit, re-tier,
+        re-place or decline — is recorded on this thread.
+
+  - type: dropdown
+    id: tactic
+    attributes:
+      label: Kill-chain stage (tactic)
+      description: The stage the technique belongs to, per the ID ranges in CONTRIBUTING.md.
+      options:
+        - reconnaissance
+        - initial-access
+        - credential-harvest
+        - privilege-escalation
+        - lateral-movement
+        - persistence
+        - collection
+        - exfiltration
+        - impact
+    validations:
+      required: true
+
+  - type: input
+    id: technique-name
+    attributes:
+      label: Technique name
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What the technique does and why it works.
+    validations:
+      required: true
+
+  - type: input
+    id: attack-class
+    attributes:
+      label: Attack class
+      description: Which attack class this belongs to (see attack-classes/).
+    validations:
+      required: true
+
+  - type: dropdown
+    id: evidence-tier
+    attributes:
+      label: Evidence tier
+      description: The published evidence bar the submission meets. Purely theoretical techniques are not accepted.
+      options:
+        - Observed
+        - Validated
+        - Adapted
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence-source
+    attributes:
+      label: Evidence source (the tier's own requirement)
+      description: >-
+        Observed — the real-world production system, security incident report, or
+        internet-wide exposure assessment where this was documented. Validated — the
+        documented reproduction steps and the expected output. Adapted — the named
+        traditional technique (e.g. the MITRE ATT&CK id) and a clear explanation of how the
+        agent-specific variant differs.
+    validations:
+      required: true
+
+  - type: textarea
+    id: procedure-example
+    attributes:
+      label: Procedure example
+      description: Step-by-step description of how an attacker executes this.
+    validations:
+      required: true
+
+  - type: textarea
+    id: detection-logic
+    attributes:
+      label: Detection logic
+      description: What to look for, plus HMA check IDs if known.
+    validations:
+      required: true
+
+  - type: textarea
+    id: dvaa-validation
+    attributes:
+      label: DVAA validation
+      description: DVAA challenge ID or scenario name, and how to reproduce in DVAA.
+    validations:
+      required: true
+
+  - type: textarea
+    id: defensive-controls
+    attributes:
+      label: Defensive controls
+      description: OASB control IDs and how to prevent this.
+    validations:
+      required: true
+
+  - type: textarea
+    id: references
+    attributes:
+      label: References
+      description: Links to evidence, academic papers, incident reports.
+    validations:
+      required: true
+
+  - type: input
+    id: credit-preference
+    attributes:
+      label: Credit preference
+      description: >-
+        Your name or handle exactly as you want it published in ATTRIBUTION.md, or "decline"
+        to decline credit (recorded there as declined, per CONTRIBUTING.md, "Contributor
+        credit").
+    validations:
+      required: true

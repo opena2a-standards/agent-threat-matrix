@@ -125,6 +125,37 @@ If you find an error in a technique description, evidence citation, or cross-ref
 - What the correct information should be
 - A source for the correction
 
+## Contributor credit
+
+An accepted contribution is credited to its contributor: a new technique or attack class, new
+evidence that changes a technique's tier, or a correction that changes published content. The
+credit is published in `ATTRIBUTION.md` in this repository — the externally-contributed list
+carries, per technique, the contributor's name or handle **exactly as the contributor gives
+it** (in the issue form's credit preference field or the pull request body), together with the
+issue or pull request the submission arrived in.
+
+To decline credit, say so in the submission's credit preference field. A declined credit is
+recorded in `ATTRIBUTION.md` as *(credit declined)*: the entry stays in the
+externally-contributed list with its submission reference, and is never reclassified as
+in-house work.
+
+Credit is recorded, never guessed. `ATTRIBUTION.md` places every technique id in `matrix.json`
+in exactly one of two published lists — externally contributed or authored in-house — and
+`scripts/check_attribution.py` enforces the partition in CI, on the same terms as the
+cross-reference placement above. An external entry must name the issue or pull request it
+arrived in; where the repository's history does not establish an external contributor for a
+technique, that technique is listed as authored in-house.
+
+## Change control
+
+OpenA2A retains final change control over the matrix. OpenA2A decides what enters the matrix,
+and a submission — however well evidenced — creates no entitlement to inclusion. Content that
+has been accepted may afterwards be edited, re-tiered (its evidence tier changed), re-placed
+(its canonical class or its (A)/(B) cross-reference placement changed), or removed entirely,
+as the evidence and the taxonomy evolve. Each such decision is recorded on the submission
+thread — the issue or pull request the content arrived in — so the contributor and any later
+reader can see what was decided and why.
+
 ## Code of Conduct
 
 Contributions must be:
