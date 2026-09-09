@@ -28,6 +28,10 @@ Standard library only, no network. Two passes:
    - S9 attack class and attack path membership lists name techniques
    - S10 stix/agent-threat-matrix-bundle.json is byte-identical to what
         scripts/generate_stix.py renders from this matrix.json
+   - S11 technique-ids.json ``matrixCommit`` is the 40-hex sha of the commit
+        whose matrix.json the id list indexes; a placeholder, an abbreviated
+        sha or a missing key is refused. No git is consulted: a shallow or
+        gitless checkout cannot resolve the object, so only the shape is checked
 
 Exit 0 when everything holds, 1 otherwise.
 """
@@ -48,6 +52,7 @@ STIX_BUNDLE = ROOT / "stix" / "agent-threat-matrix-bundle.json"
 STIX_GENERATOR = ROOT / "scripts" / "generate_stix.py"
 
 DOTTED_RE = re.compile(r"^(T-[0-9]{4})\.[0-9]{3}$")
+COMMIT_SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 
 # --------------------------------------------------------------------------- schema subset
 
@@ -215,6 +220,9 @@ def semantic_checks(matrix: dict, readiness: dict, technique_ids_file, errors: l
             if not missing and not extra:
                 detail.append("same ids, different order (the list must be sorted)")
             errors.append("S8 technique-ids.json ids differ from matrix.json: " + "; ".join(detail))
+        commit = technique_ids_file.get("matrixCommit")
+        if not (isinstance(commit, str) and COMMIT_SHA_RE.match(commit)):
+            errors.append(f"S11 technique-ids.json matrixCommit {commit!r} is not a 40-hex commit sha")
 
     for attack_class in matrix["attackClasses"]:
         for tid in attack_class.get("techniques", []):
@@ -271,8 +279,9 @@ def main() -> int:
         return 1
     errors = list(checker.errors)
 
+    technique_ids_file = load_json(TECHNIQUE_IDS)
     if not errors:
-        semantic_checks(matrix, readiness, load_json(TECHNIQUE_IDS), errors)
+        semantic_checks(matrix, readiness, technique_ids_file, errors)
         stix_check(errors)
     else:
         errors.append("semantic checks skipped until the schema violations above are fixed")
@@ -287,7 +296,8 @@ def main() -> int:
     print(
         f"matrix.json validates against schema 1.2: {len(matrix['techniques'])} techniques "
         f"({sub} sub-techniques), {len(matrix['dataSources'])} data sources, "
-        f"technique-ids.json and STIX bundle in sync"
+        f"technique-ids.json and STIX bundle in sync "
+        f"(matrixCommit {technique_ids_file['matrixCommit']})"
     )
     return 0
 
