@@ -27,6 +27,8 @@ Schema release. No technique, tier, or classification content changed.
 ### Changed
 
 - `technique-ids.json`: `matrixCommit` is the 40-character sha of the commit whose `matrix.json` the id list indexes (it carried the placeholder `PENDING-AT-MERGE`). `scripts/validate_matrix.py` gains S11, which refuses any value that is not a 40-hex commit sha, and its summary line names the commit.
+- `scripts/check_readme_claims.py` checks every occurrence of each counted claim, not only that the right number appears somewhere, and covers the counts repeated in the README "Use cases" section (tactics and techniques, the lab-scenario ratio, and the observed, validated and adapted tier counts). A stale repeat used to pass while the overview copy still matched; a failure now names the README line.
+- `scripts/check_live_api_drift.py` checks the README sentence that states which version the live API labels the matrix with, which version this repository is at, and that the technique and tactic counts agree, against the live payload and `matrix.json`. A wrong number in that sentence fails the check, and so does the sentence itself once the live API serves the same version as `matrix.json`, until it is removed. Before, neither this check nor `scripts/check_readme_claims.py` read the sentence.
 
 ### Added
 

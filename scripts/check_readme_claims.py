@@ -49,27 +49,49 @@ def main():
     total = len(techniques)
     failures = []
 
-    def require(pattern, label):
-        """The README must state this exact number somewhere."""
-        if not re.search(pattern, readme):
-            failures.append(label)
+    def require(pattern, expected, label):
+        """The README states this wording at least once, and every occurrence carries
+        the measured number(s).
 
-    require(rf"\b{len(tactics)} tactics\b", f"{len(tactics)} tactics")
-    require(rf"\*\*{total} techniques\*\*", f"**{total} techniques**")
-    require(rf"\b{total} techniques\b", f"{total} techniques")
-    require(rf"\*\*{len(classes)} attack classes\*\*", f"**{len(classes)} attack classes**")
-    require(
-        rf"\*\*{tiers.get('observed', 0)} techniques with real-world evidence\*\*",
-        f"{tiers.get('observed', 0)} observed",
-    )
-    require(
-        rf"\*\*{tiers.get('validated', 0)} techniques validated in controlled lab environments\*\*",
-        f"{tiers.get('validated', 0)} validated",
-    )
-    require(
-        rf"\*\*{tiers.get('adapted', 0)} techniques adapted from traditional environments\*\*",
-        f"{tiers.get('adapted', 0)} adapted",
-    )
+        `pattern` captures each stated number as a group, in the order of `expected`.
+        Checking every occurrence, rather than that the right number appears
+        somewhere, is what catches a count repeated in a second section (Use cases,
+        Purpose) going stale while the first copy still matches.
+        """
+        want = tuple(str(v) for v in expected)
+        found = list(re.finditer(pattern, readme))
+        if not found:
+            failures.append(f"README does not state {label} ({', '.join(want)})")
+        for m in found:
+            if m.groups() != want:
+                line = readme.count("\n", 0, m.start()) + 1
+                failures.append(
+                    f"README.md:{line}: \"{m.group(0)}\" does not match matrix.json "
+                    f"({label}: {', '.join(want)})"
+                )
+
+    observed = tiers.get("observed", 0)
+    validated = tiers.get("validated", 0)
+    adapted = tiers.get("adapted", 0)
+
+    require(r"\b(\d+) tactics\b", [len(tactics)], "tactics")
+    require(r"\*\*(\d+) techniques\*\*", [total], "techniques")
+    require(r"\b(\d+) tactics and (\d+) techniques\b", [len(tactics), total],
+            "tactics and techniques")
+    require(r"\b(\d+) attack classes\b", [len(classes)], "attack classes")
+    require(r"\*\*(\d+) attack classes\*\*", [len(classes)], "attack classes")
+
+    # Evidence tiers, in the overview wording and in the Use cases wording.
+    require(r"\*\*(\d+) techniques with real-world evidence\*\*", [observed], "observed")
+    require(r"\b(\d+) of the (\d+) techniques carry real-world evidence\b",
+            [observed, total], "observed of total")
+    require(r"\*\*(\d+) techniques validated in controlled lab environments\*\*",
+            [validated], "validated")
+    require(r"\b(\d+) are validated in controlled lab environments\b", [validated],
+            "validated")
+    require(r"\*\*(\d+) techniques adapted from traditional environments\*\*",
+            [adapted], "adapted")
+    require(r"\b(\d+) are adapted from traditional environments\b", [adapted], "adapted")
 
     # Coverage claims. Detection and defensive control are stated as universal,
     # so they must actually hold for every technique. The lab-scenario claim is
@@ -87,8 +109,9 @@ def main():
             f"but {total - with_control} do not: {gaps}"
         )
     require(
-        rf"\b{with_lab} of the {total} also carry a reproducible lab scenario\b",
-        f"{with_lab} of the {total} carry a lab scenario",
+        r"\b(\d+) of the (\d+) (?:also )?carry a reproducible lab scenario\b",
+        [with_lab, total],
+        "lab scenario of total",
     )
 
     tier_total = sum(tiers.values())
