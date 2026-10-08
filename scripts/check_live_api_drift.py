@@ -9,6 +9,10 @@ compares the metadata and counts that have actually drifted before:
   (rendered in the site header on every page).
 - created: the API served the request date as the creation date.
 - counts: registry-side migrations once added classes without memberships.
+- README.md: the sentence stating which version the live API labels the matrix
+  with, which version this repository is at, and that the counts agree. It is a
+  measurement of this same payload, so it is held to it, and it fails once the
+  registry catches up until the sentence is removed.
 
 Read-only over the public endpoint, so it carries no secret. It compares
 spec-owned metadata and counts only — content fields the registry legitimately
@@ -17,10 +21,16 @@ enriches at runtime (threat status, prevalence, evidence) are out of scope.
 
 import json
 import os
+import re
 import sys
 import urllib.request
 
 API_URL = "https://api.oa2a.org/api/v1/threat-matrix"
+
+LIVE_CLAIM = "labels the matrix"
+LIVE_VERSION = re.compile(r"labels the matrix (\d+(?:\.\d+)*)")
+REPO_VERSION = re.compile(r"this repository is at (\d+(?:\.\d+)*)")
+COUNTS_CLAIM = "the technique and tactic counts agree"
 
 
 def _version_tuple(value) -> tuple:
@@ -31,9 +41,50 @@ def _version_tuple(value) -> tuple:
         return ()
 
 
+def readme_findings(readme: str, live: dict, spec: dict) -> list:
+    """Findings for each README line that states the live API's matrix version."""
+    findings = []
+    live_version, spec_version = live.get("version"), spec.get("version")
+    for n, line in enumerate(readme.splitlines(), 1):
+        if LIVE_CLAIM not in line:
+            continue
+        where = f"README.md:{n}"
+        stated = LIVE_VERSION.search(line)
+        if not stated:
+            findings.append(
+                f"{where} states the live API's matrix version, but no version "
+                f"number follows {LIVE_CLAIM!r}"
+            )
+        elif stated.group(1) != str(live_version):
+            finding = f"{where} says the live API labels the matrix {stated.group(1)}; it serves {live_version!r}"
+            if live_version == spec_version:
+                finding += ", the same version as matrix.json, so remove the sentence"
+            findings.append(finding)
+        elif live_version == spec_version:
+            findings.append(
+                f"{where} states a version gap, but the live API and matrix.json "
+                f"both say {spec_version!r}, so remove the sentence"
+            )
+
+        repo = REPO_VERSION.search(line)
+        if repo and repo.group(1) != str(spec_version):
+            findings.append(f"{where} says this repository is at {repo.group(1)}; matrix.json says {spec_version!r}")
+
+        if COUNTS_CLAIM in line:
+            for coll in ("techniques", "tactics"):
+                n_live, n_spec = len(live.get(coll) or []), len(spec.get(coll) or [])
+                if n_live != n_spec:
+                    findings.append(
+                        f"{where} says {COUNTS_CLAIM}; {coll}: live API has {n_live}, matrix.json has {n_spec}"
+                    )
+    return findings
+
+
 def main() -> int:
     with open("matrix.json") as f:
         spec = json.load(f)
+    with open("README.md") as f:
+        readme = f.read()
 
     try:
         with urllib.request.urlopen(API_URL, timeout=30) as resp:
@@ -78,6 +129,8 @@ def main() -> int:
         failures.append(
             f"classes with empty techniques[] while techniques declare membership: {', '.join(hollow)}"
         )
+
+    failures.extend(readme_findings(readme, live, spec))
 
     for n_ in notes:
         print(f"NOTE: {n_}")
