@@ -93,10 +93,13 @@ def _ac1_no_banned_word_in_headings_or_headers():
 
 
 def _ac1_readme_cell_updated():
-    line80 = (ROOT / "README.md").read_text().splitlines()[79]
-    assert "MITRE ATT&CK / ATLAS / OWASP LLM" in line80
-    assert "which techniques this repository's mapping documents name" in line80
-    assert "Gap analysis" not in line80
+    # Located by its first cell, not by line number: README sections above it move.
+    rows = [line for line in (ROOT / "README.md").read_text().splitlines()
+            if line.startswith("| MITRE ATT&CK / ATLAS / OWASP LLM |")]
+    assert len(rows) == 1, rows
+    row = rows[0]
+    assert "which techniques this repository's mapping documents name" in row
+    assert "Gap analysis" not in row
 
 
 def _ac1_changelog_names_both_paths():
@@ -138,7 +141,7 @@ AC1_CASES = [
     ("ATM-03.AC1 no cross-references heading reads Coverage Summary", _ac1_no_coverage_summary_heading),
     ("ATM-03.AC1 the four-row aggregate table is deleted", _ac1_aggregate_table_deleted),
     ("ATM-03.AC1 no banned word in any heading or table header", _ac1_no_banned_word_in_headings_or_headers),
-    ("ATM-03.AC1 README line 80 cell is updated", _ac1_readme_cell_updated),
+    ("ATM-03.AC1 README cross-reference row is updated", _ac1_readme_cell_updated),
     ("ATM-03.AC1 CHANGELOG Unreleased names both paths", _ac1_changelog_names_both_paths),
     ("ATM-03.AC1 git mv preserved the file history", _ac1_git_mv_history_preserved),
 ]
