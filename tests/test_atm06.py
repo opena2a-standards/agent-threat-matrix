@@ -102,8 +102,8 @@ def _ac1_change_control_names_the_four_powers_and_the_thread():
 def _ac1_tier_table_unchanged():
     text = CONTRIBUTING.read_text()
     for row in (
-        "| **Observed** | Documented in a real-world production system, security incident report, or internet-wide exposure assessment |",
-        "| **Validated** | Reproduced in a controlled lab environment with documented steps, expected output, and independent verification |",
+        "| **Observed** | Confirmed in real-world production systems | The real-world production system, security incident report, or internet-wide exposure assessment where it was documented |",
+        "| **Validated** | Reproduced in controlled lab environment (DVAA) | The documented reproduction steps and the expected output |",
     ):
         assert row in text, "the evidence-tier table is not rewritten"
     assert "We do not accept purely theoretical techniques." in text

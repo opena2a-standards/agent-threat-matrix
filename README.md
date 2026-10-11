@@ -96,7 +96,7 @@ The Agent Threat Matrix is designed to work **alongside** these frameworks, not 
 
 ## Evidence Standard
 
-Every technique in this matrix is assigned an evidence tier:
+Every technique in this matrix is assigned an evidence tier. The definitions are quoted from [docs/evidence-tiers.md](docs/evidence-tiers.md):
 
 | Tier | Meaning | Count |
 |------|---------|-------|
@@ -260,7 +260,7 @@ agent-threat-matrix/
 
 ### Schema
 
-`matrix.json` follows `schema/threat-matrix-v1.2.schema.json` (JSON Schema 2020-12). `scripts/validate_matrix.py` checks the file against that schema and the rules the schema cannot state (ids resolve, `replacedBy` and `parentId` present exactly when required, `technique-ids.json` in sync). `matrixCommit` in `technique-ids.json` is the 40-character sha of the commit whose `matrix.json` the id list indexes; the validator refuses a value of any other shape, and in a checkout that has the commit's history it also refuses a sha that names no commit or whose `matrix.json` carries different ids (a shallow checkout without that commit, a partial clone without that commit's tree or `matrix.json`, or a copy without git, gets the shape check only, and the validator's summary line says which check ran). Technique ids may take the form `T-NNNN.NNN` for a sub-technique, listed flat in `techniques` with a `parentId`; `schema/consumer-readiness.json` keeps dotted ids out of the file until the listed consumers accept them. `stix/agent-threat-matrix-bundle.json` is a STIX 2.1 rendering of the matrix produced by `scripts/generate_stix.py`, with deterministic object ids; the validator fails when the committed bundle differs from a fresh rendering. Evidence tiers are described in `docs/evidence-tiers.md`.
+`matrix.json` follows `schema/threat-matrix-v1.2.schema.json` (JSON Schema 2020-12). `scripts/validate_matrix.py` checks the file against that schema and the rules the schema cannot state (ids resolve, `replacedBy` and `parentId` present exactly when required, `technique-ids.json` in sync). `matrixCommit` in `technique-ids.json` is the 40-character sha of the commit whose `matrix.json` the id list indexes; the validator refuses a value of any other shape, and in a checkout that has the commit's history it also refuses a sha that names no commit or whose `matrix.json` carries different ids (a shallow checkout without that commit, a partial clone without that commit's tree or `matrix.json`, or a copy without git, gets the shape check only, and the validator's summary line says which check ran). Technique ids may take the form `T-NNNN.NNN` for a sub-technique, listed flat in `techniques` with a `parentId`; `schema/consumer-readiness.json` keeps dotted ids out of the file until the listed consumers accept them. `stix/agent-threat-matrix-bundle.json` is a STIX 2.1 rendering of the matrix produced by `scripts/generate_stix.py`, with deterministic object ids; the validator fails when the committed bundle differs from a fresh rendering. Evidence tiers are defined in `docs/evidence-tiers.md`, and `scripts/check_evidence_tiers.py` checks that every page quoting a tier definition quotes it word for word.
 
 ---
 
@@ -278,7 +278,7 @@ When referencing the framework:
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the full process. In summary:
 
-1. Every new technique must have either a real-world observation or a reproducible lab scenario
+1. Every new technique must meet one evidence tier: a real-world observation (Observed), a reproducible lab scenario (Validated), or an established traditional precedent (Adapted)
 2. Assign the next available technique ID in the appropriate stage range
 3. Include HMA detection check ID, DVAA validation (if applicable), and OASB control mapping
 4. Submit as a pull request with evidence documentation

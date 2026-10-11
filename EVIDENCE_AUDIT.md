@@ -1,12 +1,12 @@
 # Evidence Audit: Every Technique Against MITRE's Standard
 
 MITRE ATT&CK requires every technique to be grounded in observed adversary behavior.
-We apply three evidence tiers:
+We apply three evidence tiers, defined in [docs/evidence-tiers.md](docs/evidence-tiers.md)
+and quoted here:
 
-- **OBSERVED**: Confirmed in real-world production systems (NemoClaw findings, exposure sweeps, npm attacks)
-- **VALIDATED**: Reproducible in controlled lab environment (DVAA challenges, HMA scan results)
-- **ADAPTED**: A well-understood traditional technique applied to the agent context, with a
-  clear attack vector but no agent-specific observation or lab reproduction yet
+- **OBSERVED**: Confirmed in real-world production systems
+- **VALIDATED**: Reproduced in controlled lab environment (DVAA)
+- **ADAPTED**: Well-understood traditional technique applied to agent context, not yet observed agent-specifically
 
 We do not publish purely theoretical techniques. Where this audit assessed a technique as
 theoretical, the outcome was either to establish an agent-specific basis for it or to label
