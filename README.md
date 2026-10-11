@@ -8,7 +8,7 @@ A structured framework for classifying, detecting, and defending against attacks
 
 ### Your team ships an agent and security asks what can go wrong
 
-A team is about to ship an agent that reads documents, calls tools and keeps memory. Security asks for the threat list. Existing catalogs cover networks (MITRE ATT&CK) and models (MITRE ATLAS); the layer between the model and the user, where governance files, skills, MCP connections, memory and credentials in context live, is where agents differ, and a team without a list defends by guesswork.
+A team is about to ship an agent that reads documents, calls tools and keeps memory. Security asks for the threat list. Existing catalogs cover networks (MITRE ATT&CK) and AI systems (MITRE ATLAS, which names attacks on models and, in recent releases, some on agents, such as agent tool invocation and agent configuration changes). The layer between the model and the user, where governance files, skills, MCP connections, memory and credentials in context live, is where agents differ, and a team without a list for that layer defends by guesswork.
 
 The matrix classifies attacks on that layer into 9 tactics and 61 techniques along a kill chain. Each technique carries an evidence tier, maps to a detection check and a defensive control, and 60 of the 61 carry a reproducible lab scenario.
 
@@ -68,7 +68,7 @@ This matrix covers the **agent layer**, the infrastructure between the model and
 
 This matrix does **not** cover:
 
-- Model-level attacks (adversarial examples, training data poisoning): see [MITRE ATLAS](https://atlas.mitre.org/)
+- Model-level attacks (adversarial examples, training data poisoning): see [MITRE ATLAS](https://atlas.mitre.org/), which also names some agent techniques; [the ATLAS mapping](cross-references/mitre-atlas-mapping.md) relates its tactics to this matrix's
 - Prompt injection as a standalone topic: see [OWASP Top 10 for LLM](https://owasp.org/www-project-top-10-for-large-language-model-applications/)
 - Traditional enterprise network attacks: see [MITRE ATT&CK](https://attack.mitre.org/)
 
