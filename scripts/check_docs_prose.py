@@ -9,8 +9,9 @@ Two writing rules apply to every Markdown page a reader sees here:
      are not dashes and are left alone.
 - P2 no heading or bold section label is named "Why this exists" or "Why this matters".
 
-The checked set is every tracked ``*.md`` and ``*.mdx`` file (every such file on disk when
-the repository root is not the top of a git work tree) except CHANGELOG.md and changelog.d/,
+The checked set is every ``*.md`` and ``*.mdx`` file that git tracks or that is untracked and
+not ignored, so a new file is checked before it is staged (every such file on disk when the
+repository root is not the top of a git work tree), except CHANGELOG.md and changelog.d/,
 whose history is not rewritten, LICENSE files, dependency and build output, and test,
 fixture, corpus, golden, snapshot and example directories, whose text is data a test
 compares against. Front matter, fenced code blocks, inline code spans, HTML comments and
@@ -23,6 +24,7 @@ Exit 0 when both rules hold, 1 otherwise, printing ``file:line`` for each violat
 each file that is not valid UTF-8.
 """
 
+import os
 import re
 import subprocess
 import sys
@@ -45,6 +47,7 @@ FENCE_RE = re.compile(r"^ {0,3}(`{3,}|~{3,})")
 INLINE_CODE_RE = re.compile(r"(?<!`)(`+)(?!`)(.+?)(?<!`)\1(?!`)")
 RULE_RE = re.compile(r"^\s*-+\s*$")
 DELIMITER_CELL_RE = re.compile(r":?-+:?")
+BLOCKQUOTE_RE = re.compile(r"^\s*(?:>\s*)+")
 DASHES = (
     ("spaced double hyphen", re.compile(r"(?:^|\s)--(?:\s|$)")),
     ("em dash", re.compile("—")),
@@ -64,18 +67,21 @@ def excluded(rel: str) -> bool:
 
 
 def git_markdown_files(root: Path):
-    """Return the tracked Markdown paths when root is the top of a git work tree, else None.
-    A root nested inside some other repository's work tree is walked instead: there,
-    ``git ls-files`` lists that repository's index, not this tree."""
+    """Return the tracked and the untracked, not ignored, Markdown paths when root is the top
+    of a git work tree, else None. A root nested inside some other repository's work tree is
+    walked instead: there, ``git ls-files`` lists that repository's index, not this tree. The
+    top is compared by file identity, so a path that differs only in letter case on a
+    case-insensitive filesystem still counts as the same directory."""
     def git(*args) -> str:
         return subprocess.run(
             ["git", "-C", str(root), *args], capture_output=True, check=True, timeout=60,
         ).stdout.decode("utf-8")
 
     try:
-        if Path(git("rev-parse", "--show-toplevel").strip()).resolve() != root.resolve():
+        if not os.path.samefile(git("rev-parse", "--show-toplevel").strip(), root):
             return None
-        out = git("ls-files", "-z", "--", "*.md", "*.mdx")
+        out = git("ls-files", "-z", "--cached", "--others", "--exclude-standard",
+                  "--", "*.md", "*.mdx")
     except (OSError, subprocess.SubprocessError, UnicodeDecodeError):
         return None
     return [p for p in out.split("\0") if p]
@@ -93,8 +99,10 @@ def markdown_files(root: Path) -> list:
 
 def strip_html_comments(line: str):
     """Replace each complete ``<!-- ... -->`` in one line with a space and cut the line at an
-    unclosed ``<!--``. Return the stripped line and whether a comment is left open. Each
-    character is scanned once, so a line of many unclosed openers costs linear time."""
+    unclosed ``<!--``. Return the stripped line and whether a comment is left open. As in
+    CommonMark, ``<!-->`` and ``<!--->`` are complete empty comments, so the search for the
+    closing ``-->`` starts at the opener's own hyphens. Each character is scanned once, so a
+    line of many unclosed openers costs linear time."""
     kept = []
     pos = 0
     while True:
@@ -103,7 +111,7 @@ def strip_html_comments(line: str):
             kept.append(line[pos:])
             return "".join(kept), False
         kept.append(line[pos:start])
-        end = line.find("-->", start + 4)
+        end = line.find("-->", start + 2)
         if end < 0:
             return "".join(kept), True
         kept.append(" ")
@@ -112,8 +120,9 @@ def strip_html_comments(line: str):
 
 def table_delimiter_row(line: str) -> bool:
     """True for a GFM table delimiter row such as ``| -- | :-: |`` or ``-- | --``: at least
-    one pipe, and every cell between the pipes is hyphens with optional alignment colons."""
-    row = line.strip()
+    one pipe, and every cell between the pipes is hyphens with optional alignment colons.
+    Block quote markers in front of the row, as in ``> | -- | -- |``, are removed first."""
+    row = BLOCKQUOTE_RE.sub("", line).strip()
     if "|" not in row:
         return False
     if row.startswith("|"):

@@ -7,18 +7,17 @@ files, the material is already assembled.
 
 **Owner-retained actions** (marked OWNER-RETAINED below; explicitly NOT performed here):
 submitting the CVE Request Form, contacting MITRE or any Root, and obtaining counsel sign-off.
-The unit (defined below) records a queued-for-owner card at
-`decisions/2026-08-31-queued-cna-filing-csnp.md` for the filing itself.
+The unit (defined below) links an unpublished record that queues the filing itself for the
+owner.
 
 ## How to read this document
 
 Three terms recur throughout:
 
 - **The owner** is the person who files the CNA application on CSNP's behalf.
-- **The unit** is OpenA2A's planning record for this filing, `roadmap/standards-cna-csnp.md`.
-  It is kept in a private planning tracker and is not published in this repository, so a
-  claim sourced to the unit cannot be checked from here. The [Provenance](#provenance) table
-  marks every such claim `unit`.
+- **The unit** is OpenA2A's planning record for this filing. It is kept in a private planning
+  tracker and is not published in this repository, so a claim sourced to the unit cannot be
+  checked from here. The [Provenance](#provenance) table marks every such claim `unit`.
 - **OWNER-RETAINED** labels an action that only the owner may take: submitting the CVE Request
   Form, contacting MITRE or any Root, or obtaining counsel sign-off. Nothing labeled
   OWNER-RETAINED has been done, and nothing in this repository does it.
@@ -202,13 +201,15 @@ repository records a value.
 
 ## Provenance
 
-`unit` = `roadmap/standards-cna-csnp.md`. Repo paths are relative to this repository.
+`unit` = the unpublished planning record for this filing (see
+[How to read this document](#how-to-read-this-document)). Repo paths are relative to this
+repository.
 
 | Claim | Source |
 | --- | --- |
 | File for CNA under CSNP so the authority reads as neutral | unit |
 | Counsel must confirm charitable-purpose fit before applying | unit |
-| Queued-for-owner card at `decisions/2026-08-31-queued-cna-filing-csnp.md` | unit (Links) |
+| The filing is queued for the owner in a separate unpublished record | unit (Links) |
 | Scope statement wording (Block A) | unit, prereq (1) |
 | Red Hat recommended root for open-source / nonprofit orgs | unit |
 | `RootCNA-Coordination@redhat.com` | unit |

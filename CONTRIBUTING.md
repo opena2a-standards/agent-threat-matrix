@@ -175,7 +175,8 @@ It prints `file:line` for each spaced double hyphen, em dash or spaced en dash u
 in prose, and for each heading or bold label named "Why this exists" or "Why this matters",
 and exits 1 if it finds any. Rewrite the sentence with a period, a comma, a colon or
 parentheses. Code spans, fenced code blocks, HTML comments and table delimiter rows are not
-checked, and neither are `CHANGELOG.md` and test fixture directories. For a finding in
+checked, and neither are `CHANGELOG.md` and test fixture directories. A new file is checked
+before you stage it; a file that git ignores is not checked. For a finding in
 `attack-classes/`, make the fix in the class description in `matrix.json` and regenerate the
 page.
 
