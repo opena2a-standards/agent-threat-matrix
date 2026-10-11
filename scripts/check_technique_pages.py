@@ -25,6 +25,8 @@ of a technique page is left alone. A missing or repeated technique-page line has
 place to write the data to, so ``--fix`` reports it and still exits 1.
 """
 
+from __future__ import annotations  # "X | None" annotations also load on Python 3.9
+
 import bisect
 import json
 import re
@@ -58,8 +60,76 @@ FIELD_PATTERNS = (
 )
 FIELDS = tuple((label, re.compile(pattern, re.M), render) for label, pattern, render in FIELD_PATTERNS)
 NO_PROCEDURES_RE = re.compile(rf"^(?P<line>{re.escape(NO_PROCEDURES)})$", re.M)
+# Block structure, matched in a line from where the markers and indentation of the block
+# quotes and list items that hold it end, after tabs are expanded to stops of four columns.
 # A fence line: up to three spaces, a run of one fence character, then the rest of the line.
 FENCE_RE = re.compile(r" {0,3}(?P<run>`{3,}|~{3,})(?P<rest>.*)")
+LIST_MARKER_RE = re.compile(r"(?P<marker> {0,3}(?:[-+*]|(?P<number>[0-9]{1,9})[.)]))(?P<space> *)")
+QUOTE_MARKER_RE = re.compile(r" {0,3}> ?")
+THEMATIC_BREAK_RE = re.compile(r" {0,3}(?:(?:\*[ \t]*){3,}|(?:-[ \t]*){3,}|(?:_[ \t]*){3,})\r?")
+SETEXT_UNDERLINE_RE = re.compile(r" {0,3}(?:=+|-+)[ \t]*\r?")
+HEADING_RE = re.compile(r" {0,3}#{1,6}(?:[ \t\r]|$)")
+COMMENT_START_RE = re.compile(r" {0,3}<!--")
+SPACES_RE = re.compile(" *")
+# Leaf blocks other than a fence, which is held as its opening run.
+PARAGRAPH, INDENTED_CODE, COMMENT = "paragraph", "indented code", "comment"
+
+
+class _Line:
+    """One line with tabs expanded, and where its text ends (trailing spaces and a carriage
+    return are not text)."""
+
+    def __init__(self, line: str):
+        self.text = line.expandtabs(4)
+        self.end = len(self.text.rstrip(" \r"))
+        # A thematic break runs to the end of the line, so it can only start inside the
+        # longest tail made of one of its characters and spaces. Finding that tail once
+        # keeps a line of many nested list markers from being rescanned at each marker.
+        last = self.text[self.end - 1] if self.end else ""
+        self.break_tail = self.end
+        if last in ("*", "-", "_"):
+            self.break_tail = len(self.text[:self.end].rstrip(last + " "))
+
+    def text_start(self, pos: int) -> int:
+        return SPACES_RE.match(self.text, pos).end()
+
+    def thematic_break(self, pos: int) -> bool:
+        start = self.text_start(pos)
+        return start - pos <= 3 and start >= self.break_tail and start < self.end \
+            and bool(THEMATIC_BREAK_RE.fullmatch(self.text, pos))
+
+    def fence_opener(self, pos: int) -> re.Match | None:
+        """The fence this line opens at ``pos``, or None. A backtick run followed by another
+        backtick on the same line is an inline code span, not a fence."""
+        m = FENCE_RE.fullmatch(self.text, pos)
+        if m and not (m["run"][0] == "`" and "`" in m["rest"]):
+            return m
+        return None
+
+    def list_item(self, pos: int, interrupting: bool) -> tuple[int, bool] | None:
+        """For a list item that starts at ``pos``, its content column and whether its first
+        line is blank; None when no list item starts there. An item that would interrupt a
+        paragraph must have text and, when ordered, start at 1."""
+        m = LIST_MARKER_RE.match(self.text, pos)
+        if not m:
+            return None
+        blank = m.end() >= self.end
+        if not (m["space"] or blank):
+            return None
+        if interrupting and (blank or (m["number"] is not None and int(m["number"]) != 1)):
+            return None
+        if blank or len(m["space"]) > 4:
+            # An item that starts blank, or with indented code, has its content one column
+            # after the marker.
+            return m.end("marker") + 1, blank
+        return m.end(), False
+
+    def starts_block(self, pos: int) -> bool:
+        """True when a block that ends a paragraph starts at ``pos``, so the line is not a
+        lazy continuation of that paragraph."""
+        return bool(self.thematic_break(pos) or QUOTE_MARKER_RE.match(self.text, pos)
+                    or self.list_item(pos, interrupting=False) or self.fence_opener(pos)
+                    or HEADING_RE.match(self.text, pos) or COMMENT_START_RE.match(self.text, pos))
 
 
 def fenced_spans(text: str) -> list[tuple[int, int]]:
@@ -69,24 +139,120 @@ def fenced_spans(text: str) -> list[tuple[int, int]]:
     of the page. The fence rules are CommonMark's: a backtick run followed by another
     backtick on the same line is an inline code span and opens nothing; a fence closes on a
     line of the same character, at least as long as the opening run, with nothing after
-    it; and an unclosed fence runs to the end of the page. Lines end at ``\\n`` only, as
-    they do for the field patterns, so a form feed or U+2028 does not start a line.
+    it; a fence inside a list item or block quote ends with it, so a fence opened in a list
+    item ends at the first non-blank line indented less than the item's content (only
+    paragraph text continues lazily); a fence line inside an HTML comment (from a line that
+    starts with ``<!--`` to the line that holds ``-->``) opens nothing; and an unclosed
+    fence runs to the end of the page. Lines end at ``\\n`` only, as they do for the field
+    patterns, so a form feed or U+2028 does not start a line.
+
+    To place each fence, the block quotes and list items that hold it are followed by
+    CommonMark's rules, including lazy continuation lines, a list item that interrupts a
+    paragraph (it must have text, and an ordered one must start at 1) and a list item that
+    starts with a blank line (a second blank line ends it). Of the HTML blocks only the
+    comment is followed: a fence line inside any other, such as a ``<div>`` block that runs
+    to the next blank line, still opens a fence. A comment ends at ``-->`` or with the list
+    item or block quote that holds it, not at a blank line, as the CommonMark specification
+    reads it; markdown-it ends a comment inside a list item at a blank line. Data lines
+    inside an HTML comment are still read. Each line is read once, so the cost is linear in
+    the length of the page.
     """
     spans = []
-    fence = None
-    start = offset = 0
-    for line in text.split("\n"):
-        m = FENCE_RE.fullmatch(line)
-        if fence is None:
-            if m and not (m["run"][0] == "`" and "`" in m["rest"]):
-                fence, start = m["run"], offset
-        elif m and m["run"][0] == fence[0] and len(m["run"]) >= len(fence) \
-                and not m["rest"].strip(" \t\r"):
-            spans.append((start, offset + len(line) + 1))
-            fence = None
-        offset += len(line) + 1
-    if fence is not None:
-        spans.append((start, len(text)))
+    # Open containers, outermost first: None for a block quote, and for a list item the
+    # width from where the item's line starts inside its parent to the item's content.
+    containers = []
+    leaf = None  # PARAGRAPH, INDENTED_CODE, COMMENT, or the opening run of a fence
+    fence_start = 0
+    blank_item = False  # the innermost container is a list item whose only line is blank
+    offset = 0
+    for raw in text.split("\n"):
+        line_start, offset = offset, offset + len(raw) + 1
+        line = _Line(raw)
+        text_at = line.text_start(0)
+
+        # The open containers this line continues: a block quote by its marker, a list item
+        # by indentation to its content or by a blank line. Indentation is counted from the
+        # end of the enclosing container's marker on this line, as CommonMark counts it.
+        pos = matched = 0
+        for width in containers:
+            if width is None:
+                m = QUOTE_MARKER_RE.match(line.text, pos)
+                if not m:
+                    break
+                pos = m.end()
+                text_at = line.text_start(pos)
+            elif text_at < line.end:
+                if text_at - pos < width:
+                    break
+                pos += width
+            matched += 1
+        blank = text_at >= line.end
+        was_blank_item, blank_item = blank_item, False
+
+        if matched < len(containers):
+            if leaf == PARAGRAPH and not blank and not line.starts_block(pos):
+                continue  # a lazy continuation line keeps every container and the paragraph
+            del containers[matched:]
+            if leaf not in (None, PARAGRAPH, INDENTED_CODE, COMMENT):
+                spans.append((fence_start, line_start))  # the fence ends with its container
+            leaf = None
+        elif was_blank_item and blank:
+            containers.pop()  # a list item can begin with at most one blank line
+            leaf = None
+
+        if leaf == COMMENT:
+            if line.text.find("-->", pos) >= 0:
+                leaf = None
+            continue
+        if leaf not in (None, PARAGRAPH, INDENTED_CODE):
+            m = FENCE_RE.fullmatch(line.text, pos)
+            if m and m["run"][0] == leaf[0] and len(m["run"]) >= len(leaf) \
+                    and not m["rest"].strip(" \t\r"):
+                spans.append((fence_start, offset))
+                leaf = None
+            continue
+        if blank:
+            if leaf == PARAGRAPH:
+                leaf = None
+            continue
+        if leaf == INDENTED_CODE:
+            if text_at - pos >= 4:
+                continue
+            leaf = None
+
+        # New containers: block quote markers and list markers, in the order they appear.
+        interrupting = leaf == PARAGRAPH
+        while text_at < line.end and text_at - pos < 4 and not line.thematic_break(pos):
+            if m := QUOTE_MARKER_RE.match(line.text, pos):
+                containers.append(None)
+                pos = m.end()
+            elif item := line.list_item(pos, interrupting):
+                column, blank_item = item
+                containers.append(column - pos)
+                pos = column
+            else:
+                break
+            text_at = line.text_start(pos)
+            leaf = None
+            interrupting = False
+
+        # The leaf block, if this line starts one.
+        if text_at >= line.end:
+            continue
+        if text_at - pos >= 4:
+            if leaf != PARAGRAPH:
+                leaf = INDENTED_CODE
+        elif line.thematic_break(pos) or HEADING_RE.match(line.text, pos) or (
+                leaf == PARAGRAPH and SETEXT_UNDERLINE_RE.fullmatch(line.text, pos)):
+            leaf = None
+        elif opener := line.fence_opener(pos):
+            leaf, fence_start = opener["run"], line_start
+        elif COMMENT_START_RE.match(line.text, pos):
+            leaf = None if line.text.find("-->", pos) >= 0 else COMMENT
+        else:
+            leaf = PARAGRAPH
+    if leaf not in (None, PARAGRAPH, INDENTED_CODE, COMMENT):
+        spans.append((fence_start, len(text)))
     return spans
 
 

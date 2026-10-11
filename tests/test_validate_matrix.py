@@ -222,7 +222,7 @@ def test_technique_ids_file_must_match():
 
 # --------------------------------------------------------------------------- ATM-07 (S11)
 
-SHA40_RE = r"^[0-9a-f]{40}$"
+SHA40_RE = r"[0-9a-f]{40}"
 
 
 def _shipped_matrix_commit() -> str:
@@ -232,7 +232,7 @@ def _shipped_matrix_commit() -> str:
 def _ac1_shipped_matrix_commit_is_a_full_sha():
     import re
     value = _shipped_matrix_commit()
-    assert isinstance(value, str) and re.match(SHA40_RE, value), value
+    assert isinstance(value, str) and re.fullmatch(SHA40_RE, value), value
     assert value != "PENDING-AT-MERGE"
 
 
@@ -281,6 +281,14 @@ def _ac2_truncated_sha_is_refused():
          f"S11 technique-ids.json matrixCommit {short!r} is not a 40-hex commit sha")
 
 
+def _ac2_trailing_newline_is_refused():
+    # The scratch tree has no git history, so only the shape check runs; a "$" anchor
+    # also matches before a trailing newline, which let this value pass.
+    value = _shipped_matrix_commit() + "\n"
+    _red(mutate(_plant_matrix_commit(value)),
+         f"S11 technique-ids.json matrixCommit {value!r} is not a 40-hex commit sha")
+
+
 def _ac2_missing_key_is_refused():
     _red(mutate(_plant_matrix_commit(None, present=False)),
          "S11 technique-ids.json matrixCommit None is not a 40-hex commit sha")
@@ -297,6 +305,8 @@ AC2_CASES = [
      _ac2_placeholder_is_refused),
     ("ATM-07.AC2 a twelve-character abbreviation turns the validator red with the S11 line",
      _ac2_truncated_sha_is_refused),
+    ("ATM-07.AC2 a sha with a trailing newline turns the validator red with the S11 line",
+     _ac2_trailing_newline_is_refused),
     ("ATM-07.AC2 a missing matrixCommit key turns the validator red rendering None",
      _ac2_missing_key_is_refused),
     ("ATM-07.AC2 a non-string matrixCommit turns the validator red",
@@ -589,3 +599,25 @@ def test_stix_generator_is_deterministic_and_self_consistent():
         assert all(o["spec_version"] == "2.1" for o in bundle["objects"])
     finally:
         shutil.rmtree(root)
+
+
+def test_stix_generator_runs_with_docstrings_stripped():
+    # python3 -OO strips docstrings; the argument parser's description used to be read from
+    # the module docstring and the run ended in an AttributeError.
+    root = scratch_tree()
+    try:
+        proc = subprocess.run(["python3", "-OO", str(root / "scripts" / "generate_stix.py")],
+                              capture_output=True, text=True, timeout=120)
+        assert proc.returncode == 0, proc.stdout + proc.stderr
+        assert (root / "stix" / "agent-threat-matrix-bundle.json").read_bytes() \
+            == (ROOT / "stix" / "agent-threat-matrix-bundle.json").read_bytes()
+    finally:
+        shutil.rmtree(root)
+
+
+def test_stix_generator_description_is_its_docstring_summary():
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("generate_stix", ROOT / "scripts" / "generate_stix.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    assert mod.DESCRIPTION == mod.__doc__.splitlines()[0]

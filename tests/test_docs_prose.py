@@ -96,6 +96,31 @@ def test_code_comments_front_matter_and_compounds_are_not_reported():
     assert CHK.check_text("doc.md", text) == []
 
 
+# Lines that CommonMark does not treat as an opening fence, so the prose after each is still
+# checked: backticks with a backtick in the info string are an inline code span, and a form
+# feed or U+2028 does not end a line, so the backticks after it are not at a line start.
+NOT_A_FENCE = [
+    ("a backtick in the info string", "```x`y\n"),
+    ("a line separator before the backticks", "Example\u2028```\n"),
+    ("a form feed before the backticks", "Example\x0c```\n"),
+]
+
+
+@pytest.mark.parametrize("opener", [o for _, o in NOT_A_FENCE], ids=[n for n, _ in NOT_A_FENCE])
+def test_a_line_that_is_not_a_fence_leaves_the_prose_after_it_checked(opener):
+    failures = CHK.check_text("doc.md", opener + f"A dash {EM} in prose.\n")
+    assert failures == ["doc.md:2: P1 em dash used as a dash in prose"]
+
+
+def test_a_backtick_in_a_tilde_fence_info_string_still_opens_the_fence():
+    assert CHK.check_text("doc.md", f"~~~x`y\nA dash {EM} in code.\n~~~\n") == []
+
+
+def test_lines_end_at_commonmark_line_endings():
+    failures = CHK.check_text("doc.md", f"a\r\nb\rA dash {EM} here.\n")
+    assert failures == ["doc.md:3: P1 em dash used as a dash in prose"]
+
+
 def test_why_this_exists_sections_are_reported():
     text = (
         "## Why this exists\n"

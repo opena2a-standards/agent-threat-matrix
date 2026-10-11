@@ -16,7 +16,10 @@ whose history is not rewritten, LICENSE files, dependency and build output, and 
 fixture, corpus, golden, snapshot and example directories, whose text is data a test
 compares against. Front matter, fenced code blocks, inline code spans, HTML comments and
 table delimiter rows are skipped: a ``--`` there is a command-line separator, program text or
-table syntax, not punctuation. VERBATIM lists the lines that quote a recorded source word for
+table syntax, not punctuation. Fences follow CommonMark in two ways: lines end at ``\\n``,
+``\\r\\n`` or ``\\r`` only, so backticks after a form feed or U+2028 are not at the start of
+a line; and a run of backticks with another backtick later on its line is an inline code
+span, which opens no fence. VERBATIM lists the lines that quote a recorded source word for
 word, where rewriting the punctuation would misquote it; an entry matches one exact line, so
 an edited line is checked again.
 
@@ -44,6 +47,7 @@ VERBATIM = {
 }
 
 FENCE_RE = re.compile(r"^ {0,3}(`{3,}|~{3,})")
+LINE_END_RE = re.compile(r"\r\n|\r|\n")
 INLINE_CODE_RE = re.compile(r"(?<!`)(`+)(?!`)(.+?)(?<!`)\1(?!`)")
 RULE_RE = re.compile(r"^\s*-+\s*$")
 DELIMITER_CELL_RE = re.compile(r":?-+:?")
@@ -132,10 +136,17 @@ def table_delimiter_row(line: str) -> bool:
     return all(DELIMITER_CELL_RE.fullmatch(cell.strip()) for cell in row.split("|"))
 
 
+def split_lines(text: str) -> list:
+    """Split at CommonMark's line endings only. ``str.splitlines`` also breaks at a form feed,
+    U+2028 and other characters that CommonMark keeps inside a line."""
+    lines = LINE_END_RE.split(text)
+    return lines[:-1] if lines[-1] == "" else lines
+
+
 def prose_lines(text: str):
     """Yield (line number, line) for each line outside front matter, fences and comments,
     with inline code spans and HTML comments removed."""
-    lines = text.splitlines()
+    lines = split_lines(text)
     start = 0
     if lines and lines[0].strip() == "---":
         for i in range(1, len(lines)):
@@ -158,7 +169,7 @@ def prose_lines(text: str):
             line = line.split("-->", 1)[1]
             in_comment = False
         m = FENCE_RE.match(line)
-        if m:
+        if m and not (m.group(1)[0] == "`" and "`" in line[m.end():]):
             fence = m.group(1)
             continue
         line, in_comment = strip_html_comments(line)
@@ -167,7 +178,7 @@ def prose_lines(text: str):
 
 def check_text(rel: str, text: str) -> list:
     """Return one ``file:line: rule`` string per violation in one Markdown file."""
-    raw = text.splitlines()
+    raw = split_lines(text)
     failures = []
     for lineno, line in prose_lines(text):
         if (rel, raw[lineno - 1].rstrip()) in VERBATIM:

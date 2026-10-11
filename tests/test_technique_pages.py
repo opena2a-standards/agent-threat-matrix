@@ -225,7 +225,7 @@ def test_an_unclosed_fence_hides_the_data_lines_after_it(tree):
 # end a line. The data line after each is still a data line of the page.
 NOT_A_FENCE = [
     ("a backtick in the info string", "```x`y\n"),
-    ("a line separator before the backticks", "Example ```\n"),
+    ("a line separator before the backticks", "Example\u2028```\n"),
     ("a form feed before the backticks", "Example\x0c```\n"),
 ]
 
@@ -241,6 +241,71 @@ def test_a_line_that_is_not_a_fence_does_not_hide_the_data_lines_after_it(tree, 
     assert "T-1006: page has 2 'HMA Checks' lines" in result.stdout
 
 
+# Blocks that CommonMark ends, or never reads as a fence, before the data line after them,
+# so that line is still a data line of the page. A fence inside a list item or a block
+# quote ends with it, at the first line that does not continue it, and a fence line inside
+# an HTML comment opens nothing. Every case but the block quote used to be read as a fence
+# running to the end of the page, which hid the data line.
+ENDED_BEFORE_THE_DATA_LINE = [
+    ("a fence in a list item", "- step\n  ```sh\n  run\n"),
+    ("a fence in a list item after a lazy line", "- step\ncontinued\n  ```sh\n  run\n"),
+    ("a fence in a block quote", "> ```sh\n> run\n"),
+    ("a fence line in an HTML comment", "<!--\n```\n-->\n"),
+    # An item whose first line is blank ends at a second blank line, so the comment is not
+    # in the item and does not end at the unindented fence line.
+    ("a comment after an item that starts blank", "-\n\n  <!--\n```\n-->\n"),
+    # An ordered item that interrupts a paragraph must start at 1, so "2." is paragraph
+    # text and the comment is not in an item.
+    ("a comment after an ordered line that continues a paragraph",
+     "Some text\n2. step\n   <!--\n```\n-->\n"),
+]
+
+
+@pytest.mark.parametrize("block", [b for _, b in ENDED_BEFORE_THE_DATA_LINE],
+                         ids=[n for n, _ in ENDED_BEFORE_THE_DATA_LINE])
+def test_a_block_that_ends_before_a_data_line_does_not_hide_it(tree, block):
+    page = tree / "techniques" / "T-1006.md"
+    text = page.read_text(encoding="utf-8")
+    page.write_text(text + "\n" + block + "- **HMA Checks:** WRONG-001\n", encoding="utf-8")
+
+    result = run_checker(tree)
+    assert result.returncode == 1, result.stdout
+    assert "T-1006: page has 2 'HMA Checks' lines" in result.stdout
+
+
+# Fences that CommonMark keeps open over the data line after them, so that line is code.
+STILL_OPEN_AT_THE_DATA_LINE = [
+    # A comment in a list item ends with the item, so the unindented fence line opens a fence.
+    ("a fence after a comment in a list item", "- <!--\n```\n"),
+    # A fence is not paragraph text, so it ends the list item instead of continuing it.
+    ("a fence after a lazy line of a list item", "- step\ncontinued\n```\n"),
+    # A closing fence has at most three spaces of indentation.
+    ("a closing fence line indented four spaces", "```\n    ```\n"),
+]
+
+
+@pytest.mark.parametrize("block", [b for _, b in STILL_OPEN_AT_THE_DATA_LINE],
+                         ids=[n for n, _ in STILL_OPEN_AT_THE_DATA_LINE])
+def test_a_fence_still_open_at_a_data_line_hides_it(tree, block):
+    page = tree / "techniques" / "T-1006.md"
+    text = page.read_text(encoding="utf-8")
+    page.write_text(text + "\n" + block + "- **HMA Checks:** AIM-001\n", encoding="utf-8")
+
+    result = run_checker(tree)
+    assert result.returncode == 0, result.stdout
+
+
+def test_a_line_indented_four_spaces_opens_no_fence(tree):
+    # Four spaces of indentation make indented code, not a fence, so the data line after it
+    # is still a data line of the page.
+    mutate(tree / "techniques" / "T-1006.md", "## Mitigation\n",
+           "## Mitigation\n\n    ```\n- **HMA Checks:** WRONG-001\n")
+
+    result = run_checker(tree)
+    assert result.returncode == 1, result.stdout
+    assert "T-1006: page has 2 'HMA Checks' lines" in result.stdout
+
+
 def test_many_fenced_blocks_cost_linear_time():
     blocks = 16000
     text = "# t\n```\n# t\n```\n" * blocks
@@ -249,6 +314,14 @@ def test_many_fenced_blocks_cost_linear_time():
     found = CHK.find_lines(title, text)
     assert time.perf_counter() - started < 2.0
     assert len(found) == blocks
+
+
+def test_deeply_nested_list_items_cost_linear_time():
+    # A line of many list markers, each read once, and lines that continue every item.
+    text = "- " * 20000 + "x\n" + ("1. " * 2000 + "y\n") + (" " * 6000 + "z\n") * 200
+    started = time.perf_counter()
+    CHK.fenced_spans(text)
+    assert time.perf_counter() - started < 2.0
 
 
 def test_dvaa_line_on_a_technique_without_one_in_the_data_is_red_and_fixed(tree):

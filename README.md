@@ -121,7 +121,7 @@ This matrix maps every technique to four external references:
 | [OASB](https://oasb.ai) | Defensive controls (46 controls across 10 domains) |
 | MITRE ATT&CK / ATLAS / OWASP LLM | An index of which techniques this repository's mapping documents name against each framework, and which they do not |
 
-See [cross-references/](cross-references/) for detailed mapping documents. The DVAA figures are pinned in [`related-projects.json`](related-projects.json) with the DVAA release they were read from. On each README line naming DVAA, `python3 scripts/check_readme_claims.py` reads the wordings "N agents", "N deliberately vulnerable", "N hardened reference", "N control-protected variants", "N vulnerable agents" and "N categories" (up to two words may stand between the number and "categories"), and fails when one states a different number. A DVAA figure worded any other way is not checked.
+See [cross-references/](cross-references/) for detailed mapping documents. The DVAA figures are pinned in [`related-projects.json`](related-projects.json) with the DVAA release they were read from. On each README line naming DVAA, `python3 scripts/check_readme_claims.py` reads the wordings "N agents", "N deliberately vulnerable", "N hardened reference", "N control-protected variant(s)", "N vulnerable agent(s)" and "N categories" (up to two words, each a run of ASCII letters and hyphens, may stand between the number and "categories"), in any letter case with one space between words, and fails when one states a different number. A DVAA figure worded any other way is not checked.
 
 ---
 
