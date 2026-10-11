@@ -20,9 +20,19 @@ The pages under tactics/ carry nothing but data (name, kill chain stage, descrip
 a table of the tactic's techniques in matrix.json order), so each must equal its full
 rendering from matrix.json. Their tables kept the same four superseded classes.
 
-Run with ``--fix`` to rewrite those lines and tactic pages from the data. Every other line
-of a technique page is left alone. A missing or repeated technique-page line has no single
-place to write the data to, so ``--fix`` reports it and still exits 1.
+The ``## Mitigation`` section of a technique page is data too: it lists the OASB controls
+in ``oasbControls``, and says "No documented mitigations yet." only for a technique that
+maps none. Every page said that while every technique mapped to one or more controls. The
+section runs from its heading to the next ``## `` heading outside fenced code blocks. A
+technique page also carries no ``**Severity:**`` line: matrix.json has no severity field,
+and every page printed the label with an empty value.
+
+Run with ``--fix`` to rewrite those lines, the Mitigation section and the tactic pages from
+the data, and to drop a Severity line. Every other line of a technique page is left alone.
+A missing or repeated technique-page line or Mitigation section has no single place to
+write the data to, and a Mitigation section that holds a fenced code block may hold the
+rest of the page behind an unclosed fence, so ``--fix`` reports each of them and still
+exits 1.
 """
 
 from __future__ import annotations  # "X | None" annotations also load on Python 3.9
@@ -35,7 +45,12 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 NO_PROCEDURES = "No documented procedures yet."
+NO_MITIGATION = "No documented mitigations yet."
+OASB_URL = "https://oasb.ai"
 DVAA_LABEL = "DVAA Validation"
+SEVERITY_RE = re.compile(r"^(?P<line>\*\*Severity:\*\*.*)$", re.M)
+MITIGATION_RE = re.compile(r"^(?P<line>## Mitigation)$", re.M)
+SECTION_RE = re.compile(r"^(?P<line>## .*)$", re.M)
 
 # (label, pattern whose group ``line`` is the data line, rendering from a technique).
 # A rendering of None means the page must not carry the line.
@@ -298,7 +313,51 @@ def check_technique_page(technique: dict, text: str) -> tuple[list[str], str]:
         if have != want:
             failures.append(f"{tid}: {label} line is '{have}', matrix.json says '{want}'")
             updated = _replace(updated, found[0], want)
+
+    severity = find_lines(SEVERITY_RE, updated)
+    if severity:
+        count = "a Severity line" if len(severity) == 1 else f"{len(severity)} Severity lines"
+        failures.append(f"{tid}: page has {count}, and matrix.json has no severity field")
+        for match in reversed(severity):
+            start, end = match.span("line")
+            updated = updated[:start] + updated[end + 1:]
+
+    mitigation_failures, updated = check_mitigation(technique, updated)
+    failures.extend(mitigation_failures)
     return failures, updated
+
+
+def expected_mitigation(technique: dict) -> str:
+    """The Mitigation section body: one line per OASB control matrix.json maps."""
+    controls = technique.get("oasbControls") or []
+    if not controls:
+        return NO_MITIGATION
+    lines = [f"Apply the [OASB-1]({OASB_URL}) controls that matrix.json maps to this technique:", ""]
+    lines += [f"- OASB {control}" for control in controls]
+    return "\n".join(lines)
+
+
+def check_mitigation(technique: dict, text: str) -> tuple[list[str], str]:
+    """Return the Mitigation section's disagreement with the data and the page with the
+    section rewritten. A section that holds a fenced code block is not rewritten."""
+    tid = technique["id"]
+    headings = find_lines(MITIGATION_RE, text)
+    if len(headings) > 1:
+        return [f"{tid}: page has {len(headings)} '## Mitigation' sections"], text
+    if not headings:
+        return [f"{tid}: page has no '## Mitigation' section"], text
+    start = headings[0].end("line")
+    following = [m.start() for m in find_lines(SECTION_RE, text) if m.start() > start]
+    end = following[0] if following else len(text)
+    want = expected_mitigation(technique)
+    if text[start:end].strip("\n") == want:
+        return [], text
+    controls = ", ".join(technique.get("oasbControls") or []) or "none"
+    failures = [f"{tid}: Mitigation section does not list the OASB controls matrix.json maps ({controls})"]
+    if any(start <= fence_start < end for fence_start, _ in fenced_spans(text)):
+        return failures, text
+    trailer = "\n\n" if end < len(text) else "\n"
+    return failures, text[:start] + "\n\n" + want + trailer + text[end:]
 
 
 def _replace(text: str, match: re.Match, line: str) -> str:
@@ -383,7 +442,8 @@ def check_pages(matrix: dict, fix: bool) -> list[str]:
 
 
 def report(heading: str, failures: list[str]) -> None:
-    print(f"{heading} {len(failures)} technique- or tactic-page line(s) that disagree with matrix.json:")
+    print(f"{heading} {len(failures)} technique- or tactic-page line(s) or section(s) that disagree "
+          "with matrix.json:")
     for failure in failures:
         print(f"  - {failure}")
 
@@ -408,7 +468,8 @@ def main(argv: list[str]) -> int:
             return 1
 
     print(f"OK: {len(matrix['techniques'])} technique pages and {len(matrix['tactics'])} tactic "
-          "pages agree with matrix.json on every data line")
+          "pages agree with matrix.json on every data line and Mitigation section, and no "
+          "technique page carries a Severity line")
     return 0
 
 
