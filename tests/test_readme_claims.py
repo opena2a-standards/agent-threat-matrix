@@ -260,6 +260,26 @@ GLUED_WORDINGS = [
      "(21 agents: 16 deliberately vulnerable", "(22 agentś: 16 deliberately vulnerable"),
     ("U+0301 on the s of categories",
      "variants; 12 vulnerability categories", "variants; 13 vulnerability categorieś"),
+    # The wordings below are stated once in README, so each glued copy is added beside
+    # the original rather than replacing it.
+    ("U+00E9 before the deliberately vulnerable count",
+     "16 deliberately vulnerable,", "16 deliberately vulnerable, é17 deliberately vulnerable,"),
+    ("U+00E9 after deliberately vulnerable",
+     "16 deliberately vulnerable,", "16 deliberately vulnerable, 17 deliberately vulnerableé,"),
+    ("U+00E9 before the hardened reference count",
+     "1 hardened reference,", "1 hardened reference, é2 hardened reference,"),
+    ("U+00E9 after hardened reference",
+     "1 hardened reference,", "1 hardened reference, 2 hardened referenceé,"),
+    ("U+00E9 before the control-protected variant count",
+     "4 control-protected variants;",
+     "4 control-protected variants, é5 control-protected variants;"),
+    ("U+00E9 after control-protected variants",
+     "4 control-protected variants;",
+     "4 control-protected variants, 5 control-protected variantsé;"),
+    ("U+00E9 before the vulnerable agent count",
+     "16 deliberately vulnerable,", "16 deliberately vulnerable, é17 vulnerable agents,"),
+    ("U+00E9 after vulnerable agents",
+     "16 deliberately vulnerable,", "16 deliberately vulnerable, 17 vulnerable agentsé,"),
 ]
 
 
