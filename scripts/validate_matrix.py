@@ -30,13 +30,19 @@ Standard library only, no network. Two passes:
         scripts/generate_stix.py renders from this matrix.json
    - S11 technique-ids.json ``matrixCommit`` is the 40-hex sha of the commit
         whose matrix.json the id list indexes; a placeholder, an abbreviated
-        sha or a missing key is refused. No git is consulted: a shallow or
-        gitless checkout cannot resolve the object, so only the shape is checked
+        sha or a missing key is refused. Where the repository root is the top
+        of a git work tree that holds the commit, matrix.json is read at that
+        commit, and a sha that names no commit, names another kind of object,
+        or indexes a matrix.json whose ids differ from the list is refused. A
+        copy without git, or a shallow checkout that lacks the commit, cannot
+        resolve the object, so there only the shape is checked; the summary
+        line says which check ran
 
 Exit 0 when everything holds, 1 otherwise.
 """
 
 import json
+import os
 import re
 import subprocess
 import sys
@@ -53,6 +59,10 @@ STIX_GENERATOR = ROOT / "scripts" / "generate_stix.py"
 
 DOTTED_RE = re.compile(r"^(T-[0-9]{4})\.[0-9]{3}$")
 COMMIT_SHA_RE = re.compile(r"^[0-9a-f]{40}$")
+
+# Variables that would point git at a repository other than the one ROOT sits in.
+GIT_LOCATION_VARS = ("GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR", "GIT_INDEX_FILE",
+                     "GIT_OBJECT_DIRECTORY", "GIT_ALTERNATE_OBJECT_DIRECTORIES")
 
 # --------------------------------------------------------------------------- schema subset
 
@@ -142,7 +152,71 @@ def technique_label(technique: dict, index: int) -> str:
     return technique.get("id") if isinstance(technique.get("id"), str) else f"techniques[{index}]"
 
 
-def semantic_checks(matrix: dict, readiness: dict, technique_ids_file, errors: list):
+def id_difference(expected: list, listed) -> str:
+    """The ids one list misses and adds against the other, or "" when they hold the same ids."""
+    missing = sorted(set(expected) - set(listed or []))
+    extra = sorted(set(listed or []) - set(expected))
+    detail = []
+    if missing:
+        detail.append(f"missing {missing}")
+    if extra:
+        detail.append(f"extra {extra}")
+    return "; ".join(detail)
+
+
+def git(*args):
+    """Run git in ROOT; stdout as text, or None when git is absent or the command fails."""
+    env = {key: value for key, value in os.environ.items() if key not in GIT_LOCATION_VARS}
+    env["GIT_NO_LAZY_FETCH"] = "1"  # a partial clone must not fetch a missing object
+    try:
+        proc = subprocess.run(["git", "-C", str(ROOT), *args],
+                              capture_output=True, timeout=60, env=env)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if proc.returncode != 0:
+        return None
+    return proc.stdout.decode("utf-8", errors="replace")
+
+
+def resolve_matrix_commit(commit: str, listed, errors: list) -> str:
+    """S11 beyond the shape: compare the ids of matrix.json at matrixCommit with the list.
+
+    Returns the note the summary line prints after the sha.
+    """
+    top = git("rev-parse", "--show-toplevel")
+    if top is None or Path(top.strip()).resolve() != ROOT:
+        return "shape only: no git history at the repository root"
+    kind = (git("cat-file", "-t", commit) or "").strip()
+    if not kind:
+        if (git("rev-parse", "--is-shallow-repository") or "").strip() == "true":
+            return "shape only: shallow checkout without that commit"
+        errors.append(f"S11 technique-ids.json matrixCommit {commit} does not name a commit in this repository")
+        return ""
+    if kind != "commit":
+        errors.append(f"S11 technique-ids.json matrixCommit {commit} names a {kind} object, not a commit")
+        return ""
+    blob = git("cat-file", "blob", f"{commit}:matrix.json")
+    if blob is None:
+        errors.append(f"S11 technique-ids.json matrixCommit {commit} has no matrix.json")
+        return ""
+    try:
+        indexed = sorted(t["id"] for t in json.loads(blob)["techniques"])
+    except (json.JSONDecodeError, KeyError, TypeError):
+        errors.append(f"S11 technique-ids.json matrixCommit {commit}: matrix.json at that commit does not parse")
+        return ""
+    detail = id_difference(indexed, listed)
+    if detail:
+        errors.append(
+            f"S11 technique-ids.json matrixCommit {commit} indexes a matrix.json whose ids "
+            f"differ from the list: {detail}"
+        )
+        return ""
+    return "ids match matrix.json at that commit"
+
+
+def semantic_checks(matrix: dict, readiness: dict, technique_ids_file, errors: list) -> str:
+    """Append one line per semantic failure; return the matrixCommit note for the summary."""
+    commit_note = ""
     techniques = matrix["techniques"]
     tactic_ids = {t["id"] for t in matrix["tactics"]}
     class_ids = {c["id"] for c in matrix["attackClasses"]}
@@ -210,19 +284,13 @@ def semantic_checks(matrix: dict, readiness: dict, technique_ids_file, errors: l
             )
         listed = technique_ids_file.get("ids")
         if listed != expected:
-            missing = sorted(set(expected) - set(listed or []))
-            extra = sorted(set(listed or []) - set(expected))
-            detail = []
-            if missing:
-                detail.append(f"missing {missing}")
-            if extra:
-                detail.append(f"extra {extra}")
-            if not missing and not extra:
-                detail.append("same ids, different order (the list must be sorted)")
-            errors.append("S8 technique-ids.json ids differ from matrix.json: " + "; ".join(detail))
+            detail = id_difference(expected, listed) or "same ids, different order (the list must be sorted)"
+            errors.append("S8 technique-ids.json ids differ from matrix.json: " + detail)
         commit = technique_ids_file.get("matrixCommit")
         if not (isinstance(commit, str) and COMMIT_SHA_RE.match(commit)):
             errors.append(f"S11 technique-ids.json matrixCommit {commit!r} is not a 40-hex commit sha")
+        else:
+            commit_note = resolve_matrix_commit(commit, listed, errors)
 
     for attack_class in matrix["attackClasses"]:
         for tid in attack_class.get("techniques", []):
@@ -232,6 +300,7 @@ def semantic_checks(matrix: dict, readiness: dict, technique_ids_file, errors: l
         for tid in path.get("techniques", []):
             if tid not in ids:
                 errors.append(f"S9 attackPaths {path['id']}: step {tid} is not a technique id")
+    return commit_note
 
 
 def stix_check(errors: list):
@@ -280,8 +349,9 @@ def main() -> int:
     errors = list(checker.errors)
 
     technique_ids_file = load_json(TECHNIQUE_IDS)
+    commit_note = ""
     if not errors:
-        semantic_checks(matrix, readiness, technique_ids_file, errors)
+        commit_note = semantic_checks(matrix, readiness, technique_ids_file, errors)
         stix_check(errors)
     else:
         errors.append("semantic checks skipped until the schema violations above are fixed")
@@ -297,7 +367,7 @@ def main() -> int:
         f"matrix.json validates against schema 1.2: {len(matrix['techniques'])} techniques "
         f"({sub} sub-techniques), {len(matrix['dataSources'])} data sources, "
         f"technique-ids.json and STIX bundle in sync "
-        f"(matrixCommit {technique_ids_file['matrixCommit']})"
+        f"(matrixCommit {technique_ids_file['matrixCommit']}, {commit_note})"
     )
     return 0
 
