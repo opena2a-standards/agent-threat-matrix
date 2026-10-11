@@ -30,6 +30,7 @@ import json
 import pathlib
 import re
 import sys
+import unicodedata
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 MATRIX = ROOT / "matrix.json"
@@ -49,6 +50,18 @@ CATEGORY_LABELS = {
     "identity": "Identity",
     "sandbox": "Sandbox",
 }
+
+
+def combining_marks():
+    """A regex character class body holding every combining mark (Unicode category M)."""
+    ranges = []
+    for code in range(sys.maxunicode + 1):
+        if unicodedata.category(chr(code)).startswith("M"):
+            if ranges and ranges[-1][1] == code - 1:
+                ranges[-1][1] = code
+            else:
+                ranges.append([code, code])
+    return "".join(f"\\U{lo:08x}-\\U{hi:08x}" for lo, hi in ranges)
 
 
 def table_cell(text):
@@ -267,14 +280,18 @@ def main(argv):
     # re.ASCII keeps that to ASCII letters and digits: without it "[A-Za-z]" also matches
     # U+0130, U+0131, U+017F (long s) and U+212A (Kelvin sign), and an "i" or "s" in a
     # wording matches the first three. re.ASCII would also narrow \b to ASCII word
-    # characters and read "é21 agents" as "21 agents", so each wording is bounded by a
-    # Unicode word boundary instead: a wording glued to a letter or digit of any script
-    # is not read.
+    # characters and read "é21 agents" as "21 agents". A Unicode \b is not enough either:
+    # it counts no combining mark as a word character, so "é" written as "e" and U+0301
+    # was read. Each wording is bounded instead by the absence of a Unicode word character
+    # or a combining mark on either side: a wording glued to a letter, digit or combining
+    # mark of any script is not read.
     on_dvaa_lines = dict(text=dvaa_lines, source=pinned, flags=re.IGNORECASE | re.ASCII)
+    glue = r"(?u:[\w" + combining_marks() + r"])"
 
     def wording(words):
-        """The pattern for "N <words>", bounded on both sides by a Unicode word boundary."""
-        return r"(?u:\b)(\d+) " + words + r"(?u:\b)"
+        """The pattern for "N <words>", with no Unicode word character and no combining
+        mark directly before or after it."""
+        return r"(?<!" + glue + r")(\d+) " + words + r"(?!" + glue + r")"
 
     require(wording("agents"), [dvaa["agents"]], "DVAA agents", **on_dvaa_lines)
     require(wording("deliberately vulnerable"), [kinds["deliberatelyVulnerable"]],
