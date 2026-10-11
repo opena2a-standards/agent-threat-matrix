@@ -22,11 +22,14 @@ Hangul filler or combining mark does so directly beside a DVAA wording, while a 
 that renders as nothing leaves the figure in the rendered line.
 """
 
+import importlib.util
 import json
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
+import unicodedata
 from pathlib import Path
 
 import pytest
@@ -266,6 +269,14 @@ GLUED_WORDINGS = [
      "(21 agents: 16 deliberately vulnerable", "(22 agentś: 16 deliberately vulnerable"),
     ("U+0301 on the s of categories",
      "variants; 12 vulnerability categories", "variants; 13 vulnerability categorieś"),
+    # An enclosing mark (category Me) is a combining mark as much as a nonspacing (Mn) or
+    # spacing (Mc) one, so it glues a wording too.
+    ("U+20DD (combining enclosing circle) before the agent count",
+     "(21 agents: 16 deliberately vulnerable",
+     "(\N{COMBINING ENCLOSING CIRCLE}22 agents: 16 deliberately vulnerable"),
+    ("U+20DD (combining enclosing circle) on the s of agents",
+     "(21 agents: 16 deliberately vulnerable",
+     "(22 agents\N{COMBINING ENCLOSING CIRCLE}: 16 deliberately vulnerable"),
     # The wordings below are stated once in README, so each glued copy is added beside
     # the original rather than replacing it.
     ("U+00E9 before the deliberately vulnerable count",
@@ -575,8 +586,11 @@ print(f"status={status} calls={calls}")
 
 def test_the_check_reads_the_categories_of_readme_characters_only():
     # The combining-mark test used to rebuild a character class from all 1,114,112 code
-    # points on every run. It now looks up the characters of README lines naming DVAA
-    # and the two beside each DVAA wording, which are fewer than README's characters.
+    # points on every run. It now looks up every character of the README lines naming
+    # DVAA for format characters, each distinct character of those lines once more for
+    # combining marks, and the code points of each run of combining marks found there and
+    # the one on either side of it.
+    # On the shipped README that is fewer lookups than README has characters.
     td = scratch_tree()
     try:
         r = subprocess.run(["python3", "-c", COUNT_CATEGORY_CALLS,
@@ -589,6 +603,49 @@ def test_the_check_reads_the_categories_of_readme_characters_only():
         assert calls <= len((td / "README.md").read_text(encoding="utf-8")), last
     finally:
         shutil.rmtree(td)
+
+
+def load_checker():
+    spec = importlib.util.spec_from_file_location(
+        "check_readme_claims", ROOT / "scripts" / "check_readme_claims.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def mark_runs():
+    """Every run of consecutive combining marks (category M), as (first, last) code points."""
+    runs = []
+    for code in range(sys.maxunicode + 1):
+        if unicodedata.category(chr(code)).startswith("M"):
+            if runs and runs[-1][1] == code - 1:
+                runs[-1][1] = code
+            else:
+                runs.append([code, code])
+    return [tuple(run) for run in runs]
+
+
+def class_ranges(body):
+    """The (first, last) code points of a class body written as \\U ranges only."""
+    pairs = re.findall(r"\\U([0-9a-f]{8})-\\U([0-9a-f]{8})", body)
+    assert "".join(f"\\U{lo}-\\U{hi}" for lo, hi in pairs) == body, ascii(body[:40])
+    return [(int(lo, 16), int(hi, 16)) for lo, hi in pairs]
+
+
+def test_the_combining_mark_class_holds_one_range_per_run_of_marks():
+    # Listed one by one, each combining mark outside the Basic Multilingual Plane is a
+    # separate entry that every test of the class walks, so a DVAA line carrying many of
+    # them slowed matching past a table of every mark. The class holds each run of
+    # consecutive marks that has a mark in the text as one range instead.
+    checker = load_checker()
+    runs = mark_runs()
+    every_mark = "".join(chr(code) for lo, hi in runs for code in range(lo, hi + 1))
+    assert class_ranges(checker.combining_marks_in(every_mark)) == runs
+    # Marks scattered over a run, with other characters between them, still take one range.
+    some = runs[::7]
+    scattered = "DVAA " + " ".join(f"{chr(lo)}x{chr(hi)}" for lo, hi in some)
+    assert class_ranges(checker.combining_marks_in(scattered)) == some
+    assert checker.combining_marks_in("DVAA: 21 agents") == ""
 
 
 def test_the_dvaa_category_count_must_be_stated():

@@ -81,11 +81,29 @@ IGNORABLE_MARKS = frozenset(
 )
 
 
+def is_mark(code):
+    """Whether code point `code` is a combining mark (Unicode category M: Mn, Mc or Me)."""
+    return 0 <= code <= sys.maxunicode and unicodedata.category(chr(code)).startswith("M")
+
+
 def combining_marks_in(text):
-    """A regex character class body holding each combining mark (Unicode category M)
-    that occurs in `text`. A mark that occurs nowhere in `text` can stand beside no
-    wording in it, so the class need not hold every mark there is."""
-    return "".join(sorted(c for c in set(text) if unicodedata.category(c).startswith("M")))
+    """A regex character class body holding, as one range each, the runs of consecutive
+    combining marks that hold a mark occurring in `text`. A mark that occurs nowhere in
+    `text` can stand beside no wording in it, so the class need not hold every mark there
+    is. Listed one by one, each mark outside the Basic Multilingual Plane is a separate
+    entry that every test of the class walks; as runs, the class has no more ranges than
+    a table of every mark."""
+    ranges = []
+    for code in sorted(ord(c) for c in set(text) if is_mark(ord(c))):
+        if ranges and code <= ranges[-1][1]:
+            continue
+        lo = hi = code
+        while is_mark(lo - 1):
+            lo -= 1
+        while is_mark(hi + 1):
+            hi += 1
+        ranges.append((lo, hi))
+    return "".join(f"\\U{lo:08x}-\\U{hi:08x}" for lo, hi in ranges)
 
 
 def table_cell(text):
@@ -346,7 +364,9 @@ def main(argv):
     # one start position matches at several lengths ("13 categories x categories" holds
     # "13 categories") a mark glued to the longer wording leaves the shorter one read.
     # The mark part of the class is built from the DVAA lines alone, not from every code
-    # point: a mark that stands on none of them can stand beside no wording.
+    # point: a mark that stands on none of them can stand beside no wording. It holds each
+    # run of consecutive marks that has a mark on those lines, so it is never larger than
+    # a table of every mark.
     on_dvaa_lines = dict(text=dvaa_lines, source=pinned, flags=re.IGNORECASE | re.ASCII)
     glue = r"(?u:[\w" + combining_marks_in(dvaa_lines) + r"])"
 
