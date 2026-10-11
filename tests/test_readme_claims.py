@@ -105,6 +105,13 @@ MUTATIONS = [
     # DVAA's own table is titled Attack Categories; the count is read under either name.
     ("variants; 12 vulnerability categories", "variants; 13 attack categories"),
     ("variants; 12 vulnerability categories", "variants; 13 categories"),
+    # Up to two words may stand between the number and "categories".
+    ("variants; 12 vulnerability categories", "variants; 13 distinct attack categories"),
+    # Every DVAA wording is read in any letter case, and the singular nouns are read too.
+    ("variants; 12 vulnerability categories", "variants; 13 Attack Categories"),
+    ("variants; 12 vulnerability categories", "variants; 13 VULNERABILITY CATEGORIES"),
+    ("(21 agents: 16 deliberately vulnerable", "(22 Agents: 16 deliberately vulnerable"),
+    ("4 control-protected variants", "3 control-protected variant"),
     # The DVAA row counted all 21 agents as vulnerable.
     ("Lab validation (21 agents: 16 deliberately vulnerable, 1 hardened reference, "
      "4 control-protected variants; 12 vulnerability categories)",
@@ -179,6 +186,33 @@ def test_a_dvaa_figure_changed_in_the_pinned_file_is_red_on_every_readme_line():
                        "environment (21 agents, 12 vulnerability categories)"):
             assert f"README.md:{line_of(td, needle)}:" in r.stderr, r.stderr
         assert "related-projects.json (DVAA vulnerability categories: 13)" in r.stderr, r.stderr
+    finally:
+        shutil.rmtree(td)
+
+
+def test_a_category_count_with_three_words_before_the_noun_is_not_read():
+    # README states that a DVAA figure worded any other way than the wordings it lists is
+    # not checked; three words between the number and "categories" is such a wording.
+    td = scratch_tree()
+    try:
+        mutate_readme(td, "variants; 12 vulnerability categories",
+                      "variants; 13 distinct attack vulnerability categories")
+        r = run_checker(td)
+        assert r.returncode == 0, r.stderr
+    finally:
+        shutil.rmtree(td)
+
+
+def test_the_dvaa_category_count_must_be_stated():
+    td = scratch_tree()
+    try:
+        mutate_readme(td, "variants; 12 vulnerability categories",
+                      "variants; 12 vulnerability classes")
+        mutate_readme(td, "environment (21 agents, 12 vulnerability categories)",
+                      "environment (21 agents, 12 vulnerability classes)")
+        r = run_checker(td)
+        assert r.returncode == 1, r.stdout
+        assert "README does not state DVAA vulnerability categories (12)" in r.stderr, r.stderr
     finally:
         shutil.rmtree(td)
 

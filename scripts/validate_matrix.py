@@ -60,7 +60,8 @@ STIX_BUNDLE = ROOT / "stix" / "agent-threat-matrix-bundle.json"
 STIX_GENERATOR = ROOT / "scripts" / "generate_stix.py"
 
 DOTTED_RE = re.compile(r"^(T-[0-9]{4})\.[0-9]{3}$")
-COMMIT_SHA_RE = re.compile(r"^[0-9a-f]{40}$")
+# Applied with fullmatch: ``$`` also matches before a trailing newline.
+COMMIT_SHA_RE = re.compile(r"[0-9a-f]{40}")
 
 # Variables that would point git at a repository other than the one ROOT sits in.
 GIT_LOCATION_VARS = ("GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR", "GIT_INDEX_FILE",
@@ -317,7 +318,7 @@ def semantic_checks(matrix: dict, readiness: dict, technique_ids_file, errors: l
             detail = id_difference(expected, listed) or "same ids, different order (the list must be sorted)"
             errors.append("S8 technique-ids.json ids differ from matrix.json: " + detail)
         commit = technique_ids_file.get("matrixCommit")
-        if not (isinstance(commit, str) and COMMIT_SHA_RE.match(commit)):
+        if not (isinstance(commit, str) and COMMIT_SHA_RE.fullmatch(commit)):
             errors.append(f"S11 technique-ids.json matrixCommit {commit!r} is not a 40-hex commit sha")
         else:
             commit_note = resolve_matrix_commit(commit, listed, errors)

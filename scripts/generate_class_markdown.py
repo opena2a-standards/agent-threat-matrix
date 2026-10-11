@@ -19,7 +19,8 @@ class with no page, or a page for a class that is gone):
 
     python3 scripts/generate_class_markdown.py --check
 
-Any other argument, such as a mistyped ``--chek``, exits 2 and writes nothing.
+``--help`` (or ``-h``) prints the usage and exits 0. Any other argument, such as a
+mistyped ``--chek``, exits 2. Neither writes anything.
 
 The severity line is gone deliberately: matrix.json carries no per-class
 severity, and a generator default dressed as a measurement is exactly what
@@ -37,6 +38,8 @@ import os
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# The first line of the docstring, which ``python3 -OO`` strips.
+DESCRIPTION = "Regenerate attack-classes/*.md from matrix.json."
 
 
 def render_pages(matrix: dict) -> dict:
@@ -119,7 +122,7 @@ def check(pages: dict, out_dir: str) -> int:
 def main(argv: list) -> int:
     # An argument this script does not know ends the run with exit 2 before anything is
     # written: a mistyped --check must not regenerate the pages.
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0], allow_abbrev=False)
+    parser = argparse.ArgumentParser(description=DESCRIPTION, allow_abbrev=False)
     parser.add_argument("--check", action="store_true",
                         help="write nothing; exit 1 when attack-classes/ differs from a fresh rendering")
     args = parser.parse_args(argv)

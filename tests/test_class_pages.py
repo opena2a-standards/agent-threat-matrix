@@ -23,14 +23,15 @@ GENERATOR = Path("scripts") / "generate_class_markdown.py"
 PROSE_CHECKER = ROOT / "scripts" / "check_docs_prose.py"
 
 
-def _load_prose_checker():
-    spec = importlib.util.spec_from_file_location("check_docs_prose", PROSE_CHECKER)
+def _load(name: str, path: Path):
+    spec = importlib.util.spec_from_file_location(name, path)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod
 
 
-PROSE = _load_prose_checker()
+PROSE = _load("check_docs_prose", PROSE_CHECKER)
+GENERATOR_MODULE = _load("generate_class_markdown", ROOT / GENERATOR)
 
 
 def scratch_tree() -> Path:
@@ -122,7 +123,8 @@ def test_check_reports_a_description_changed_only_in_matrix_json():
         shutil.rmtree(td)
 
 
-@pytest.mark.parametrize("argument,status", [("--chek", 2), ("--chec", 2), ("check", 2), ("--help", 0)])
+@pytest.mark.parametrize("argument,status",
+                         [("--chek", 2), ("--chec", 2), ("check", 2), ("--help", 0), ("-h", 0)])
 def test_an_argument_other_than_check_writes_nothing(argument, status):
     td = scratch_tree()
     try:
@@ -137,6 +139,26 @@ def test_an_argument_other_than_check_writes_nothing(argument, status):
         assert "Wrote" not in proc.stdout
         assert page.read_text(encoding="utf-8") == edited
         assert (td / "attack-classes" / "NOT-A-CLASS.md").exists()
+    finally:
+        shutil.rmtree(td)
+
+
+def test_the_description_states_what_help_and_other_arguments_do():
+    doc = GENERATOR_MODULE.__doc__
+    assert "``--help`` (or ``-h``) prints the usage and exits 0." in doc
+    assert "Any other argument, such as a\nmistyped ``--chek``, exits 2." in doc
+    assert GENERATOR_MODULE.DESCRIPTION == doc.splitlines()[0]
+
+
+def test_check_runs_with_docstrings_stripped():
+    # python3 -OO strips docstrings; the argument parser's description used to be read from
+    # the module docstring and the run ended in an AttributeError.
+    td = scratch_tree()
+    try:
+        proc = subprocess.run(["python3", "-OO", str(td / GENERATOR), "--check"],
+                              capture_output=True, text=True, timeout=120)
+        assert proc.returncode == 0, proc.stdout + proc.stderr
+        assert f"OK: {class_count()} attack class pages match matrix.json." in proc.stdout
     finally:
         shutil.rmtree(td)
 

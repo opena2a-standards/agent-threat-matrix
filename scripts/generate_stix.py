@@ -36,6 +36,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 MATRIX = ROOT / "matrix.json"
 DEFAULT_OUTPUT = ROOT / "stix" / "agent-threat-matrix-bundle.json"
+# The first line of the docstring, which ``python3 -OO`` strips.
+DESCRIPTION = "Render matrix.json as a STIX 2.1 bundle at stix/agent-threat-matrix-bundle.json."
 
 SPEC_VERSION = "2.1"
 KILL_CHAIN = "agent-threat-matrix"
@@ -261,7 +263,7 @@ def render(matrix: dict) -> str:
 
 
 def main(argv: list) -> int:
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser = argparse.ArgumentParser(description=DESCRIPTION)
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT, help="where to write the bundle")
     args = parser.parse_args(argv)
 

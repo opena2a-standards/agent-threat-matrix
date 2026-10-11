@@ -16,8 +16,10 @@ other project, so they are pinned in related-projects.json with the release and
 commit each was read from, and every README line naming the project must state the
 pinned number wherever it uses one of the wordings read here. For DVAA those are
 "N agents", "N deliberately vulnerable", "N hardened reference", "N control-protected
-variants", "N vulnerable agents" and "N categories" (up to two words may stand between
-the number and "categories"); a figure worded any other way is not checked. DVAA was
+variant(s)", "N vulnerable agent(s)" and "N categories", where up to two words, each a
+run of ASCII letters and hyphens, may stand between the number and "categories". Each
+is read in any letter case with one space between words; a figure worded any other way
+is not checked. DVAA was
 described as "21 vulnerable agents" while DVAA labels one of the 21 a hardened
 reference and four control-protected variants.
 
@@ -180,7 +182,8 @@ def main(argv):
     total = len(techniques)
     failures = []
 
-    def require(pattern, expected, label, text=readme, source="matrix.json", stated=True):
+    def require(pattern, expected, label, text=readme, source="matrix.json", stated=True,
+                flags=0):
         """The README states this wording at least once, and every occurrence carries
         the measured number(s).
 
@@ -192,7 +195,7 @@ def main(argv):
         absent, but any occurrence must still carry the measured number(s).
         """
         want = tuple(str(v) for v in expected)
-        found = list(re.finditer(pattern, text))
+        found = list(re.finditer(pattern, text, flags))
         if not found and stated:
             failures.append(f"README does not state {label} ({', '.join(want)})")
         for m in found:
@@ -260,20 +263,22 @@ def main(argv):
         )
     dvaa_lines = lines_naming(readme, "DVAA")
     pinned = "related-projects.json"
-    require(r"\b(\d+) agents\b", [dvaa["agents"]], "DVAA agents", dvaa_lines, pinned)
+    # Every DVAA wording is read in any letter case: DVAA itself writes "Attack Categories".
+    on_dvaa_lines = dict(text=dvaa_lines, source=pinned, flags=re.IGNORECASE)
+    require(r"\b(\d+) agents\b", [dvaa["agents"]], "DVAA agents", **on_dvaa_lines)
     require(r"\b(\d+) deliberately vulnerable\b", [kinds["deliberatelyVulnerable"]],
-            "DVAA deliberately vulnerable agents", dvaa_lines, pinned)
+            "DVAA deliberately vulnerable agents", **on_dvaa_lines)
     require(r"\b(\d+) hardened reference\b", [kinds["hardenedReference"]],
-            "DVAA hardened reference agents", dvaa_lines, pinned)
+            "DVAA hardened reference agents", **on_dvaa_lines)
     require(r"\b(\d+) control-protected variants?\b", [kinds["controlProtectedVariant"]],
-            "DVAA control-protected variants", dvaa_lines, pinned)
+            "DVAA control-protected variants", **on_dvaa_lines)
     # "N vulnerable agents" counts only the agents DVAA labels vulnerable.
     require(r"\b(\d+) (?:deliberately )?vulnerable agents?\b", [kinds["deliberatelyVulnerable"]],
-            "DVAA vulnerable agents", dvaa_lines, pinned, stated=False)
-    # DVAA titles its own table Attack Categories, so the count is read under any name:
-    # "N categories" with up to two words between the number and the noun.
+            "DVAA vulnerable agents", stated=False, **on_dvaa_lines)
+    # The count is read under any name: "N categories" with up to two words, each a run
+    # of ASCII letters and hyphens, between the number and the noun.
     require(r"\b(\d+) (?:[A-Za-z-]+ ){0,2}categories\b", [dvaa["vulnerabilityCategories"]],
-            "DVAA vulnerability categories", dvaa_lines, pinned)
+            "DVAA vulnerability categories", **on_dvaa_lines)
     dvaa_summary = (
         f"DVAA {dvaa['sourceVersion']}: {dvaa['agents']} agents "
         f"({', '.join(f'{k}={v}' for k, v in kinds.items())}), "
