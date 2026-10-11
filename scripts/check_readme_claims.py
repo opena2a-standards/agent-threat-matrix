@@ -62,16 +62,11 @@ HANGUL_FILLERS = (
 )
 
 
-def combining_marks():
-    """A regex character class body holding every combining mark (Unicode category M)."""
-    ranges = []
-    for code in range(sys.maxunicode + 1):
-        if unicodedata.category(chr(code)).startswith("M"):
-            if ranges and ranges[-1][1] == code - 1:
-                ranges[-1][1] = code
-            else:
-                ranges.append([code, code])
-    return "".join(f"\\U{lo:08x}-\\U{hi:08x}" for lo, hi in ranges)
+def beside_a_combining_mark(text, match):
+    """True when a combining mark (Unicode category M) stands directly before or after
+    `match` in `text`."""
+    beside = text[max(match.start() - 1, 0):match.start()] + text[match.end():match.end() + 1]
+    return any(unicodedata.category(c).startswith("M") for c in beside)
 
 
 def table_cell(text):
@@ -220,7 +215,7 @@ def main(argv):
     failures = []
 
     def require(pattern, expected, label, text=readme, source="matrix.json", stated=True,
-                flags=0):
+                flags=0, skip=None):
         """The README states this wording at least once, and every occurrence carries
         the measured number(s).
 
@@ -229,10 +224,11 @@ def main(argv):
         somewhere, is what catches a count repeated in a second section (Use cases,
         Purpose) going stale while the first copy still matches. `text` is the README
         or a line-preserving subset of it; with `stated=False` the wording may be
-        absent, but any occurrence must still carry the measured number(s).
+        absent, but any occurrence must still carry the measured number(s). An
+        occurrence `m` for which `skip(text, m)` is true is not read.
         """
         want = tuple(str(v) for v in expected)
-        found = list(re.finditer(pattern, text, flags))
+        found = [m for m in re.finditer(pattern, text, flags) if not (skip and skip(text, m))]
         if not found and stated:
             failures.append(f"README does not state {label} ({', '.join(want)})")
         for m in found:
@@ -308,9 +304,12 @@ def main(argv):
     # it counts no combining mark as a word character, so "é" written as "e" and U+0301
     # was read. Each wording is bounded instead by the absence of a Unicode word character
     # or a combining mark on either side: a wording glued to a letter, digit or combining
-    # mark of any script is not read.
-    on_dvaa_lines = dict(text=dvaa_lines, source=pinned, flags=re.IGNORECASE | re.ASCII)
-    glue = r"(?u:[\w" + combining_marks() + r"])"
+    # mark of any script is not read. The pattern holds the word-character bound and
+    # require() drops an occurrence with a combining mark beside it. No wording holds a
+    # digit after its number, so no occurrence starts inside another and resuming the
+    # search after a dropped one passes over nothing the pattern would have read.
+    on_dvaa_lines = dict(text=dvaa_lines, source=pinned, flags=re.IGNORECASE | re.ASCII,
+                         skip=beside_a_combining_mark)
     # A wording is not read when a character that renders as nothing stands inside or
     # beside it ("age" U+00AD "nts", "22" U+200B " agents", U+3164 "22 agents"), so such
     # a character fails the line instead of leaving its figure unchecked.
@@ -323,9 +322,9 @@ def main(argv):
         )
 
     def wording(words):
-        """The pattern for "N <words>", with no Unicode word character and no combining
-        mark directly before or after it."""
-        return r"(?<!" + glue + r")(\d+) " + words + r"(?!" + glue + r")"
+        """The pattern for "N <words>", with no Unicode word character directly before or
+        after it."""
+        return r"(?<!(?u:\w))(\d+) " + words + r"(?!(?u:\w))"
 
     require(wording("agents"), [dvaa["agents"]], "DVAA agents", **on_dvaa_lines)
     require(wording("deliberately vulnerable"), [kinds["deliberatelyVulnerable"]],
