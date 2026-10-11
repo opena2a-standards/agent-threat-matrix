@@ -31,10 +31,11 @@ lists as default ignorable without assigning them (U+2065, U+FFF0 to U+FFF8, U+E
 U+E0002 to U+E001F, U+E0080 to U+E00FF, U+E01F0 to U+E0FFF). Inside a wording such a
 character keeps the wording from being read, and a Hangul filler or combining mark does
 so directly beside a DVAA wording, while a character that renders as nothing leaves the
-figure in the rendered line. A line that states one of the matrix.json counts once such
-characters are removed fails the same way when it carries one. Each failure names the
-line, the column of the character's first occurrence on it, counted in characters from
-1, and the character.
+figure in the rendered line. A line names DVAA when it contains "DVAA" once such
+characters are removed, so one written inside the name does not take the line out of the
+check, and a line that states one of the matrix.json counts once they are removed fails
+the same way when it carries one. Each failure names the line, the column of the
+character's first occurrence on it, counted in characters from 1, and the character.
 
 Exit 0 when every claim matches the data, 1 otherwise.
 """
@@ -204,10 +205,12 @@ def fix_class_tables(matrix, readme):
     return readme[:start] + render_class_tables(matrix) + readme[end:]
 
 
-def lines_naming(text, name):
-    """`text` with every line that does not contain `name` blanked, so a match
-    offset still converts to its README line number."""
-    return "\n".join(line if name in line else "" for line in text.split("\n"))
+def lines_naming(lines, name):
+    """The README with every line blanked that does not contain `name` once the characters
+    `hiding_kind` names are removed, so a match offset still converts to its README line
+    number. `lines` holds each README line as `classified` returns it. "DV" U+200B "AA"
+    shows as DVAA, so that line names DVAA."""
+    return "\n".join(line if name in shown else "" for line, shown, _ in lines)
 
 
 def hiding_kind(c):
@@ -227,16 +230,24 @@ def hiding_kind(c):
     return None
 
 
-def hiding_characters(line):
-    """(column, character) for the first occurrence in `line` of each character that
-    `hiding_kind` names, the column counted in characters from 1."""
-    found = []
+def classified(line):
+    """(line, shown, hidden) for `line`: `shown` is `line` with every character
+    `hiding_kind` names removed, and `hidden` holds (column, character) for the first
+    occurrence of each such character, the column counted in characters from 1. One
+    lookup per character gives both; a repeat of a character already found is removed
+    without another."""
+    shown = []
+    hidden = []
     seen = set()
     for column, c in enumerate(line, 1):
-        if c not in seen and hiding_kind(c):
+        if c in seen:
+            continue
+        if hiding_kind(c):
             seen.add(c)
-            found.append((column, c))
-    return found
+            hidden.append((column, c))
+        else:
+            shown.append(c)
+    return line, "".join(shown), hidden
 
 
 def empty(value):
@@ -364,7 +375,10 @@ def main(argv):
             f"related-projects.json: dvaa.agentsByKind counts sum to {sum(kinds.values())}, "
             f"dvaa.agents is {dvaa['agents']}"
         )
-    dvaa_lines = lines_naming(readme, "DVAA")
+    # Each README line is classified once: the lookups that find the characters failing a
+    # line also give the line as it shows, and that decides whether it names DVAA.
+    lines = [classified(line) for line in readme.split("\n")]
+    dvaa_lines = lines_naming(lines, "DVAA")
     pinned = "related-projects.json"
     # Every DVAA wording is read in any letter case: DVAA itself writes "Attack Categories".
     # re.ASCII keeps that to ASCII letters and digits: without it "[A-Za-z]" also matches
@@ -408,15 +422,14 @@ def main(argv):
     # U+00AD "nts", "22" U+200B " agents", "tac" U+00AD "tics"), or when a Hangul filler or
     # combining mark is glued to a DVAA wording (U+3164 "22 agents", "agents" U+034F), so
     # the character fails the line instead of leaving its figure unchecked. That holds for
-    # every line naming DVAA and every line that states a matrix.json count once such
-    # characters are removed: "8 tac" U+00AD "tics" states a count the check cannot read.
-    for number, line in enumerate(readme.split("\n"), 1):
-        hidden = hiding_characters(line)
+    # every line that names DVAA or states a matrix.json count once such characters are
+    # removed: "DV" U+200B "AA" names DVAA, and "8 tac" U+00AD "tics" states a count the
+    # check cannot read.
+    for number, (line, shown, hidden) in enumerate(lines, 1):
         if not hidden:
             continue
-        shown = "".join(c for c in line if not hiding_kind(c))
         readers = []
-        if "DVAA" in line:
+        if "DVAA" in shown:
             readers.append(("naming DVAA", "DVAA"))
         if any(re.search(pattern, shown) for pattern in count_wordings):
             readers.append(("stating a matrix.json count", "count"))
