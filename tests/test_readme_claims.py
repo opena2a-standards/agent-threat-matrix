@@ -383,6 +383,78 @@ def test_a_wording_a_space_away_from_a_combining_mark_is_still_read():
         shutil.rmtree(td)
 
 
+def test_a_wording_at_the_start_of_the_readme_is_read_beside_a_final_combining_mark():
+    # The character before a wording at offset 0 is no character, not the last one in
+    # the README: a combining mark ending the README does not glue the first wording.
+    td = scratch_tree()
+    try:
+        readme = td / "README.md"
+        text = readme.read_text(encoding="utf-8").rstrip("\n")
+        readme.write_text(f"22 agents in DVAA\n{text}\nDVAA\N{COMBINING ACUTE ACCENT}",
+                          encoding="utf-8")
+        r = run_checker(td)
+        assert r.returncode == 1, r.stdout
+        assert ('README.md:1: "22 agents" does not match related-projects.json '
+                "(DVAA agents: 21)") in r.stderr, r.stderr
+    finally:
+        shutil.rmtree(td)
+
+
+def test_a_shorter_categories_wording_at_the_same_start_is_read_when_the_longer_is_glued():
+    # "N categories" allows up to two words before the noun, so one start position can
+    # match at several lengths. A combining mark glued to the longest, "13 categories x
+    # categories", must not hide the shorter "13 categories" at the same start.
+    td = scratch_tree()
+    try:
+        readme = td / "README.md"
+        text = readme.read_text(encoding="utf-8").rstrip("\n") + "\n"
+        readme.write_text(f"{text}DVAA: 13 categories x categories\N{COMBINING ACUTE ACCENT}\n",
+                          encoding="utf-8")
+        r = run_checker(td)
+        assert r.returncode == 1, r.stdout
+        line = text.count("\n") + 1
+        assert (f'README.md:{line}: "13 categories" does not match related-projects.json '
+                "(DVAA vulnerability categories: 12)") in r.stderr, r.stderr
+    finally:
+        shutil.rmtree(td)
+
+
+# Runs the checker in-process with unicodedata.category counted, then prints the count.
+COUNT_CATEGORY_CALLS = """
+import importlib.util, sys, unicodedata
+calls = 0
+category = unicodedata.category
+def counted(c):
+    global calls
+    calls += 1
+    return category(c)
+unicodedata.category = counted
+spec = importlib.util.spec_from_file_location("check_readme_claims", sys.argv[1])
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+status = module.main([])
+print(f"status={status} calls={calls}")
+"""
+
+
+def test_the_check_reads_the_categories_of_readme_characters_only():
+    # The combining-mark test used to rebuild a character class from all 1,114,112 code
+    # points on every run. It now looks up the characters of README lines naming DVAA
+    # and the two beside each DVAA wording, which are fewer than README's characters.
+    td = scratch_tree()
+    try:
+        r = subprocess.run(["python3", "-c", COUNT_CATEGORY_CALLS,
+                            str(td / "scripts" / "check_readme_claims.py")],
+                           capture_output=True, text=True, timeout=120)
+        assert r.returncode == 0, r.stderr
+        last = r.stdout.strip().splitlines()[-1]
+        assert last.startswith("status=0 calls="), r.stdout
+        calls = int(last.rsplit("=", 1)[1])
+        assert calls <= len((td / "README.md").read_text(encoding="utf-8")), last
+    finally:
+        shutil.rmtree(td)
+
+
 def test_the_dvaa_category_count_must_be_stated():
     td = scratch_tree()
     try:

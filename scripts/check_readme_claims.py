@@ -62,16 +62,11 @@ HANGUL_FILLERS = (
 )
 
 
-def combining_marks():
-    """A regex character class body holding every combining mark (Unicode category M)."""
-    ranges = []
-    for code in range(sys.maxunicode + 1):
-        if unicodedata.category(chr(code)).startswith("M"):
-            if ranges and ranges[-1][1] == code - 1:
-                ranges[-1][1] = code
-            else:
-                ranges.append([code, code])
-    return "".join(f"\\U{lo:08x}-\\U{hi:08x}" for lo, hi in ranges)
+def combining_marks_in(text):
+    """A regex character class body holding each combining mark (Unicode category M)
+    that occurs in `text`. A mark that occurs nowhere in `text` can stand beside no
+    wording in it, so the class need not hold every mark there is."""
+    return "".join(sorted(c for c in set(text) if unicodedata.category(c).startswith("M")))
 
 
 def table_cell(text):
@@ -308,9 +303,13 @@ def main(argv):
     # it counts no combining mark as a word character, so "é" written as "e" and U+0301
     # was read. Each wording is bounded instead by the absence of a Unicode word character
     # or a combining mark on either side: a wording glued to a letter, digit or combining
-    # mark of any script is not read.
+    # mark of any script is not read. Both bounds stay inside the pattern, so that where
+    # one start position matches at several lengths ("13 categories x categories" holds
+    # "13 categories") a mark glued to the longer wording leaves the shorter one read.
+    # The mark part of the class is built from the DVAA lines alone, not from every code
+    # point: a mark that stands on none of them can stand beside no wording.
     on_dvaa_lines = dict(text=dvaa_lines, source=pinned, flags=re.IGNORECASE | re.ASCII)
-    glue = r"(?u:[\w" + combining_marks() + r"])"
+    glue = r"(?u:[\w" + combining_marks_in(dvaa_lines) + r"])"
     # A wording is not read when a character that renders as nothing stands inside or
     # beside it ("age" U+00AD "nts", "22" U+200B " agents", U+3164 "22 agents"), so such
     # a character fails the line instead of leaving its figure unchecked.
