@@ -4,10 +4,11 @@
 matrix.json is canonical for what the Agent Threat Matrix contains. The three files
 under cross-references/ are an analyst reading of two external frameworks against it.
 This checker keeps that reading honest and keeps every count on the published pages
-derived rather than typed. It reads cross-references/ and matrix.json only; it makes no
-statement about what an external framework contains.
+derived rather than typed. It reads cross-references/ and matrix.json only. Its one
+statement about what an external framework contains is the C8 pin of the ATLAS tactic
+list, which names the ATLAS release it was read from.
 
-Seven properties:
+Eight properties:
 
 - C1 every ``T-####`` in cross-references/ exists in matrix.json.
 - C2 every attack-class id in cross-references/ exists in matrix.json.attackClasses.
@@ -19,10 +20,14 @@ Seven properties:
 - C6 no ``~`` immediately precedes a digit anywhere in cross-references/.
 - C7 none of ``coverage``, ``covered``, ``covers`` or ``gap analysis`` appears in a
      heading line or a table header row in cross-references/.
+- C8 mitre-atlas-mapping.md states the ATLAS release it is read against, and its tactic
+     table (the rows whose first cell is bold) holds exactly one row per tactic of that
+     release, as ``**Name** (AML.TA####)`` under the release's current name and in its
+     matrix order, and names no technique id.
 
 Run with ``--fix`` to rewrite only the generated block from matrix.json and the mapping
 table. Every other line is left alone; there is no other rewrite, because C3 and C4 are
-editorial placements, not text a script may invent. Exit 0 when all seven hold, 1
+editorial placements, not text a script may invent. Exit 0 when all eight hold, 1
 otherwise, printing one line per violation.
 """
 
@@ -35,6 +40,31 @@ ROOT = Path(__file__).resolve().parent.parent
 CROSSREF = ROOT / "cross-references"
 INDEX_NAME = "technique-overlap-index.md"
 OWASP_NAME = "owasp-llm-mapping.md"
+ATLAS_NAME = "mitre-atlas-mapping.md"
+
+# The ATLAS release the tactic mapping is read against, and that release's tactics in
+# ATLAS matrix order: the tactics map and the matrix sequence positions of
+# dist/v6/ATLAS-2026.09.yaml in the mitre-atlas/atlas-data repository. When ATLAS adds,
+# renames or retires a tactic, update this pin and the page in the same change.
+ATLAS_RELEASE = "2026.09"
+ATLAS_TACTICS = (
+    ("AML.TA0002", "Reconnaissance"),
+    ("AML.TA0003", "Resource Development"),
+    ("AML.TA0001", "AI Attack Adaptation"),
+    ("AML.TA0004", "Initial Access"),
+    ("AML.TA0000", "AI Model Access"),
+    ("AML.TA0005", "Execution"),
+    ("AML.TA0006", "Persistence"),
+    ("AML.TA0012", "Privilege Escalation"),
+    ("AML.TA0007", "Defense Evasion"),
+    ("AML.TA0013", "Credential Access"),
+    ("AML.TA0008", "Discovery"),
+    ("AML.TA0015", "Lateral Movement"),
+    ("AML.TA0009", "Collection"),
+    ("AML.TA0014", "Command and Control"),
+    ("AML.TA0010", "Exfiltration"),
+    ("AML.TA0011", "Impact"),
+)
 
 BEGIN = "<!-- BEGIN GENERATED: overlap-counts -->"
 END = "<!-- END GENERATED: overlap-counts -->"
@@ -52,6 +82,11 @@ HEADING_RE = re.compile(r"^#{1,6}\s")
 # membership test so it is linear -- an `X*-X*` form over a class that contains the dash
 # backtracks quadratically on a long crafted run of dashes.
 TABLE_SEP_RE = re.compile(r"^\s*\|[\s:|-]*$")
+# A row of the ATLAS tactic table: its first cell is bold. The tactic cell must then read
+# exactly "**Name** (AML.TA####)".
+ATLAS_ROW_RE = re.compile(r"^\|\s*\*\*")
+ATLAS_TACTIC_CELL_RE = re.compile(r"^\|\s*\*\*([^*|]+)\*\*\s*\((AML\.TA\d{4})\)\s*\|")
+ATLAS_TECH_ID_RE = re.compile(r"\bAML\.T\d{4}")
 
 # The section of CONTRIBUTING.md the C3/C4 failure text points a contributor at.
 PLACEMENT_SECTION = 'CONTRIBUTING.md, "Placing a new technique"'
@@ -82,6 +117,68 @@ def parse_owasp_named(text: str) -> set:
 def parse_no_counterpart(text: str) -> set:
     """Technique ids whose row leads a table in the overlap index (set B)."""
     return {m.group(1) for line in text.splitlines() if (m := NO_COUNTERPART_ROW_RE.match(line))}
+
+
+def parse_atlas_rows(text: str) -> list:
+    """(line number, tactic id or None, tactic name or None, line) per ATLAS tactic-table row."""
+    rows = []
+    for lineno, line in enumerate(text.splitlines(), 1):
+        if not ATLAS_ROW_RE.match(line):
+            continue
+        m = ATLAS_TACTIC_CELL_RE.match(line)
+        rows.append((lineno, m.group(2) if m else None, m.group(1).strip() if m else None, line))
+    return rows
+
+
+def check_atlas_mapping(text: str) -> list:
+    """C8 failures for the text of mitre-atlas-mapping.md."""
+    failures = []
+    if f"ATLAS release {ATLAS_RELEASE}" not in text:
+        failures.append(
+            f"C8 {ATLAS_NAME}: the page does not state the ATLAS release it is read against "
+            f"(expected the words 'ATLAS release {ATLAS_RELEASE}')"
+        )
+    pinned = dict(ATLAS_TACTICS)
+    rows = parse_atlas_rows(text)
+    seen = []
+    for lineno, tid, name, line in rows:
+        if tid is None:
+            failures.append(
+                f"C8 {ATLAS_NAME}:{lineno}: the tactic cell does not read '**Name** (AML.TA####)'"
+            )
+            continue
+        if tid not in pinned:
+            failures.append(
+                f"C8 {ATLAS_NAME}:{lineno}: {tid} is not a tactic of ATLAS release {ATLAS_RELEASE}"
+            )
+        elif name != pinned[tid]:
+            failures.append(
+                f"C8 {ATLAS_NAME}:{lineno}: {tid} is named '{name}'; ATLAS release "
+                f"{ATLAS_RELEASE} names it '{pinned[tid]}'"
+            )
+        if tid in seen:
+            failures.append(f"C8 {ATLAS_NAME}:{lineno}: {tid} has more than one row")
+        seen.append(tid)
+        ids = sorted(set(TECH_ID_RE.findall(line)) | set(ATLAS_TECH_ID_RE.findall(line)))
+        if ids:
+            failures.append(
+                f"C8 {ATLAS_NAME}:{lineno}: the tactic table names technique ids "
+                f"({', '.join(ids)}); it relates tactics only"
+            )
+    for tid, name in ATLAS_TACTICS:
+        if tid not in seen:
+            failures.append(
+                f"C8 {ATLAS_NAME}: ATLAS tactic {tid} {name} has no row; the tactic table holds "
+                f"one row per tactic of ATLAS release {ATLAS_RELEASE}"
+            )
+    order = [tid for tid, _name in ATLAS_TACTICS]
+    present = [tid for tid in dict.fromkeys(seen) if tid in pinned]
+    if present != [tid for tid in order if tid in present]:
+        failures.append(
+            f"C8 {ATLAS_NAME}: the tactic rows are not in ATLAS matrix order "
+            f"({', '.join(order)})"
+        )
+    return failures
 
 
 def class_ids_in(text: str) -> set:
@@ -206,6 +303,13 @@ def run_checks(root: Path) -> list:
                     failures.append(
                         f"C7 {path.name}:{lineno}: heading or table header contains '{word}'"
                     )
+
+    # C8 -- the ATLAS tactic table matches the pinned ATLAS release.
+    atlas_path = root / "cross-references" / ATLAS_NAME
+    if atlas_path.exists():
+        failures.extend(check_atlas_mapping(atlas_path.read_text()))
+    else:
+        failures.append(f"C8 {ATLAS_NAME}: the page is missing")
 
     return failures
 

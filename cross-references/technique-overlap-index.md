@@ -135,7 +135,7 @@ Each framework states the layer it addresses. This table restates those publishe
 
 | Layer | Framework | What It Models |
 |-------|-----------|---------------|
-| Model | MITRE ATLAS | Training data, model weights, inference attacks, ML supply chain |
+| Model | MITRE ATLAS | Training data, model weights, inference attacks, AI supply chain; also some AI agent techniques (agent tool invocation, agent configuration, agent context poisoning) |
 | Application | OWASP LLM Top 10 | Prompt injection, output handling, plugin trust, information disclosure |
 | **Agent** | **Agent Threat Matrix** | **Governance files, tool ecosystems, multi-agent protocols, agent memory, sandbox boundaries, agent identity** |
 | Infrastructure | MITRE ATT&CK | Network, endpoint, cloud, enterprise IT |

@@ -6,6 +6,7 @@ validator enforces is proven red on one minimal mutation.
 """
 
 import json
+import os
 import shutil
 import subprocess
 import tempfile
@@ -19,8 +20,8 @@ FILES = ("matrix.json", "technique-ids.json", "schema/threat-matrix-v1.2.schema.
          "scripts/generate_stix.py", "stix/agent-threat-matrix-bundle.json")
 
 
-def scratch_tree() -> Path:
-    td = Path(tempfile.mkdtemp(prefix="atm-schema-"))
+def scratch_tree(td: Path = None) -> Path:
+    td = td or Path(tempfile.mkdtemp(prefix="atm-schema-"))
     for rel in FILES:
         dst = td / rel
         dst.parent.mkdir(parents=True, exist_ok=True)
@@ -360,6 +361,138 @@ AC4_CASES = [
 @pytest.mark.parametrize("case", [pytest.param(fn, id=name) for name, fn in AC4_CASES])
 def test_atm07_ac4(case):
     case()
+
+
+# --------------------------------------------------------------------------- S11 against git history
+
+GIT_ENV = {key: value for key, value in os.environ.items()
+           if key not in ("GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR", "GIT_INDEX_FILE",
+                          "GIT_OBJECT_DIRECTORY", "GIT_ALTERNATE_OBJECT_DIRECTORIES")}
+
+
+def git(root: Path, *args) -> str:
+    return subprocess.run(
+        ["git", "-C", str(root), "-c", "user.name=validator-test",
+         "-c", "user.email=validator-test@example.invalid", "-c", "commit.gpgsign=false",
+         "-c", "core.hooksPath=/dev/null", *args],
+        check=True, capture_output=True, text=True, timeout=60, env=GIT_ENV).stdout.strip()
+
+
+def commit_all(root: Path, message: str) -> str:
+    git(root, "add", "--", *FILES)
+    git(root, "commit", "-q", "-m", message)
+    return git(root, "rev-parse", "HEAD")
+
+
+def history_tree(stamp_fn=None) -> Path:
+    """A scratch tree with git history whose technique-ids.json is stamped with an earlier commit.
+
+    stamp_fn(root) commits whatever history the case needs and returns the sha to stamp;
+    by default the stamp is the commit that holds the shipped matrix.json.
+    """
+    root = scratch_tree()
+    git(root, "init", "-q")
+    sha = stamp_fn(root) if stamp_fn else commit_all(root, "matrix")
+    ids = load(root, "technique-ids.json")
+    ids["matrixCommit"] = sha
+    dump(root, "technique-ids.json", ids)
+    commit_all(root, "stamp matrixCommit")
+    return root
+
+
+def run_on(root: Path) -> subprocess.CompletedProcess:
+    try:
+        return run_validator(root)
+    finally:
+        shutil.rmtree(root)
+
+
+def test_matrix_commit_resolved_in_history_is_green():
+    root = history_tree()
+    sha = load(root, "technique-ids.json")["matrixCommit"]
+    proc = run_on(root)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert f"(matrixCommit {sha}, ids match matrix.json at that commit)" in proc.stdout, proc.stdout
+
+
+def test_matrix_commit_naming_no_commit_is_refused_with_history():
+    root = history_tree()
+    ids = load(root, "technique-ids.json")
+    ids["matrixCommit"] = "0" * 40
+    dump(root, "technique-ids.json", ids)
+    _red(run_on(root),
+         f"S11 technique-ids.json matrixCommit {'0' * 40} does not name a commit in this repository")
+
+
+def test_matrix_commit_indexing_a_different_matrix_is_refused():
+    def stamp(root):
+        shipped = (root / "matrix.json").read_bytes()
+        matrix = load(root, "matrix.json")
+        matrix["techniques"] = [t for t in matrix["techniques"] if t["id"] != "T-7007"]
+        dump(root, "matrix.json", matrix)
+        older = commit_all(root, "matrix without T-7007")
+        (root / "matrix.json").write_bytes(shipped)
+        commit_all(root, "matrix with T-7007")
+        return older
+    root = history_tree(stamp)
+    sha = load(root, "technique-ids.json")["matrixCommit"]
+    _red(run_on(root),
+         f"S11 technique-ids.json matrixCommit {sha} indexes a matrix.json whose ids "
+         f"differ from the list: extra ['T-7007']")
+
+
+def test_matrix_commit_naming_a_tree_is_refused():
+    root = history_tree()
+    tree = git(root, "rev-parse", "HEAD^{tree}")
+    ids = load(root, "technique-ids.json")
+    ids["matrixCommit"] = tree
+    dump(root, "technique-ids.json", ids)
+    _red(run_on(root), f"S11 technique-ids.json matrixCommit {tree} names a tree object, not a commit")
+
+
+def test_matrix_commit_without_a_matrix_is_refused():
+    def stamp(root):
+        git(root, "add", "--", "schema")
+        git(root, "commit", "-q", "-m", "schema only")
+        return git(root, "rev-parse", "HEAD")
+    root = history_tree(stamp)
+    sha = load(root, "technique-ids.json")["matrixCommit"]
+    _red(run_on(root), f"S11 technique-ids.json matrixCommit {sha} has no matrix.json")
+
+
+def test_shallow_checkout_without_the_commit_checks_the_shape_only():
+    source = history_tree()
+    clone = Path(tempfile.mkdtemp(prefix="atm-shallow-")) / "clone"
+    try:
+        subprocess.run(["git", "clone", "-q", "--depth", "1", source.as_uri(), str(clone)],
+                       check=True, capture_output=True, text=True, timeout=60, env=GIT_ENV)
+        assert git(clone, "rev-parse", "--is-shallow-repository") == "true"
+        proc = run_validator(clone)
+    finally:
+        shutil.rmtree(source)
+        shutil.rmtree(clone.parent)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert "shape only: shallow checkout without that commit)" in proc.stdout, proc.stdout
+
+
+def test_copy_without_git_checks_the_shape_only():
+    proc = run_on(scratch_tree())
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert "shape only: no git history at the repository root)" in proc.stdout, proc.stdout
+
+
+def test_copy_nested_in_another_repository_checks_the_shape_only():
+    outer = Path(tempfile.mkdtemp(prefix="atm-outer-"))
+    try:
+        git(outer, "init", "-q")
+        (outer / "README").write_text("outer\n")
+        git(outer, "add", "--", "README")
+        git(outer, "commit", "-q", "-m", "outer")
+        proc = run_validator(scratch_tree(outer / "vendored"))
+    finally:
+        shutil.rmtree(outer)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert "shape only: no git history at the repository root)" in proc.stdout, proc.stdout
 
 
 def test_stix_bundle_must_be_byte_identical():
