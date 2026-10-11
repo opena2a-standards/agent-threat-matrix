@@ -117,6 +117,54 @@ def test_duplicate_technique_line_is_red(tree):
     assert run_checker(tree, "--fix").returncode == 1
 
 
+# Code examples whose lines look like the page's data lines. A shell comment used to be
+# counted as a second Title line.
+FENCED_EXAMPLES = (
+    "```sh\n"
+    "# list the agent card a host serves\n"
+    "curl -s https://agent.example/.well-known/agent.json\n"
+    "```\n"
+    "\n"
+    "~~~markdown\n"
+    "# T-1006: Agent Card Lookup\n"
+    "\n"
+    "## Description\n"
+    "\n"
+    "Discover A2A agent cards\n"
+    "\n"
+    "- **HMA Checks:** AIM-001\n"
+    "- Tactic: [collection](../tactics/collection.md)\n"
+    "~~~\n"
+    "\n"
+)
+
+
+def test_lines_inside_fenced_code_blocks_are_not_data_lines(tree):
+    page = tree / "techniques" / "T-1006.md"
+    mutate(page, "## Mitigation\n", FENCED_EXAMPLES + "## Mitigation\n")
+    before = page.read_text(encoding="utf-8")
+
+    result = run_checker(tree)
+    assert result.returncode == 0, result.stdout
+    assert run_checker(tree, "--fix").returncode == 0
+    assert page.read_text(encoding="utf-8") == before
+
+
+def test_stale_line_beside_a_fenced_code_block_is_red_and_fixed(tree):
+    page = tree / "techniques" / "T-1006.md"
+    mutate(page, "## Mitigation\n", FENCED_EXAMPLES + "## Mitigation\n")
+    before = page.read_text(encoding="utf-8")
+    mutate(page, "- **HMA Checks:** A2A-001, A2A-002\n", "- **HMA Checks:** AIM-001, AIM-002\n")
+
+    result = run_checker(tree)
+    assert result.returncode == 1
+    assert ("T-1006: HMA Checks line is '- **HMA Checks:** AIM-001, AIM-002', "
+            "matrix.json says '- **HMA Checks:** A2A-001, A2A-002'") in result.stdout
+
+    assert run_checker(tree, "--fix").returncode == 0
+    assert page.read_text(encoding="utf-8") == before
+
+
 def test_dvaa_line_on_a_technique_without_one_in_the_data_is_red_and_fixed(tree):
     page = tree / "techniques" / "T-8003.md"
     before = page.read_text(encoding="utf-8")

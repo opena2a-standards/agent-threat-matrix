@@ -141,3 +141,15 @@ def test_readme_scope_lines_do_not_limit_atlas_to_models():
     assert "and models (MITRE ATLAS)" not in text
     scope = [line for line in text.splitlines() if line.startswith("- Model-level attacks")]
     assert scope and "agent" in scope[0], scope
+
+
+# The quoted description of ATLAS is in the notes of atlas-data release v2026.08
+# (published 2026-09-01), not in those of v2026.09, the release the page is read against.
+ATLAS_QUOTE = "harmful autonomous behavior materially enabled by AI"
+
+
+def test_quoted_atlas_description_names_the_release_it_comes_from():
+    para = next((p for p in ATLAS_PAGE.read_text().split("\n\n") if ATLAS_QUOTE in p), None)
+    assert para, "the page no longer quotes the ATLAS description"
+    sentence = para.split(ATLAS_QUOTE)[0].rsplit(". ", 1)[-1]
+    assert "2026.08" in sentence and CHK.ATLAS_RELEASE not in sentence, sentence

@@ -475,6 +475,34 @@ def test_shallow_checkout_without_the_commit_checks_the_shape_only():
     assert "shape only: shallow checkout without that commit)" in proc.stdout, proc.stdout
 
 
+@pytest.mark.parametrize("filter_spec,note", [
+    ("blob:none", "shape only: partial clone without matrix.json at that commit)"),
+    ("tree:0", "shape only: partial clone without that commit's tree)"),
+])
+def test_partial_clone_without_the_objects_checks_the_shape_only(filter_spec, note):
+    def stamp(root):
+        # Same ids, different bytes: the stamped matrix.json is a blob the checkout never reads.
+        shipped = (root / "matrix.json").read_bytes()
+        (root / "matrix.json").write_bytes(shipped + b"\n")
+        older = commit_all(root, "matrix with a trailing newline")
+        (root / "matrix.json").write_bytes(shipped)
+        commit_all(root, "matrix")
+        return older
+    source = history_tree(stamp)
+    git(source, "config", "uploadpack.allowFilter", "true")
+    clone = Path(tempfile.mkdtemp(prefix="atm-partial-")) / "clone"
+    try:
+        subprocess.run(["git", "clone", "-q", f"--filter={filter_spec}", source.as_uri(), str(clone)],
+                       check=True, capture_output=True, text=True, timeout=60, env=GIT_ENV)
+        assert git(clone, "config", "--get", "remote.origin.promisor") == "true"
+        proc = run_validator(clone)
+    finally:
+        shutil.rmtree(source)
+        shutil.rmtree(clone.parent)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert note in proc.stdout, proc.stdout
+
+
 def test_copy_without_git_checks_the_shape_only():
     proc = run_on(scratch_tree())
     assert proc.returncode == 0, proc.stdout + proc.stderr
