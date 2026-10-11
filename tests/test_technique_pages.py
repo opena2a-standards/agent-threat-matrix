@@ -258,6 +258,19 @@ ENDED_BEFORE_THE_DATA_LINE = [
     # text and the comment is not in an item.
     ("a comment after an ordered line that continues a paragraph",
      "Some text\n2. step\n   <!--\n```\n-->\n"),
+    # A comment line starts a block, so it ends the list item instead of continuing its
+    # paragraph lazily, and the fence line inside the comment opens nothing.
+    ("a fence line in a comment that ends a list item", "- step\n<!--\n```\n-->\n"),
+    # A line indented four columns is indented code, not a paragraph, so an ordered item
+    # after it may start at 2 and holds the fence. The page ends in a list item, which the
+    # indented line would continue, so a paragraph ends that item first.
+    ("a fence in an ordered item after indented code",
+     "Notes\n\n    code\n2. step\n   ```\n"),
+    # Five spaces after a marker start indented code one column after the marker, so the
+    # item's content is two columns in and the fence is in the item.
+    ("a fence in an item whose text starts with indented code", "-     code\n  ```\n"),
+    # A tab reaches column four, so the tab-indented line continues the item.
+    ("a fence in an item continued by a tab-indented line", "- step\n\n\tmore\n  ```\n"),
 ]
 
 
@@ -281,6 +294,12 @@ STILL_OPEN_AT_THE_DATA_LINE = [
     ("a fence after a lazy line of a list item", "- step\ncontinued\n```\n"),
     # A closing fence has at most three spaces of indentation.
     ("a closing fence line indented four spaces", "```\n    ```\n"),
+    # Three list markers with spaces between them are a thematic break, not three list
+    # items, so the indented fence after it is not in an item.
+    ("a fence after a thematic break made of list markers", "- - -\n  ```\n"),
+    # A comment ends at the line that holds "-->", so the fence line after it opens a fence.
+    ("a fence after a comment that ends on a later line", "<!--\n-->\n```\n"),
+    ("a fence after a comment that ends on its first line", "<!-- note -->\n```\n"),
 ]
 
 
@@ -293,6 +312,47 @@ def test_a_fence_still_open_at_a_data_line_hides_it(tree, block):
 
     result = run_checker(tree)
     assert result.returncode == 0, result.stdout
+
+
+def hidden_lines(text: str) -> list[str]:
+    """The lines of ``text`` that start inside a fenced code block."""
+    spans = CHK.fenced_spans(text)
+    hidden, offset = [], 0
+    for line in text.split("\n"):
+        if any(start <= offset < end for start, end in spans):
+            hidden.append(line)
+        offset += len(line) + 1
+    return hidden
+
+
+# (text, the lines fenced_spans must hide). A line in a list item or block quote starts with
+# indentation or a ">" marker, and a data line is read only at the start of a line, so no
+# page-level case can show whether the fence holding such a line was found; these cases
+# read the spans directly.
+HIDDEN_LINES = [
+    ("a fence in a list item",
+     "- step\n  ```\n  - **HMA Checks:** WRONG-001\n  ```\nafter\n",
+     ["  ```", "  - **HMA Checks:** WRONG-001", "  ```"]),
+    ("a fence that ends with its list item",
+     "- step\n  ```\n  - **HMA Checks:** WRONG-001\nafter\n",
+     ["  ```", "  - **HMA Checks:** WRONG-001"]),
+    ("a fence in a block quote",
+     "> ```\n> - **HMA Checks:** WRONG-001\n> ```\nafter\n",
+     ["> ```", "> - **HMA Checks:** WRONG-001", "> ```"]),
+    ("a fence that ends with its block quote",
+     "> ```\n> - **HMA Checks:** WRONG-001\nafter\n",
+     ["> ```", "> - **HMA Checks:** WRONG-001"]),
+    # A marker has at most three spaces before it, so each of these lines is indented code
+    # and opens no container for the fence line after it to sit in.
+    ("a list marker indented four columns", "    - step\n\n      ```\n      code\n", []),
+    ("a block quote marker indented four columns", "    > ```\n    > code\n", []),
+]
+
+
+@pytest.mark.parametrize("text,hidden", [(t, h) for _, t, h in HIDDEN_LINES],
+                         ids=[n for n, _, _ in HIDDEN_LINES])
+def test_fenced_spans_hide_exactly_the_lines_of_each_fence(text, hidden):
+    assert hidden_lines(text) == hidden
 
 
 def test_a_line_indented_four_spaces_opens_no_fence(tree):

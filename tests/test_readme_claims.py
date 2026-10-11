@@ -203,6 +203,35 @@ def test_a_category_count_with_three_words_before_the_noun_is_not_read():
         shutil.rmtree(td)
 
 
+# Lines that hold a non-ASCII letter where README says each DVAA wording has ASCII letters.
+# Under re.IGNORECASE alone, "[A-Za-z]" matches U+0130, U+0131, U+017F and U+212A, and the
+# "s" of "agents" matches U+017F, so each of these used to be read and fail on its number.
+NOT_ASCII_WORDINGS = [
+    ("U+0130 between the number and categories",
+     "variants; 12 vulnerability categories", "variants; 13 İ categories"),
+    ("U+0131 between the number and categories",
+     "variants; 12 vulnerability categories", "variants; 13 ı categories"),
+    ("U+017F between the number and categories",
+     "variants; 12 vulnerability categories", "variants; 13 ſ categories"),
+    ("U+212A between the number and categories",
+     "variants; 12 vulnerability categories", "variants; 13 K categories"),
+    ("U+017F for the s of agents",
+     "(21 agents: 16 deliberately vulnerable", "(22 agentſ: 16 deliberately vulnerable"),
+]
+
+
+@pytest.mark.parametrize("old,new", [(o, n) for _, o, n in NOT_ASCII_WORDINGS],
+                         ids=[name for name, _, _ in NOT_ASCII_WORDINGS])
+def test_a_wording_with_a_non_ascii_letter_is_not_read(old, new):
+    td = scratch_tree()
+    try:
+        mutate_readme(td, old, new)
+        r = run_checker(td)
+        assert r.returncode == 0, r.stderr
+    finally:
+        shutil.rmtree(td)
+
+
 def test_the_dvaa_category_count_must_be_stated():
     td = scratch_tree()
     try:

@@ -221,8 +221,10 @@ def fenced_spans(text: str) -> list[tuple[int, int]]:
             leaf = None
 
         # New containers: block quote markers and list markers, in the order they appear.
+        # Each marker pattern allows at most three spaces before the marker, so a line
+        # indented four columns past its containers opens none.
         interrupting = leaf == PARAGRAPH
-        while text_at < line.end and text_at - pos < 4 and not line.thematic_break(pos):
+        while text_at < line.end and not line.thematic_break(pos):
             if m := QUOTE_MARKER_RE.match(line.text, pos):
                 containers.append(None)
                 pos = m.end()
