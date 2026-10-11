@@ -16,6 +16,8 @@ import subprocess
 import tempfile
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parent.parent
 GENERATOR = Path("scripts") / "generate_class_markdown.py"
 PROSE_CHECKER = ROOT / "scripts" / "check_docs_prose.py"
@@ -116,6 +118,25 @@ def test_check_reports_a_description_changed_only_in_matrix_json():
         proc = run_generator(td, "--check")
         assert proc.returncode == 1
         assert "attack-classes/PHANTOM-SOUL.md: differs from the matrix.json rendering" in proc.stdout
+    finally:
+        shutil.rmtree(td)
+
+
+@pytest.mark.parametrize("argument,status", [("--chek", 2), ("--chec", 2), ("check", 2), ("--help", 0)])
+def test_an_argument_other_than_check_writes_nothing(argument, status):
+    td = scratch_tree()
+    try:
+        page = td / "attack-classes" / "LLM-EXPOSE.md"
+        edited = page.read_text(encoding="utf-8") + "A line added by hand.\n"
+        page.write_text(edited, encoding="utf-8")
+        (td / "attack-classes" / "NOT-A-CLASS.md").write_text("# gone\n", encoding="utf-8")
+        proc = run_generator(td, argument)
+        assert proc.returncode == status, proc.stdout + proc.stderr
+        if status:
+            assert f"unrecognized arguments: {argument}" in proc.stderr
+        assert "Wrote" not in proc.stdout
+        assert page.read_text(encoding="utf-8") == edited
+        assert (td / "attack-classes" / "NOT-A-CLASS.md").exists()
     finally:
         shutil.rmtree(td)
 

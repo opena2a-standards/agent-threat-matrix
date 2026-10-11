@@ -14,8 +14,12 @@ must re-render byte-identically; run with ``--fix`` to rewrite only that block.
 The README also states figures about related projects. Those are measured in the
 other project, so they are pinned in related-projects.json with the release and
 commit each was read from, and every README line naming the project must state the
-pinned number. DVAA was described as "21 vulnerable agents" while DVAA labels one
-of the 21 a hardened reference and four control-protected variants.
+pinned number wherever it uses one of the wordings read here. For DVAA those are
+"N agents", "N deliberately vulnerable", "N hardened reference", "N control-protected
+variants", "N vulnerable agents" and "N categories" (up to two words may stand between
+the number and "categories"); a figure worded any other way is not checked. DVAA was
+described as "21 vulnerable agents" while DVAA labels one of the 21 a hardened
+reference and four control-protected variants.
 
 Exit 0 when every claim matches the data, 1 otherwise.
 """
@@ -266,7 +270,9 @@ def main(argv):
     # "N vulnerable agents" counts only the agents DVAA labels vulnerable.
     require(r"\b(\d+) (?:deliberately )?vulnerable agents?\b", [kinds["deliberatelyVulnerable"]],
             "DVAA vulnerable agents", dvaa_lines, pinned, stated=False)
-    require(r"\b(\d+) vulnerability categories\b", [dvaa["vulnerabilityCategories"]],
+    # DVAA titles its own table Attack Categories, so the count is read under any name:
+    # "N categories" with up to two words between the number and the noun.
+    require(r"\b(\d+) (?:[A-Za-z-]+ ){0,2}categories\b", [dvaa["vulnerabilityCategories"]],
             "DVAA vulnerability categories", dvaa_lines, pinned)
     dvaa_summary = (
         f"DVAA {dvaa['sourceVersion']}: {dvaa['agents']} agents "

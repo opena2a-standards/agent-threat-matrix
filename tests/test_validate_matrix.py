@@ -370,12 +370,13 @@ GIT_ENV = {key: value for key, value in os.environ.items()
                           "GIT_OBJECT_DIRECTORY", "GIT_ALTERNATE_OBJECT_DIRECTORIES")}
 
 
-def git(root: Path, *args) -> str:
+def git(root: Path, *args, stdin: str = None) -> str:
     return subprocess.run(
         ["git", "-C", str(root), "-c", "user.name=validator-test",
          "-c", "user.email=validator-test@example.invalid", "-c", "commit.gpgsign=false",
          "-c", "core.hooksPath=/dev/null", *args],
-        check=True, capture_output=True, text=True, timeout=60, env=GIT_ENV).stdout.strip()
+        check=True, capture_output=True, text=True, timeout=60, env=GIT_ENV,
+        input=stdin).stdout.strip()
 
 
 def commit_all(root: Path, message: str) -> str:
@@ -458,6 +459,36 @@ def test_matrix_commit_without_a_matrix_is_refused():
     root = history_tree(stamp)
     sha = load(root, "technique-ids.json")["matrixCommit"]
     _red(run_on(root), f"S11 technique-ids.json matrixCommit {sha} has no matrix.json")
+
+
+@pytest.mark.parametrize("mode,kind", [("040000", "tree"), ("160000", "commit")],
+                         ids=["directory", "submodule"])
+def test_matrix_commit_whose_matrix_is_not_a_file_is_refused(mode, kind):
+    def stamp(root):
+        commit_all(root, "matrix")
+        # A submodule entry names a commit this repository does not hold, as a blob that a
+        # partial clone left out is not held either.
+        entry = git(root, "rev-parse", "HEAD^{tree}") if kind == "tree" else "1" * 40
+        tree = git(root, "mktree", "--missing", stdin=f"{mode} {kind} {entry}\tmatrix.json\n")
+        return git(root, "commit-tree", tree, "-m", "matrix.json is not a file")
+    root = history_tree(stamp)
+    sha = load(root, "technique-ids.json")["matrixCommit"]
+    _red(run_on(root), f"S11 technique-ids.json matrixCommit {sha} has no matrix.json file: "
+                       f"the entry at that commit is a {kind}, not a blob")
+
+
+def test_repository_path_in_another_letter_case_still_reads_the_history():
+    root = history_tree()
+    sha = load(root, "technique-ids.json")["matrixCommit"]
+    other_case = root.parent / root.name.swapcase()
+    try:
+        if not other_case.exists():
+            pytest.skip("the filesystem is case-sensitive")
+        proc = run_validator(other_case)
+    finally:
+        shutil.rmtree(root)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert f"(matrixCommit {sha}, ids match matrix.json at that commit)" in proc.stdout, proc.stdout
 
 
 def test_shallow_checkout_without_the_commit_checks_the_shape_only():
