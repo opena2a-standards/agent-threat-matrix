@@ -10,16 +10,28 @@ Checks line, the References class link and the tactic tables on the old values w
 stayed green.
 """
 
+import importlib.util
 import json
 import shutil
 import subprocess
 import tempfile
+import time
 from pathlib import Path
 
 import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
 SCRIPT = "scripts/check_technique_pages.py"
+
+
+def _load_checker():
+    spec = importlib.util.spec_from_file_location("check_technique_pages", ROOT / SCRIPT)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+CHK = _load_checker()
 
 
 def scratch_tree() -> Path:
@@ -165,6 +177,80 @@ def test_stale_line_beside_a_fenced_code_block_is_red_and_fixed(tree):
     assert page.read_text(encoding="utf-8") == before
 
 
+# Blocks whose inner lines look like a closing fence and are not one, as in CommonMark: a
+# fence closes on a line of the same character, at least as long as the opening fence, with
+# nothing after it. Each block holds a second HMA Checks line that must stay code.
+STILL_FENCED = [
+    ("a shorter backtick line in a four-backtick block",
+     "````markdown\n```\n- **HMA Checks:** AIM-001\n```\n````\n\n"),
+    ("a tilde line in a backtick block",
+     "```text\n~~~\n- **HMA Checks:** AIM-001\n~~~\n```\n\n"),
+    ("a backtick line with an info string",
+     "```sh\n```python\n- **HMA Checks:** AIM-001\n```\n\n"),
+]
+
+
+@pytest.mark.parametrize("block", [b for _, b in STILL_FENCED], ids=[n for n, _ in STILL_FENCED])
+def test_a_line_that_does_not_close_the_fence_leaves_the_block_open(tree, block):
+    page = tree / "techniques" / "T-1006.md"
+    mutate(page, "## Mitigation\n", block + "## Mitigation\n")
+    before = page.read_text(encoding="utf-8")
+
+    result = run_checker(tree)
+    assert result.returncode == 0, result.stdout
+    assert run_checker(tree, "--fix").returncode == 0
+    assert page.read_text(encoding="utf-8") == before
+
+
+def test_an_unclosed_fence_runs_to_the_end_of_the_page(tree):
+    page = tree / "techniques" / "T-1006.md"
+    text = page.read_text(encoding="utf-8")
+    page.write_text(text + "\n```\n- **HMA Checks:** AIM-001\n", encoding="utf-8")
+
+    result = run_checker(tree)
+    assert result.returncode == 0, result.stdout
+
+
+def test_an_unclosed_fence_hides_the_data_lines_after_it(tree):
+    mutate(tree / "techniques" / "T-1006.md", "## Evidence\n", "```\n\n## Evidence\n")
+
+    result = run_checker(tree)
+    assert result.returncode == 1, result.stdout
+    assert "T-1006: page has no 'Evidence Tier' line" in result.stdout
+    assert "T-1006: page has no 'References tactic' line" in result.stdout
+
+
+# Lines that CommonMark does not treat as an opening fence: backticks followed by a
+# backtick in the info string are an inline code span, and U+2028 or a form feed does not
+# end a line. The data line after each is still a data line of the page.
+NOT_A_FENCE = [
+    ("a backtick in the info string", "```x`y\n"),
+    ("a line separator before the backticks", "Example ```\n"),
+    ("a form feed before the backticks", "Example\x0c```\n"),
+]
+
+
+@pytest.mark.parametrize("opener", [o for _, o in NOT_A_FENCE], ids=[n for n, _ in NOT_A_FENCE])
+def test_a_line_that_is_not_a_fence_does_not_hide_the_data_lines_after_it(tree, opener):
+    page = tree / "techniques" / "T-1006.md"
+    text = page.read_text(encoding="utf-8")
+    page.write_text(text + "\n" + opener + "- **HMA Checks:** WRONG-001\n", encoding="utf-8")
+
+    result = run_checker(tree)
+    assert result.returncode == 1, result.stdout
+    assert "T-1006: page has 2 'HMA Checks' lines" in result.stdout
+
+
+def test_many_fenced_blocks_cost_linear_time():
+    blocks = 16000
+    text = "# t\n```\n# t\n```\n" * blocks
+    title = next(regex for label, regex, _ in CHK.FIELDS if label == "Title")
+    started = time.perf_counter()
+    found = CHK.find_lines(title, text)
+    assert time.perf_counter() - started < 2.0
+    assert len(found) == blocks
+
+
 def test_dvaa_line_on_a_technique_without_one_in_the_data_is_red_and_fixed(tree):
     page = tree / "techniques" / "T-8003.md"
     before = page.read_text(encoding="utf-8")
@@ -193,6 +279,23 @@ def test_dvaa_added_to_the_data_is_red_and_fixed(tree):
     page = (tree / "techniques" / "T-8003.md").read_text(encoding="utf-8")
     assert "- **DVAA Validation:** dns tunnel" in page
     assert "No documented procedures yet." not in page
+    assert run_checker(tree).returncode == 0
+
+
+def test_dvaa_added_to_the_data_leaves_a_placeholder_inside_a_fenced_block_alone(tree):
+    example = "```markdown\nNo documented procedures yet.\n```\n\n"
+    mutate(tree / "techniques" / "T-8003.md", "## Procedure Examples\n",
+           example + "## Procedure Examples\n")
+    matrix_path = tree / "matrix.json"
+    matrix = json.loads(matrix_path.read_text(encoding="utf-8"))
+    technique = next(t for t in matrix["techniques"] if t["id"] == "T-8003")
+    technique["dvaaValidation"] = "dns tunnel"
+    matrix_path.write_text(json.dumps(matrix, indent=2), encoding="utf-8")
+
+    assert run_checker(tree, "--fix").returncode == 0
+    page = (tree / "techniques" / "T-8003.md").read_text(encoding="utf-8")
+    assert example + "## Procedure Examples\n\n- **DVAA Validation:** dns tunnel\n" in page
+    assert page.count("No documented procedures yet.") == 1
     assert run_checker(tree).returncode == 0
 
 

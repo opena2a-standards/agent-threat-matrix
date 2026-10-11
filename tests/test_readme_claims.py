@@ -102,6 +102,9 @@ MUTATIONS = [
     ("1 hardened reference", "2 hardened reference"),
     ("4 control-protected variants", "3 control-protected variants"),
     ("variants; 12 vulnerability categories", "variants; 13 vulnerability categories"),
+    # DVAA's own table is titled Attack Categories; the count is read under either name.
+    ("variants; 12 vulnerability categories", "variants; 13 attack categories"),
+    ("variants; 12 vulnerability categories", "variants; 13 categories"),
     # The DVAA row counted all 21 agents as vulnerable.
     ("Lab validation (21 agents: 16 deliberately vulnerable, 1 hardened reference, "
      "4 control-protected variants; 12 vulnerability categories)",

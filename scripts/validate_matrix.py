@@ -33,7 +33,8 @@ Standard library only, no network. Two passes:
         sha or a missing key is refused. Where the repository root is the top
         of a git work tree that holds the commit, matrix.json is read at that
         commit, and a sha that names no commit, names another kind of object,
-        or indexes a matrix.json whose ids differ from the list is refused. A
+        names a commit where matrix.json is a directory or a submodule, or
+        indexes a matrix.json whose ids differ from the list is refused. A
         copy without git, a shallow checkout that lacks the commit, or a
         partial clone that lacks the commit's tree or matrix.json cannot read
         the file at that commit, so there only the shape is checked; the
@@ -179,13 +180,25 @@ def git(*args):
     return proc.stdout.decode("utf-8", errors="replace")
 
 
+def same_directory(path: str, other: Path) -> bool:
+    """Whether two paths name one directory, compared by file identity.
+
+    On a case-insensitive filesystem a path that differs from the on-disk path only in
+    letter case is the same directory, which a comparison of the path text misses.
+    """
+    try:
+        return os.path.samefile(path, other)
+    except OSError:
+        return False
+
+
 def resolve_matrix_commit(commit: str, listed, errors: list) -> str:
     """S11 beyond the shape: compare the ids of matrix.json at matrixCommit with the list.
 
     Returns the note the summary line prints after the sha.
     """
     top = git("rev-parse", "--show-toplevel")
-    if top is None or Path(top.strip()).resolve() != ROOT:
+    if top is None or not same_directory(top.strip(), ROOT):
         return "shape only: no git history at the repository root"
     kind = (git("cat-file", "-t", commit) or "").strip()
     if not kind:
@@ -207,6 +220,14 @@ def resolve_matrix_commit(commit: str, listed, errors: list) -> str:
         return ""
     blob = git("cat-file", "blob", blob_id)
     if blob is None:
+        # The commit's tree records what kind of entry matrix.json is, so this reads no
+        # object a filter may have left out: a directory or a submodule there is not a
+        # missing blob.
+        entry = (git("ls-tree", commit, "--", "matrix.json") or "").split()
+        if len(entry) > 1 and entry[1] != "blob":
+            errors.append(f"S11 technique-ids.json matrixCommit {commit} has no matrix.json file: "
+                          f"the entry at that commit is a {entry[1]}, not a blob")
+            return ""
         return "shape only: partial clone without matrix.json at that commit"
     try:
         indexed = sorted(t["id"] for t in json.loads(blob)["techniques"])

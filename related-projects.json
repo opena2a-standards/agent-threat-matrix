@@ -1,5 +1,5 @@
 {
-  "description": "Figures README.md states about related projects. They are measured in those projects, not in matrix.json, so each is pinned here with the release and commit it was read from. scripts/check_readme_claims.py fails when a README line naming the project states a different number. Re-measure with the refresh command when the project releases.",
+  "description": "Figures README.md states about related projects. They are measured in those projects, not in matrix.json, so each is pinned here with the release and commit it was read from. scripts/check_readme_claims.py fails when a README line naming the project states a different number in one of the wordings the script reads; a figure worded any other way is not checked. For DVAA the wordings are 'N agents', 'N deliberately vulnerable', 'N hardened reference', 'N control-protected variants', 'N vulnerable agents' and 'N categories' (up to two words may stand between the number and 'categories'). Re-measure with the refresh command when the project releases.",
   "dvaa": {
     "repository": "https://github.com/opena2a-org/damn-vulnerable-ai-agent",
     "sourceVersion": "0.9.3",

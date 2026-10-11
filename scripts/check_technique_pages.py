@@ -25,6 +25,7 @@ of a technique page is left alone. A missing or repeated technique-page line has
 place to write the data to, so ``--fix`` reports it and still exits 1.
 """
 
+import bisect
 import json
 import re
 import sys
@@ -57,37 +58,50 @@ FIELD_PATTERNS = (
 )
 FIELDS = tuple((label, re.compile(pattern, re.M), render) for label, pattern, render in FIELD_PATTERNS)
 NO_PROCEDURES_RE = re.compile(rf"^(?P<line>{re.escape(NO_PROCEDURES)})$", re.M)
-FENCE_RE = re.compile(r"^ {0,3}(`{3,}|~{3,})")
+# A fence line: up to three spaces, a run of one fence character, then the rest of the line.
+FENCE_RE = re.compile(r" {0,3}(?P<run>`{3,}|~{3,})(?P<rest>.*)")
 
 
 def fenced_spans(text: str) -> list[tuple[int, int]]:
     """Return the (start, end) offsets of each fenced code block, fence lines included.
 
     A line in a code example, such as a ``# comment`` in a shell block, is not a data line
-    of the page. An unclosed fence runs to the end of the page, as in CommonMark.
+    of the page. The fence rules are CommonMark's: a backtick run followed by another
+    backtick on the same line is an inline code span and opens nothing; a fence closes on a
+    line of the same character, at least as long as the opening run, with nothing after
+    it; and an unclosed fence runs to the end of the page. Lines end at ``\\n`` only, as
+    they do for the field patterns, so a form feed or U+2028 does not start a line.
     """
     spans = []
     fence = None
     start = offset = 0
-    for line in text.splitlines(keepends=True):
-        m = FENCE_RE.match(line)
+    for line in text.split("\n"):
+        m = FENCE_RE.fullmatch(line)
         if fence is None:
-            if m:
-                fence, start = m.group(1), offset
-        elif m and m.group(1)[0] == fence[0] and len(m.group(1)) >= len(fence) \
-                and not line.strip().strip(fence[0]):
-            spans.append((start, offset + len(line)))
+            if m and not (m["run"][0] == "`" and "`" in m["rest"]):
+                fence, start = m["run"], offset
+        elif m and m["run"][0] == fence[0] and len(m["run"]) >= len(fence) \
+                and not m["rest"].strip(" \t\r"):
+            spans.append((start, offset + len(line) + 1))
             fence = None
-        offset += len(line)
+        offset += len(line) + 1
     if fence is not None:
-        spans.append((start, offset))
+        spans.append((start, len(text)))
     return spans
 
 
 def find_lines(regex: re.Pattern, text: str) -> list[re.Match]:
     """Return the matches of ``regex`` that start outside every fenced code block."""
     spans = fenced_spans(text)
-    return [m for m in regex.finditer(text) if not any(s <= m.start() < e for s, e in spans)]
+    starts = [start for start, _ in spans]
+
+    def fenced(position: int) -> bool:
+        # The spans are in page order and do not overlap, so only the last one that starts
+        # at or before the position can hold it.
+        index = bisect.bisect_right(starts, position) - 1
+        return index >= 0 and position < spans[index][1]
+
+    return [m for m in regex.finditer(text) if not fenced(m.start())]
 
 
 def check_technique_page(technique: dict, text: str) -> tuple[list[str], str]:
