@@ -4,7 +4,7 @@
 
 ## Description
 
-Unsigned installation scripts executed without integrity verification — curl|sh without checksum
+Unsigned installation scripts executed without integrity verification: curl|sh without checksum
 
 ## Techniques
 

@@ -4,7 +4,7 @@
 
 ## Description
 
-Skill plants payload in agent memory that survives skill uninstall — cross-session persistence
+Skill plants payload in agent memory that survives skill uninstall: cross-session persistence
 
 ## Techniques
 

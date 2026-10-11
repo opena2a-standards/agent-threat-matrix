@@ -3,8 +3,8 @@
 This index records which Agent Threat Matrix techniques the mapping documents in this
 directory name against an external framework, and which they do not.
 
-The mappings are an analyst reading of two published frameworks -- the OWASP Top 10 for
-LLM Applications and MITRE ATLAS -- against `matrix.json`. They describe where the
+The mappings are an analyst reading of two published frameworks (the OWASP Top 10 for
+LLM Applications and MITRE ATLAS) against `matrix.json`. They describe where the
 documents in this directory draw a correspondence. No entry states what OWASP or MITRE
 ATLAS does or does not address; each publishes its own scope.
 
@@ -46,16 +46,16 @@ separately.
 
 ## Techniques with no counterpart named in either mapping
 
-These techniques sit at the agent infrastructure layer, between the model layer ATLAS addresses and the application layer OWASP addresses. They arise from properties unique to AI agent systems: governance files, persistent memory, tool ecosystems, multi-agent protocols, and sandbox boundaries. Each row records the agent-layer property the technique depends on -- the thing an agent has that a bare LLM application does not.
+These techniques sit at the agent infrastructure layer, between the model layer ATLAS addresses and the application layer OWASP addresses. They arise from properties unique to AI agent systems: governance files, persistent memory, tool ecosystems, multi-agent protocols, and sandbox boundaries. Each row records the agent-layer property the technique depends on: the thing an agent has that a bare LLM application does not.
 
 ### Reconnaissance
 
 | ID | Technique | Description | Agent-layer property it depends on |
 |----|-----------|-------------|------------------------------------|
-| T-1001 | Endpoint Enumeration | Discover exposed API endpoints, health checks, and information disclosure routes on target agents | The agent's deployed control surface. Agent runtimes ship default health, info and discovery routes -- the DVAA validation for this technique is that all of its agents expose /health and /info -- so the route set is readable before any prompt is sent, and it is the input every other reconnaissance technique starts from. The enumeration itself is a traditional web technique applied to that surface, in the same sense as T-8003. |
-| T-1002 | Tool Discovery | Enumerate available tools and their schemas via MCP tools/list or equivalent discovery endpoints | The agent's tool registry. MCP answers a tools/list call with every registered tool and its schema, so an agent's capability set is self-describing and readable without invoking a tool -- a request that only exists where a tool protocol does. Same surface as T-1005 at a finer grain: T-1002 is the protocol call, T-1005 is the capability picture built from it. |
+| T-1001 | Endpoint Enumeration | Discover exposed API endpoints, health checks, and information disclosure routes on target agents | The agent's deployed control surface. Agent runtimes ship default health, info and discovery routes (the DVAA validation for this technique is that all of its agents expose /health and /info), so the route set is readable before any prompt is sent, and it is the input every other reconnaissance technique starts from. The enumeration itself is a traditional web technique applied to that surface, in the same sense as T-8003. |
+| T-1002 | Tool Discovery | Enumerate available tools and their schemas via MCP tools/list or equivalent discovery endpoints | The agent's tool registry. MCP answers a tools/list call with every registered tool and its schema, so an agent's capability set is self-describing and readable without invoking a tool. The call is a request that only exists where a tool protocol does. Same surface as T-1005 at a finer grain: T-1002 is the protocol call, T-1005 is the capability picture built from it. |
 | T-1004 | Security Level Probing | Probe an agent's behavioral constraint strength through calibrated test inputs | The agent's governance layer. Calibrated probes measure the strength of an agent's natural-language behavioral constraints, a property only a governed agent has. |
-| T-1005 | Capability Mapping | Enumerate an agent's full tool catalog via MCP tools/list or equivalent | The agent's tool catalog. An agent exposes its full tool set through MCP tools/list or a skill catalog, so the capability picture is enumerable at once -- the coarse-grained view T-1002 feeds. |
+| T-1005 | Capability Mapping | Enumerate an agent's full tool catalog via MCP tools/list or equivalent | The agent's tool catalog. An agent exposes its full tool set through MCP tools/list or a skill catalog, so the capability picture is enumerable at once (the coarse-grained view T-1002 feeds). |
 | T-1006 | Agent Card Discovery | Discover agent capabilities via A2A protocol (/.well-known/agent.json) | The agent's A2A identity surface. An agent advertises its declared role and skills at /.well-known/agent.json, readable over the A2A protocol before any interaction. |
 | T-1007 | Context Window Probing | Measure an agent's token budget to plan context overflow attacks | The agent's memory architecture. The token budget is an agent-specific constraint, and measuring it plans a context-overflow attack. |
 
@@ -151,5 +151,5 @@ listed above.
 
 ## Detailed Mapping References
 
-- [owasp-llm-mapping.md](owasp-llm-mapping.md) -- Full OWASP LLM Top 10 technique-by-technique mapping
-- [mitre-atlas-mapping.md](mitre-atlas-mapping.md) -- Full MITRE ATLAS tactic-by-tactic mapping
+- [owasp-llm-mapping.md](owasp-llm-mapping.md): full OWASP LLM Top 10 technique-by-technique mapping
+- [mitre-atlas-mapping.md](mitre-atlas-mapping.md): full MITRE ATLAS tactic-by-tactic mapping

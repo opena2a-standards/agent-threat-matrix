@@ -4,7 +4,7 @@
 
 ## Description
 
-NemoClaw network services bound to public interfaces — gateway, k3s API, mDNS beacons
+NemoClaw network services bound to public interfaces: gateway, k3s API, mDNS beacons
 
 ## Techniques
 

@@ -4,7 +4,7 @@
 
 ## Description
 
-LLM inference endpoints exposed without authentication — allows arbitrary prompt execution
+LLM inference endpoints exposed without authentication, allowing arbitrary prompt execution
 
 ## Techniques
 

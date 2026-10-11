@@ -4,7 +4,7 @@
 
 ## Description
 
-Using stolen credentials detected via behavioral baseline mismatch — agent DNA forgery
+Using stolen credentials detected via behavioral baseline mismatch: agent DNA forgery
 
 ## Techniques
 

@@ -4,7 +4,7 @@
 
 ## Description
 
-Inherited OpenClaw flaws that survive NemoClaw sandboxing — heartbeat persistence, pre-allowed APIs
+Inherited OpenClaw flaws that survive NemoClaw sandboxing: heartbeat persistence, pre-allowed APIs
 
 ## Techniques
 
