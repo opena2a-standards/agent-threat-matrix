@@ -264,23 +264,31 @@ def main(argv):
     dvaa_lines = lines_naming(readme, "DVAA")
     pinned = "related-projects.json"
     # Every DVAA wording is read in any letter case: DVAA itself writes "Attack Categories".
-    # re.ASCII keeps that to ASCII letters: without it "[A-Za-z]" also matches U+0130,
-    # U+0131, U+017F (long s) and U+212A (Kelvin sign), and an "i" or "s" in a wording
-    # matches the first three.
+    # re.ASCII keeps that to ASCII letters and digits: without it "[A-Za-z]" also matches
+    # U+0130, U+0131, U+017F (long s) and U+212A (Kelvin sign), and an "i" or "s" in a
+    # wording matches the first three. re.ASCII would also narrow \b to ASCII word
+    # characters and read "é21 agents" as "21 agents", so each wording is bounded by a
+    # Unicode word boundary instead: a wording glued to a letter or digit of any script
+    # is not read.
     on_dvaa_lines = dict(text=dvaa_lines, source=pinned, flags=re.IGNORECASE | re.ASCII)
-    require(r"\b(\d+) agents\b", [dvaa["agents"]], "DVAA agents", **on_dvaa_lines)
-    require(r"\b(\d+) deliberately vulnerable\b", [kinds["deliberatelyVulnerable"]],
+
+    def wording(words):
+        """The pattern for "N <words>", bounded on both sides by a Unicode word boundary."""
+        return r"(?u:\b)(\d+) " + words + r"(?u:\b)"
+
+    require(wording("agents"), [dvaa["agents"]], "DVAA agents", **on_dvaa_lines)
+    require(wording("deliberately vulnerable"), [kinds["deliberatelyVulnerable"]],
             "DVAA deliberately vulnerable agents", **on_dvaa_lines)
-    require(r"\b(\d+) hardened reference\b", [kinds["hardenedReference"]],
+    require(wording("hardened reference"), [kinds["hardenedReference"]],
             "DVAA hardened reference agents", **on_dvaa_lines)
-    require(r"\b(\d+) control-protected variants?\b", [kinds["controlProtectedVariant"]],
+    require(wording("control-protected variants?"), [kinds["controlProtectedVariant"]],
             "DVAA control-protected variants", **on_dvaa_lines)
     # "N vulnerable agents" counts only the agents DVAA labels vulnerable.
-    require(r"\b(\d+) (?:deliberately )?vulnerable agents?\b", [kinds["deliberatelyVulnerable"]],
+    require(wording("(?:deliberately )?vulnerable agents?"), [kinds["deliberatelyVulnerable"]],
             "DVAA vulnerable agents", stated=False, **on_dvaa_lines)
     # The count is read under any name: "N categories" with up to two words, each a run
     # of ASCII letters and hyphens, between the number and the noun.
-    require(r"\b(\d+) (?:[A-Za-z-]+ ){0,2}categories\b", [dvaa["vulnerabilityCategories"]],
+    require(wording("(?:[A-Za-z-]+ ){0,2}categories"), [dvaa["vulnerabilityCategories"]],
             "DVAA vulnerability categories", **on_dvaa_lines)
     dvaa_summary = (
         f"DVAA {dvaa['sourceVersion']}: {dvaa['agents']} agents "

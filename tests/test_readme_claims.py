@@ -232,6 +232,48 @@ def test_a_wording_with_a_non_ascii_letter_is_not_read(old, new):
         shutil.rmtree(td)
 
 
+# Lines where a letter or digit outside ASCII is glued to a DVAA wording. re.ASCII also
+# narrows \b to ASCII word characters, so each of these used to be read as the wording
+# beside it ("é22 agents" as "22 agents") and fail on its number.
+GLUED_WORDINGS = [
+    ("U+00E9 before the agent count",
+     "(21 agents: 16 deliberately vulnerable", "(é22 agents: 16 deliberately vulnerable"),
+    ("U+00E9 after agents",
+     "(21 agents: 16 deliberately vulnerable", "(22 agentsé: 16 deliberately vulnerable"),
+    ("U+0662 (Arabic-Indic two) before the agent count",
+     "(21 agents: 16 deliberately vulnerable", "(٢22 agents: 16 deliberately vulnerable"),
+    ("U+00E9 before the category count",
+     "variants; 12 vulnerability categories", "variants; é13 vulnerability categories"),
+    ("U+00E9 after categories",
+     "variants; 12 vulnerability categories", "variants; 13 vulnerability categoriesé"),
+]
+
+
+@pytest.mark.parametrize("old,new", [(o, n) for _, o, n in GLUED_WORDINGS],
+                         ids=[name for name, _, _ in GLUED_WORDINGS])
+def test_a_wording_glued_to_a_non_ascii_letter_or_digit_is_not_read(old, new):
+    td = scratch_tree()
+    try:
+        mutate_readme(td, old, new)
+        r = run_checker(td)
+        assert r.returncode == 0, r.stderr
+    finally:
+        shutil.rmtree(td)
+
+
+def test_a_wording_beside_punctuation_is_still_read():
+    # The Unicode word boundary still holds at the punctuation README puts around a figure.
+    td = scratch_tree()
+    try:
+        mutate_readme(td, "(21 agents: 16 deliberately vulnerable",
+                      "(22 agents: 16 deliberately vulnerable")
+        r = run_checker(td)
+        assert r.returncode == 1, r.stdout
+        assert "related-projects.json (DVAA agents: 21)" in r.stderr, r.stderr
+    finally:
+        shutil.rmtree(td)
+
+
 def test_the_dvaa_category_count_must_be_stated():
     td = scratch_tree()
     try:
