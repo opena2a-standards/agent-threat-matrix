@@ -19,12 +19,20 @@ pinned number wherever it uses one of the wordings read here. For DVAA those are
 variant(s)", "N vulnerable agent(s)" and "N categories", where up to two words, each a
 run of ASCII letters and hyphens, may stand between the number and "categories". Each
 is read in any letter case with one space between words; a figure worded any other way
-is not checked. A line naming DVAA that carries a format character (Unicode category
-Cf, such as U+00AD SOFT HYPHEN or U+200B ZERO WIDTH SPACE) or a Hangul filler (U+115F,
-U+1160, U+3164, U+FFA0) fails: inside or beside a wording, such a character keeps the
-figure from being read while the rendered line still shows it. DVAA was
-described as "21 vulnerable agents" while DVAA labels one of the 21 a hardened
-reference and four control-protected variants.
+is not checked. DVAA was described as "21 vulnerable agents" while DVAA labels one of
+the 21 a hardened reference and four control-protected variants.
+
+A line naming DVAA fails when it carries a format character (Unicode category Cf, such
+as U+00AD SOFT HYPHEN or U+200B ZERO WIDTH SPACE), a control character (category Cc)
+other than a tab, a Hangul filler (U+115F, U+1160, U+3164, U+FFA0) or one of the
+combining marks Unicode lists as default ignorable (U+034F, U+17B4, U+17B5, U+180B to
+U+180D, U+180F, U+FE00 to U+FE0F, U+E0100 to U+E01EF). Inside a wording such a character
+keeps the wording from being read, and a Hangul filler or combining mark does so directly
+beside a DVAA wording, while a character that renders as nothing leaves the figure in the
+rendered line. A line that states one of the matrix.json counts once such characters are
+removed fails the same way when it carries one. Each failure names the line, the column
+of the character's first occurrence on it, counted in characters from 1, and the
+character.
 
 Exit 0 when every claim matches the data, 1 otherwise.
 """
@@ -54,11 +62,22 @@ CATEGORY_LABELS = {
     "sandbox": "Sandbox",
 }
 
-# Letters (category Lo) that render as blank space, so a Unicode word boundary does not
-# hold between one of them and a digit or letter beside it.
+# Letters (category Lo) that render as blank space. Each is a word character, so a DVAA
+# wording directly beside one is not read, and \b does not hold between one and a digit
+# or letter beside it.
 HANGUL_FILLERS = (
     "\N{HANGUL CHOSEONG FILLER}\N{HANGUL JUNGSEONG FILLER}"
     "\N{HANGUL FILLER}\N{HALFWIDTH HANGUL FILLER}"
+)
+
+# The combining marks (category Mn) Unicode lists as default ignorable code points, which
+# render as nothing: U+034F COMBINING GRAPHEME JOINER, two Khmer inherent vowels, the
+# Mongolian free variation selectors and the variation selectors, 263 code points.
+IGNORABLE_MARKS = frozenset(
+    chr(code)
+    for low, high in ((0x034F, 0x034F), (0x17B4, 0x17B5), (0x180B, 0x180D), (0x180F, 0x180F),
+                      (0xFE00, 0xFE0F), (0xE0100, 0xE01EF))
+    for code in range(low, high + 1)
 )
 
 
@@ -161,17 +180,30 @@ def lines_naming(text, name):
     return "\n".join(line if name in line else "" for line in text.split("\n"))
 
 
-def hiding_characters(text):
-    """(line number, character) for the first occurrence on each line of every format
-    character (category Cf) and Hangul filler in `text`. Such a character inside or
-    beside a wording keeps the figure from being read while the line still renders it."""
+def hiding_kind(c):
+    """What `c` is when it fails a line that names DVAA or states a count, else None: a
+    character that can keep a wording from being read."""
+    category = unicodedata.category(c)
+    if category == "Cf":
+        return "a format character"
+    if category == "Cc" and c != "\t":
+        return "a control character"
+    if c in HANGUL_FILLERS:
+        return "a Hangul filler"
+    if c in IGNORABLE_MARKS:
+        return "a default-ignorable combining mark"
+    return None
+
+
+def hiding_characters(line):
+    """(column, character) for the first occurrence in `line` of each character that
+    `hiding_kind` names, the column counted in characters from 1."""
     found = []
-    for number, line in enumerate(text.split("\n"), 1):
-        seen = set()
-        for c in line:
-            if c not in seen and (unicodedata.category(c) == "Cf" or c in HANGUL_FILLERS):
-                seen.add(c)
-                found.append((number, c))
+    seen = set()
+    for column, c in enumerate(line, 1):
+        if c not in seen and hiding_kind(c):
+            seen.add(c)
+            found.append((column, c))
     return found
 
 
@@ -238,28 +270,35 @@ def main(argv):
                     f"({label}: {', '.join(want)})"
                 )
 
+    count_wordings = []
+
+    def count(pattern, expected, label):
+        """`require` for a matrix.json count, which any README line may state."""
+        count_wordings.append(pattern)
+        require(pattern, expected, label)
+
     observed = tiers.get("observed", 0)
     validated = tiers.get("validated", 0)
     adapted = tiers.get("adapted", 0)
 
-    require(r"\b(\d+) tactics\b", [len(tactics)], "tactics")
-    require(r"\*\*(\d+) techniques\*\*", [total], "techniques")
-    require(r"\b(\d+) tactics and (\d+) techniques\b", [len(tactics), total],
-            "tactics and techniques")
-    require(r"\b(\d+) attack classes\b", [len(classes)], "attack classes")
-    require(r"\*\*(\d+) attack classes\*\*", [len(classes)], "attack classes")
+    count(r"\b(\d+) tactics\b", [len(tactics)], "tactics")
+    count(r"\*\*(\d+) techniques\*\*", [total], "techniques")
+    count(r"\b(\d+) tactics and (\d+) techniques\b", [len(tactics), total],
+          "tactics and techniques")
+    count(r"\b(\d+) attack classes\b", [len(classes)], "attack classes")
+    count(r"\*\*(\d+) attack classes\*\*", [len(classes)], "attack classes")
 
     # Evidence tiers, in the overview wording and in the Use cases wording.
-    require(r"\*\*(\d+) techniques with real-world evidence\*\*", [observed], "observed")
-    require(r"\b(\d+) of the (\d+) techniques carry real-world evidence\b",
-            [observed, total], "observed of total")
-    require(r"\*\*(\d+) techniques validated in controlled lab environments\*\*",
-            [validated], "validated")
-    require(r"\b(\d+) are validated in controlled lab environments\b", [validated],
-            "validated")
-    require(r"\*\*(\d+) techniques adapted from traditional environments\*\*",
-            [adapted], "adapted")
-    require(r"\b(\d+) are adapted from traditional environments\b", [adapted], "adapted")
+    count(r"\*\*(\d+) techniques with real-world evidence\*\*", [observed], "observed")
+    count(r"\b(\d+) of the (\d+) techniques carry real-world evidence\b",
+          [observed, total], "observed of total")
+    count(r"\*\*(\d+) techniques validated in controlled lab environments\*\*",
+          [validated], "validated")
+    count(r"\b(\d+) are validated in controlled lab environments\b", [validated],
+          "validated")
+    count(r"\*\*(\d+) techniques adapted from traditional environments\*\*",
+          [adapted], "adapted")
+    count(r"\b(\d+) are adapted from traditional environments\b", [adapted], "adapted")
 
     # Coverage claims. Detection and defensive control are stated as universal,
     # so they must actually hold for every technique. The lab-scenario claim is
@@ -276,7 +315,7 @@ def main(argv):
             f"README claims every technique maps to a defensive control, "
             f"but {total - with_control} do not: {gaps}"
         )
-    require(
+    count(
         r"\b(\d+) of the (\d+) (?:also )?carry a reproducible lab scenario\b",
         [with_lab, total],
         "lab scenario of total",
@@ -310,16 +349,6 @@ def main(argv):
     # point: a mark that stands on none of them can stand beside no wording.
     on_dvaa_lines = dict(text=dvaa_lines, source=pinned, flags=re.IGNORECASE | re.ASCII)
     glue = r"(?u:[\w" + combining_marks_in(dvaa_lines) + r"])"
-    # A wording is not read when a character that renders as nothing stands inside or
-    # beside it ("age" U+00AD "nts", "22" U+200B " agents", U+3164 "22 agents"), so such
-    # a character fails the line instead of leaving its figure unchecked.
-    for number, c in hiding_characters(dvaa_lines):
-        kind = "a Hangul filler" if c in HANGUL_FILLERS else "a format character"
-        named = " ".join(filter(None, (f"U+{ord(c):04X}", unicodedata.name(c, ""))))
-        failures.append(
-            f"README.md:{number}: a line naming DVAA carries {named}, {kind}, which can hide "
-            f"a figure from the DVAA wordings; remove it"
-        )
 
     def wording(words):
         """The pattern for "N <words>", with no Unicode word character and no combining
@@ -340,6 +369,35 @@ def main(argv):
     # of ASCII letters and hyphens, between the number and the noun.
     require(wording("(?:[A-Za-z-]+ ){0,2}categories"), [dvaa["vulnerabilityCategories"]],
             "DVAA vulnerability categories", **on_dvaa_lines)
+
+    # A wording is not read when a character `hiding_kind` names stands inside it ("age"
+    # U+00AD "nts", "22" U+200B " agents", "tac" U+00AD "tics"), or when a Hangul filler or
+    # combining mark is glued to a DVAA wording (U+3164 "22 agents", "agents" U+034F), so
+    # the character fails the line instead of leaving its figure unchecked. That holds for
+    # every line naming DVAA and every line that states a matrix.json count once such
+    # characters are removed: "8 tac" U+00AD "tics" states a count the check cannot read.
+    for number, line in enumerate(readme.split("\n"), 1):
+        hidden = hiding_characters(line)
+        if not hidden:
+            continue
+        shown = "".join(c for c in line if not hiding_kind(c))
+        readers = []
+        if "DVAA" in line:
+            readers.append(("naming DVAA", "DVAA"))
+        if any(re.search(pattern, shown) for pattern in count_wordings):
+            readers.append(("stating a matrix.json count", "count"))
+        if not readers:
+            continue
+        where = " and ".join(phrase for phrase, _ in readers)
+        wordings = " and ".join(name for _, name in readers)
+        for column, c in hidden:
+            named = " ".join(filter(None, (f"U+{ord(c):04X}", unicodedata.name(c, ""))))
+            failures.append(
+                f"README.md:{number}:{column}: a line {where} carries {named}, "
+                f"{hiding_kind(c)}, which can hide a figure from the {wordings} wordings; "
+                f"remove it"
+            )
+
     dvaa_summary = (
         f"DVAA {dvaa['sourceVersion']}: {dvaa['agents']} agents "
         f"({', '.join(f'{k}={v}' for k, v in kinds.items())}), "
