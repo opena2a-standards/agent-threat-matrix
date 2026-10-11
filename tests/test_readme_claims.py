@@ -14,12 +14,16 @@ description changed in matrix.json alone, and a missing marker must each go red,
 The DVAA figures are measured in DVAA, not in matrix.json, and are pinned in
 related-projects.json. Every README line naming DVAA must state the pinned numbers: the
 line that called all 21 agents vulnerable, while DVAA labels one hardened and four
-control-protected, must go red. A README line naming DVAA that carries a format character
-or a Hangul filler must go red too: inside or beside a wording, such a character keeps the
-figure from being read while the rendered line still shows it.
+control-protected, must go red. A README line naming DVAA that carries a format character,
+a control character other than a tab, a Hangul filler or a default-ignorable combining mark
+must go red too, and so must a line that states a matrix.json count once such characters
+are removed. Inside a wording such a character keeps the wording from being read, and a
+Hangul filler or combining mark does so directly beside a DVAA wording, while a character
+that renders as nothing leaves the figure in the rendered line.
 """
 
 import json
+import re
 import shutil
 import subprocess
 import tempfile
@@ -297,9 +301,20 @@ def test_a_wording_glued_to_a_non_ascii_letter_or_digit_is_not_read(old, new):
         shutil.rmtree(td)
 
 
-# Lines naming DVAA that carry a character which renders as nothing. Each one hides the
-# wording beside it from the check ("22 agents" glued to U+3164 is not read, and neither
-# is "age" U+00AD "nts"), so the line itself must fail, naming the character.
+def column_of(root: Path, needle: str, named: str) -> int:
+    """The column, counted in characters from 1, of the first occurrence of the character
+    `named` (as "U+XXXX ...") on the README line holding `needle`."""
+    character = chr(int(re.match(r"U\+([0-9A-F]+)", named).group(1), 16))
+    text = (root / "README.md").read_text(encoding="utf-8")
+    start = text.rindex("\n", 0, text.index(needle)) + 1
+    return text.index(character, start) - start + 1
+
+
+# Lines naming DVAA that carry a character which fails such a line. Each case but the last
+# hides the wording it stands in or beside from the check ("age" U+00AD "nts" is not read,
+# and neither is "22 agents" glued to U+3164 or "categories" glued to U+17B4); the last
+# carries U+FEFF between two wordings that state the pinned numbers. Each line must fail,
+# naming the line, the column of the character and the character.
 AGENT_COUNT = "(21 agents: 16 deliberately vulnerable"
 CATEGORY_COUNT = "variants; 12 vulnerability categories"
 INVISIBLE_CHARACTERS = [
@@ -324,6 +339,27 @@ INVISIBLE_CHARACTERS = [
     ("U+2060 WORD JOINER between the category count and the noun", CATEGORY_COUNT,
      "variants; 13\N{WORD JOINER} vulnerability categories",
      "U+2060 WORD JOINER, a format character"),
+    ("U+008B, a control character, inside agents", AGENT_COUNT,
+     "(22 age\x8bnts: 16 deliberately vulnerable",
+     "U+008B, a control character"),
+    ("U+007F, a control character, between the category count and the noun", CATEGORY_COUNT,
+     "variants; 13\x7f vulnerability categories",
+     "U+007F, a control character"),
+    ("U+034F COMBINING GRAPHEME JOINER inside agents", AGENT_COUNT,
+     "(22 age\N{COMBINING GRAPHEME JOINER}nts: 16 deliberately vulnerable",
+     "U+034F COMBINING GRAPHEME JOINER, a default-ignorable combining mark"),
+    ("U+FE0F VARIATION SELECTOR-16 between the number and the noun", AGENT_COUNT,
+     "(22\N{VARIATION SELECTOR-16} agents: 16 deliberately vulnerable",
+     "U+FE0F VARIATION SELECTOR-16, a default-ignorable combining mark"),
+    ("U+180B MONGOLIAN FREE VARIATION SELECTOR ONE before the agent count", AGENT_COUNT,
+     "(\N{MONGOLIAN FREE VARIATION SELECTOR ONE}22 agents: 16 deliberately vulnerable",
+     "U+180B MONGOLIAN FREE VARIATION SELECTOR ONE, a default-ignorable combining mark"),
+    ("U+17B4 KHMER VOWEL INHERENT AQ after categories", CATEGORY_COUNT,
+     "variants; 13 vulnerability categories\N{KHMER VOWEL INHERENT AQ}",
+     "U+17B4 KHMER VOWEL INHERENT AQ, a default-ignorable combining mark"),
+    ("U+E0100 VARIATION SELECTOR-17 inside categories", CATEGORY_COUNT,
+     "variants; 13 vulnerability categ\N{VARIATION SELECTOR-17}ories",
+     "U+E0100 VARIATION SELECTOR-17, a default-ignorable combining mark"),
     ("U+FEFF on a line naming DVAA with the right numbers",
      "environment (21 agents, 12 vulnerability categories)",
      "environment (21 agents,\N{ZERO WIDTH NO-BREAK SPACE} 12 vulnerability categories)",
@@ -339,13 +375,113 @@ def test_a_dvaa_line_carrying_an_invisible_character_is_red(old, new, named):
         mutate_readme(td, old, new)
         r = run_checker(td)
         assert r.returncode == 1, r.stdout
-        assert (f"README.md:{line_of(td, new)}: a line naming DVAA carries {named}, "
-                "which can hide a figure from the DVAA wordings; remove it") in r.stderr, r.stderr
+        assert (f"README.md:{line_of(td, new)}:{column_of(td, new, named)}: a line naming DVAA "
+                f"carries {named}, which can hide a figure from the DVAA wordings; "
+                "remove it") in r.stderr, r.stderr
     finally:
         shutil.rmtree(td)
 
 
-def test_an_invisible_character_on_a_line_not_naming_dvaa_is_not_read():
+# Lines that state a matrix.json count once the character is removed. Each case but the
+# last hides a count from the check ("8 tac" U+00AD "tics" is not read, and neither is
+# U+3164 glued to "62 techniques"), while another statement of the same count still
+# matches; the last carries U+200B at the end of a line whose counts are right. Each line
+# must fail, naming the line, the column of the character and the character.
+COUNT_LINE_CHARACTERS = [
+    ("U+00AD SOFT HYPHEN inside tactics", "**61 techniques** across 9 tactics",
+     "**61 techniques** across 8 tac\N{SOFT HYPHEN}tics",
+     "U+00AD SOFT HYPHEN, a format character"),
+    ("U+3164 HANGUL FILLER before the technique count",
+     "into 9 tactics and 61 techniques along a kill chain",
+     "into 9 tactics and \N{HANGUL FILLER}62 techniques along a kill chain",
+     "U+3164 HANGUL FILLER, a Hangul filler"),
+    ("U+034F COMBINING GRAPHEME JOINER inside the observed count",
+     "16 of the 61 techniques carry real-world evidence",
+     "15 of the 61 tech\N{COMBINING GRAPHEME JOINER}niques carry real-world evidence",
+     "U+034F COMBINING GRAPHEME JOINER, a default-ignorable combining mark"),
+    ("U+007F, a control character, between the class count and the noun",
+     "**40 attack classes**", "**41\x7f attack classes**", "U+007F, a control character"),
+    ("U+00AD SOFT HYPHEN in the only count a line states", "cite, and build upon.",
+     "cite, and build upon. It spans 8 tac\N{SOFT HYPHEN}tics.",
+     "U+00AD SOFT HYPHEN, a format character"),
+    ("U+200B on a line stating the right counts", "and each is marked as such.",
+     "and each is marked as such.\N{ZERO WIDTH SPACE}",
+     "U+200B ZERO WIDTH SPACE, a format character"),
+]
+
+
+@pytest.mark.parametrize("old,new,named", [(o, n, c) for _, o, n, c in COUNT_LINE_CHARACTERS],
+                         ids=[name for name, _, _, _ in COUNT_LINE_CHARACTERS])
+def test_a_count_line_carrying_an_invisible_character_is_red(old, new, named):
+    td = scratch_tree()
+    try:
+        mutate_readme(td, old, new)
+        r = run_checker(td)
+        assert r.returncode == 1, r.stdout
+        assert (f"README.md:{line_of(td, new)}:{column_of(td, new, named)}: a line stating a "
+                f"matrix.json count carries {named}, which can hide a figure from the count "
+                "wordings; remove it") in r.stderr, r.stderr
+    finally:
+        shutil.rmtree(td)
+
+
+def test_a_line_naming_dvaa_and_stating_a_count_names_both():
+    td = scratch_tree()
+    try:
+        new = "environment (21 agents, 12 vulnerability categories; 9\N{ZERO WIDTH SPACE} tactics)"
+        mutate_readme(td, "environment (21 agents, 12 vulnerability categories)", new)
+        named = "U+200B ZERO WIDTH SPACE, a format character"
+        r = run_checker(td)
+        assert r.returncode == 1, r.stdout
+        assert (f"README.md:{line_of(td, new)}:{column_of(td, new, named)}: a line naming DVAA "
+                f"and stating a matrix.json count carries {named}, which can hide a figure from "
+                "the DVAA and count wordings; remove it") in r.stderr, r.stderr
+    finally:
+        shutil.rmtree(td)
+
+
+def test_a_character_repeated_on_a_line_fails_it_once():
+    # One failure line per character per line, at the column of its first occurrence.
+    td = scratch_tree()
+    try:
+        new = ("environment\N{ZERO WIDTH SPACE} (21 agents,\N{SOFT HYPHEN} 12\N{ZERO WIDTH SPACE} "
+               "vulnerability categories)")
+        mutate_readme(td, "environment (21 agents, 12 vulnerability categories)", new)
+        line = line_of(td, new)
+        r = run_checker(td)
+        assert r.returncode == 1, r.stdout
+        on_line = [f for f in r.stderr.split("\n") if f.startswith(f"  - README.md:{line}:")]
+        assert on_line == [
+            f"  - README.md:{line}:{column_of(td, new, named)}: a line naming DVAA carries "
+            f"{named}, which can hide a figure from the DVAA wordings; remove it"
+            for named in ("U+200B ZERO WIDTH SPACE, a format character",
+                          "U+00AD SOFT HYPHEN, a format character")
+        ], r.stderr
+    finally:
+        shutil.rmtree(td)
+
+
+# A tab is the one control character that does not fail a line: it renders as space.
+TABS = [
+    ("on a line naming DVAA", "environment (21 agents, 12 vulnerability categories)",
+     "environment\t(21 agents, 12 vulnerability categories)"),
+    ("on a line stating a count", "**61 techniques** across 9 tactics",
+     "**61 techniques**\tacross 9 tactics"),
+]
+
+
+@pytest.mark.parametrize("old,new", [(o, n) for _, o, n in TABS], ids=[name for name, _, _ in TABS])
+def test_a_tab_does_not_fail_a_line(old, new):
+    td = scratch_tree()
+    try:
+        mutate_readme(td, old, new)
+        r = run_checker(td)
+        assert r.returncode == 0, r.stderr
+    finally:
+        shutil.rmtree(td)
+
+
+def test_an_invisible_character_on_a_line_naming_neither_dvaa_nor_a_count_passes():
     td = scratch_tree()
     try:
         mutate_readme(td, "Apache-2.0. The framework is free to use, cite, and build upon.",
