@@ -159,8 +159,8 @@ NemoClaw security assessment (10 confirmed vulnerabilities)" among the v1.0 sour
 
 **Do NOT claim CVE-2026-25253.** The unit is explicit: cite `CVE-2026-25253` only as a CVE our
 tooling detects, **NOT** as ours. It is not an originated or owned CVE and must never be
-presented as one. This repository does not reference `CVE-2026-25253`; the unit is its only
-source here, and the unit does not name which tool detects it, so no tool is named.
+presented as one. No other file in this repository references `CVE-2026-25253`; the unit is its
+only source here, and the unit does not name which tool detects it, so no tool is named.
 
 **Supporting corpus, from this repository** (measured by `scripts/check_readme_claims.py`,
 which is enforced in CI): 9 tactics, 61 techniques and 40 attack classes in `matrix.json`, with
@@ -222,7 +222,7 @@ repository records a value.
 | The four ref URLs | unit, Filing + Refs |
 | NemoClaw: 10 vulnerabilities to NVIDIA PSIRT | unit, step 5 |
 | 10 confirmed NemoClaw vulnerabilities | `CHANGELOG.md`, `EVIDENCE_AUDIT.md` |
-| `CVE-2026-25253` is detected, not owned | unit, step 5 (not present in this repo) |
+| `CVE-2026-25253` is detected, not owned | unit, step 5 (named in no other file in this repo) |
 | 9 tactics / 61 techniques / 40 attack classes; tiers 16/42/3 | `matrix.json`, verified by `scripts/check_readme_claims.py` |
 | ~4-week minimum; onboarding call >=3 weeks out | unit, REALITY (corrected 2026-07-05) |
 | Done when: CNA assigned and listed, weeks out | unit |
