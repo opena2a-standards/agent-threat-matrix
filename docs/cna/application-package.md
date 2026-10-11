@@ -7,18 +7,17 @@ files, the material is already assembled.
 
 **Owner-retained actions** (marked OWNER-RETAINED below; explicitly NOT performed here):
 submitting the CVE Request Form, contacting MITRE or any Root, and obtaining counsel sign-off.
-The unit (defined below) records a queued-for-owner card at
-`decisions/2026-08-31-queued-cna-filing-csnp.md` for the filing itself.
+The unit (defined below) links an unpublished record that queues the filing itself for the
+owner.
 
 ## How to read this document
 
 Three terms recur throughout:
 
 - **The owner** is the person who files the CNA application on CSNP's behalf.
-- **The unit** is OpenA2A's planning record for this filing, `roadmap/standards-cna-csnp.md`.
-  It is kept in a private planning tracker and is not published in this repository, so a
-  claim sourced to the unit cannot be checked from here. The [Provenance](#provenance) table
-  marks every such claim `unit`.
+- **The unit** is OpenA2A's planning record for this filing. It is kept in a private planning
+  tracker and is not published in this repository, so a claim sourced to the unit cannot be
+  checked from here. The [Provenance](#provenance) table marks every such claim `unit`.
 - **OWNER-RETAINED** labels an action that only the owner may take: submitting the CVE Request
   Form, contacting MITRE or any Root, or obtaining counsel sign-off. Nothing labeled
   OWNER-RETAINED has been done, and nothing in this repository does it.
@@ -159,8 +158,8 @@ NemoClaw security assessment (10 confirmed vulnerabilities)" among the v1.0 sour
 
 **Do NOT claim CVE-2026-25253.** The unit is explicit: cite `CVE-2026-25253` only as a CVE our
 tooling detects, **NOT** as ours. It is not an originated or owned CVE and must never be
-presented as one. This repository does not reference `CVE-2026-25253`; the unit is its only
-source here, and the unit does not name which tool detects it, so no tool is named.
+presented as one. No other file in this repository references `CVE-2026-25253`; the unit is its
+only source here, and the unit does not name which tool detects it, so no tool is named.
 
 **Supporting corpus, from this repository** (measured by `scripts/check_readme_claims.py`,
 which is enforced in CI): 9 tactics, 61 techniques and 40 attack classes in `matrix.json`, with
@@ -202,13 +201,15 @@ repository records a value.
 
 ## Provenance
 
-`unit` = `roadmap/standards-cna-csnp.md`. Repo paths are relative to this repository.
+`unit` = the unpublished planning record for this filing (see
+[How to read this document](#how-to-read-this-document)). Repo paths are relative to this
+repository.
 
 | Claim | Source |
 | --- | --- |
 | File for CNA under CSNP so the authority reads as neutral | unit |
 | Counsel must confirm charitable-purpose fit before applying | unit |
-| Queued-for-owner card at `decisions/2026-08-31-queued-cna-filing-csnp.md` | unit (Links) |
+| The filing is queued for the owner in a separate unpublished record | unit (Links) |
 | Scope statement wording (Block A) | unit, prereq (1) |
 | Red Hat recommended root for open-source / nonprofit orgs | unit |
 | `RootCNA-Coordination@redhat.com` | unit |
@@ -222,7 +223,7 @@ repository records a value.
 | The four ref URLs | unit, Filing + Refs |
 | NemoClaw: 10 vulnerabilities to NVIDIA PSIRT | unit, step 5 |
 | 10 confirmed NemoClaw vulnerabilities | `CHANGELOG.md`, `EVIDENCE_AUDIT.md` |
-| `CVE-2026-25253` is detected, not owned | unit, step 5 (not present in this repo) |
+| `CVE-2026-25253` is detected, not owned | unit, step 5 (named in no other file in this repo) |
 | 9 tactics / 61 techniques / 40 attack classes; tiers 16/42/3 | `matrix.json`, verified by `scripts/check_readme_claims.py` |
 | ~4-week minimum; onboarding call >=3 weeks out | unit, REALITY (corrected 2026-07-05) |
 | Done when: CNA assigned and listed, weeks out | unit |

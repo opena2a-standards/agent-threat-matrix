@@ -10,6 +10,11 @@ while the overview copy still matched.
 The attack-class tables are generated from matrix.json: a reworded description, a
 description changed in matrix.json alone, and a missing marker must each go red, and
 ``--fix`` must re-render the block without touching the rest of the README.
+
+The DVAA figures are measured in DVAA, not in matrix.json, and are pinned in
+related-projects.json. Every README line naming DVAA must state the pinned numbers: the
+line that called all 21 agents vulnerable, while DVAA labels one hardened and four
+control-protected, must go red.
 """
 
 import json
@@ -21,7 +26,7 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
-FILES = ("README.md", "matrix.json", "scripts/check_readme_claims.py")
+FILES = ("README.md", "matrix.json", "related-projects.json", "scripts/check_readme_claims.py")
 BEGIN = "<!-- BEGIN GENERATED: attack-class-tables -->"
 END = "<!-- END GENERATED: attack-class-tables -->"
 GATEWAY_DESCRIPTION = (
@@ -91,6 +96,23 @@ MUTATIONS = [
      "**43 techniques validated in controlled lab environments**"),
     ("**3 techniques adapted from traditional environments**",
      "**2 techniques adapted from traditional environments**"),
+    # Cross-framework mapping: the DVAA figures pinned in related-projects.json.
+    ("(21 agents: 16 deliberately vulnerable", "(22 agents: 16 deliberately vulnerable"),
+    ("(21 agents: 16 deliberately vulnerable", "(21 agents: 17 deliberately vulnerable"),
+    ("1 hardened reference", "2 hardened reference"),
+    ("4 control-protected variants", "3 control-protected variants"),
+    ("variants; 12 vulnerability categories", "variants; 13 vulnerability categories"),
+    # The DVAA row counted all 21 agents as vulnerable.
+    ("Lab validation (21 agents: 16 deliberately vulnerable, 1 hardened reference, "
+     "4 control-protected variants; 12 vulnerability categories)",
+     "Lab validation (21 vulnerable agents, 12 vulnerability categories)"),
+    # Related projects.
+    ("environment (21 agents, 12 vulnerability categories)",
+     "environment (20 agents, 12 vulnerability categories)"),
+    ("environment (21 agents, 12 vulnerability categories)",
+     "environment (21 agents, 11 vulnerability categories)"),
+    ("environment (21 agents, 12 vulnerability categories)",
+     "environment (21 vulnerable agents, 12 vulnerability categories)"),
 ]
 
 
@@ -116,6 +138,56 @@ def test_a_claim_reworded_out_of_the_readme_is_red():
         r = run_checker(td)
         assert r.returncode == 1, r.stdout
         assert "README does not state observed of total" in r.stderr, r.stderr
+    finally:
+        shutil.rmtree(td)
+
+
+def mutate_related(root: Path, edit) -> None:
+    path = root / "related-projects.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    edit(data["dvaa"])
+    path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+
+
+def line_of(root: Path, needle: str) -> int:
+    text = (root / "README.md").read_text(encoding="utf-8")
+    return text[:text.index(needle)].count("\n") + 1
+
+
+def test_dvaa_kinds_must_add_up_to_the_agent_count():
+    td = scratch_tree()
+    try:
+        mutate_related(td, lambda d: d["agentsByKind"]["hardenedReference"].update(count=2))
+        r = run_checker(td)
+        assert r.returncode == 1, r.stdout
+        assert ("related-projects.json: dvaa.agentsByKind counts sum to 22, "
+                "dvaa.agents is 21") in r.stderr, r.stderr
+    finally:
+        shutil.rmtree(td)
+
+
+def test_a_dvaa_figure_changed_in_the_pinned_file_is_red_on_every_readme_line():
+    td = scratch_tree()
+    try:
+        mutate_related(td, lambda d: d.update(vulnerabilityCategories=13))
+        r = run_checker(td)
+        assert r.returncode == 1, r.stdout
+        for needle in ("variants; 12 vulnerability categories",
+                       "environment (21 agents, 12 vulnerability categories)"):
+            assert f"README.md:{line_of(td, needle)}:" in r.stderr, r.stderr
+        assert "related-projects.json (DVAA vulnerability categories: 13)" in r.stderr, r.stderr
+    finally:
+        shutil.rmtree(td)
+
+
+def test_dvaa_figures_are_only_read_from_lines_naming_dvaa():
+    td = scratch_tree()
+    try:
+        mutate_readme(td, "Apache-2.0. The framework is free to use, cite, and build upon.",
+                      "Apache-2.0. The framework is free to use, cite, and build upon. "
+                      "A team running 3 agents can cite it.")
+        r = run_checker(td)
+        assert r.returncode == 0, r.stderr
     finally:
         shutil.rmtree(td)
 

@@ -117,11 +117,11 @@ This matrix maps every technique to four external references:
 | Framework | What It Provides |
 |-----------|-----------------|
 | [HackMyAgent](https://github.com/opena2a-org/hackmyagent) | Automated detection (310 static checks, 164 attack payloads) |
-| [DVAA](https://github.com/opena2a-org/damn-vulnerable-ai-agent) | Lab validation (21 vulnerable agents, 12 vulnerability categories) |
+| [DVAA](https://github.com/opena2a-org/damn-vulnerable-ai-agent) | Lab validation (21 agents: 16 deliberately vulnerable, 1 hardened reference, 4 control-protected variants; 12 vulnerability categories) |
 | [OASB](https://oasb.ai) | Defensive controls (46 controls across 10 domains) |
 | MITRE ATT&CK / ATLAS / OWASP LLM | An index of which techniques this repository's mapping documents name against each framework, and which they do not |
 
-See [cross-references/](cross-references/) for detailed mapping documents.
+See [cross-references/](cross-references/) for detailed mapping documents. The DVAA figures are pinned in [`related-projects.json`](related-projects.json) with the DVAA release they were read from, and `python3 scripts/check_readme_claims.py` fails when a README line naming DVAA states a different number.
 
 ---
 
@@ -169,7 +169,7 @@ Attack classes group related techniques by the underlying vulnerability pattern.
 | [CODE-INJECTION](attack-classes/CODE-INJECTION.md) | Injecting and executing arbitrary code through SQL injection, command injection, or code generation | T-7002, T-9001 |
 | [GATEWAY-EXPLOIT](attack-classes/GATEWAY-EXPLOIT.md) | Modifying gateway or proxy configurations to intercept, redirect, or manipulate agent traffic | T-6003 |
 | [INTEGRITY-BYPASS](attack-classes/INTEGRITY-BYPASS.md) | Digest or hash verification bypass on empty or missing values: tampered artifacts pass silently | T-9001 |
-| [LLM-EXPOSE](attack-classes/LLM-EXPOSE.md) | LLM inference endpoints exposed without authentication: allows arbitrary prompt execution | T-1001, T-1004 |
+| [LLM-EXPOSE](attack-classes/LLM-EXPOSE.md) | LLM inference endpoints exposed without authentication, allowing arbitrary prompt execution | T-1001, T-1004 |
 | [MCP-EXPLOIT](attack-classes/MCP-EXPLOIT.md) | Attacking Model Context Protocol server configurations, tool registrations, and inter-server trust | T-1002, T-1005, T-4003, T-5003, T-5005, T-5006 |
 | [PARSER-DIFFERENTIAL](attack-classes/PARSER-DIFFERENTIAL.md) | Exploits differences between parser implementations to bypass security controls | T-2009 |
 | [RETROACTIVE-PRIV](attack-classes/RETROACTIVE-PRIV.md) | Exploiting previously granted access or cached credentials to gain unauthorized capabilities | T-1001, T-1004, T-1007, T-3001, T-3003, T-3005, T-3006, T-5004, T-8005 |
@@ -260,7 +260,7 @@ agent-threat-matrix/
 
 ### Schema
 
-`matrix.json` follows `schema/threat-matrix-v1.2.schema.json` (JSON Schema 2020-12). `scripts/validate_matrix.py` checks the file against that schema and the rules the schema cannot state (ids resolve, `replacedBy` and `parentId` present exactly when required, `technique-ids.json` in sync) and runs in CI. `matrixCommit` in `technique-ids.json` is the 40-character sha of the commit whose `matrix.json` the id list indexes; the validator refuses a value of any other shape, and in a checkout that has the commit's history it also refuses a sha that names no commit or whose `matrix.json` carries different ids (a shallow checkout without that commit, or a copy without git, gets the shape check only, and the validator's summary line says which check ran). Technique ids may take the form `T-NNNN.NNN` for a sub-technique, listed flat in `techniques` with a `parentId`; `schema/consumer-readiness.json` keeps dotted ids out of the file until the listed consumers accept them. `stix/agent-threat-matrix-bundle.json` is a STIX 2.1 rendering of the matrix produced by `scripts/generate_stix.py`, with deterministic object ids; the validator fails when the committed bundle differs from a fresh rendering. Evidence tiers are described in `docs/evidence-tiers.md`.
+`matrix.json` follows `schema/threat-matrix-v1.2.schema.json` (JSON Schema 2020-12). `scripts/validate_matrix.py` checks the file against that schema and the rules the schema cannot state (ids resolve, `replacedBy` and `parentId` present exactly when required, `technique-ids.json` in sync). `matrixCommit` in `technique-ids.json` is the 40-character sha of the commit whose `matrix.json` the id list indexes; the validator refuses a value of any other shape, and in a checkout that has the commit's history it also refuses a sha that names no commit or whose `matrix.json` carries different ids (a shallow checkout without that commit, a partial clone without that commit's tree or `matrix.json`, or a copy without git, gets the shape check only, and the validator's summary line says which check ran). Technique ids may take the form `T-NNNN.NNN` for a sub-technique, listed flat in `techniques` with a `parentId`; `schema/consumer-readiness.json` keeps dotted ids out of the file until the listed consumers accept them. `stix/agent-threat-matrix-bundle.json` is a STIX 2.1 rendering of the matrix produced by `scripts/generate_stix.py`, with deterministic object ids; the validator fails when the committed bundle differs from a fresh rendering. Evidence tiers are described in `docs/evidence-tiers.md`.
 
 ---
 

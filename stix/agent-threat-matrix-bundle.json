@@ -1592,7 +1592,7 @@
       "modified": "2026-06-03T00:00:00.000Z",
       "created_by_ref": "identity--fb866cae-55fa-52bc-a91a-91aecf30b3f7",
       "name": "Phantom Soul",
-      "description": "Agent deployed with zero behavioral constraints \u2014 no SOUL.md, no system prompt, no governance",
+      "description": "Agent deployed with zero behavioral constraints: no SOUL.md, no system prompt, no governance",
       "context": "unspecified",
       "object_refs": [
         "attack-pattern--5e2e9ce3-3b55-52a1-9ba7-76b3985ad028"
@@ -1657,7 +1657,7 @@
       "modified": "2026-06-03T00:00:00.000Z",
       "created_by_ref": "identity--fb866cae-55fa-52bc-a91a-91aecf30b3f7",
       "name": "Soul Forking",
-      "description": "Different behavior under evaluation vs production \u2014 agent passes safety tests but behaves differently in deployment",
+      "description": "Different behavior under evaluation vs production: agent passes safety tests but behaves differently in deployment",
       "context": "unspecified",
       "object_refs": [
         "attack-pattern--6671c790-9498-5e27-8c32-5edc187b8f42"
@@ -1875,7 +1875,7 @@
       "modified": "2026-06-03T00:00:00.000Z",
       "created_by_ref": "identity--fb866cae-55fa-52bc-a91a-91aecf30b3f7",
       "name": "Skill Memory Amplification",
-      "description": "Skill plants payload in agent memory that survives skill uninstall \u2014 cross-session persistence",
+      "description": "Skill plants payload in agent memory that survives skill uninstall: cross-session persistence",
       "context": "unspecified",
       "object_refs": [
         "attack-pattern--513e91ee-8d49-5024-b2db-fa4329a852af"
@@ -1891,7 +1891,7 @@
       "modified": "2026-06-03T00:00:00.000Z",
       "created_by_ref": "identity--fb866cae-55fa-52bc-a91a-91aecf30b3f7",
       "name": "Supply Chain Install Attack",
-      "description": "Unsigned installation scripts executed without integrity verification \u2014 curl|sh without checksum",
+      "description": "Unsigned installation scripts executed without integrity verification: curl|sh without checksum",
       "context": "unspecified",
       "object_refs": [
         "attack-pattern--a09f8058-1a20-5f48-91f7-4edbbdd38af8"
@@ -1992,7 +1992,7 @@
       "modified": "2026-06-03T00:00:00.000Z",
       "created_by_ref": "identity--fb866cae-55fa-52bc-a91a-91aecf30b3f7",
       "name": "Integrity Check Bypass",
-      "description": "Digest or hash verification bypass on empty or missing values \u2014 tampered artifacts pass silently",
+      "description": "Digest or hash verification bypass on empty or missing values: tampered artifacts pass silently",
       "context": "unspecified",
       "object_refs": [
         "attack-pattern--67f43189-c688-503d-a386-6ec382984d29"
@@ -2008,7 +2008,7 @@
       "modified": "2026-06-03T00:00:00.000Z",
       "created_by_ref": "identity--fb866cae-55fa-52bc-a91a-91aecf30b3f7",
       "name": "LLM Inference Exposure",
-      "description": "LLM inference endpoints exposed without authentication \u2014 allows arbitrary prompt execution",
+      "description": "LLM inference endpoints exposed without authentication, allowing arbitrary prompt execution",
       "context": "unspecified",
       "object_refs": [
         "attack-pattern--f1c9743e-5532-543c-a19b-cb160eba7353",
@@ -2070,7 +2070,7 @@
       "modified": "2026-06-03T00:00:00.000Z",
       "created_by_ref": "identity--fb866cae-55fa-52bc-a91a-91aecf30b3f7",
       "name": "TOCTOU Race Condition",
-      "description": "Time-of-check-time-of-use race between verification and execution \u2014 swap window for attackers",
+      "description": "Time-of-check-time-of-use race between verification and execution: swap window for attackers",
       "context": "unspecified",
       "object_refs": [
         "attack-pattern--67f43189-c688-503d-a386-6ec382984d29"
@@ -2103,7 +2103,7 @@
       "modified": "2026-06-03T00:00:00.000Z",
       "created_by_ref": "identity--fb866cae-55fa-52bc-a91a-91aecf30b3f7",
       "name": "NemoClaw Network Exposure",
-      "description": "NemoClaw network services bound to public interfaces \u2014 gateway, k3s API, mDNS beacons",
+      "description": "NemoClaw network services bound to public interfaces: gateway, k3s API, mDNS beacons",
       "context": "unspecified",
       "object_refs": [
         "attack-pattern--f1c9743e-5532-543c-a19b-cb160eba7353",
@@ -2121,7 +2121,7 @@
       "modified": "2026-06-03T00:00:00.000Z",
       "created_by_ref": "identity--fb866cae-55fa-52bc-a91a-91aecf30b3f7",
       "name": "NemoClaw OpenClaw Inheritance",
-      "description": "Inherited OpenClaw flaws that survive NemoClaw sandboxing \u2014 heartbeat persistence, pre-allowed APIs",
+      "description": "Inherited OpenClaw flaws that survive NemoClaw sandboxing: heartbeat persistence, pre-allowed APIs",
       "context": "unspecified",
       "object_refs": [
         "attack-pattern--f1c9743e-5532-543c-a19b-cb160eba7353"
@@ -2186,7 +2186,7 @@
       "modified": "2026-06-03T00:00:00.000Z",
       "created_by_ref": "identity--fb866cae-55fa-52bc-a91a-91aecf30b3f7",
       "name": "Behavioral Impersonation",
-      "description": "Using stolen credentials detected via behavioral baseline mismatch \u2014 agent DNA forgery",
+      "description": "Using stolen credentials detected via behavioral baseline mismatch: agent DNA forgery",
       "context": "unspecified",
       "object_refs": [
         "attack-pattern--065a16b2-e69a-5e8b-918a-71a40d42d00b"

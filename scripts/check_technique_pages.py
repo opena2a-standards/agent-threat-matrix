@@ -11,10 +11,10 @@ prose, but these lines are data that also lives in matrix.json:
 - ``- **HMA Checks:**``, ``- **OASB Controls:**`` and ``- **Evidence Tier:**``
 - the two References links, ``- Attack Class: [...]`` and ``- Tactic: [...]``
 
-Each must appear once and equal its rendering from the data. Only two of them were
-checked until 2026-10-11: when matrix.json moved T-1006 and T-5002 to A2A-EXPOSE on
-2026-08-25, their HMA Checks lines and four References class links kept the old values
-while CI stayed green.
+Each must appear once outside fenced code blocks and equal its rendering from the data.
+Only two of them were checked until 2026-10-11: when matrix.json moved T-1006 and T-5002
+to A2A-EXPOSE on 2026-08-25, their HMA Checks lines and four References class links kept
+the old values while CI stayed green.
 
 The pages under tactics/ carry nothing but data (name, kill chain stage, description and
 a table of the tactic's techniques in matrix.json order), so each must equal its full
@@ -57,6 +57,37 @@ FIELD_PATTERNS = (
 )
 FIELDS = tuple((label, re.compile(pattern, re.M), render) for label, pattern, render in FIELD_PATTERNS)
 NO_PROCEDURES_RE = re.compile(rf"^(?P<line>{re.escape(NO_PROCEDURES)})$", re.M)
+FENCE_RE = re.compile(r"^ {0,3}(`{3,}|~{3,})")
+
+
+def fenced_spans(text: str) -> list[tuple[int, int]]:
+    """Return the (start, end) offsets of each fenced code block, fence lines included.
+
+    A line in a code example, such as a ``# comment`` in a shell block, is not a data line
+    of the page. An unclosed fence runs to the end of the page, as in CommonMark.
+    """
+    spans = []
+    fence = None
+    start = offset = 0
+    for line in text.splitlines(keepends=True):
+        m = FENCE_RE.match(line)
+        if fence is None:
+            if m:
+                fence, start = m.group(1), offset
+        elif m and m.group(1)[0] == fence[0] and len(m.group(1)) >= len(fence) \
+                and not line.strip().strip(fence[0]):
+            spans.append((start, offset + len(line)))
+            fence = None
+        offset += len(line)
+    if fence is not None:
+        spans.append((start, offset))
+    return spans
+
+
+def find_lines(regex: re.Pattern, text: str) -> list[re.Match]:
+    """Return the matches of ``regex`` that start outside every fenced code block."""
+    spans = fenced_spans(text)
+    return [m for m in regex.finditer(text) if not any(s <= m.start() < e for s, e in spans)]
 
 
 def check_technique_page(technique: dict, text: str) -> tuple[list[str], str]:
@@ -66,7 +97,7 @@ def check_technique_page(technique: dict, text: str) -> tuple[list[str], str]:
     updated = text
     for label, regex, render in FIELDS:
         want = render(technique)
-        found = list(regex.finditer(updated))
+        found = find_lines(regex, updated)
         if len(found) > 1:
             failures.append(f"{tid}: page has {len(found)} '{label}' lines")
             continue
@@ -77,9 +108,9 @@ def check_technique_page(technique: dict, text: str) -> tuple[list[str], str]:
             continue
         if not found:
             failures.append(f"{tid}: page has no '{label}' line")
-            placeholder = NO_PROCEDURES_RE.search(updated) if label == DVAA_LABEL else None
-            if placeholder:
-                updated = _replace(updated, placeholder, want)
+            placeholders = find_lines(NO_PROCEDURES_RE, updated) if label == DVAA_LABEL else []
+            if placeholders:
+                updated = _replace(updated, placeholders[0], want)
             continue
         have = found[0].group("line")
         if have != want:

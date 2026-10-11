@@ -1,0 +1,27 @@
+{
+  "description": "Figures README.md states about related projects. They are measured in those projects, not in matrix.json, so each is pinned here with the release and commit it was read from. scripts/check_readme_claims.py fails when a README line naming the project states a different number. Re-measure with the refresh command when the project releases.",
+  "dvaa": {
+    "repository": "https://github.com/opena2a-org/damn-vulnerable-ai-agent",
+    "sourceVersion": "0.9.3",
+    "sourceCommit": "57918267d8d529ceec6d40fc9836ab09d128eee4",
+    "source": "README.md: the Security column of the Agents table, and the rows of the Attack Categories table",
+    "readOn": "2026-10-11",
+    "agents": 21,
+    "agentsByKind": {
+      "deliberatelyVulnerable": {
+        "count": 16,
+        "securityLabels": ["Critical", "Standard", "Vulnerable", "Weak"]
+      },
+      "hardenedReference": {
+        "count": 1,
+        "securityLabels": ["Hardened"]
+      },
+      "controlProtectedVariant": {
+        "count": 4,
+        "securityLabels": ["AIM-protected"]
+      }
+    },
+    "vulnerabilityCategories": 12,
+    "refresh": "curl -s https://raw.githubusercontent.com/opena2a-org/damn-vulnerable-ai-agent/main/README.md | grep -E \"^\\| [A-Za-z-]+ \\| 70[0-9]{2} \\|\" | awk -F'|' '{gsub(/ /,\"\",$4); print $4}' | sort | uniq -c"
+  }
+}

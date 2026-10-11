@@ -1358,7 +1358,7 @@
     {
       "id": "PHANTOM-SOUL",
       "name": "Phantom Soul",
-      "description": "Agent deployed with zero behavioral constraints \u2014 no SOUL.md, no system prompt, no governance",
+      "description": "Agent deployed with zero behavioral constraints: no SOUL.md, no system prompt, no governance",
       "techniques": [
         "T-1006"
       ],
@@ -1411,7 +1411,7 @@
     {
       "id": "SOUL-FORK",
       "name": "Soul Forking",
-      "description": "Different behavior under evaluation vs production \u2014 agent passes safety tests but behaves differently in deployment",
+      "description": "Different behavior under evaluation vs production: agent passes safety tests but behaves differently in deployment",
       "techniques": [
         "T-5002"
       ],
@@ -1669,7 +1669,7 @@
     {
       "id": "SKILL-MEM-AMP",
       "name": "Skill Memory Amplification",
-      "description": "Skill plants payload in agent memory that survives skill uninstall \u2014 cross-session persistence",
+      "description": "Skill plants payload in agent memory that survives skill uninstall: cross-session persistence",
       "techniques": [
         "T-3004"
       ],
@@ -1681,7 +1681,7 @@
     {
       "id": "SUPPLY-CHAIN-INSTALL",
       "name": "Supply Chain Install Attack",
-      "description": "Unsigned installation scripts executed without integrity verification \u2014 curl|sh without checksum",
+      "description": "Unsigned installation scripts executed without integrity verification: curl|sh without checksum",
       "techniques": [
         "T-9003"
       ],
@@ -1782,7 +1782,7 @@
     {
       "id": "INTEGRITY-BYPASS",
       "name": "Integrity Check Bypass",
-      "description": "Digest or hash verification bypass on empty or missing values \u2014 tampered artifacts pass silently",
+      "description": "Digest or hash verification bypass on empty or missing values: tampered artifacts pass silently",
       "techniques": [
         "T-9001"
       ],
@@ -1806,7 +1806,7 @@
     {
       "id": "LLM-EXPOSE",
       "name": "LLM Inference Exposure",
-      "description": "LLM inference endpoints exposed without authentication \u2014 allows arbitrary prompt execution",
+      "description": "LLM inference endpoints exposed without authentication, allowing arbitrary prompt execution",
       "techniques": [
         "T-1001",
         "T-1004"
@@ -1919,7 +1919,7 @@
     {
       "id": "TOCTOU-RACE",
       "name": "TOCTOU Race Condition",
-      "description": "Time-of-check-time-of-use race between verification and execution \u2014 swap window for attackers",
+      "description": "Time-of-check-time-of-use race between verification and execution: swap window for attackers",
       "techniques": [
         "T-9001"
       ],
@@ -1951,7 +1951,7 @@
     {
       "id": "NEMO-NETWORK-EXPOSE",
       "name": "NemoClaw Network Exposure",
-      "description": "NemoClaw network services bound to public interfaces \u2014 gateway, k3s API, mDNS beacons",
+      "description": "NemoClaw network services bound to public interfaces: gateway, k3s API, mDNS beacons",
       "techniques": [
         "T-1001",
         "T-1004",
@@ -1973,7 +1973,7 @@
     {
       "id": "NEMO-OPENCLAW-INHERIT",
       "name": "NemoClaw OpenClaw Inheritance",
-      "description": "Inherited OpenClaw flaws that survive NemoClaw sandboxing \u2014 heartbeat persistence, pre-allowed APIs",
+      "description": "Inherited OpenClaw flaws that survive NemoClaw sandboxing: heartbeat persistence, pre-allowed APIs",
       "techniques": [
         "T-1001"
       ],
@@ -2054,7 +2054,7 @@
     {
       "id": "BEHAVIORAL-IMPERSONATE",
       "name": "Behavioral Impersonation",
-      "description": "Using stolen credentials detected via behavioral baseline mismatch \u2014 agent DNA forgery",
+      "description": "Using stolen credentials detected via behavioral baseline mismatch: agent DNA forgery",
       "techniques": [
         "T-4002"
       ],

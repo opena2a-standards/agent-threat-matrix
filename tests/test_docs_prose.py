@@ -4,8 +4,10 @@ scripts/check_docs_prose.py must be green on the shipped tree. Each dash form an
 "Why this exists" heading form is then planted in a fixture string and must be reported at
 its own line, while code, comments, front matter, compounds, ranges and table delimiter rows
 stay unreported. Scratch trees with no git checkout, or nested inside another repository's
-work tree, exercise the file walk the checker falls back to; a file that is not UTF-8 is
-reported at its line, not as a traceback.
+work tree, exercise the file walk the checker falls back to; a scratch git tree shows that a
+new file is checked before it is staged, that an ignored file is not, and that a path to the
+tree differing only in letter case still reads git. A file that is not UTF-8 is reported at
+its line, not as a traceback, and the run goes on to the files after it.
 """
 
 import importlib.util
@@ -14,6 +16,8 @@ import subprocess
 import tempfile
 import time
 from pathlib import Path
+
+import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
 CHECKER = ROOT / "scripts" / "check_docs_prose.py"
@@ -146,6 +150,36 @@ def test_html_comments_are_stripped_within_and_across_lines():
     assert [f.split(": P1")[0] for f in failures] == ["doc.md:1", "doc.md:3"]
 
 
+def test_text_after_an_unclosed_comment_on_its_line_is_not_reported():
+    assert CHK.check_text("doc.md", "Plain <!-- open -- here\n") == []
+
+
+def test_a_complete_comment_is_replaced_by_a_space():
+    failures = CHK.check_text("doc.md", "a<!-- c -->-- b\n")
+    assert [f.split(": P1")[0] for f in failures] == ["doc.md:1"]
+
+
+def test_empty_comment_forms_are_complete():
+    for opener in ("<!-->", "<!--->"):
+        failures = CHK.check_text("d.md", f"x {opener} y\nlater -- prose\n")
+        assert [f.split(": P1")[0] for f in failures] == ["d.md:2"], opener
+
+
+def test_delimiter_cell_with_one_alignment_colon_is_not_reported():
+    assert CHK.check_text("t.md", "| a | b |\n| :-- | -- |\n") == []
+
+
+def test_table_delimiter_row_inside_a_block_quote_is_not_reported():
+    text = (
+        "> | a | b |\n"
+        "> | -- | -- |\n"
+        "> > -- | :-- |\n"
+        "> | a -- b |\n"
+    )
+    failures = CHK.check_text("d.md", text)
+    assert [f.split(": P1")[0] for f in failures] == ["d.md:4"]
+
+
 def test_unterminated_html_comments_cost_linear_time():
     started = time.perf_counter()
     assert CHK.check_text("x.md", "<!-- " * 40000 + "\n") == []
@@ -195,12 +229,52 @@ def test_non_utf8_file_is_reported_at_its_line():
     td = Path(tempfile.mkdtemp(prefix="atm-prose-"))
     try:
         tree = _scratch_tree(td)
+        (tree / "A.md").write_bytes(b"\xff first\n")
         (tree / "README.md").write_bytes(b"# T\n\nCaf\xe9\n")
         (tree / "OTHER.md").write_text(f"Plain prose {EM} with a dash.\n", encoding="utf-8")
         proc = run_checker(tree / "scripts" / "check_docs_prose.py")
         assert proc.returncode == 1, proc.stdout + proc.stderr
         assert "Traceback" not in proc.stderr, proc.stderr
+        assert "A.md:1: not valid UTF-8" in proc.stdout, proc.stdout
         assert "README.md:3: not valid UTF-8" in proc.stdout, proc.stdout
         assert "OTHER.md:1: P1 em dash used as a dash in prose" in proc.stdout
+    finally:
+        shutil.rmtree(td)
+
+
+def _git_tree(parent: Path) -> Path:
+    tree = _scratch_tree(parent)
+    subprocess.run(["git", "init", "-q", str(tree)], check=True, capture_output=True, timeout=60)
+    (tree / ".gitignore").write_text("ignored.md\n", encoding="utf-8")
+    (tree / "README.md").write_text("# Title\n\nPlain prose.\n", encoding="utf-8")
+    (tree / "ignored.md").write_text(f"Ignored {EM} not checked.\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(tree), "add", "README.md"], check=True, capture_output=True,
+                   timeout=60)
+    return tree
+
+
+def test_new_markdown_file_is_checked_before_it_is_staged():
+    td = Path(tempfile.mkdtemp(prefix="atm-prose-"))
+    try:
+        tree = _git_tree(td)
+        (tree / "NEW.md").write_text(f"New page {EM} with a dash.\n", encoding="utf-8")
+        proc = run_checker(tree / "scripts" / "check_docs_prose.py")
+        assert proc.returncode == 1, proc.stdout + proc.stderr
+        assert "NEW.md:1: P1 em dash used as a dash in prose" in proc.stdout, proc.stdout
+        assert "ignored.md" not in proc.stdout, proc.stdout
+    finally:
+        shutil.rmtree(td)
+
+
+def test_case_variant_path_to_the_work_tree_reads_git():
+    td = Path(tempfile.mkdtemp(prefix="atm-prose-"))
+    try:
+        tree = _git_tree(td)
+        variant = tree.parent / tree.name.upper()
+        if not variant.exists():
+            pytest.skip("case-sensitive filesystem: no case-variant path to the tree")
+        proc = run_checker(variant / "scripts" / "check_docs_prose.py")
+        assert proc.returncode == 0, proc.stdout + proc.stderr
+        assert proc.stdout.startswith("OK: 1 Markdown files"), proc.stdout
     finally:
         shutil.rmtree(td)

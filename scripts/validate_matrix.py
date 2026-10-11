@@ -34,9 +34,10 @@ Standard library only, no network. Two passes:
         of a git work tree that holds the commit, matrix.json is read at that
         commit, and a sha that names no commit, names another kind of object,
         or indexes a matrix.json whose ids differ from the list is refused. A
-        copy without git, or a shallow checkout that lacks the commit, cannot
-        resolve the object, so there only the shape is checked; the summary
-        line says which check ran
+        copy without git, a shallow checkout that lacks the commit, or a
+        partial clone that lacks the commit's tree or matrix.json cannot read
+        the file at that commit, so there only the shape is checked; the
+        summary line says which check ran
 
 Exit 0 when everything holds, 1 otherwise.
 """
@@ -195,10 +196,18 @@ def resolve_matrix_commit(commit: str, listed, errors: list) -> str:
     if kind != "commit":
         errors.append(f"S11 technique-ids.json matrixCommit {commit} names a {kind} object, not a commit")
         return ""
-    blob = git("cat-file", "blob", f"{commit}:matrix.json")
-    if blob is None:
+    # A partial clone holds the commit but may lack its tree (--filter=tree:0) or the
+    # matrix.json blob (--filter=blob:none), and lazy fetching is off, so a missing object
+    # is told apart from a commit that has no matrix.json.
+    blob_id = (git("rev-parse", "--verify", "--quiet", f"{commit}:matrix.json") or "").strip()
+    if not blob_id:
+        if git("cat-file", "-e", f"{commit}^{{tree}}") is None:
+            return "shape only: partial clone without that commit's tree"
         errors.append(f"S11 technique-ids.json matrixCommit {commit} has no matrix.json")
         return ""
+    blob = git("cat-file", "blob", blob_id)
+    if blob is None:
+        return "shape only: partial clone without matrix.json at that commit"
     try:
         indexed = sorted(t["id"] for t in json.loads(blob)["techniques"])
     except (json.JSONDecodeError, KeyError, TypeError):
