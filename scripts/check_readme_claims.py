@@ -11,6 +11,12 @@ between the BEGIN/END GENERATED markers. Typed by hand, they reworded 34 of the
 40 class descriptions and four of them described a different attack. The block
 must re-render byte-identically; run with ``--fix`` to rewrite only that block.
 
+The README also states figures about related projects. Those are measured in the
+other project, so they are pinned in related-projects.json with the release and
+commit each was read from, and every README line naming the project must state the
+pinned number. DVAA was described as "21 vulnerable agents" while DVAA labels one
+of the 21 a hardened reference and four control-protected variants.
+
 Exit 0 when every claim matches the data, 1 otherwise.
 """
 
@@ -22,6 +28,7 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 MATRIX = ROOT / "matrix.json"
 README = ROOT / "README.md"
+RELATED = ROOT / "related-projects.json"
 
 CLASS_BEGIN = "<!-- BEGIN GENERATED: attack-class-tables -->"
 CLASS_END = "<!-- END GENERATED: attack-class-tables -->"
@@ -124,6 +131,12 @@ def fix_class_tables(matrix, readme):
     return readme[:start] + render_class_tables(matrix) + readme[end:]
 
 
+def lines_naming(text, name):
+    """`text` with every line that does not contain `name` blanked, so a match
+    offset still converts to its README line number."""
+    return "\n".join(line if name in line else "" for line in text.split("\n"))
+
+
 def empty(value):
     """A mapping field counts as absent when null, empty, or all-empty strings."""
     if value is None:
@@ -163,24 +176,26 @@ def main(argv):
     total = len(techniques)
     failures = []
 
-    def require(pattern, expected, label):
+    def require(pattern, expected, label, text=readme, source="matrix.json", stated=True):
         """The README states this wording at least once, and every occurrence carries
         the measured number(s).
 
         `pattern` captures each stated number as a group, in the order of `expected`.
         Checking every occurrence, rather than that the right number appears
         somewhere, is what catches a count repeated in a second section (Use cases,
-        Purpose) going stale while the first copy still matches.
+        Purpose) going stale while the first copy still matches. `text` is the README
+        or a line-preserving subset of it; with `stated=False` the wording may be
+        absent, but any occurrence must still carry the measured number(s).
         """
         want = tuple(str(v) for v in expected)
-        found = list(re.finditer(pattern, readme))
-        if not found:
+        found = list(re.finditer(pattern, text))
+        if not found and stated:
             failures.append(f"README does not state {label} ({', '.join(want)})")
         for m in found:
             if m.groups() != want:
-                line = readme.count("\n", 0, m.start()) + 1
+                line = text.count("\n", 0, m.start()) + 1
                 failures.append(
-                    f"README.md:{line}: \"{m.group(0)}\" does not match matrix.json "
+                    f"README.md:{line}: \"{m.group(0)}\" does not match {source} "
                     f"({label}: {', '.join(want)})"
                 )
 
@@ -230,6 +245,35 @@ def main(argv):
 
     failures.extend(check_class_tables(matrix, readme))
 
+    # Related-project figures, read only from the README lines that name the project.
+    related = json.loads(RELATED.read_text(encoding="utf-8"))
+    dvaa = related["dvaa"]
+    kinds = {kind: entry["count"] for kind, entry in dvaa["agentsByKind"].items()}
+    if sum(kinds.values()) != dvaa["agents"]:
+        failures.append(
+            f"related-projects.json: dvaa.agentsByKind counts sum to {sum(kinds.values())}, "
+            f"dvaa.agents is {dvaa['agents']}"
+        )
+    dvaa_lines = lines_naming(readme, "DVAA")
+    pinned = "related-projects.json"
+    require(r"\b(\d+) agents\b", [dvaa["agents"]], "DVAA agents", dvaa_lines, pinned)
+    require(r"\b(\d+) deliberately vulnerable\b", [kinds["deliberatelyVulnerable"]],
+            "DVAA deliberately vulnerable agents", dvaa_lines, pinned)
+    require(r"\b(\d+) hardened reference\b", [kinds["hardenedReference"]],
+            "DVAA hardened reference agents", dvaa_lines, pinned)
+    require(r"\b(\d+) control-protected variants?\b", [kinds["controlProtectedVariant"]],
+            "DVAA control-protected variants", dvaa_lines, pinned)
+    # "N vulnerable agents" counts only the agents DVAA labels vulnerable.
+    require(r"\b(\d+) (?:deliberately )?vulnerable agents?\b", [kinds["deliberatelyVulnerable"]],
+            "DVAA vulnerable agents", dvaa_lines, pinned, stated=False)
+    require(r"\b(\d+) vulnerability categories\b", [dvaa["vulnerabilityCategories"]],
+            "DVAA vulnerability categories", dvaa_lines, pinned)
+    dvaa_summary = (
+        f"DVAA {dvaa['sourceVersion']}: {dvaa['agents']} agents "
+        f"({', '.join(f'{k}={v}' for k, v in kinds.items())}), "
+        f"{dvaa['vulnerabilityCategories']} vulnerability categories"
+    )
+
     tier_total = sum(tiers.values())
     if tier_total != total:
         failures.append(
@@ -238,14 +282,15 @@ def main(argv):
         )
 
     if failures:
-        print("README claims do not match matrix.json:\n", file=sys.stderr)
+        print("README claims do not match matrix.json and related-projects.json:\n",
+              file=sys.stderr)
         for f in failures:
             print(f"  - {f}", file=sys.stderr)
         print(
             f"\nmeasured: {len(tactics)} tactics, {total} techniques, "
             f"{len(classes)} attack classes, tiers={tiers}, "
             f"detection={with_detection}/{total}, control={with_control}/{total}, "
-            f"lab={with_lab}/{total}",
+            f"lab={with_lab}/{total}\npinned: {dvaa_summary}",
             file=sys.stderr,
         )
         return 1
@@ -254,7 +299,7 @@ def main(argv):
         f"README claims match matrix.json: {len(tactics)} tactics, {total} techniques, "
         f"{len(classes)} attack classes, tiers={tiers}, "
         f"detection={with_detection}/{total}, control={with_control}/{total}, "
-        f"lab={with_lab}/{total}"
+        f"lab={with_lab}/{total}; and related-projects.json: {dvaa_summary}"
     )
     return 0
 
