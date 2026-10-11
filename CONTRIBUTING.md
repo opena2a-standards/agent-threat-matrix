@@ -156,6 +156,21 @@ as the evidence and the taxonomy evolve. Each such decision is recorded on the s
 thread (the issue or pull request the content arrived in), so the contributor and any later
 reader can see what was decided and why.
 
+## Checking documentation prose
+
+If your pull request adds or edits any Markdown file, run the docs prose check from the
+repository root before you open it:
+
+```bash
+python3 scripts/check_docs_prose.py
+```
+
+It prints `file:line` for each spaced double hyphen, em dash or spaced en dash used as a dash
+in prose, and for each heading or bold label named "Why this exists" or "Why this matters",
+and exits 1 if it finds any. Rewrite the sentence with a period, a comma, a colon or
+parentheses. Code spans, fenced code blocks, HTML comments and table delimiter rows are not
+checked, and neither are `CHANGELOG.md` and test fixture directories.
+
 ## Code of Conduct
 
 Contributions must be:

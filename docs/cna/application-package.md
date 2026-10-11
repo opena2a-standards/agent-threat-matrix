@@ -5,14 +5,25 @@ submitted to the CVE Program, MITRE, Red Hat, or any Root. No request has been o
 ticket, confirmation, or correspondence exists. This document exists so that when the owner
 files, the material is already assembled.
 
-**Owner-retained actions** (explicitly NOT performed here): submitting the CVE Request Form,
-contacting MITRE or any Root, and obtaining counsel sign-off. The roadmap unit records a
-queued-for-owner card at `decisions/2026-08-31-queued-cna-filing-csnp.md` for the filing itself.
+**Owner-retained actions** (marked OWNER-RETAINED below; explicitly NOT performed here):
+submitting the CVE Request Form, contacting MITRE or any Root, and obtaining counsel sign-off.
+The unit (defined below) records a queued-for-owner card at
+`decisions/2026-08-31-queued-cna-filing-csnp.md` for the filing itself.
 
 ## How to read this document
 
-Every fact below comes from exactly one of two places: the roadmap unit
-`roadmap/standards-cna-csnp.md` (referred to as **the unit**), or this repository. The
+Three terms recur throughout:
+
+- **The owner** is the person who files the CNA application on CSNP's behalf.
+- **The unit** is OpenA2A's planning record for this filing, `roadmap/standards-cna-csnp.md`.
+  It is kept in a private planning tracker and is not published in this repository, so a
+  claim sourced to the unit cannot be checked from here. The [Provenance](#provenance) table
+  marks every such claim `unit`.
+- **OWNER-RETAINED** labels an action that only the owner may take: submitting the CVE Request
+  Form, contacting MITRE or any Root, or obtaining counsel sign-off. Nothing labeled
+  OWNER-RETAINED has been done, and nothing in this repository does it.
+
+Every fact below comes from exactly one of two places: the unit or this repository. The
 [Provenance](#provenance) table maps each claim to its source. Anything not recorded in either
 place is written as the literal token `PLACEHOLDER` and is the owner's to fill. An empty field
 is intentional; nothing here is a plausible-looking guess.

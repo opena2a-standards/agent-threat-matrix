@@ -10,15 +10,17 @@ Two writing rules apply to every Markdown page a reader sees here:
 - P2 no heading or bold section label is named "Why this exists" or "Why this matters".
 
 The checked set is every tracked ``*.md`` and ``*.mdx`` file (every such file on disk when
-there is no git checkout) except CHANGELOG.md and changelog.d/, whose history is not
-rewritten, LICENSE files, dependency and build output, and test, fixture, corpus, golden,
-snapshot and example directories, whose text is data a test compares against. Front matter,
-fenced code blocks, inline code spans and HTML comments are skipped: a ``--`` there is a
-command-line separator or program text, not punctuation. VERBATIM lists the lines that quote
-a recorded source word for word, where rewriting the punctuation would misquote it; an entry
-matches one exact line, so an edited line is checked again.
+the repository root is not the top of a git work tree) except CHANGELOG.md and changelog.d/,
+whose history is not rewritten, LICENSE files, dependency and build output, and test,
+fixture, corpus, golden, snapshot and example directories, whose text is data a test
+compares against. Front matter, fenced code blocks, inline code spans, HTML comments and
+table delimiter rows are skipped: a ``--`` there is a command-line separator, program text or
+table syntax, not punctuation. VERBATIM lists the lines that quote a recorded source word for
+word, where rewriting the punctuation would misquote it; an entry matches one exact line, so
+an edited line is checked again.
 
-Exit 0 when both rules hold, 1 otherwise, printing ``file:line`` for each violation.
+Exit 0 when both rules hold, 1 otherwise, printing ``file:line`` for each violation and for
+each file that is not valid UTF-8.
 """
 
 import re
@@ -41,8 +43,8 @@ VERBATIM = {
 
 FENCE_RE = re.compile(r"^ {0,3}(`{3,}|~{3,})")
 INLINE_CODE_RE = re.compile(r"(?<!`)(`+)(?!`)(.+?)(?<!`)\1(?!`)")
-HTML_COMMENT_RE = re.compile(r"<!--.*?-->")
 RULE_RE = re.compile(r"^\s*-+\s*$")
+DELIMITER_CELL_RE = re.compile(r":?-+:?")
 DASHES = (
     ("spaced double hyphen", re.compile(r"(?:^|\s)--(?:\s|$)")),
     ("em dash", re.compile("—")),
@@ -61,19 +63,64 @@ def excluded(rel: str) -> bool:
     return any(part in EXCLUDED_DIRS for part in parts[:-1])
 
 
-def markdown_files(root: Path) -> list:
-    try:
-        out = subprocess.run(
-            ["git", "-C", str(root), "ls-files", "-z", "--", "*.md", "*.mdx"],
-            capture_output=True, check=True, timeout=60,
+def git_markdown_files(root: Path):
+    """Return the tracked Markdown paths when root is the top of a git work tree, else None.
+    A root nested inside some other repository's work tree is walked instead: there,
+    ``git ls-files`` lists that repository's index, not this tree."""
+    def git(*args) -> str:
+        return subprocess.run(
+            ["git", "-C", str(root), *args], capture_output=True, check=True, timeout=60,
         ).stdout.decode("utf-8")
-        paths = [p for p in out.split("\0") if p]
-    except (OSError, subprocess.SubprocessError):
+
+    try:
+        if Path(git("rev-parse", "--show-toplevel").strip()).resolve() != root.resolve():
+            return None
+        out = git("ls-files", "-z", "--", "*.md", "*.mdx")
+    except (OSError, subprocess.SubprocessError, UnicodeDecodeError):
+        return None
+    return [p for p in out.split("\0") if p]
+
+
+def markdown_files(root: Path) -> list:
+    paths = git_markdown_files(root)
+    if paths is None:
         paths = [
             p.relative_to(root).as_posix() for p in root.rglob("*")
             if p.suffix in (".md", ".mdx") and ".git" not in p.relative_to(root).parts
         ]
     return sorted(p for p in paths if not excluded(p) and (root / p).is_file())
+
+
+def strip_html_comments(line: str):
+    """Replace each complete ``<!-- ... -->`` in one line with a space and cut the line at an
+    unclosed ``<!--``. Return the stripped line and whether a comment is left open. Each
+    character is scanned once, so a line of many unclosed openers costs linear time."""
+    kept = []
+    pos = 0
+    while True:
+        start = line.find("<!--", pos)
+        if start < 0:
+            kept.append(line[pos:])
+            return "".join(kept), False
+        kept.append(line[pos:start])
+        end = line.find("-->", start + 4)
+        if end < 0:
+            return "".join(kept), True
+        kept.append(" ")
+        pos = end + 3
+
+
+def table_delimiter_row(line: str) -> bool:
+    """True for a GFM table delimiter row such as ``| -- | :-: |`` or ``-- | --``: at least
+    one pipe, and every cell between the pipes is hyphens with optional alignment colons."""
+    row = line.strip()
+    if "|" not in row:
+        return False
+    if row.startswith("|"):
+        row = row[1:]
+    if row.endswith("|"):
+        row = row[:-1]
+    return all(DELIMITER_CELL_RE.fullmatch(cell.strip()) for cell in row.split("|"))
 
 
 def prose_lines(text: str):
@@ -105,10 +152,7 @@ def prose_lines(text: str):
         if m:
             fence = m.group(1)
             continue
-        line = HTML_COMMENT_RE.sub(" ", line)
-        if "<!--" in line:
-            line = line.split("<!--", 1)[0]
-            in_comment = True
+        line, in_comment = strip_html_comments(line)
         yield i + 1, INLINE_CODE_RE.sub(" ", line)
 
 
@@ -119,7 +163,7 @@ def check_text(rel: str, text: str) -> list:
     for lineno, line in prose_lines(text):
         if (rel, raw[lineno - 1].rstrip()) in VERBATIM:
             continue
-        if not RULE_RE.match(line):
+        if not RULE_RE.match(line) and not table_delimiter_row(line):
             for name, pattern in DASHES:
                 if pattern.search(line):
                     failures.append(f"{rel}:{lineno}: P1 {name} used as a dash in prose")
@@ -133,7 +177,15 @@ def run_checks(root: Path):
     files = markdown_files(root)
     failures = []
     for rel in files:
-        failures.extend(check_text(rel, (root / rel).read_text(encoding="utf-8")))
+        data = (root / rel).read_bytes()
+        try:
+            text = data.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            lineno = data.count(b"\n", 0, exc.start) + 1
+            failures.append(f"{rel}:{lineno}: not valid UTF-8 (byte 0x{data[exc.start]:02x}); "
+                            "save the file as UTF-8 so its prose can be checked")
+            continue
+        failures.extend(check_text(rel, text))
     return files, failures
 
 

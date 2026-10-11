@@ -2,14 +2,17 @@
 
 scripts/check_docs_prose.py must be green on the shipped tree. Each dash form and each
 "Why this exists" heading form is then planted in a fixture string and must be reported at
-its own line, while code, comments, front matter, compounds and ranges stay unreported. A
-scratch tree with no git checkout exercises the file walk the checker falls back to.
+its own line, while code, comments, front matter, compounds, ranges and table delimiter rows
+stay unreported. Scratch trees with no git checkout, or nested inside another repository's
+work tree, exercise the file walk the checker falls back to; a file that is not UTF-8 is
+reported at its line, not as a traceback.
 """
 
 import importlib.util
 import shutil
 import subprocess
 import tempfile
+import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -118,21 +121,86 @@ def test_verbatim_entry_matches_one_exact_line():
     assert CHK.check_text("README.md", f"{line}\n") != []
 
 
+def test_table_delimiter_rows_are_not_reported():
+    text = (
+        "| a | b |\n"
+        "| -- | -- |\n"
+        "| :-- | --: |\n"
+        "a | b\n"
+        "-- | --\n"
+        "> -- quoted\n"
+        "- -- item\n"
+        "| a -- b |\n"
+    )
+    failures = CHK.check_text("t.md", text)
+    assert [f.split(": P1")[0] for f in failures] == ["t.md:6", "t.md:7", "t.md:8"]
+
+
+def test_html_comments_are_stripped_within_and_across_lines():
+    text = (
+        "Kept <!-- a -- b --> text -- here <!-- open -- \n"
+        "still -- inside -->after\n"
+        "<!-- one --> word -- <!-- two -->\n"
+    )
+    failures = CHK.check_text("doc.md", text)
+    assert [f.split(": P1")[0] for f in failures] == ["doc.md:1", "doc.md:3"]
+
+
+def test_unterminated_html_comments_cost_linear_time():
+    started = time.perf_counter()
+    assert CHK.check_text("x.md", "<!-- " * 40000 + "\n") == []
+    assert time.perf_counter() - started < 2.0
+
+
+def _scratch_tree(parent: Path) -> Path:
+    tree = parent / "tree"
+    (tree / "scripts").mkdir(parents=True)
+    shutil.copy(CHECKER, tree / "scripts" / "check_docs_prose.py")
+    return tree
+
+
 def test_red_on_a_scratch_tree_without_git():
     td = Path(tempfile.mkdtemp(prefix="atm-prose-"))
     try:
-        (td / "scripts").mkdir()
-        shutil.copy(CHECKER, td / "scripts" / "check_docs_prose.py")
-        (td / "README.md").write_text("# Title\n\nPlain prose.\n", encoding="utf-8")
-        proc = run_checker(td / "scripts" / "check_docs_prose.py")
+        tree = _scratch_tree(td)
+        (tree / "README.md").write_text("# Title\n\nPlain prose.\n", encoding="utf-8")
+        proc = run_checker(tree / "scripts" / "check_docs_prose.py")
         assert proc.returncode == 0, proc.stdout
         assert proc.stdout.startswith("OK: 1 Markdown files")
 
-        (td / "README.md").write_text(f"# Title\n\nPlain prose {EM} with a dash.\n", encoding="utf-8")
-        (td / "CHANGELOG.md").write_text(f"History {EM} is not rewritten.\n", encoding="utf-8")
-        proc = run_checker(td / "scripts" / "check_docs_prose.py")
+        (tree / "README.md").write_text(f"# Title\n\nPlain prose {EM} with a dash.\n", encoding="utf-8")
+        (tree / "CHANGELOG.md").write_text(f"History {EM} is not rewritten.\n", encoding="utf-8")
+        proc = run_checker(tree / "scripts" / "check_docs_prose.py")
         assert proc.returncode == 1
         assert "README.md:3: P1 em dash used as a dash in prose" in proc.stdout
         assert "CHANGELOG.md" not in proc.stdout
+    finally:
+        shutil.rmtree(td)
+
+
+def test_scratch_tree_inside_another_git_work_tree_is_walked():
+    td = Path(tempfile.mkdtemp(prefix="atm-prose-"))
+    try:
+        subprocess.run(["git", "init", "-q", str(td)], check=True, capture_output=True, timeout=60)
+        tree = _scratch_tree(td)
+        (tree / "README.md").write_text("# Title\n\nPlain prose.\n", encoding="utf-8")
+        proc = run_checker(tree / "scripts" / "check_docs_prose.py")
+        assert proc.returncode == 0, proc.stdout
+        assert proc.stdout.startswith("OK: 1 Markdown files"), proc.stdout
+    finally:
+        shutil.rmtree(td)
+
+
+def test_non_utf8_file_is_reported_at_its_line():
+    td = Path(tempfile.mkdtemp(prefix="atm-prose-"))
+    try:
+        tree = _scratch_tree(td)
+        (tree / "README.md").write_bytes(b"# T\n\nCaf\xe9\n")
+        (tree / "OTHER.md").write_text(f"Plain prose {EM} with a dash.\n", encoding="utf-8")
+        proc = run_checker(tree / "scripts" / "check_docs_prose.py")
+        assert proc.returncode == 1, proc.stdout + proc.stderr
+        assert "Traceback" not in proc.stderr, proc.stderr
+        assert "README.md:3: not valid UTF-8" in proc.stdout, proc.stdout
+        assert "OTHER.md:1: P1 em dash used as a dash in prose" in proc.stdout
     finally:
         shutil.rmtree(td)

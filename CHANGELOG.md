@@ -30,6 +30,11 @@ Schema release. No technique, tier, or classification content changed.
 - `scripts/check_readme_claims.py` checks every occurrence of each counted claim, not only that the right number appears somewhere, and covers the counts repeated in the README "Use cases" section (tactics and techniques, the lab-scenario ratio, and the observed, validated and adapted tier counts). A stale repeat used to pass while the overview copy still matched; a failure now names the README line.
 - `scripts/check_live_api_drift.py` checks the README sentence that states which version the live API labels the matrix with, which version this repository is at, and that the technique and tactic counts agree, against the live payload and `matrix.json`. A wrong number in that sentence fails the check, and so does the sentence itself once the live API serves the same version as `matrix.json`, until it is removed. Before, neither this check nor `scripts/check_readme_claims.py` read the sentence.
 
+### Fixed
+
+- `scripts/check_docs_prose.py`: HTML comments are stripped in one pass, so a line holding many unclosed `<!--` no longer costs quadratic time (a 40 KB line took about 0.8 s); a GFM table delimiter row such as `| -- | -- |` is no longer reported as a dash; a Markdown file that is not valid UTF-8 is reported as `file:line: not valid UTF-8` with exit 1 instead of ending the run with a traceback; and a copy of the repository nested inside another repository's work tree is walked on disk instead of reading the outer repository's index, which listed no files. CONTRIBUTING.md now tells contributors to run the check before opening a pull request.
+- `docs/cna/application-package.md` defines "the owner", "the unit" and OWNER-RETAINED at the top of the document.
+
 ### Added
 
 - `canonical-classes.json`: the canonical attack classes resolved to `matrix.json` technique ids (authored mapping, ruled 2026-08-30). The class axis is behavior; `attackClass` in `matrix.json` is attack vector, and neither is derivable from the other. Each technique carries exactly one `primary` class, with `secondary` recording other classes its definition also satisfies; resolution uses `primary` only. `scripts/check_canonical_classes.py` enforces the shape: known class names, ids that exist in `matrix.json`, `primary` a partition of the technique ids, and per-class arrays sorted and disjoint.
