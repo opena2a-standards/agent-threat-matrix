@@ -19,7 +19,10 @@ pinned number wherever it uses one of the wordings read here. For DVAA those are
 variant(s)", "N vulnerable agent(s)" and "N categories", where up to two words, each a
 run of ASCII letters and hyphens, may stand between the number and "categories". Each
 is read in any letter case with one space between words; a figure worded any other way
-is not checked. DVAA was
+is not checked. A line naming DVAA that carries a format character (Unicode category
+Cf, such as U+00AD SOFT HYPHEN or U+200B ZERO WIDTH SPACE) or a Hangul filler (U+115F,
+U+1160, U+3164, U+FFA0) fails: inside or beside a wording, such a character keeps the
+figure from being read while the rendered line still shows it. DVAA was
 described as "21 vulnerable agents" while DVAA labels one of the 21 a hardened
 reference and four control-protected variants.
 
@@ -50,6 +53,13 @@ CATEGORY_LABELS = {
     "identity": "Identity",
     "sandbox": "Sandbox",
 }
+
+# Letters (category Lo) that render as blank space, so a Unicode word boundary does not
+# hold between one of them and a digit or letter beside it.
+HANGUL_FILLERS = (
+    "\N{HANGUL CHOSEONG FILLER}\N{HANGUL JUNGSEONG FILLER}"
+    "\N{HANGUL FILLER}\N{HALFWIDTH HANGUL FILLER}"
+)
 
 
 def combining_marks():
@@ -154,6 +164,20 @@ def lines_naming(text, name):
     """`text` with every line that does not contain `name` blanked, so a match
     offset still converts to its README line number."""
     return "\n".join(line if name in line else "" for line in text.split("\n"))
+
+
+def hiding_characters(text):
+    """(line number, character) for the first occurrence on each line of every format
+    character (category Cf) and Hangul filler in `text`. Such a character inside or
+    beside a wording keeps the figure from being read while the line still renders it."""
+    found = []
+    for number, line in enumerate(text.split("\n"), 1):
+        seen = set()
+        for c in line:
+            if c not in seen and (unicodedata.category(c) == "Cf" or c in HANGUL_FILLERS):
+                seen.add(c)
+                found.append((number, c))
+    return found
 
 
 def empty(value):
@@ -287,6 +311,16 @@ def main(argv):
     # mark of any script is not read.
     on_dvaa_lines = dict(text=dvaa_lines, source=pinned, flags=re.IGNORECASE | re.ASCII)
     glue = r"(?u:[\w" + combining_marks() + r"])"
+    # A wording is not read when a character that renders as nothing stands inside or
+    # beside it ("age" U+00AD "nts", "22" U+200B " agents", U+3164 "22 agents"), so such
+    # a character fails the line instead of leaving its figure unchecked.
+    for number, c in hiding_characters(dvaa_lines):
+        kind = "a Hangul filler" if c in HANGUL_FILLERS else "a format character"
+        named = " ".join(filter(None, (f"U+{ord(c):04X}", unicodedata.name(c, ""))))
+        failures.append(
+            f"README.md:{number}: a line naming DVAA carries {named}, {kind}, which can hide "
+            f"a figure from the DVAA wordings; remove it"
+        )
 
     def wording(words):
         """The pattern for "N <words>", with no Unicode word character and no combining
