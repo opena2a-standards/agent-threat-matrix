@@ -14,7 +14,9 @@ description changed in matrix.json alone, and a missing marker must each go red,
 The DVAA figures are measured in DVAA, not in matrix.json, and are pinned in
 related-projects.json. Every README line naming DVAA must state the pinned numbers: the
 line that called all 21 agents vulnerable, while DVAA labels one hardened and four
-control-protected, must go red.
+control-protected, must go red. A README line naming DVAA that carries a format character
+or a Hangul filler must go red too: inside or beside a wording, such a character keeps the
+figure from being read while the rendered line still shows it.
 """
 
 import json
@@ -289,6 +291,66 @@ def test_a_wording_glued_to_a_non_ascii_letter_or_digit_is_not_read(old, new):
     td = scratch_tree()
     try:
         mutate_readme(td, old, new)
+        r = run_checker(td)
+        assert r.returncode == 0, r.stderr
+    finally:
+        shutil.rmtree(td)
+
+
+# Lines naming DVAA that carry a character which renders as nothing. Each one hides the
+# wording beside it from the check ("22 agents" glued to U+3164 is not read, and neither
+# is "age" U+00AD "nts"), so the line itself must fail, naming the character.
+AGENT_COUNT = "(21 agents: 16 deliberately vulnerable"
+CATEGORY_COUNT = "variants; 12 vulnerability categories"
+INVISIBLE_CHARACTERS = [
+    ("U+3164 HANGUL FILLER before the agent count", AGENT_COUNT,
+     "(\N{HANGUL FILLER}22 agents: 16 deliberately vulnerable",
+     "U+3164 HANGUL FILLER, a Hangul filler"),
+    ("U+FFA0 HALFWIDTH HANGUL FILLER before the agent count", AGENT_COUNT,
+     "(\N{HALFWIDTH HANGUL FILLER}22 agents: 16 deliberately vulnerable",
+     "U+FFA0 HALFWIDTH HANGUL FILLER, a Hangul filler"),
+    ("U+115F HANGUL CHOSEONG FILLER after agents", AGENT_COUNT,
+     "(22 agents\N{HANGUL CHOSEONG FILLER}: 16 deliberately vulnerable",
+     "U+115F HANGUL CHOSEONG FILLER, a Hangul filler"),
+    ("U+1160 HANGUL JUNGSEONG FILLER before the category count", CATEGORY_COUNT,
+     "variants; \N{HANGUL JUNGSEONG FILLER}13 vulnerability categories",
+     "U+1160 HANGUL JUNGSEONG FILLER, a Hangul filler"),
+    ("U+00AD SOFT HYPHEN inside agents", AGENT_COUNT,
+     "(22 age\N{SOFT HYPHEN}nts: 16 deliberately vulnerable",
+     "U+00AD SOFT HYPHEN, a format character"),
+    ("U+200B ZERO WIDTH SPACE between the number and the noun", AGENT_COUNT,
+     "(22 \N{ZERO WIDTH SPACE}agents: 16 deliberately vulnerable",
+     "U+200B ZERO WIDTH SPACE, a format character"),
+    ("U+2060 WORD JOINER between the category count and the noun", CATEGORY_COUNT,
+     "variants; 13\N{WORD JOINER} vulnerability categories",
+     "U+2060 WORD JOINER, a format character"),
+    ("U+FEFF on a line naming DVAA with the right numbers",
+     "environment (21 agents, 12 vulnerability categories)",
+     "environment (21 agents,\N{ZERO WIDTH NO-BREAK SPACE} 12 vulnerability categories)",
+     "U+FEFF ZERO WIDTH NO-BREAK SPACE, a format character"),
+]
+
+
+@pytest.mark.parametrize("old,new,named", [(o, n, c) for _, o, n, c in INVISIBLE_CHARACTERS],
+                         ids=[name for name, _, _, _ in INVISIBLE_CHARACTERS])
+def test_a_dvaa_line_carrying_an_invisible_character_is_red(old, new, named):
+    td = scratch_tree()
+    try:
+        mutate_readme(td, old, new)
+        r = run_checker(td)
+        assert r.returncode == 1, r.stdout
+        assert (f"README.md:{line_of(td, new)}: a line naming DVAA carries {named}, "
+                "which can hide a figure from the DVAA wordings; remove it") in r.stderr, r.stderr
+    finally:
+        shutil.rmtree(td)
+
+
+def test_an_invisible_character_on_a_line_not_naming_dvaa_is_not_read():
+    td = scratch_tree()
+    try:
+        mutate_readme(td, "Apache-2.0. The framework is free to use, cite, and build upon.",
+                      "Apache-2.0. The framework is free to use,\N{ZERO WIDTH SPACE} cite, "
+                      "and build upon.")
         r = run_checker(td)
         assert r.returncode == 0, r.stderr
     finally:
