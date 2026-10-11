@@ -586,11 +586,13 @@ print(f"status={status} calls={calls}")
 
 def test_the_check_reads_the_categories_of_readme_characters_only():
     # The combining-mark test used to rebuild a character class from all 1,114,112 code
-    # points on every run. It now looks up every character of the README lines naming
-    # DVAA for format characters, each distinct character of those lines once more for
-    # combining marks, and the code points of each run of combining marks found there and
-    # the one on either side of it.
-    # On the shipped README that is fewer lookups than README has characters.
+    # points on every run. It now looks up every character of every README line for
+    # format and control characters, each distinct character of the lines naming DVAA
+    # once more for combining marks, and the code points of each run of combining marks
+    # found there and the one on either side of it.
+    # The format and control lookups skip the newlines between lines, and the shipped
+    # README has more newlines than the check makes combining-mark lookups, so on it the
+    # check makes fewer lookups than README has characters.
     td = scratch_tree()
     try:
         r = subprocess.run(["python3", "-c", COUNT_CATEGORY_CALLS,
