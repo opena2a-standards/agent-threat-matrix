@@ -113,8 +113,14 @@ If a technique-grain MITRE ATLAS mapping is ever authored, this two-list partiti
 Attack classes group related techniques. To propose a new class:
 
 1. Identify 2+ techniques that share a common vulnerability pattern
-2. Create a class file in `attack-classes/` with the class name, description, member techniques, and member HMA checks
-3. Explain why this grouping is useful for practitioners
+2. Add the class to `attackClasses` in `matrix.json` with its name, description, member techniques, and member HMA checks
+3. Write its page by running `python3 scripts/generate_class_markdown.py`
+4. Explain why this grouping is useful for practitioners
+
+The pages in `attack-classes/` are rendered from `matrix.json`. To change a page, change the
+class in `matrix.json` and run the generator again; a page edited by hand is overwritten by the
+next run. `python3 scripts/generate_class_markdown.py --check` writes nothing and exits 1 when
+a page differs from what `matrix.json` renders.
 
 ## Reporting Errors
 
@@ -169,7 +175,9 @@ It prints `file:line` for each spaced double hyphen, em dash or spaced en dash u
 in prose, and for each heading or bold label named "Why this exists" or "Why this matters",
 and exits 1 if it finds any. Rewrite the sentence with a period, a comma, a colon or
 parentheses. Code spans, fenced code blocks, HTML comments and table delimiter rows are not
-checked, and neither are `CHANGELOG.md` and test fixture directories.
+checked, and neither are `CHANGELOG.md` and test fixture directories. For a finding in
+`attack-classes/`, make the fix in the class description in `matrix.json` and regenerate the
+page.
 
 ## Code of Conduct
 

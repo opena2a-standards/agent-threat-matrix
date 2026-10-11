@@ -169,7 +169,7 @@ Attack classes group related techniques by the underlying vulnerability pattern.
 | [CODE-INJECTION](attack-classes/CODE-INJECTION.md) | Injecting and executing arbitrary code through SQL injection, command injection, or code generation | T-7002, T-9001 |
 | [GATEWAY-EXPLOIT](attack-classes/GATEWAY-EXPLOIT.md) | Modifying gateway or proxy configurations to intercept, redirect, or manipulate agent traffic | T-6003 |
 | [INTEGRITY-BYPASS](attack-classes/INTEGRITY-BYPASS.md) | Digest or hash verification bypass on empty or missing values: tampered artifacts pass silently | T-9001 |
-| [LLM-EXPOSE](attack-classes/LLM-EXPOSE.md) | LLM inference endpoints exposed without authentication: allows arbitrary prompt execution | T-1001, T-1004 |
+| [LLM-EXPOSE](attack-classes/LLM-EXPOSE.md) | LLM inference endpoints exposed without authentication, allowing arbitrary prompt execution | T-1001, T-1004 |
 | [MCP-EXPLOIT](attack-classes/MCP-EXPLOIT.md) | Attacking Model Context Protocol server configurations, tool registrations, and inter-server trust | T-1002, T-1005, T-4003, T-5003, T-5005, T-5006 |
 | [PARSER-DIFFERENTIAL](attack-classes/PARSER-DIFFERENTIAL.md) | Exploits differences between parser implementations to bypass security controls | T-2009 |
 | [RETROACTIVE-PRIV](attack-classes/RETROACTIVE-PRIV.md) | Exploiting previously granted access or cached credentials to gain unauthorized capabilities | T-1001, T-1004, T-1007, T-3001, T-3003, T-3005, T-3006, T-5004, T-8005 |
