@@ -234,7 +234,9 @@ def test_a_wording_with_a_non_ascii_letter_is_not_read(old, new):
 
 # Lines where a letter or digit outside ASCII is glued to a DVAA wording. re.ASCII also
 # narrows \b to ASCII word characters, so each of these used to be read as the wording
-# beside it ("é22 agents" as "22 agents") and fail on its number.
+# beside it ("é22 agents" as "22 agents") and fail on its number. A Unicode \b counts no
+# combining mark as a word character, so the cases with a combining mark were still read
+# under it: "é" written as "e" and U+0301 failed where the precomposed U+00E9 passed.
 GLUED_WORDINGS = [
     ("U+00E9 before the agent count",
      "(21 agents: 16 deliberately vulnerable", "(é22 agents: 16 deliberately vulnerable"),
@@ -246,6 +248,18 @@ GLUED_WORDINGS = [
      "variants; 12 vulnerability categories", "variants; é13 vulnerability categories"),
     ("U+00E9 after categories",
      "variants; 12 vulnerability categories", "variants; 13 vulnerability categoriesé"),
+    ("e and U+0301 before the agent count",
+     "(21 agents: 16 deliberately vulnerable", "(é22 agents: 16 deliberately vulnerable"),
+    ("U+0915 U+093F (Devanagari ki) before the agent count",
+     "(21 agents: 16 deliberately vulnerable",
+     "(कि22 agents: 16 deliberately vulnerable"),
+    ("U+05D1 U+05BC (Hebrew bet with dagesh) before the agent count",
+     "(21 agents: 16 deliberately vulnerable",
+     "(בּ22 agents: 16 deliberately vulnerable"),
+    ("U+0301 on the s of agents",
+     "(21 agents: 16 deliberately vulnerable", "(22 agentś: 16 deliberately vulnerable"),
+    ("U+0301 on the s of categories",
+     "variants; 12 vulnerability categories", "variants; 13 vulnerability categorieś"),
 ]
 
 
@@ -267,6 +281,19 @@ def test_a_wording_beside_punctuation_is_still_read():
     try:
         mutate_readme(td, "(21 agents: 16 deliberately vulnerable",
                       "(22 agents: 16 deliberately vulnerable")
+        r = run_checker(td)
+        assert r.returncode == 1, r.stdout
+        assert "related-projects.json (DVAA agents: 21)" in r.stderr, r.stderr
+    finally:
+        shutil.rmtree(td)
+
+
+def test_a_wording_a_space_away_from_a_combining_mark_is_still_read():
+    # Only a combining mark directly beside the wording glues it; a space still bounds it.
+    td = scratch_tree()
+    try:
+        mutate_readme(td, "(21 agents: 16 deliberately vulnerable",
+                      "(é 22 agents: 16 deliberately vulnerable")
         r = run_checker(td)
         assert r.returncode == 1, r.stdout
         assert "related-projects.json (DVAA agents: 21)" in r.stderr, r.stderr
