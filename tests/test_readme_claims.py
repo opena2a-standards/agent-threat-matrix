@@ -6,8 +6,13 @@ Each count the README states is then changed by one in a single place and the ch
 must go red, including the counts repeated in the "Use cases" section: the checker used
 to accept a claim when the right number appeared anywhere, so a stale repeat passed
 while the overview copy still matched.
+
+The attack-class tables are generated from matrix.json: a reworded description, a
+description changed in matrix.json alone, and a missing marker must each go red, and
+``--fix`` must re-render the block without touching the rest of the README.
 """
 
+import json
 import shutil
 import subprocess
 import tempfile
@@ -17,6 +22,11 @@ import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
 FILES = ("README.md", "matrix.json", "scripts/check_readme_claims.py")
+BEGIN = "<!-- BEGIN GENERATED: attack-class-tables -->"
+END = "<!-- END GENERATED: attack-class-tables -->"
+GATEWAY_DESCRIPTION = (
+    "Modifying gateway or proxy configurations to intercept, redirect, or manipulate agent traffic"
+)
 
 
 def scratch_tree() -> Path:
@@ -28,8 +38,8 @@ def scratch_tree() -> Path:
     return td
 
 
-def run_checker(root: Path) -> subprocess.CompletedProcess:
-    return subprocess.run(["python3", str(root / "scripts" / "check_readme_claims.py")],
+def run_checker(root: Path, *args: str) -> subprocess.CompletedProcess:
+    return subprocess.run(["python3", str(root / "scripts" / "check_readme_claims.py"), *args],
                           capture_output=True, text=True, timeout=120)
 
 
@@ -106,5 +116,76 @@ def test_a_claim_reworded_out_of_the_readme_is_red():
         r = run_checker(td)
         assert r.returncode == 1, r.stdout
         assert "README does not state observed of total" in r.stderr, r.stderr
+    finally:
+        shutil.rmtree(td)
+
+
+def test_readme_describes_every_class_as_matrix_json_does():
+    matrix = json.loads((ROOT / "matrix.json").read_text(encoding="utf-8"))
+    text = (ROOT / "README.md").read_text(encoding="utf-8")
+    block = text[text.index(BEGIN):text.index(END)]
+    missing = []
+    for cls in matrix["attackClasses"]:
+        cell = cls["description"].replace(" — ", ": ").replace("|", "\\|")
+        if f"| [{cls['id']}](attack-classes/{cls['id']}.md) | {cell} |" not in block:
+            missing.append(cls["id"])
+    assert missing == [], f"README rows not matching matrix.json: {missing}"
+
+
+def test_a_reworded_class_description_is_red():
+    td = scratch_tree()
+    try:
+        mutate_readme(td, f"| {GATEWAY_DESCRIPTION} |",
+                      "| Misconfigured API gateways exposing agent infrastructure |")
+        text = (td / "README.md").read_text(encoding="utf-8")
+        line = text[:text.index("Misconfigured API gateways")].count("\n") + 1
+        r = run_checker(td)
+        assert r.returncode == 1, r.stdout
+        assert f"README.md:{line}: the attack-class tables differ from matrix.json" in r.stderr, \
+            r.stderr
+    finally:
+        shutil.rmtree(td)
+
+
+def test_a_class_changed_in_matrix_json_is_red_until_fixed():
+    td = scratch_tree()
+    try:
+        path = td / "matrix.json"
+        matrix = json.loads(path.read_text(encoding="utf-8"))
+        for cls in matrix["attackClasses"]:
+            if cls["id"] == "GATEWAY-EXPLOIT":
+                cls["description"] = "Rewritten in the data — with a pipe a|b"
+        path.write_text(json.dumps(matrix, indent=2), encoding="utf-8")
+        before = (td / "README.md").read_text(encoding="utf-8")
+
+        r = run_checker(td)
+        assert r.returncode == 1, r.stdout
+        assert "the attack-class tables differ from matrix.json" in r.stderr, r.stderr
+
+        r = run_checker(td, "--fix")
+        assert r.returncode == 0, r.stderr
+        assert "FIXED: rewrote the attack-class tables" in r.stdout
+        after = (td / "README.md").read_text(encoding="utf-8")
+        assert "| Rewritten in the data: with a pipe a\\|b |" in after
+        assert GATEWAY_DESCRIPTION not in after
+        # Only the generated block moved.
+        assert after[:after.index(BEGIN)] == before[:before.index(BEGIN)]
+        assert after[after.index(END):] == before[before.index(END):]
+
+        r = run_checker(td, "--fix")
+        assert r.returncode == 0, r.stderr
+        assert "OK: attack-class tables already current" in r.stdout
+    finally:
+        shutil.rmtree(td)
+
+
+@pytest.mark.parametrize("marker", [BEGIN, END])
+def test_a_missing_class_table_marker_is_red(marker):
+    td = scratch_tree()
+    try:
+        mutate_readme(td, marker, "")
+        r = run_checker(td)
+        assert r.returncode == 1, r.stdout
+        assert "the attack-class tables need exactly one" in r.stderr, r.stderr
     finally:
         shutil.rmtree(td)

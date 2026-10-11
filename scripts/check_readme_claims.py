@@ -6,6 +6,11 @@ and coverage claims (detection, defensive control, lab scenario). Those are
 measurements, not prose, so they are checked here and in CI rather than
 maintained by hand.
 
+The attack-class tables are a rendering of matrix.json.attackClasses, held
+between the BEGIN/END GENERATED markers. Typed by hand, they reworded 34 of the
+40 class descriptions and four of them described a different attack. The block
+must re-render byte-identically; run with ``--fix`` to rewrite only that block.
+
 Exit 0 when every claim matches the data, 1 otherwise.
 """
 
@@ -17,6 +22,106 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 MATRIX = ROOT / "matrix.json"
 README = ROOT / "README.md"
+
+CLASS_BEGIN = "<!-- BEGIN GENERATED: attack-class-tables -->"
+CLASS_END = "<!-- END GENERATED: attack-class-tables -->"
+
+# Section labels for matrix.json attackClasses[].category. A category missing here
+# is titled from its slug, so a new category still renders.
+CATEGORY_LABELS = {
+    "governance": "Governance",
+    "supply-chain": "Supply Chain",
+    "infrastructure": "Infrastructure",
+    "nemoclaw": "NemoClaw-Specific",
+    "identity": "Identity",
+    "sandbox": "Sandbox",
+}
+
+
+def table_cell(text):
+    """A matrix.json string as one Markdown table cell. A spaced em dash becomes a
+    colon, as on the attack-classes/ pages, and a pipe is escaped."""
+    return text.replace(" — ", ": ").replace("|", "\\|")
+
+
+def render_class_tables(matrix):
+    """The attack-class tables: one per category, in order of first appearance in
+    matrix.json, classes sorted by id. Members are the techniques the class declares
+    plus those whose primary attackClass is the class, as on the class pages."""
+    primary = {}
+    for t in matrix["techniques"]:
+        primary.setdefault(t.get("attackClass"), set()).add(t["id"])
+
+    by_category = {}
+    for cls in matrix.get("attackClasses", []):
+        by_category.setdefault(cls["category"], []).append(cls)
+
+    sections = []
+    for category, classes in by_category.items():
+        label = CATEGORY_LABELS.get(category, category.replace("-", " ").title())
+        noun = "class" if len(classes) == 1 else "classes"
+        lines = [
+            f"### {label} ({len(classes)} {noun})",
+            "| Class | Description | Techniques |",
+            "|-------|-------------|------------|",
+        ]
+        for cls in sorted(classes, key=lambda c: c["id"]):
+            members = sorted(set(cls.get("techniques") or []) | primary.get(cls["id"], set()))
+            lines.append(
+                f"| [{cls['id']}](attack-classes/{cls['id']}.md) "
+                f"| {table_cell(cls['description'])} | {', '.join(members)} |"
+            )
+        sections.append("\n".join(lines))
+    return f"{CLASS_BEGIN}\n\n" + "\n\n".join(sections) + f"\n\n{CLASS_END}"
+
+
+def class_block_span(readme):
+    """(start, end) offsets of the generated block including its markers, or None
+    unless each marker occurs exactly once, BEGIN first."""
+    if readme.count(CLASS_BEGIN) != 1 or readme.count(CLASS_END) != 1:
+        return None
+    start = readme.index(CLASS_BEGIN)
+    end = readme.index(CLASS_END)
+    if end < start:
+        return None
+    return start, end + len(CLASS_END)
+
+
+def check_class_tables(matrix, readme):
+    """Failure lines for the generated attack-class block; empty when it is current."""
+    span = class_block_span(readme)
+    if span is None:
+        return [
+            f"README.md: the attack-class tables need exactly one '{CLASS_BEGIN}' "
+            f"followed by exactly one '{CLASS_END}'"
+        ]
+    start, end = span
+    have = readme[start:end].split("\n")
+    want = render_class_tables(matrix).split("\n")
+    first_line = readme.count("\n", 0, start) + 1
+    for i, (h, w) in enumerate(zip(have, want)):
+        if h != w:
+            return [
+                f"README.md:{first_line + i}: the attack-class tables differ from matrix.json "
+                f"(expected \"{w}\"); run python3 scripts/check_readme_claims.py --fix"
+            ]
+    if len(have) != len(want):
+        line = first_line + min(len(have), len(want))
+        return [
+            f"README.md:{line}: the attack-class tables have {len(have)} lines, matrix.json "
+            f"renders {len(want)}; run python3 scripts/check_readme_claims.py --fix"
+        ]
+    return []
+
+
+def fix_class_tables(matrix, readme):
+    """README text with only the generated block re-rendered; unchanged when the
+    markers are missing or out of order."""
+    span = class_block_span(readme)
+    if span is None:
+        return readme
+    start, end = span
+    return readme[:start] + render_class_tables(matrix) + readme[end:]
 
 
 def empty(value):
@@ -30,9 +135,18 @@ def empty(value):
     return False
 
 
-def main():
+def main(argv):
     matrix = json.loads(MATRIX.read_text(encoding="utf-8"))
     readme = README.read_text(encoding="utf-8")
+
+    if "--fix" in argv:
+        fixed = fix_class_tables(matrix, readme)
+        if fixed != readme:
+            README.write_text(fixed, encoding="utf-8")
+            readme = fixed
+            print("FIXED: rewrote the attack-class tables from matrix.json")
+        else:
+            print("OK: attack-class tables already current")
 
     tactics = matrix["tactics"]
     techniques = matrix["techniques"]
@@ -114,6 +228,8 @@ def main():
         "lab scenario of total",
     )
 
+    failures.extend(check_class_tables(matrix, readme))
+
     tier_total = sum(tiers.values())
     if tier_total != total:
         failures.append(
@@ -144,4 +260,4 @@ def main():
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(main(sys.argv[1:]))
