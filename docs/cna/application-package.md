@@ -1,6 +1,6 @@
 # CNA Application Prep Package
 
-**Status: PREP ONLY — NOT SUBMITTED.** Nothing in this package has been filed, sent, or
+**Status: PREP ONLY, NOT SUBMITTED.** Nothing in this package has been filed, sent, or
 submitted to the CVE Program, MITRE, Red Hat, or any Root. No request has been opened and no
 ticket, confirmation, or correspondence exists. This document exists so that when the owner
 files, the material is already assembled.
@@ -23,7 +23,7 @@ confirm that operating a CNA fits CSNP's charitable purpose *before* applying.
 
 ---
 
-## Block A — Scope statement
+## Block A: Scope statement
 
 The scope statement exactly as the unit records it:
 
@@ -34,9 +34,9 @@ This is prereq item (1) in the unit and is one of the documents step 3 refers to
 
 ---
 
-## Block B — Root recommendation
+## Block B: Root recommendation
 
-**Recommended Root: Red Hat** — contact `RootCNA-Coordination@redhat.com`.
+**Recommended Root: Red Hat** (contact `RootCNA-Coordination@redhat.com`).
 
 **Rationale, as cited by the unit:** Red Hat is the recommended root for open-source /
 nonprofit orgs. The unit records no rationale beyond that; no additional justification has been
@@ -57,26 +57,26 @@ recorded because the unit records it. It has not been contacted.
 
 ---
 
-## Block C — Prereq checklist
+## Block C: Prereq checklist
 
 The five prereqs the unit records as needing to be ready before/at onboarding.
 
-- [ ] **(1) Scope statement.** Recorded in [Block A](#block-a--scope-statement). Ready — no
+- [ ] **(1) Scope statement.** Recorded in [Block A](#block-a-scope-statement). Ready: no
       owner input required.
-- [ ] **(2) Published disclosure/embargo policy URL.** `opena2a.org/security/disclosure-policy`
-      — the URL the unit records. Owner to confirm the policy is published and reachable at that
+- [ ] **(2) Published disclosure/embargo policy URL.** `opena2a.org/security/disclosure-policy`,
+      the URL the unit records. Owner to confirm the policy is published and reachable at that
       URL at filing time: `PLACEHOLDER` (confirmed / not confirmed).
-- [ ] **(3) Advisory publishing location URL.** `api.oa2a.org/api/v1/registry/advisories` — the
+- [ ] **(3) Advisory publishing location URL.** `api.oa2a.org/api/v1/registry/advisories`, the
       URL the unit records. Owner to confirm the location is live at filing time: `PLACEHOLDER`
       (confirmed / not confirmed).
 - [ ] **(4) At least 2 points of contact.** The unit requires name + email for each, and a phone
       number for the primary, for KEV/emergency use. Listed by role below; every value is an
       owner placeholder.
-- [ ] **(5) Counsel sign-off — OWNER-RETAINED.** Written confirmation that operating a CNA fits
+- [ ] **(5) Counsel sign-off (OWNER-RETAINED).** Written confirmation that operating a CNA fits
       CSNP's 501c3 charitable purpose. The unit records this as a precondition of applying, and
       obtaining it is the owner's action, not this package's.
 
-### (4) Points of contact — by role, values owner-supplied
+### (4) Points of contact: by role, values owner-supplied
 
 Roles are the two contact functions the unit describes (a primary, who carries the
 KEV/emergency phone, and at least one further contact). No person is named anywhere in this
@@ -93,7 +93,7 @@ package; the organizational title attached to each role is also the owner's to a
 The unit says "at least 2"; if the owner adds further contacts, copy a column and keep every
 unsupplied value as `PLACEHOLDER`.
 
-### (5) Counsel sign-off line — OWNER-RETAINED
+### (5) Counsel sign-off line (OWNER-RETAINED)
 
 > Counsel confirms that operating a CVE Numbering Authority fits CSNP's 501c3 charitable
 > purpose.
@@ -102,26 +102,26 @@ unsupplied value as `PLACEHOLDER`.
 | --- | --- |
 | Counsel | `PLACEHOLDER` |
 | Signed on | `PLACEHOLDER` |
-| Status | **OWNER-RETAINED — not obtained.** The unit records this as required before applying. |
+| Status | **OWNER-RETAINED, not obtained.** The unit records this as required before applying. |
 
 ---
 
-## Block D — Steps and refs
+## Block D: Steps and refs
 
 The unit's five steps, in the unit's order.
 
 1. **Submit the initial request at `cveform.mitre.org`.** The unit records the first action as
    the CVE Request Form at `https://cveform.mitre.org/` → "Request Information on the CVE
-   Numbering Program (CNA)". **Not submitted** — owner-retained. Date submitted:
+   Numbering Program (CNA)". **Not submitted** (owner-retained). Date submitted:
    `PLACEHOLDER`.
-2. **Pick the Root.** See [Block B](#block-b--root-recommendation). Recommendation staged;
+2. **Pick the Root.** See [Block B](#block-b-root-recommendation). Recommendation staged;
    the selection is the owner's. Root selected: `PLACEHOLDER`.
 3. **Finalize the 3 required documents.** The unit does not enumerate which three; the
-   document-shaped prereqs are items (1), (2) and (3) in [Block C](#block-c--prereq-checklist)
-   — scope statement, disclosure/embargo policy URL, advisory publishing location URL. That
+   document-shaped prereqs are items (1), (2) and (3) in [Block C](#block-c-prereq-checklist):
+   scope statement, disclosure/embargo policy URL, advisory publishing location URL. That
    mapping is a reading of the unit, not something the unit records; owner to confirm against
    the onboarding guide.
-4. **Line up the POCs.** See [Block C item (4)](#4-points-of-contact--by-role-values-owner-supplied).
+4. **Line up the POCs.** See [Block C item (4)](#4-points-of-contact-by-role-values-owner-supplied).
    Roles are staged; names, emails and phone numbers are the owner's to supply.
 5. **Lead the evidence with originated coordinated disclosures.** See
    [Evidence framing](#evidence-framing) below.
@@ -140,7 +140,7 @@ this package.
 
 ### Evidence framing
 
-**Lead with originated coordinated disclosures.** The unit records: NemoClaw — 10 vulnerabilities
+**Lead with originated coordinated disclosures.** The unit records: NemoClaw, 10 vulnerabilities
 disclosed to NVIDIA PSIRT. This repository corroborates the count: `CHANGELOG.md` lists "NVIDIA
 NemoClaw security assessment (10 confirmed vulnerabilities)" among the v1.0 sources, and
 `EVIDENCE_AUDIT.md` records that the five NemoClaw-specific attack classes "are all backed by the
@@ -149,7 +149,7 @@ NemoClaw security assessment (10 confirmed vulnerabilities)" among the v1.0 sour
 **Do NOT claim CVE-2026-25253.** The unit is explicit: cite `CVE-2026-25253` only as a CVE our
 tooling detects, **NOT** as ours. It is not an originated or owned CVE and must never be
 presented as one. This repository does not reference `CVE-2026-25253`; the unit is its only
-source here, and the unit does not name which tool detects it — so no tool is named.
+source here, and the unit does not name which tool detects it, so no tool is named.
 
 **Supporting corpus, from this repository** (measured by `scripts/check_readme_claims.py`,
 which is enforced in CI): 9 tactics, 61 techniques and 40 attack classes in `matrix.json`, with

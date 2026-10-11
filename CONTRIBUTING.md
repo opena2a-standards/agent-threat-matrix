@@ -87,7 +87,7 @@ A technique enters **list (A)** only if you can complete this sentence with a qu
 
 > *"OWASP item LLMnn names this technique's object or effect at: `<verbatim sentence>`."*
 
-Three tests. All three must pass, against the **item's own text** -- its Description, Common Examples of Vulnerability, or Example Attack Scenarios. **The item's title is not evidence.** Reading a title is how "memory injection" reached "Overreliance".
+Three tests. All three must pass, against the **item's own text**: its Description, Common Examples of Vulnerability, or Example Attack Scenarios. **The item's title is not evidence.** Reading a title is how "memory injection" reached "Overreliance".
 
 1. **Object test.** Either the thing the technique acts on, or the asset it yields, is named in that text.
 2. **Effect test.** What the attacker gets is the same kind of outcome the item describes. Discovery is not disclosure. Persistence is not a bad recommendation. A badly designed component is not an attacker-planted one.
@@ -95,13 +95,13 @@ Three tests. All three must pass, against the **item's own text** -- its Descrip
 
 **Any test fails -> list (B).** Two tests passing is not a partial pass; the table's "Partial Overlap" header describes the *degree* of a real correspondence, never a substitute for one.
 
-**If (A):** the row records the OWASP item id and one sentence naming what overlaps **and** what the item does not reach. The pull request body -- not the published file -- carries the `matrix.json` line range of the technique record, the verbatim OWASP sentence relied on, and the numbered mitigation from test 3.
+**If (A):** the row records the OWASP item id and one sentence naming what overlaps **and** what the item does not reach. The pull request body (not the published file) carries the `matrix.json` line range of the technique record, the verbatim OWASP sentence relied on, and the numbered mitigation from test 3.
 
-**If (B):** the row records the agent-layer property it depends on -- *the thing an agent has that a bare LLM application does not*: persistent memory across sessions, a tool registry, a governance file, an A2A identity, a deployed control surface, a sandbox boundary. **If the honest answer is that the technique is a traditional one adapted to an agent, the cell says that**, as T-8003's row does. Inventing uniqueness to fill the column is the defect this rule exists to stop.
+**If (B):** the row records the agent-layer property it depends on, *the thing an agent has that a bare LLM application does not*: persistent memory across sessions, a tool registry, a governance file, an A2A identity, a deployed control surface, a sandbox boundary. **If the honest answer is that the technique is a traditional one adapted to an agent, the cell says that**, as T-8003's row does. Inventing uniqueness to fill the column is the defect this rule exists to stop.
 
 Two ties broken in advance, so nobody re-derives them:
 
-- **A technique's delivery vector never places it.** Almost everything is delivered by prompt injection. If delivery placed techniques, every row would be LLM01 and the table would carry no information. Place on the technique's own distinguishing property -- the reason it has its own `T-` id instead of being a footnote on another one.
+- **A technique's delivery vector never places it.** Almost everything is delivered by prompt injection. If delivery placed techniques, every row would be LLM01 and the table would carry no information. Place on the technique's own distinguishing property: the reason it has its own `T-` id instead of being a footnote on another one.
 - **C3/C4 red is never resolved by moving the technique into whichever list makes CI green.** Red means the placement has not been made, not that a list is short.
 
 The pull request that adds a technique to `matrix.json` carries, in the same commit, its `canonical-classes.json` `primary` class **and** its placement in (A) or (B). A PR that adds a technique without both is incomplete, and both validators failing is the gate working as designed.
@@ -129,7 +129,7 @@ If you find an error in a technique description, evidence citation, or cross-ref
 
 An accepted contribution is credited to its contributor: a new technique or attack class, new
 evidence that changes a technique's tier, or a correction that changes published content. The
-credit is published in `ATTRIBUTION.md` in this repository — the externally-contributed list
+credit is published in `ATTRIBUTION.md` in this repository. The externally-contributed list
 carries, per technique, the contributor's name or handle **exactly as the contributor gives
 it** (in the issue form's credit preference field or the pull request body), together with the
 issue or pull request the submission arrived in.
@@ -140,7 +140,7 @@ externally-contributed list with its submission reference, and is never reclassi
 in-house work.
 
 Credit is recorded, never guessed. `ATTRIBUTION.md` places every technique id in `matrix.json`
-in exactly one of two published lists — externally contributed or authored in-house — and
+in exactly one of two published lists (externally contributed or authored in-house), and
 `scripts/check_attribution.py` enforces the partition in CI, on the same terms as the
 cross-reference placement above. An external entry must name the issue or pull request it
 arrived in; where the repository's history does not establish an external contributor for a
@@ -149,11 +149,11 @@ technique, that technique is listed as authored in-house.
 ## Change control
 
 OpenA2A retains final change control over the matrix. OpenA2A decides what enters the matrix,
-and a submission — however well evidenced — creates no entitlement to inclusion. Content that
+and a submission, however well evidenced, creates no entitlement to inclusion. Content that
 has been accepted may afterwards be edited, re-tiered (its evidence tier changed), re-placed
 (its canonical class or its (A)/(B) cross-reference placement changed), or removed entirely,
 as the evidence and the taxonomy evolve. Each such decision is recorded on the submission
-thread — the issue or pull request the content arrived in — so the contributor and any later
+thread (the issue or pull request the content arrived in), so the contributor and any later
 reader can see what was decided and why.
 
 ## Code of Conduct

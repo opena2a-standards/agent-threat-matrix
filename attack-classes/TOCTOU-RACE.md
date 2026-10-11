@@ -4,7 +4,7 @@
 
 ## Description
 
-Time-of-check-time-of-use race between verification and execution — swap window for attackers
+Time-of-check-time-of-use race between verification and execution: swap window for attackers
 
 ## Techniques
 

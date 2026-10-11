@@ -56,7 +56,7 @@ The **AI Agent Threat Matrix** classifies attacks against AI agent systems into 
 
 ### What This Covers (and What It Doesn't)
 
-This matrix covers the **agent layer** — the infrastructure between the model and the user:
+This matrix covers the **agent layer**, the infrastructure between the model and the user:
 
 - Governance file manipulation (SOUL.md, system prompts, behavioral constraints)
 - Skill and plugin supply chain attacks
@@ -68,9 +68,9 @@ This matrix covers the **agent layer** — the infrastructure between the model 
 
 This matrix does **not** cover:
 
-- Model-level attacks (adversarial examples, training data poisoning) — see [MITRE ATLAS](https://atlas.mitre.org/)
-- Prompt injection as a standalone topic — see [OWASP Top 10 for LLM](https://owasp.org/www-project-top-10-for-large-language-model-applications/)
-- Traditional enterprise network attacks — see [MITRE ATT&CK](https://attack.mitre.org/)
+- Model-level attacks (adversarial examples, training data poisoning): see [MITRE ATLAS](https://atlas.mitre.org/)
+- Prompt injection as a standalone topic: see [OWASP Top 10 for LLM](https://owasp.org/www-project-top-10-for-large-language-model-applications/)
+- Traditional enterprise network attacks: see [MITRE ATT&CK](https://attack.mitre.org/)
 
 The Agent Threat Matrix is designed to work **alongside** these frameworks, not replace them.
 
@@ -155,9 +155,9 @@ Attack classes group related techniques by the underlying vulnerability pattern:
 | SKILL-FRONTMATTER | YAML metadata injection bypassing content filters | DVAA PluginBot |
 | SKILL-EXFIL | Skill exfiltrates data outside declared tool boundaries | DVAA tool chain scenarios |
 | ORG-SKILL-SPREAD | Compromised admin skill propagates organization-wide | ClawHavoc campaign patterns |
-| SUPPLY-CHAIN-INSTALL | Unsigned installation scripts executed without integrity verification — curl\|sh without checksum | — |
-| FAKETOOL-INJECT | MCP tool impersonation, squatting, and schema poisoning attacks | — |
-| PERSIST-STATE | Cross-session persistence via memory poisoning, state tampering, and cached context injection | — |
+| SUPPLY-CHAIN-INSTALL | Unsigned installation scripts executed without integrity verification: curl\|sh without checksum | None listed |
+| FAKETOOL-INJECT | MCP tool impersonation, squatting, and schema poisoning attacks | None listed |
+| PERSIST-STATE | Cross-session persistence via memory poisoning, state tampering, and cached context injection | None listed |
 
 ### Infrastructure (10 classes)
 | Class | Description | Real-World Evidence |
@@ -170,8 +170,8 @@ Attack classes group related techniques by the underlying vulnerability pattern:
 | CODE-INJECTION | Command injection via unsanitized inputs | NemoClaw C-001, C-002 |
 | INTEGRITY-BYPASS | Digest/hash bypass on empty or missing values | NemoClaw C-005 |
 | TOCTOU-RACE | Time-of-check-time-of-use race in verification pipelines | NemoClaw C-006 |
-| A2A-EXPOSE | Agent-to-Agent protocol endpoints publicly discoverable without access control | — |
-| PARSER-DIFFERENTIAL | Exploits differences between parser implementations to bypass security controls | — |
+| A2A-EXPOSE | Agent-to-Agent protocol endpoints publicly discoverable without access control | None listed |
+| PARSER-DIFFERENTIAL | Exploits differences between parser implementations to bypass security controls | None listed |
 
 ### NemoClaw-Specific (5 classes)
 | Class | Description | Evidence |
@@ -204,7 +204,7 @@ Follow the kill chain stages sequentially. Use technique IDs to plan attack path
 Map your defenses against each tactic. Use OASB controls as a checklist. Any tactic without detection or prevention represents a gap. Focus on breaking the chain at the earliest stage.
 
 ### For Researchers
-Cite techniques using their IDs (e.g., "ATM T-2001"). The catalog is extensible — contribute new techniques via pull request with evidence requirements.
+Cite techniques using their IDs (e.g., "ATM T-2001"). The catalog is extensible: contribute new techniques via pull request with evidence requirements.
 
 ### For Vendors
 Map your product's detection capabilities to ATM technique IDs. This enables customers to understand which agent-specific threats your product covers.
@@ -215,19 +215,19 @@ Map your product's detection capabilities to ATM technique IDs. This enables cus
 
 Complete kill chain traversals demonstrated in DVAA:
 
-**Path A — API Agent Full Compromise:**
+**Path A (API Agent Full Compromise):**
 T-1001 → T-2001 → T-3001 → T-5004 → T-7001 → T-8002
 (LegacyBot → ToolBot: recon, inject, harvest creds, pivot, enumerate files, exfiltrate)
 
-**Path B — Memory Persistence Chain:**
+**Path B (Memory Persistence Chain):**
 T-1001 → T-2001 → T-6001 → T-7004 → T-8005
 (MemoryBot: recon, inject, persist in memory, dump memory, exfiltrate via conversation)
 
-**Path C — Multi-Agent A2A Chain:**
+**Path C (Multi-Agent A2A Chain):**
 T-1006 → T-2001 → T-4002 → T-5002 → T-9001
 (Orchestrator → Worker → ToolBot: discover agent card, inject, impersonate admin, pivot via A2A, modify data)
 
-**Path D — Supply Chain to Full Compromise:**
+**Path D (Supply Chain to Full Compromise):**
 T-1002 → T-2005 → T-6004 → T-5003 → T-9006
 (PluginBot → ProxyBot: discover tools, inject via tool description, backdoor skill, hop MCP servers, compromise downstream)
 

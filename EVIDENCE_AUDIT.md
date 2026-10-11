@@ -10,7 +10,7 @@ We apply three evidence tiers:
 
 We do not publish purely theoretical techniques. Where this audit assessed a technique as
 theoretical, the outcome was either to establish an agent-specific basis for it or to label
-it ADAPTED and say so on the technique page — never to publish it unmarked. MITRE includes
+it ADAPTED and say so on the technique page, never to publish it unmarked. MITRE includes
 adapted techniques when the attack vector is clear; the difference is that we label them.
 
 These three tier names are the ones that ship: `evidenceTier` in `matrix.json` takes exactly
@@ -43,7 +43,7 @@ These three tier names are the ones that ship: `evidenceTier` in `matrix.json` t
 | T-2003 | Role-Play Jailbreak | OBSERVED | "DAN" jailbreaks widely documented. DVAA L2-01. |
 | T-2004 | Context Window Exploitation | VALIDATED | DVAA L2-06. Academic research on attention dilution. |
 | T-2005 | Tool Description Injection | VALIDATED | DVAA PluginBot (3012). Skill frontmatter injection demonstrated in DVAA. |
-| T-2006 | Unicode/Encoding Bypass | OBSERVED | os-info-checker npm attack (May 2025) — real supply chain attack using Unicode steganography. |
+| T-2006 | Unicode/Encoding Bypass | OBSERVED | os-info-checker npm attack (May 2025): real supply chain attack using Unicode steganography. |
 | T-2007 | Multi-Turn Manipulation | VALIDATED | DVAA multi-turn challenges. Academic research on gradual jailbreaking. |
 | T-2008 | System Prompt Boundary Bypass | VALIDATED | DVAA L3-04. Boundary confusion between system and user messages. |
 | T-2009 | Parser Differential Exploitation | VALIDATED | DVAA parser-differential-json scenario; PARSE-001..010 HMA checks exist. VALIDATED. |
@@ -106,7 +106,7 @@ These three tier names are the ones that ship: `evidenceTier` in `matrix.json` t
 | T-6002 | Self-Replicating Memory Entry | VALIDATED | DVAA L3-03. Memory entry that re-injects itself when recalled. |
 | T-6003 | Configuration Modification | OBSERVED | OpenClaw gateway configs modifiable without auth (~75K exposed). NemoClaw config files world-readable. |
 | T-6004 | Skill/Plugin Backdoor | VALIDATED | DVAA skill-backdoor-install scenario. |
-| T-6005 | Scheduled Task Injection | OBSERVED | OpenClaw heartbeat mechanism confirmed (RQ-OC-001 investigation — local fs only, not remote, but persistence mechanism exists). NemoClaw H-007. |
+| T-6005 | Scheduled Task Injection | OBSERVED | OpenClaw heartbeat mechanism confirmed (RQ-OC-001 investigation: local fs only, not remote, but persistence mechanism exists). NemoClaw H-007. |
 | T-6006 | Tool Registration Persistence | VALIDATED | DVAA L2-08 (PluginBot malicious tool registration). |
 | T-6007 | Persistent Agent State Manipulation | VALIDATED | DVAA persistent-agent-memory-poison scenario; PERSIST-001..010 HMA checks exist. VALIDATED. |
 
@@ -138,12 +138,12 @@ These three tier names are the ones that ship: `evidenceTier` in `matrix.json` t
 | T-8002 | HTTP Callback | VALIDATED | DVAA ToolBot fetch_url to external endpoint with no egress filtering. |
 | T-8003 | DNS Exfiltration | ADAPTED | Plausible but not demonstrated in DVAA or observed in the wild for AI agents specifically. Standard technique from traditional environments. |
 | T-8004 | Tool Chain Exfiltration | VALIDATED | DVAA L3-06 (read_file + fetch_url chain). |
-| T-8005 | Conversation Exfiltration | VALIDATED | All DVAA agents — data extracted via conversation responses. |
+| T-8005 | Conversation Exfiltration | VALIDATED | All DVAA agents: data extracted via conversation responses. |
 | T-8006 | Webhook Exfiltration | OBSERVED | NemoClaw H-007 (Telegram Bot API pre-allowed in sandbox policy). OpenClaw pre-allows messaging APIs. |
 
 **Verdict: 1 OBSERVED, 4 VALIDATED, 1 ADAPTED.**
 
-**T-8003 (DNS Exfiltration) is the only technique in this stage without an agent-specific basis.** It's a well-understood traditional technique applied to the agent context. Decision taken and applied: publish it as **ADAPTED**, marked on the technique page as "adapted from traditional environments — not yet observed in AI agent-specific deployments." MITRE includes adapted techniques when the attack vector is clear.
+**T-8003 (DNS Exfiltration) is the only technique in this stage without an agent-specific basis.** It's a well-understood traditional technique applied to the agent context. Decision taken and applied: publish it as **ADAPTED**, marked on the technique page as "adapted from traditional environments, not yet observed in AI agent-specific deployments." MITRE includes adapted techniques when the attack vector is clear.
 
 ---
 
@@ -187,7 +187,7 @@ All 40 attack classes contain at least one OBSERVED or VALIDATED technique. No a
 
 1. **No real-world observation of multi-agent consensus attacks.** T-9004 should be marked as projected.
 2. **DNS exfiltration for AI agents** (T-8003) is inherited from traditional environments. No agent-specific twist documented.
-3. **Reputation poisoning** (T-9005) is generic — could be more specific to agent-generated content.
+3. **Reputation poisoning** (T-9005) is generic. It could be more specific to agent-generated content.
 
 ### What MITRE Would Push Back On
 
@@ -213,10 +213,10 @@ client fetches that URL, the honeypot records the fetch and resolves the canary 
 the payload it was embedded in.
 
 Two different figures appear below and they are not interchangeable. Published counts come
-from `GET /api/v1/intelligence/attack-prevalence`, which reports a **rolling 30-day window**
-— those move daily as fires age out, so quote the endpoint, not this page, for a current
+from `GET /api/v1/intelligence/attack-prevalence`, which reports a **rolling 30-day window**.
+Those move daily as fires age out, so quote the endpoint, not this page, for a current
 number (a 2026-07-28 pull gave roughly 7,300 evidence records over roughly 7,100 distinct
-fires). Structural figures — ratios, mix percentages, per-classifier totals — are measured
+fires). Structural figures (ratios, mix percentages, per-classifier totals) are measured
 directly against the full evidence corpus on the stated date and are cited because the
 *proportions* are stable, not because the absolutes are.
 
@@ -225,18 +225,18 @@ canary token is a deterministic hash of `(salt, category, tier, date)`, so it re
 `(category, tier)`, which resolves to one payload and one technique. That path is genuinely
 1:1 and the property is enforced, not merely observed: a partial unique index on
 `(category, tier) WHERE tier IS NOT NULL` makes a duplicate mapping unrepresentable.
-Measured 2026-07-28, it holds exactly — 10,970 rows across 10,970 distinct fires, ratio
+Measured 2026-07-28, it holds exactly: 10,970 rows across 10,970 distinct fires, ratio
 1.000, spanning 26 techniques.
 
 This replaced an earlier site-level scheme in which `agentpwn.com` was mapped to five
 technique classes and every qualifying interaction wrote one row per mapped technique. Under
 that scheme 7,125 interactions became 35,625 rows and all five techniques reported an
-identical 7,125 — one population counted five ways.
+identical 7,125: one population counted five ways.
 
 **That fan-out is not fully gone, and the residue should be read as a known defect.** Some
 lures are hand-slugged rather than hashed (`browser-verify`, `tool-*`, `trap-ci`,
 `cred-verify`, `badge`, `loop-test`). These resolve to a category but to no tier, so they
-fall outside the partial index and the writer falls back to a category-only lookup — which
+fall outside the partial index and the writer falls back to a category-only lookup, which
 matches *every* technique that category maps to. Measured 2026-07-28: 121 such fires produced
 382 rows, a ratio of **3.157**, across 9 techniques.
 
@@ -249,7 +249,7 @@ matches *every* technique that category maps to. Measured 2026-07-28: 121 such f
 So the blended row-to-fire ratio is about **1.02**, not 5.00 and not 1.00: 96.6% of rows are
 1:1, and the remaining 3.4% reproduce the original error at small scale. Do not read a
 per-technique count as a fire count without subtracting this class. The per-technique counts
-are otherwise **differentiated** rather than identical — one 2026-07-28 pull gave T-2007 800,
+are otherwise **differentiated** rather than identical: one 2026-07-28 pull gave T-2007 800,
 T-2001 754, T-2003 615, T-2006 498, T-4007 418, T-6004 405, T-2004 330, T-8002 314 across 26
 techniques (these drift between pulls; the differentiation is the durable claim, not the
 digits).
@@ -262,10 +262,10 @@ link. It is not, by itself, proof that an *agent* obeyed an *injection*:
   withdrawn as evasion primitives: User-Agent substring; `agent_type` (derived from the UA,
   so the same defect one layer up); reverse DNS (resolved without forward confirmation, so a
   VPS PTR record defeats it); source ASN (AS8075 is Azure and AS15169 is Google Cloud, so a
-  free-tier VM buys entry to "Bingbot's" ASN — and OpenAI publishes GPTBot egress inside
+  free-tier VM buys entry to "Bingbot's" ASN, and OpenAI publishes GPTBot egress inside
   Azure space, so genuine GPTBot would have been excluded *as* Bingbot); and a canary-token
   validity check believed to be a server-side HMAC, which on inspection tests only
-  `startsWith("apwn_") && length === 21` — a pure function of the URL the client requested.
+  `startsWith("apwn_") && length === 21`, a pure function of the URL the client requested.
   Every one of these keys on something the client chooses, so each would have let an agent
   delete its own evidence rather than remove noise. Crawlers are therefore **counted and
   disclosed**, not filtered: over-counting a crawler is visible in the published client mix,
@@ -275,7 +275,7 @@ link. It is not, by itself, proof that an *agent* obeyed an *injection*:
   `unknown`, each at `verified` or `claimed` confidence. What is actually recorded is far
   narrower. Measured 2026-07-28 over the 11,093 distinct fires behind the evidence corpus:
   **80.5% unclassified**, 19.0% `browser/claimed`, 0.5% `llm_crawler/claimed`. Across every
-  interaction the honeypot has ever recorded — over 420,000 by that date, and still climbing —
+  interaction the honeypot has ever recorded (over 420,000 by that date, and still climbing),
   `agent_type` has taken only three values: null, `browser` and `llm_crawler`. **`llm_agent`
   has never been written once, and no interaction has ever reached `verified` confidence.**
   Those two counts are exactly zero, not merely small. So the rule "only
@@ -288,11 +288,11 @@ link. It is not, by itself, proof that an *agent* obeyed an *injection*:
 - **Recovered history has a hard ceiling.** Fires predating the client-classification columns
   can be retro-classified only from the stored User-Agent, at `claimed` confidence. The raw
   IP is deliberately never retained, so `verified` classification is permanently unavailable
-  for those rows — which is most of the corpus.
+  for those rows, which is most of the corpus.
 
 **Why no evidence tier was upgraded on this basis.** T-2004 (Context Window Exploitation) and
 T-8002 (HTTP Callback) remain VALIDATED rather than OBSERVED. Payload-level attribution
-removed the original objection — a count is no longer one population counted five ways — but
+removed the original objection (a count is no longer one population counted five ways), but
 OBSERVED means the specific behaviour was confirmed in a real-world system, and an ungated
 fetch count cannot separate an agent that obeyed an injection from a crawler that followed a
 link. Promoting a tier on volume alone would reproduce the old error in a subtler form.
@@ -301,7 +301,7 @@ Both techniques were then reassessed individually, against measurement rather th
 Neither reassessment supports a promotion, and each fails for a different reason.
 
 **T-8002 (HTTP Callback): the channel that would justify OBSERVED is empty.** A callback is
-structurally the strongest signal the honeypot can collect — an outbound request to a URL
+structurally the strongest signal the honeypot can collect: an outbound request to a URL
 that only the injected payload named, which is the technique's definition rather than a proxy
 for it. It is also not what T-8002's evidence is made of. Measured 2026-07-28, all 488
 T-8002 rows are canary fetches (469 payload-attributed, 19 from the category fan-out
@@ -323,11 +323,11 @@ ambiguous channel while the unambiguous one has no real-world observation at all
 **T-2004 (Context Window Exploitation): the comparison cannot be computed, and that is the
 finding.** The objection to promoting T-2004 was that a fire shows an agent followed a link
 embedded in a context-dilution payload without isolating dilution as the cause. Settling that
-needs a conversion rate — fires over exposures — and **the honeypot records fires but never
+needs a conversion rate (fires over exposures), and **the honeypot records fires but never
 records exposures.** No serve or impression counter is kept per `(category, tier)`. The
 `page_visit` stream cannot substitute: it registers 114 `context-window` visits against 993
 `context-window` fires, so it is not the population the fires came from. Every other quantity
-derivable from the fire log — distinct tokens, active days, token-days — is itself a function
+derivable from the fire log (distinct tokens, active days, token-days) is itself a function
 of firing, so any rate built on one is circular.
 
 Two things can still be stated, and neither supports a promotion:
@@ -335,8 +335,8 @@ Two things can still be stated, and neither supports a promotion:
 - **Raw per-tier fire counts show no monotonic relationship with dilution.** `context-window`
   tiers 1 through 5 recorded 253, 191, 221, 143 and 185 fires. The least-diluted arm fires
   most, which is the wrong direction for the mechanism.
-- **Firing intensity is flat.** Measured as fires per token-day — the one normalisation not
-  confounded by how long a token stays in circulation — `context-window` runs 1.10, 1.09,
+- **Firing intensity is flat.** Measured as fires per token-day (the one normalisation not
+  confounded by how long a token stays in circulation), `context-window` runs 1.10, 1.09,
   1.12, 1.07, 1.09 across tiers 1 to 5. Site-wide the quantity is very nearly a constant:
   across all 48 `(category, tier)` cells it spans 1.07 to 1.18, median 1.13, standard
   deviation 0.023. The `context-window` tiers sit inside that band and are unordered with
@@ -349,7 +349,7 @@ the conclusion drawn from it was wrong: a token's fire count is largely a functi
 days it remained in circulation (3.1 to 4.2 days on average, varying by tier), so the metric
 measured token longevity and not conversion. The gradient vanishes under the corrected
 normalisation. It is recorded here because the same mistake is easy to repeat against this
-dataset — any denominator taken from the fire log encodes the firing it is meant to normalise.
+dataset: any denominator taken from the fire log encodes the firing it is meant to normalise.
 
 What would still move each tier: for T-8002, real third-party callbacks, which need the
 channel to be exercised rather than analysed; for T-2004, a serve-side counter incrementing
@@ -366,6 +366,6 @@ payload of that technique class over the trailing 30 days, with no client-type f
 any stage. Read it as prevalence of engagement with that technique's traps. Do not read it as
 a count of confirmed compromises; do not read it as a count of agents, since no row in it has
 ever been classified as one; and do not sum evidence rows to get a population size, because
-the 3.4% category-fan-out class counts one fire three or four times — use the distinct-fire
+the 3.4% category-fan-out class counts one fire three or four times. Use the distinct-fire
 count. The live response carries its own `clientMix` block and caveat stating these limits;
 that block, not this page, is the current figure.

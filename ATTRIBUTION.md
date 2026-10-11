@@ -2,10 +2,10 @@
 
 Every technique id in `matrix.json` sits in exactly one of the two published lists below:
 
-- **Externally contributed** — the technique arrived through a public submission. The row
-  carries the contributor's credit exactly as the contributor gave it — or *(credit declined)*
-  if they declined credit — and the issue or pull request the submission arrived in.
-- **Authored in-house** — the technique was authored by the OpenA2A project.
+- **Externally contributed:** the technique arrived through a public submission. The row
+  carries the contributor's credit exactly as the contributor gave it, or *(credit declined)*
+  if they declined credit, and the issue or pull request the submission arrived in.
+- **Authored in-house:** the technique was authored by the OpenA2A project.
 
 `scripts/check_attribution.py` enforces the partition in CI, on the same terms as the
 cross-reference placement check: it fails when an id is in both lists, when an id is in

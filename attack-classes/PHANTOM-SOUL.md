@@ -4,7 +4,7 @@
 
 ## Description
 
-Agent deployed with zero behavioral constraints — no SOUL.md, no system prompt, no governance
+Agent deployed with zero behavioral constraints: no SOUL.md, no system prompt, no governance
 
 ## Techniques
 

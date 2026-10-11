@@ -4,7 +4,7 @@
 
 ## Description
 
-Different behavior under evaluation vs production — agent passes safety tests but behaves differently in deployment
+Different behavior under evaluation vs production: agent passes safety tests but behaves differently in deployment
 
 ## Techniques
 

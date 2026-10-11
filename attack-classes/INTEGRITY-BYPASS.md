@@ -4,7 +4,7 @@
 
 ## Description
 
-Digest or hash verification bypass on empty or missing values — tampered artifacts pass silently
+Digest or hash verification bypass on empty or missing values: tampered artifacts pass silently
 
 ## Techniques
 
