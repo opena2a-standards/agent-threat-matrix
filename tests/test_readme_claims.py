@@ -400,6 +400,25 @@ def test_a_wording_at_the_start_of_the_readme_is_read_beside_a_final_combining_m
         shutil.rmtree(td)
 
 
+def test_a_shorter_categories_wording_at_the_same_start_is_read_when_the_longer_is_glued():
+    # "N categories" allows up to two words before the noun, so one start position can
+    # match at several lengths. A combining mark glued to the longest, "13 categories x
+    # categories", must not hide the shorter "13 categories" at the same start.
+    td = scratch_tree()
+    try:
+        readme = td / "README.md"
+        text = readme.read_text(encoding="utf-8").rstrip("\n") + "\n"
+        readme.write_text(f"{text}DVAA: 13 categories x categories\N{COMBINING ACUTE ACCENT}\n",
+                          encoding="utf-8")
+        r = run_checker(td)
+        assert r.returncode == 1, r.stdout
+        line = text.count("\n") + 1
+        assert (f'README.md:{line}: "13 categories" does not match related-projects.json '
+                "(DVAA vulnerability categories: 12)") in r.stderr, r.stderr
+    finally:
+        shutil.rmtree(td)
+
+
 # Runs the checker in-process with unicodedata.category counted, then prints the count.
 COUNT_CATEGORY_CALLS = """
 import importlib.util, sys, unicodedata
