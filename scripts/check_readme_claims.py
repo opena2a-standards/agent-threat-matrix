@@ -264,7 +264,10 @@ def main(argv):
     dvaa_lines = lines_naming(readme, "DVAA")
     pinned = "related-projects.json"
     # Every DVAA wording is read in any letter case: DVAA itself writes "Attack Categories".
-    on_dvaa_lines = dict(text=dvaa_lines, source=pinned, flags=re.IGNORECASE)
+    # re.ASCII keeps that to ASCII letters: without it "[A-Za-z]" also matches U+0130,
+    # U+0131, U+017F (long s) and U+212A (Kelvin sign), and an "i" or "s" in a wording
+    # matches the first three.
+    on_dvaa_lines = dict(text=dvaa_lines, source=pinned, flags=re.IGNORECASE | re.ASCII)
     require(r"\b(\d+) agents\b", [dvaa["agents"]], "DVAA agents", **on_dvaa_lines)
     require(r"\b(\d+) deliberately vulnerable\b", [kinds["deliberatelyVulnerable"]],
             "DVAA deliberately vulnerable agents", **on_dvaa_lines)
