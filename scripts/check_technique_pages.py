@@ -27,12 +27,18 @@ section runs from its heading to the next ``## `` heading outside fenced code bl
 technique page also carries no ``**Severity:**`` line: matrix.json has no severity field,
 and every page printed the label with an empty value.
 
+A page whose technique is ``adapted`` in matrix.json states its evidence gap in words, in
+one ``- **Evidence Gap:**`` line, and no other page carries that line. The three adapted
+pages showed only ``Evidence Tier: adapted`` while EVIDENCE_AUDIT.md said they stated the
+gap.
+
 Run with ``--fix`` to rewrite those lines, the Mitigation section and the tactic pages from
-the data, and to drop a Severity line. Every other line of a technique page is left alone.
-A missing or repeated technique-page line or Mitigation section has no single place to
-write the data to, and a Mitigation section that holds a fenced code block may hold the
-rest of the page behind an unclosed fence, so ``--fix`` reports each of them and still
-exits 1.
+the data, to drop a Severity line or an Evidence Gap line the data does not back, and to add
+a missing Evidence Gap line directly under the Evidence Tier line. Every other line of a
+technique page is left alone. Any other missing technique-page line, a repeated line or
+Mitigation section, and a missing Mitigation section have no single place to write the data
+to, and a Mitigation section that holds a fenced code block may hold the rest of the page
+behind an unclosed fence, so ``--fix`` reports each of them and still exits 1.
 """
 
 from __future__ import annotations  # "X | None" annotations also load on Python 3.9
@@ -48,6 +54,9 @@ NO_PROCEDURES = "No documented procedures yet."
 NO_MITIGATION = "No documented mitigations yet."
 OASB_URL = "https://oasb.ai"
 DVAA_LABEL = "DVAA Validation"
+ADAPTED_GAP = ("- **Evidence Gap:** Adapted from traditional environments. This technique has no "
+               "agent-specific observation and no lab reproduction yet.")
+GAP_RE = re.compile(r"^(?P<line>- \*\*Evidence Gap:\*\*.*)$", re.M)
 SEVERITY_RE = re.compile(r"^(?P<line>\*\*Severity:\*\*.*)$", re.M)
 MITIGATION_RE = re.compile(r"^(?P<line>## Mitigation)$", re.M)
 SECTION_RE = re.compile(r"^(?P<line>## .*)$", re.M)
@@ -74,6 +83,7 @@ FIELD_PATTERNS = (
      lambda t: f"- Tactic: [{t['tactic']}](../tactics/{t['tactic']}.md)"),
 )
 FIELDS = tuple((label, re.compile(pattern, re.M), render) for label, pattern, render in FIELD_PATTERNS)
+TIER_RE = next(regex for label, regex, _ in FIELDS if label == "Evidence Tier")
 NO_PROCEDURES_RE = re.compile(rf"^(?P<line>{re.escape(NO_PROCEDURES)})$", re.M)
 # Block structure, matched in a line from where the markers and indentation of the block
 # quotes and list items that hold it end, after tabs are expanded to stops of four columns.
@@ -322,9 +332,40 @@ def check_technique_page(technique: dict, text: str) -> tuple[list[str], str]:
             start, end = match.span("line")
             updated = updated[:start] + updated[end + 1:]
 
+    gap_failures, updated = check_evidence_gap(technique, updated)
+    failures.extend(gap_failures)
     mitigation_failures, updated = check_mitigation(technique, updated)
     failures.extend(mitigation_failures)
     return failures, updated
+
+
+def check_evidence_gap(technique: dict, text: str) -> tuple[list[str], str]:
+    """Return the Evidence Gap line's disagreement with the tier and the page rewritten. An
+    adapted page carries the line once; a missing one goes directly under the tier line."""
+    tid = technique["id"]
+    tier = technique.get("evidenceTier")
+    found = find_lines(GAP_RE, text)
+    if tier != "adapted":
+        if not found:
+            return [], text
+        for match in reversed(found):
+            start, end = match.span("line")
+            text = text[:start] + text[end + 1:]
+        return [f"{tid}: page has an Evidence Gap line, and matrix.json tier is '{tier}', not adapted"], text
+    if len(found) > 1:
+        return [f"{tid}: page has {len(found)} 'Evidence Gap' lines"], text
+    if found:
+        have = found[0].group("line")
+        if have == ADAPTED_GAP:
+            return [], text
+        return ([f"{tid}: Evidence Gap line is '{have}', the adapted tier says '{ADAPTED_GAP}'"],
+                _replace(text, found[0], ADAPTED_GAP))
+    tiers = find_lines(TIER_RE, text)
+    if len(tiers) == 1:
+        end = tiers[0].end("line")
+        text = text[:end] + "\n" + ADAPTED_GAP + text[end:]
+    return [f"{tid}: adapted page does not state its evidence gap; matrix.json tier adapted "
+            f"says '{ADAPTED_GAP}'"], text
 
 
 def expected_mitigation(technique: dict) -> str:
@@ -468,8 +509,8 @@ def main(argv: list[str]) -> int:
             return 1
 
     print(f"OK: {len(matrix['techniques'])} technique pages and {len(matrix['tactics'])} tactic "
-          "pages agree with matrix.json on every data line and Mitigation section, and no "
-          "technique page carries a Severity line")
+          "pages agree with matrix.json on every data line and Mitigation section, every adapted "
+          "page states its evidence gap, and no technique page carries a Severity line")
     return 0
 
 

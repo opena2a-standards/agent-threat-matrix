@@ -1195,7 +1195,7 @@
       "hmaChecks": [
         "SUPPLY-001"
       ],
-      "dvaaValidation": "consensus-manipulation",
+      "dvaaValidation": null,
       "oasbControls": [
         "7.1",
         "7.2",
@@ -1213,7 +1213,7 @@
       "hmaChecks": [
         "SUPPLY-001"
       ],
-      "dvaaValidation": "malicious output generation",
+      "dvaaValidation": null,
       "oasbControls": [
         "4.1",
         "4.4",

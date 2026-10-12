@@ -164,6 +164,37 @@ def test_replaced_by_requires_deprecated_and_must_resolve():
     assert "S5 T-1001: replacedBy 'T-9999' is not a technique id" in proc.stderr
 
 
+def test_no_shipped_adapted_technique_names_a_lab_scenario():
+    # Adapted means no lab reproduction; T-9004 and T-9005 named one and were counted
+    # in the README lab-scenario ratio as well as in the adapted tier.
+    adapted = [t for t in load(ROOT, "matrix.json")["techniques"] if t["evidenceTier"] == "adapted"]
+    assert adapted
+    assert [t["id"] for t in adapted if t.get("dvaaValidation")] == []
+
+
+def test_adapted_technique_with_a_lab_scenario_is_red():
+    def fn(root):
+        m = load(root, "matrix.json")
+        t = next(t for t in m["techniques"] if t["id"] == "T-8003")
+        assert t["evidenceTier"] == "adapted"
+        t["dvaaValidation"] = "dns-exfil"
+        dump(root, "matrix.json", m)
+        regenerate_stix(root)
+    _red(mutate(fn), "S12 T-8003: evidenceTier is adapted (no lab reproduction) but dvaaValidation names 'dns-exfil'")
+
+
+def test_validated_technique_with_a_lab_scenario_is_green():
+    def fn(root):
+        m = load(root, "matrix.json")
+        t = next(t for t in m["techniques"] if t["id"] == "T-8003")
+        t["evidenceTier"] = "validated"
+        t["dvaaValidation"] = "dns-exfil"
+        dump(root, "matrix.json", m)
+        regenerate_stix(root)
+    proc = mutate(fn)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+
+
 def test_dotted_id_is_rejected_while_consumers_are_not_ready():
     def fn(root):
         add_subtechnique(root)

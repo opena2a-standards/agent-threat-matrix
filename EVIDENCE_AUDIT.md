@@ -143,7 +143,7 @@ These three tier names are the ones that ship: `evidenceTier` in `matrix.json` t
 
 **Verdict: 1 OBSERVED, 4 VALIDATED, 1 ADAPTED.**
 
-**T-8003 (DNS Exfiltration) is the only technique in this stage without an agent-specific basis.** It's a well-understood traditional technique applied to the agent context. Decision taken and applied: publish it as **ADAPTED**, marked on the technique page as "adapted from traditional environments, not yet observed in AI agent-specific deployments." MITRE includes adapted techniques when the attack vector is clear.
+**T-8003 (DNS Exfiltration) is the only technique in this stage without an agent-specific basis.** It's a well-understood traditional technique applied to the agent context. Decision taken and applied: publish it as **ADAPTED**, with the technique page stating "Adapted from traditional environments. This technique has no agent-specific observation and no lab reproduction yet." MITRE includes adapted techniques when the attack vector is clear.
 
 ---
 
@@ -154,13 +154,13 @@ These three tier names are the ones that ship: `evidenceTier` in `matrix.json` t
 | T-9001 | Data Manipulation | VALIDATED | DVAA ToolBot write_file and DataBot SQL injection. NemoClaw C-005 (digest bypass enables blueprint tampering). |
 | T-9002 | Service Disruption | VALIDATED | Resource exhaustion via context flooding. Standard DoS techniques applied to agents. |
 | T-9003 | Malicious Code Deployment | OBSERVED | NemoClaw C-003 (curl|sh without checksum). Supply chain attacks deploying backdoors. |
-| T-9004 | Multi-Agent Consensus Manipulation | ADAPTED | Plausible in multi-agent voting systems but not observed. DVAA consensus-manipulation scenario exists but is synthetic. |
-| T-9005 | Reputation Poisoning | ADAPTED | Plausible output manipulation but not observed in production AI agent context specifically. |
+| T-9004 | Multi-Agent Consensus Manipulation | ADAPTED | Plausible in multi-agent voting systems but not observed. A DVAA consensus-manipulation scenario exists but is synthetic and does not reproduce the technique, so `matrix.json` names no lab scenario for it. |
+| T-9005 | Reputation Poisoning | ADAPTED | Plausible output manipulation but not observed in production AI agent context specifically, and not reproduced in the lab, so `matrix.json` names no lab scenario for it. |
 | T-9006 | Supply Chain Compromise | OBSERVED | os-info-checker npm attack (May 2025). ClawHavoc campaign. NemoClaw C-003, C-005, C-006. |
 
 **Verdict: 2 OBSERVED, 2 VALIDATED, 2 ADAPTED.**
 
-**T-9004 (Multi-Agent Consensus Manipulation) and T-9005 (Reputation Poisoning) lack agent-specific evidence.** Both are plausible but have no observation in AI agent deployments. Decision taken and applied: publish both as **ADAPTED** rather than holding them, so the gap is stated on the page instead of the technique being absent.
+**T-9004 (Multi-Agent Consensus Manipulation) and T-9005 (Reputation Poisoning) lack agent-specific evidence.** Both are plausible but have no observation in AI agent deployments. Decision taken and applied: publish both as **ADAPTED** rather than holding them, so the gap is stated on the page instead of the technique being absent. Each page states "Adapted from traditional environments. This technique has no agent-specific observation and no lab reproduction yet." Neither counts toward the README's lab-scenario ratio; re-tiering either to VALIDATED needs a DVAA scenario that reproduces it.
 
 ---
 
@@ -185,7 +185,7 @@ All 40 attack classes contain at least one OBSERVED or VALIDATED technique. No a
 
 ### Gaps Identified
 
-1. **No real-world observation of multi-agent consensus attacks.** T-9004 should be marked as projected.
+1. **No real-world observation of multi-agent consensus attacks.** T-9004 is published as ADAPTED, the tier for a technique with no agent-specific observation or lab reproduction; the schema has no other tier for it.
 2. **DNS exfiltration for AI agents** (T-8003) is inherited from traditional environments. No agent-specific twist documented.
 3. **Reputation poisoning** (T-9005) is generic. It could be more specific to agent-generated content.
 

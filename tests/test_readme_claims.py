@@ -102,7 +102,7 @@ MUTATIONS = [
      "into 8 tactics and 61 techniques along a kill chain"),
     ("into 9 tactics and 61 techniques along a kill chain",
      "into 9 tactics and 62 techniques along a kill chain"),
-    ("and 60 of the 61 carry a reproducible lab scenario",
+    ("and 58 of the 61 carry a reproducible lab scenario",
      "and 59 of the 61 carry a reproducible lab scenario"),
     # Use cases: the evidence-tier sentence.
     ("16 of the 61 techniques carry real-world evidence",
@@ -116,8 +116,8 @@ MUTATIONS = [
     # Purpose.
     ("into 9 tactics and 61 techniques, organized by kill chain stage",
      "into 9 tactics and 60 techniques, organized by kill chain stage"),
-    ("60 of the 61 also carry a reproducible lab scenario",
-     "61 of the 61 also carry a reproducible lab scenario"),
+    ("58 of the 61 also carry a reproducible lab scenario",
+     "60 of the 61 also carry a reproducible lab scenario"),
     # Matrix overview.
     ("**61 techniques** across 9 tactics", "**61 techniques** across 10 tactics"),
     ("**40 attack classes**", "**41 attack classes**"),

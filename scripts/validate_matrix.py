@@ -39,6 +39,8 @@ Standard library only, no network. Two passes:
         partial clone that lacks the commit's tree or matrix.json cannot read
         the file at that commit, so there only the shape is checked; the
         summary line says which check ran
+   - S12 an ``adapted`` technique carries no ``dvaaValidation``: the tier means
+        no lab reproduction, so naming a lab scenario counts it both ways
 
 Exit 0 when everything holds, 1 otherwise.
 """
@@ -274,6 +276,13 @@ def semantic_checks(matrix: dict, readiness: dict, technique_ids_file, errors: l
         for source in t.get("dataSources", []):
             if source not in source_ids:
                 errors.append(f"S4 {tid}: dataSources value {source!r} is not in the dataSources registry")
+
+        scenario = t.get("dvaaValidation")
+        if t["evidenceTier"] == "adapted" and isinstance(scenario, str) and scenario.strip():
+            errors.append(
+                f"S12 {tid}: evidenceTier is adapted (no lab reproduction) but dvaaValidation names "
+                f"{scenario!r}; set it to null, or reproduce the technique and re-tier it validated"
+            )
 
         status = t.get("status", "active")
         replaced_by = t.get("replacedBy")

@@ -10,7 +10,7 @@ A structured framework for classifying, detecting, and defending against attacks
 
 A team is about to ship an agent that reads documents, calls tools and keeps memory. Security asks for the threat list. Existing catalogs cover networks (MITRE ATT&CK) and AI systems (MITRE ATLAS, which names attacks on models and, in recent releases, some on agents, such as agent tool invocation and agent configuration changes). The layer between the model and the user, where governance files, skills, MCP connections, memory and credentials in context live, is where agents differ, and a team without a list for that layer defends by guesswork.
 
-The matrix classifies attacks on that layer into 9 tactics and 61 techniques along a kill chain. Each technique carries an evidence tier, maps to a detection check and a defensive control, and 60 of the 61 carry a reproducible lab scenario.
+The matrix classifies attacks on that layer into 9 tactics and 61 techniques along a kill chain. Each technique carries an evidence tier, maps to a detection check and a defensive control, and 58 of the 61 carry a reproducible lab scenario.
 
 What you can do today: browse [threats.opena2a.org](https://threats.opena2a.org), or read `matrix.json` and validate it against its schema.
 
@@ -52,7 +52,7 @@ Why you can check this yourself: [`matrix.json`](matrix.json) and its schema [`s
 
 AI agents operate differently from traditional software. They make decisions based on natural language, delegate actions to tools with varying trust levels, communicate with other agents via open protocols, and maintain persistent memory that can be poisoned. These properties create attack surfaces that existing frameworks do not adequately model.
 
-The **AI Agent Threat Matrix** classifies attacks against AI agent systems into 9 tactics and 61 techniques, organized by kill chain stage. Every technique carries an explicit evidence tier: observed in the wild, validated in a controlled lab environment, or adapted from a traditional environment and marked as such. Every technique maps to automated detection and a defensive control; 60 of the 61 also carry a reproducible lab scenario.
+The **AI Agent Threat Matrix** classifies attacks against AI agent systems into 9 tactics and 61 techniques, organized by kill chain stage. Every technique carries an explicit evidence tier: observed in the wild, validated in a controlled lab environment, or adapted from a traditional environment and marked as such. Every technique maps to automated detection and a defensive control; 58 of the 61 also carry a reproducible lab scenario.
 
 ### What This Covers (and What It Doesn't)
 
