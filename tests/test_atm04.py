@@ -1,8 +1,8 @@
 """ATM-04 acceptance tests.
 
 Leaf test names begin with the criterion id (ATM-04.ACn) so each criterion can be traced
-to a passing testcase in the JUnit output: the id is the first token of every parametrize
-id below.
+to a passing testcase in a JUnit report written by `pytest --junitxml`: the id is the
+first token of every parametrize id below.
 
 The checker under test is scripts/check_canonical_classes.py. AC1 pins its CI wiring in
 the readme-claims job with an untampered verdict; AC2 proves the check GREEN on the
@@ -227,8 +227,26 @@ def _oasb_entry() -> str:
     return entry
 
 
+def _names_internal_role(changelog: str) -> bool:
+    """A role title is the word Chief and a capitalised word, across any white space."""
+    return re.search(r"Chief\s+[A-Z]", changelog) is not None
+
+
 def _ac4_no_internal_role_named():
-    assert not re.search(r"Chief\s+[A-Z]", CHANGELOG.read_text())
+    assert not _names_internal_role(CHANGELOG.read_text())
+
+
+def _ac4_a_role_title_is_found_on_one_line_and_across_a_line_break():
+    # The shipped CHANGELOG holds no title, so only a synthetic one shows the check fires.
+    # The title is put together here so that this file names none.
+    word = "Chief"
+    head = "# Changelog\n\n## Unreleased\n\n### Changed\n\n- OASB control mappings re-derived "
+    one_line = head + f"(reviewed by the {word} Archivist, 2026-08-25).\n"
+    split = head + f"(reviewed by the {word}\n  Archivist, 2026-08-25).\n"
+    public = head + "(mapping review, 2026-08-25).\n"
+    assert _names_internal_role(one_line), "a title on one line"
+    assert _names_internal_role(split), "a title split across a line break"
+    assert not _names_internal_role(public)
 
 
 def _ac4_entry_keeps_its_technical_content():
@@ -243,6 +261,7 @@ def _ac4_attribution_takes_a_public_form():
 
 AC4_CASES = [
     ("ATM-04.AC4 CHANGELOG names no internal role", _ac4_no_internal_role_named),
+    ("ATM-04.AC4 a role title is found on one line and across a line break", _ac4_a_role_title_is_found_on_one_line_and_across_a_line_break),
     ("ATM-04.AC4 the OASB entry keeps its four techniques and its date", _ac4_entry_keeps_its_technical_content),
     ("ATM-04.AC4 the attribution takes a public form", _ac4_attribution_takes_a_public_form),
 ]
