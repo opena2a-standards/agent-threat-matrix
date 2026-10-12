@@ -35,7 +35,9 @@ stand before a "[", the name does not name DVAA; on a line that also carries a c
 that fails it, a mark directly after the name leaves the line naming DVAA, and the line
 goes red. The three steps README states for reading the name are also written below as a
 plain scan, which must read generated lines as the checker does, so the sentence and the
-checker's patterns cannot drift apart with every test passing.
+checker's patterns cannot drift apart with every test passing. The example README and the
+checker's description give of a no-break space after a tag name must be a form that only
+the second reading names, and the two must give the same form.
 """
 
 import html
@@ -1121,6 +1123,25 @@ def test_a_mark_after_markup_or_written_as_a_reference_is_put_apart():
         assert checker.detached(attached) == attached
     # No ASCII character is a combining mark, so none after the name needs a lookup.
     assert not any(checker.is_mark(code) for code in range(128))
+
+
+def test_the_no_break_space_example_is_a_form_only_the_second_reading_names():
+    # README and the checker's description gave '[DV](url "<b' U+00A0 'x=")AA' as the form a
+    # no-break space after a tag name no longer hides. No ">" follows it, so no tag is
+    # removed and the first reading already named DVAA; with the final ">" the first reading
+    # removes "AA" with the tag, and only the second reading names DVAA.
+    checker = load_checker()
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    sentence = next(line for line in readme.split("\n") if "So the name written as" in line)
+    examples = re.findall(r"`([^`]*)` U\+00A0 `([^`]*)`", sentence)
+    assert len(examples) == 1, examples
+    before, after = examples[0]
+    assert f'"{before}" U+00A0 "{after}"' in " ".join(checker.__doc__.split())
+    written = before + "\N{NO-BREAK SPACE}" + after
+    assert checker.OTHER_SPACE_AFTER_TAG_NAME.search(written)
+    assert not checker.holds(checker.name_form(written, checker.RAW_HTML), "DVAA")
+    assert checker.holds(checker.name_form(written, checker.SPACE_OR_TAB_HTML), "DVAA")
+    assert checker.names(written, "DVAA")
 
 
 def test_a_line_naming_dvaa_and_stating_a_count_names_both():

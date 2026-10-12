@@ -72,7 +72,7 @@ stands for less any such character, so "&#8203;" (U+200B) leaves nothing, and it
 brought to NFKC with each character Unicode lists as confusable with A, D or V read as
 that letter (U+0410 CYRILLIC CAPITAL LETTER A reads as A). So the name written as
 "DV&#8203;AA", "**DV**AA", "DV<!-- -->AA", "<b>DV</b>AA", "[DV](url)AA",
-"DV![](x.png)AA", "[DV](url "<b" U+00A0 "x=")AA" or in fullwidth letters does not take
+"DV![](x.png)AA", "[DV](url "<b" U+00A0 "x=")AA>" or in fullwidth letters does not take
 the line out of the check, while "DV!AA" does not name DVAA. On a line that carries one
 of the characters above, a combining mark after "DVAA" does not keep the line from naming
 DVAA, so "DVAA" U+200B U+0301 names DVAA and the line fails on U+200B. A line that states
