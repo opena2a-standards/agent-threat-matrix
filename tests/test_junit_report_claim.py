@@ -219,6 +219,11 @@ def test_name_claims_read_past_a_mark_inside_a_word_and_stop_where_only_marks_fo
         inside = f"test_atm03{mark}py"
         assert name_claims(f"Leaf test names in {inside} begin with the criterion id") == [
             f"names in {inside} begin with"], mark
+        # An underscore is not a mark, so with one after it, marks or none after that, it
+        # ends no sentence either.
+        for word in (f"suffix{mark}_", f"suffix{mark}_)", f"{mark}_"):
+            assert name_claims(f"Leaf test names in {word} begin with the criterion id") == [
+                f"names in {word} begin with"], word
         # With nothing but marks after it, also in a word of marks alone, it ends a sentence.
         for end in (f"suffix{mark})", f'"suffix{mark}"', f"suffix{mark}{mark}", f"({mark})",
                     mark):
