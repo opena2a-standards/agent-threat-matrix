@@ -1091,6 +1091,23 @@ def test_name_form_reads_a_long_run_of_combining_marks_in_n_log_n_time(text, for
     assert seconds < 1, f"{seconds:.2f} s"
 
 
+def test_names_reads_a_long_run_of_combining_marks_after_the_name_in_linear_time():
+    # names decomposes each name form with unicodedata.normalize("NFKD"), which puts a run of
+    # combining marks in order by moving one mark at a time. It is linear only because nfkc
+    # has already put the form in order: on this line, U+0301 U+0316 repeated 100,000 times
+    # took about 0.3 s on Python 3.14 and 400,000 about 1 s. Decomposed as written, out of
+    # order, the run took about 2 s at 50,000 and about four times as long at each doubling.
+    # The no-break space after "<b" adds the second reading, and the form holds the name only
+    # once decomposed, as "A" composes with one U+0301, so the line is read with every step.
+    checker = load_checker()
+    line = "<b\N{NO-BREAK SPACE} DVAA" + OUT_OF_ORDER
+    start = time.perf_counter()
+    named = checker.names(line, "DVAA")
+    seconds = time.perf_counter() - start
+    assert not named
+    assert seconds < 3, f"{seconds:.2f} s"
+
+
 def test_a_mark_after_markup_or_written_as_a_reference_is_put_apart():
     checker = load_checker()
     assert checker.name_form("DV![](x.png)AA") == "DVAA"
