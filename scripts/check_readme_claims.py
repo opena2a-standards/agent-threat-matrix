@@ -269,23 +269,24 @@ def decoded(reference):
     return "".join(c for c in html.unescape(reference.group()) if not hiding_kind(c))
 
 
-def name_form(shown):
-    """`shown` as a name in it reads: the raw HTML `RAW_HTML` matches, the link
+def name_form(stripped):
+    """`stripped` as a name in it reads: the raw HTML `RAW_HTML` matches, the link
     destinations and reference labels `LINK_TARGET` matches and the Markdown characters
     that mark up text removed, character references decoded, and the text brought to NFKC
     with each character in `CONFUSABLES` read as the letters it resembles. The markup is
     removed before the references are decoded, as a reference to "*" shows a star."""
-    text = RAW_HTML.sub("", shown)
+    text = RAW_HTML.sub("", stripped)
     text = LINK_TARGET.sub("", text).translate(MARKUP)
     text = REFERENCE.sub(decoded, text)
     return unicodedata.normalize("NFKC", text).translate(CONFUSABLES)
 
 
-def names(shown, name):
-    """Whether a line that shows as `shown` names `name`: it contains `name` as it stands
-    or in its `name_form`. "DV" U+200B "AA", "DV&#8203;AA", "**DV**AA", "DV<!-- -->AA",
-    "DVA" U+0410 and the fullwidth letters each name DVAA."""
-    return name in shown or name in name_form(shown)
+def names(stripped, name):
+    """Whether a line that is `stripped` once the characters `hiding_kind` names are
+    removed names `name`: it contains `name` as it stands or in its `name_form`.
+    "DV" U+200B "AA", "DV&#8203;AA", "**DV**AA", "DV<!-- -->AA", "DVA" U+0410 and the
+    fullwidth letters each name DVAA."""
+    return name in stripped or name in name_form(stripped)
 
 
 def hiding_kind(c):
@@ -461,7 +462,7 @@ def main(argv):
     # line also give the line with such characters removed, which decides whether it names
     # DVAA.
     lines = [classified(line) for line in readme.split("\n")]
-    naming = [names(shown, "DVAA") for _, shown, _ in lines]
+    naming = [names(stripped, "DVAA") for _, stripped, _ in lines]
     dvaa_lines = lines_naming(lines, naming)
     pinned = "related-projects.json"
     # Every DVAA wording is read in any letter case: DVAA itself writes "Attack Categories".
