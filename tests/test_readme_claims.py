@@ -989,11 +989,12 @@ def stated_name_form(checker, line, any_space=True):
 # pieces in five, of longer pieces: the openings and closes of HTML, character references,
 # white space other than a space, and characters NFKC or the confusables read as A, D or V
 # or leave beside them. With these, each pattern alternative and each step, changed or
-# taken out of order, reads at least 30 of the 200,000 lines differently, with two
+# taken out of order, reads at least 30 of the 200,000 lines differently, with three
 # exceptions a case above also pins: removing each "!" before the link spans rather than
 # after them reads 2 lines differently ("exclamation mark before a link span"), and in
 # the second reading letting only a space and "/" end a tag name reads 13 differently
-# ("tab after a tag name in the second reading").
+# ("tab after a tag name in the second reading") and letting only a space and a tab end
+# it reads 22 differently ("slash after a tag name in the second reading").
 MARKUP_CHARACTERS = "[]()DVAx \"*_~`\\<>"
 PIECES = [
     *"/-!?=1&#;\t", "<x", "</A", "<!--", "-->", "<?", "?>", "<![CDATA[", "]]>", "<!",
