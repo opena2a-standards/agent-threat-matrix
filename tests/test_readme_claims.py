@@ -570,8 +570,10 @@ JOINING_CHARACTERS = [
     ("U+200B ZERO WIDTH SPACE between the name and U+0301",
      "DVAA\N{ZERO WIDTH SPACE}\N{COMBINING ACUTE ACCENT}",
      "U+200B ZERO WIDTH SPACE, a format character"),
-    ("U+200B ZERO WIDTH SPACE between the name and U+20DD in strong emphasis",
-     "**DVAA\N{ZERO WIDTH SPACE}\N{COMBINING ENCLOSING CIRCLE}**",
+    # NFKC leaves U+20DD apart from the A, so "DVAA" U+20DD names DVAA without the
+    # character; U+0301 past U+0332 is joined to it.
+    ("U+200B ZERO WIDTH SPACE between the name and U+0332 U+0301 in strong emphasis",
+     "**DVAA\N{ZERO WIDTH SPACE}\N{COMBINING LOW LINE}\N{COMBINING ACUTE ACCENT}**",
      "U+200B ZERO WIDTH SPACE, a format character"),
 ]
 
@@ -669,8 +671,27 @@ WRITTEN_NAMES = [
     # Read with the no-break space ending the tag name, "<b" U+00A0 "x>" is removed.
     ("U+00A0 NO-BREAK SPACE after a tag name", f"[DV<b\N{NO-BREAK SPACE}x>AA]{DVAA_URL}"),
     # A combining mark after the first "DVAA" leaves the second one read.
-    ("U+20DD COMBINING ENCLOSING CIRCLE after a first DVAA",
-     f"[DVAA\N{COMBINING ENCLOSING CIRCLE} DVAA]{DVAA_URL}"),
+    ("U+0301 COMBINING ACUTE ACCENT after a first DVAA",
+     f"[DVAA\N{COMBINING ACUTE ACCENT} DVAA]{DVAA_URL}"),
+    # A combining mark that NFKC leaves apart from the last A, drawn under, through or
+    # around it, does not make another name; at 0d1bad2 each such line was read, and
+    # treating any mark after the name as making one took it out of the check.
+    ("U+0332 COMBINING LOW LINE after the name", f"[DVAA\N{COMBINING LOW LINE}]{DVAA_URL}"),
+    ("U+0335 COMBINING SHORT STROKE OVERLAY after the name",
+     f"[DVAA\N{COMBINING SHORT STROKE OVERLAY}]{DVAA_URL}"),
+    ("U+0338 COMBINING LONG SOLIDUS OVERLAY after the name",
+     f"[DVAA\N{COMBINING LONG SOLIDUS OVERLAY}]{DVAA_URL}"),
+    ("U+20DD COMBINING ENCLOSING CIRCLE after the name",
+     f"[DVAA\N{COMBINING ENCLOSING CIRCLE}]{DVAA_URL}"),
+    ("U+0332 U+0338 after the name",
+     f"[DVAA\N{COMBINING LOW LINE}\N{COMBINING LONG SOLIDUS OVERLAY}]{DVAA_URL}"),
+    # U+20DD has combining class 0, so NFKC joins no mark after it to the A.
+    ("U+20DD U+0301 after the name",
+     f"[DVAA\N{COMBINING ENCLOSING CIRCLE}\N{COMBINING ACUTE ACCENT}]{DVAA_URL}"),
+    ("U+0332 COMBINING LOW LINE after U+0410",
+     f"[DVA\N{CYRILLIC CAPITAL LETTER A}\N{COMBINING LOW LINE}]{DVAA_URL}"),
+    ("U+0332 COMBINING LOW LINE after strong emphasis",
+     f"[DV**AA**\N{COMBINING LOW LINE}]{DVAA_URL}"),
     # A combining mark that stands after markup rather than directly after a letter, and a
     # character reference to a mark, do not count as directly after the name.
     ("U+20DD COMBINING ENCLOSING CIRCLE after strong emphasis",
@@ -684,6 +705,7 @@ WRITTEN_NAMES = [
     # Such a mark is also kept apart from the name, so that NFKC does not join U+0301 to
     # the last A and read "DVA" U+00C1.
     ("reference to U+0301 after strong emphasis", f"[DV**AA**&#x301;]{DVAA_URL}"),
+    ("reference to U+0301 after the name", f"[DVAA&#x301;]{DVAA_URL}"),
     ("reference to U+0301 after the name in strong emphasis",
      f"[DV**AA&#x301;**]{DVAA_URL}"),
     ("fullwidth letters",
@@ -769,7 +791,8 @@ def test_a_backtick_beside_the_name_dvaa_leaves_the_line_read(line):
 # rather than marking up text, a letter with an accent is not confusable with A, NFKC
 # leaves U+00C1 composed, a comment that no line closes shows as text and runs to the end
 # of the line, a character read as letters that do not stand together in "DVAA" shows them
-# in another order, "DVAA" directly followed by a combining mark does not name DVAA, and a
+# in another order, "DVAA" directly followed by a combining mark that NFKC joins to the last
+# A shows another letter, also where the mark is joined past one NFKC leaves apart, and a
 # "!" that does not stand before a "[" stays. Such a line does not name DVAA, so its
 # figures are not read.
 OTHER_NAMES = [
@@ -783,7 +806,11 @@ OTHER_NAMES = [
     ("U+0301 COMBINING ACUTE ACCENT after the name", "[DVAA\N{COMBINING ACUTE ACCENT}]"),
     ("U+0301 COMBINING ACUTE ACCENT after U+0410",
      "[DVA\N{CYRILLIC CAPITAL LETTER A}\N{COMBINING ACUTE ACCENT}]"),
-    ("U+20DD COMBINING ENCLOSING CIRCLE after the name", "[DVAA\N{COMBINING ENCLOSING CIRCLE}]"),
+    ("U+0332 COMBINING LOW LINE and U+0301 after the name",
+     "[DVAA\N{COMBINING LOW LINE}\N{COMBINING ACUTE ACCENT}]"),
+    ("U+0301 COMBINING ACUTE ACCENT and U+0332 after the name",
+     "[DVAA\N{COMBINING ACUTE ACCENT}\N{COMBINING LOW LINE}]"),
+    ("U+0308 COMBINING DIAERESIS after the name", "[DVAA\N{COMBINING DIAERESIS}]"),
     ("exclamation mark", "[DV!AA]"),
 ] + [
     (confusable_case(code), f"[D{chr(code)}A]")

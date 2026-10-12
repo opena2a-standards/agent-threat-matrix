@@ -45,16 +45,20 @@ lists as default ignorable without assigning them (U+2065, U+FFF0 to U+FFF8, U+E
 U+E0002 to U+E001F, U+E0080 to U+E00FF, U+E01F0 to U+E0FFF). Inside a wording such a
 character keeps the wording from being read, and a Hangul filler or combining mark does
 so directly beside a DVAA wording, while a character that renders as nothing leaves the
-figure in the rendered line. A line names DVAA when it contains "DVAA" with no combining
-mark (Unicode category M) directly after it once such characters are removed, either as
-it then stands or after three more steps, so "DVAA" followed by U+0301 COMBINING ACUTE
-ACCENT does not name DVAA. A mark counts as directly after "DVAA" only where it is
-written as itself, not as a character reference, directly after a letter or another mark,
-so "DV**AA**" U+20DD and "DVAA&#x20dd;" name DVAA. A mark that does not count as directly
-after "DVAA" is also kept apart from the name, so that NFKC in the third step below does
-not join it to the last A: "DV**AA**" U+0301, "DV**AA**&#x301;" and "DV**AA&#x301;**"
-name DVAA, while NFKC alone gives "DVA" U+00C1. First, going along the line, its HTML
-is removed wherever it stands, also where it starts inside a link destination or title
+figure in the rendered line. A line names DVAA when it contains "DVAA" once such
+characters are removed, either as it then stands or after three more steps, with no
+combining mark (Unicode category M) directly after it that NFKC joins to the last A. So
+"DVAA" followed by U+0301 COMBINING ACUTE ACCENT, which NFKC joins to the A as U+00C1,
+does not name DVAA, nor does "DVAA" followed by U+0332 COMBINING LOW LINE and U+0301,
+while "DVAA" followed by U+0332, U+0335 COMBINING SHORT STROKE OVERLAY, U+0338 COMBINING
+LONG SOLIDUS OVERLAY or U+20DD COMBINING ENCLOSING CIRCLE, which NFKC leaves apart from
+the A, names DVAA. A mark counts as directly after "DVAA" only where it is written as
+itself, not as a character reference, directly after a letter or another mark, and a mark
+that does not is kept apart from the name, so that NFKC in the third step below does not
+join it to the last A: "DV**AA**" U+0301, "DVAA&#x301;", "DV**AA**&#x301;" and
+"DV**AA&#x301;**" name DVAA, while NFKC alone gives "DVA" U+00C1. First, going along the
+line, its HTML is removed wherever it stands, also where it starts inside a link
+destination or title
 and ends after the ) that closes them: each comment, processing instruction, CDATA
 section and declaration from its opening <!--, <?, <![CDATA[ or <! and an ASCII letter to
 the first -->, ?>, ]]> or > after it, respectively, or to the end of the line when none
@@ -387,13 +391,18 @@ def name_form(stripped, raw_html=RAW_HTML):
 
 
 def holds(text, name):
-    """Whether `text` holds `name` at some place with no combining mark directly after it,
-    so "DVAA" U+0301 does not hold DVAA and "DVAA" U+20DD " DVAA" does. Only a character
-    after `name` outside ASCII has its category looked up; no ASCII character is a mark."""
+    """Whether `text` holds `name` at some place where NFKC does not join the combining
+    marks directly after it to its last letter. "DVAA" U+0301 does not hold DVAA, as NFKC
+    gives "DVA" U+00C1, and neither does "DVAA" U+0332 U+0301, where NFKC joins U+0301 to
+    the A past U+0332; "DVAA" U+0332 COMBINING LOW LINE, "DVAA" U+20DD and "DVAA" U+0301
+    " DVAA" do. Only a character after `name` outside ASCII has its category looked up; no
+    ASCII character is a mark."""
     start = text.find(name)
     while start >= 0:
-        after = text[start + len(name):start + len(name) + 1]
-        if after.isascii() or not is_mark(ord(after)):
+        end = run = start + len(name)
+        while run < len(text) and not text[run].isascii() and is_mark(ord(text[run])):
+            run += 1
+        if run == end or nfkc(name[-1] + text[end:run])[0] == name[-1]:
             return True
         start = text.find(name, start + 1)
     return False
@@ -423,11 +432,12 @@ def names(stripped, name, hiding=False):
     """Whether a line that is `stripped` once the characters `hiding_kind` names are
     removed names `name`: it `holds` `name` as it stands or in its `name_form`, read with
     `RAW_HTML` and, where a tag name is followed by white space other than a space or
-    tab, with `SPACE_OR_TAB_HTML` too. Where a name form holds `name` only with a
-    combining mark directly after it or only once its letters are decomposed, the name
-    form of the line `detached` is read too, so a mark counts only where it is written as
-    itself directly after a letter or another mark: "DVAA" U+20DD does not name DVAA,
-    while "DV**AA**" U+20DD and "DV**AA&#x20dd;**" do. "DV" U+200B "AA", "DV&#8203;AA",
+    tab, with `SPACE_OR_TAB_HTML` too. Where a name form holds `name` only with combining
+    marks directly after it that NFKC joins to its last letter, or only once its letters
+    are decomposed, the name form of the line `detached` is read too, so a mark counts only
+    where it is written as itself directly after a letter or another mark: "DVAA" U+0301
+    does not name DVAA, while "DV**AA**" U+0301 and "DV**AA&#x301;**" do, and "DVAA"
+    U+0332, which NFKC leaves apart from the A, names DVAA. "DV" U+200B "AA", "DV&#8203;AA",
     "**DV**AA", "DV<!-- -->AA", "DVA" U+0410 and the fullwidth letters each name DVAA;
     "DVAA" U+0301 does not. On a line that carried such a character, `hiding` true, a
     combining mark after `name` does not keep the line from naming it: removing the
