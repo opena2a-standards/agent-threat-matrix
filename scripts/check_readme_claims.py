@@ -11,9 +11,16 @@ between the BEGIN/END GENERATED markers. Typed by hand, they reworded 34 of the
 40 class descriptions and four of them described a different attack. The block
 must re-render byte-identically; run with ``--fix`` to rewrite only that block.
 
+The per-tactic table and the evidence-tier table are measurements over matrix.json too.
+Each tactic row must state the tactic's name, kill chain stage and technique count, and
+each tier row its technique count and that count as a whole percentage of all techniques,
+rounded half up; a row naming no tactic or tier, a second row for one, and a tactic or
+tier without a row each fail. The "## Attack Classes (N)" heading must state the number
+of attack classes.
+
 The README also states figures about related projects. Those are measured in the
-other project, so they are pinned in related-projects.json with the release and
-commit each was read from, and every README line naming the project must state the
+other project, so they are pinned in related-projects.json with the release each was
+read from, and for DVAA the commit, and every README line naming DVAA must state the
 pinned number wherever it uses one of the wordings read here. For DVAA those are
 "N agents", "N deliberately vulnerable", "N hardened reference", "N control-protected
 variant(s)", "N vulnerable agent(s)" and "N categories", where up to two words, each a
@@ -21,6 +28,13 @@ run of ASCII letters and hyphens, may stand between the number and "categories".
 is read in any letter case with one space between words; a figure worded any other way
 is not checked. DVAA was described as "21 vulnerable agents" while DVAA labels one of
 the 21 a hardened reference and four control-protected variants.
+
+The HackMyAgent and OASB figures are pinned in related-projects.json too, with the
+HackMyAgent release they were read from, and are read on every README line: "N static
+checks" and "N payloads" or "N attack payloads" must state the pinned HackMyAgent figures,
+and "N controls" and "N domains" the pinned OASB figures. Each wording is read in the
+letter case written here. The README stated 310 static checks after HackMyAgent 0.33.2
+reported 318, and no check read the figure.
 
 A line naming DVAA fails when it carries a format character (Unicode category Cf, such
 as U+00AD SOFT HYPHEN or U+200B ZERO WIDTH SPACE), a control character (category Cc)
@@ -103,6 +117,18 @@ CATEGORY_LABELS = {
     "identity": "Identity",
     "sandbox": "Sandbox",
 }
+
+# The evidence tiers, each with one row in the README evidence-tier table.
+TIERS = ("observed", "validated", "adapted")
+
+# Related-project figures other than DVAA's, read on every README line: the project and
+# field each is pinned under in related-projects.json, and the wording that states it.
+RELATED_WORDINGS = (
+    ("hackmyagent", "staticChecks", r"\b(\d+) static checks\b"),
+    ("hackmyagent", "attackPayloads", r"\b(\d+) (?:attack )?payloads\b"),
+    ("oasb", "controls", r"\b(\d+) controls\b"),
+    ("oasb", "domains", r"\b(\d+) domains\b"),
+)
 
 # Letters (category Lo) that render as blank space. Each is a word character, so a DVAA
 # wording directly beside one is not read, and neither is a matrix.json count wording
@@ -473,6 +499,11 @@ def empty(value):
     return False
 
 
+def percent(count, total):
+    """`count` as a whole percentage of `total`, rounded half up."""
+    return (200 * count + total) // (2 * total)
+
+
 def main(argv):
     # An argument this script does not know ends the run with exit 2 before anything is
     # read or written: a mistyped --fix must not report the README as checked. argparse
@@ -552,6 +583,7 @@ def main(argv):
           "tactics and techniques")
     count(r"\b(\d+) attack classes\b", [len(classes)], "attack classes")
     count(r"\*\*(\d+) attack classes\*\*", [len(classes)], "attack classes")
+    count(r"(?m)^## Attack Classes \((\d+)\)$", [len(classes)], "attack classes")
 
     # Evidence tiers, in the overview wording and in the Use cases wording.
     count(r"\*\*(\d+) techniques with real-world evidence\*\*", [observed], "observed")
@@ -585,6 +617,66 @@ def main(argv):
         [with_lab, total],
         "lab scenario of total",
     )
+
+    def line_of(pos):
+        return readme.count("\n", 0, pos) + 1
+
+    # Matrix overview: one row per tactic, stating its name, kill chain stage (`order`)
+    # and technique count.
+    per_tactic = {}
+    for t in techniques:
+        per_tactic[t.get("tactic")] = per_tactic.get(t.get("tactic"), 0) + 1
+    tactic_by_id = {t["id"]: t for t in tactics}
+    tactic_rows = {}
+    for m in re.finditer(r"(?m)^\| \[([^\]]+)\]\(tactics/([^)]+)\.md\) \| (\d+) \| (\d+) \|",
+                         readme):
+        name, tid, stage, stated = m.groups()
+        line = line_of(m.start())
+        tactic = tactic_by_id.get(tid)
+        if tactic is None:
+            failures.append(f"README.md:{line}: tactic row links tactics/{tid}.md, "
+                            f"which is not a tactic in matrix.json")
+            continue
+        if tid in tactic_rows:
+            failures.append(f"README.md:{line}: second row for tactic {tid} "
+                            f"(first at line {tactic_rows[tid]})")
+            continue
+        tactic_rows[tid] = line
+        want = (tactic["name"], str(tactic["order"]), str(per_tactic.get(tid, 0)))
+        if (name, stage, stated) != want:
+            failures.append(
+                f"README.md:{line}: tactic row \"{name} | {stage} | {stated}\" does not match "
+                f"matrix.json ({tid} name, kill chain stage, techniques: {' | '.join(want)})"
+            )
+    for tid in tactic_by_id:
+        if tid not in tactic_rows:
+            failures.append(f"README per-tactic table has no row for tactic {tid}")
+
+    # Evidence Standard: one row per tier, stating its count and its share of all
+    # techniques as a whole percentage.
+    tier_rows = {}
+    for m in re.finditer(r"(?m)^\| \*\*(\w+)\*\* \|.*\| (\d+) \((\d+)%\) \|$", readme):
+        tier, stated, pct = m.group(1).lower(), m.group(2), m.group(3)
+        line = line_of(m.start())
+        if tier not in TIERS:
+            failures.append(f"README.md:{line}: \"{m.group(1)}\" is not an evidence tier "
+                            f"({', '.join(TIERS)})")
+            continue
+        if tier in tier_rows:
+            failures.append(f"README.md:{line}: second row for tier {tier} "
+                            f"(first at line {tier_rows[tier]})")
+            continue
+        tier_rows[tier] = line
+        n = tiers.get(tier, 0)
+        want = (str(n), str(percent(n, total)))
+        if (stated, pct) != want:
+            failures.append(
+                f"README.md:{line}: \"{stated} ({pct}%)\" does not match matrix.json "
+                f"({tier}: {want[0]} of {total}, {want[1]}%)"
+            )
+    for tier in TIERS:
+        if tier not in tier_rows:
+            failures.append(f"README evidence tier table has no row for {tier}")
 
     failures.extend(check_class_tables(matrix, readme))
 
@@ -642,6 +734,19 @@ def main(argv):
     require(wording("(?:[A-Za-z-]+ ){0,2}categories"), [dvaa["vulnerabilityCategories"]],
             "DVAA vulnerability categories", **on_dvaa_lines)
 
+    # The HackMyAgent and OASB figures, read on every README line.
+    figures = []
+    for project, field, pattern in RELATED_WORDINGS:
+        entry = related.get(project)
+        value = entry.get(field) if isinstance(entry, dict) else None
+        if type(value) is not int:
+            failures.append(f"{pinned}: {project}.{field} is not a whole number")
+            continue
+        require(pattern, [value],
+                f"{project}.{field}, read from release {entry.get('sourceVersion')}",
+                source=pinned)
+        figures.append(f"{project}.{field}={value}")
+
     # A wording is not read when a character `hiding_kind` names stands inside it ("age"
     # U+00AD "nts", "22" U+200B " agents", "tac" U+00AD "tics"), or when a Hangul filler or
     # combining mark is glued to a DVAA wording (U+3164 "22 agents", "agents" U+034F), so
@@ -669,10 +774,10 @@ def main(argv):
                 f"remove it"
             )
 
-    dvaa_summary = (
+    related_summary = (
         f"DVAA {dvaa['sourceVersion']}: {dvaa['agents']} agents "
         f"({', '.join(f'{k}={v}' for k, v in kinds.items())}), "
-        f"{dvaa['vulnerabilityCategories']} vulnerability categories"
+        f"{dvaa['vulnerabilityCategories']} vulnerability categories; {', '.join(figures)}"
     )
 
     tier_total = sum(tiers.values())
@@ -691,7 +796,7 @@ def main(argv):
             f"\nmeasured: {len(tactics)} tactics, {total} techniques, "
             f"{len(classes)} attack classes, tiers={tiers}, "
             f"detection={with_detection}/{total}, control={with_control}/{total}, "
-            f"lab={with_lab}/{total}\npinned: {dvaa_summary}",
+            f"lab={with_lab}/{total}\npinned: {related_summary}",
             file=sys.stderr,
         )
         return 1
@@ -700,7 +805,7 @@ def main(argv):
         f"README claims match matrix.json: {len(tactics)} tactics, {total} techniques, "
         f"{len(classes)} attack classes, tiers={tiers}, "
         f"detection={with_detection}/{total}, control={with_control}/{total}, "
-        f"lab={with_lab}/{total}; and related-projects.json: {dvaa_summary}"
+        f"lab={with_lab}/{total}; and related-projects.json: {related_summary}"
     )
     return 0
 

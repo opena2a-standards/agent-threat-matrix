@@ -5,7 +5,10 @@ matrix.json so the committed files are never perturbed. The shipped tree must be
 Each count the README states is then changed by one in a single place and the checker
 must go red, including the counts repeated in the "Use cases" section: the checker used
 to accept a claim when the right number appeared anywhere, so a stale repeat passed
-while the overview copy still matched.
+while the overview copy still matched. The same holds for the per-tactic table, the
+evidence-tier counts and percentages, the "Attack Classes (N)" heading and the HackMyAgent
+and OASB figures pinned in related-projects.json, which the checker did not read at all,
+so a HackMyAgent check count went stale without failing CI.
 
 The attack-class tables are generated from matrix.json: a reworded description, a
 description changed in matrix.json alone, and a missing marker must each go red, and
@@ -150,6 +153,26 @@ MUTATIONS = [
      "environment (21 agents, 11 vulnerability categories)"),
     ("environment (21 agents, 12 vulnerability categories)",
      "environment (21 vulnerable agents, 12 vulnerability categories)"),
+    # Matrix overview: the per-tactic table (kill chain stage, technique count, name).
+    ("| [Initial Access](tactics/initial-access.md) | 2 | 9 |",
+     "| [Initial Access](tactics/initial-access.md) | 2 | 8 |"),
+    ("| [Impact](tactics/impact.md) | 9 | 6 |", "| [Impact](tactics/impact.md) | 8 | 6 |"),
+    ("| [Collection](tactics/collection.md) |", "| [Data Collection](tactics/collection.md) |"),
+    # Evidence Standard: the tier table counts and percentages.
+    ("| 16 (26%) |", "| 16 (27%) |"),
+    ("| 42 (69%) |", "| 43 (69%) |"),
+    ("| 3 (5%) |", "| 3 (4%) |"),
+    # Attack Classes: the section heading.
+    ("## Attack Classes (40)", "## Attack Classes (41)"),
+    # The HackMyAgent and OASB figures pinned in related-projects.json, in Cross-Framework
+    # Mapping and in Related Projects.
+    ("(318 static checks, 164 attack payloads)", "(310 static checks, 164 attack payloads)"),
+    ("(318 static checks, 164 attack payloads)", "(318 static checks, 165 attack payloads)"),
+    ("(318 static checks, 164 payloads)", "(310 static checks, 164 payloads)"),
+    ("(318 static checks, 164 payloads)", "(318 static checks, 163 payloads)"),
+    ("(46 controls across 10 domains)", "(45 controls across 10 domains)"),
+    ("(46 controls across 10 domains)", "(46 controls across 11 domains)"),
+    ("Defensive benchmark (46 controls)", "Defensive benchmark (47 controls)"),
 ]
 
 
@@ -179,10 +202,10 @@ def test_a_claim_reworded_out_of_the_readme_is_red():
         shutil.rmtree(td)
 
 
-def mutate_related(root: Path, edit) -> None:
+def mutate_related(root: Path, edit, project: str = "dvaa") -> None:
     path = root / "related-projects.json"
     data = json.loads(path.read_text(encoding="utf-8"))
-    edit(data["dvaa"])
+    edit(data[project])
     path.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
 
@@ -213,6 +236,50 @@ def test_a_dvaa_figure_changed_in_the_pinned_file_is_red_on_every_readme_line():
                        "environment (21 agents, 12 vulnerability categories)"):
             assert f"README.md:{line_of(td, needle)}:" in r.stderr, r.stderr
         assert "related-projects.json (DVAA vulnerability categories: 13)" in r.stderr, r.stderr
+    finally:
+        shutil.rmtree(td)
+
+
+def test_a_refreshed_hackmyagent_figure_turns_every_stale_readme_copy_red():
+    # A HackMyAgent release changes the check count: the pinned file is refreshed and both
+    # README copies of the old figure must fail, each named by line.
+    td = scratch_tree()
+    try:
+        mutate_related(td, lambda d: d.update(staticChecks=319), project="hackmyagent")
+        r = run_checker(td)
+        assert r.returncode == 1, r.stdout
+        for needle in ("(318 static checks, 164 attack payloads)",
+                       "(318 static checks, 164 payloads)"):
+            assert f"README.md:{line_of(td, needle)}:" in r.stderr, r.stderr
+        assert ("related-projects.json (hackmyagent.staticChecks, read from release 0.33.2: "
+                "319)") in r.stderr, r.stderr
+    finally:
+        shutil.rmtree(td)
+
+
+@pytest.mark.parametrize("project,field", [("oasb", "domains"), ("hackmyagent", "attackPayloads")])
+def test_a_pinned_figure_missing_from_the_file_is_red(project, field):
+    td = scratch_tree()
+    try:
+        mutate_related(td, lambda d: d.pop(field), project=project)
+        r = run_checker(td)
+        assert r.returncode == 1, r.stdout
+        assert f"related-projects.json: {project}.{field} is not a whole number" in r.stderr, \
+            r.stderr
+    finally:
+        shutil.rmtree(td)
+
+
+def test_a_tactic_row_dropped_from_the_overview_table_is_red():
+    td = scratch_tree()
+    try:
+        text = (td / "README.md").read_text(encoding="utf-8")
+        row = next(l for l in text.splitlines(keepends=True)
+                   if l.startswith("| [Persistence](tactics/persistence.md) |"))
+        mutate_readme(td, row, "")
+        r = run_checker(td)
+        assert r.returncode == 1, r.stdout
+        assert "README per-tactic table has no row for tactic persistence" in r.stderr, r.stderr
     finally:
         shutil.rmtree(td)
 
