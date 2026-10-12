@@ -470,6 +470,7 @@ NAME_CHARACTERS = [
      "U+FFA0 HALFWIDTH HANGUL FILLER, a Hangul filler"),
     ("U+034F COMBINING GRAPHEME JOINER", "DVA\N{COMBINING GRAPHEME JOINER}A",
      "U+034F COMBINING GRAPHEME JOINER, a default-ignorable combining mark"),
+    ("U+2065, unassigned", "DV⁥AA", "U+2065, an unassigned default-ignorable code point"),
 ]
 
 
