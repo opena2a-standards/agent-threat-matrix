@@ -237,7 +237,7 @@ NOT_ASCII_WORDINGS = [
     ("U+017F between the number and categories",
      "variants; 12 vulnerability categories", "variants; 13 ſ categories"),
     ("U+212A between the number and categories",
-     "variants; 12 vulnerability categories", "variants; 13 K categories"),
+     "variants; 12 vulnerability categories", "variants; 13 \N{KELVIN SIGN} categories"),
     ("U+017F for the s of agents",
      "(21 agents: 16 deliberately vulnerable", "(22 agentſ: 16 deliberately vulnerable"),
 ]
@@ -272,7 +272,8 @@ GLUED_WORDINGS = [
     ("U+00E9 after categories",
      "variants; 12 vulnerability categories", "variants; 13 vulnerability categoriesé"),
     ("e and U+0301 before the agent count",
-     "(21 agents: 16 deliberately vulnerable", "(é22 agents: 16 deliberately vulnerable"),
+     "(21 agents: 16 deliberately vulnerable",
+     "(e\N{COMBINING ACUTE ACCENT}22 agents: 16 deliberately vulnerable"),
     ("U+0915 U+093F (Devanagari ki) before the agent count",
      "(21 agents: 16 deliberately vulnerable",
      "(कि22 agents: 16 deliberately vulnerable"),
@@ -280,9 +281,11 @@ GLUED_WORDINGS = [
      "(21 agents: 16 deliberately vulnerable",
      "(בּ22 agents: 16 deliberately vulnerable"),
     ("U+0301 on the s of agents",
-     "(21 agents: 16 deliberately vulnerable", "(22 agentś: 16 deliberately vulnerable"),
+     "(21 agents: 16 deliberately vulnerable",
+     "(22 agents\N{COMBINING ACUTE ACCENT}: 16 deliberately vulnerable"),
     ("U+0301 on the s of categories",
-     "variants; 12 vulnerability categories", "variants; 13 vulnerability categorieś"),
+     "variants; 12 vulnerability categories",
+     "variants; 13 vulnerability categories\N{COMBINING ACUTE ACCENT}"),
     # An enclosing mark (category Me) is a combining mark as much as a nonspacing (Mn) or
     # spacing (Mc) one, so it glues a wording too.
     ("U+20DD (combining enclosing circle) before the agent count",
@@ -828,34 +831,63 @@ def test_the_stated_steps_read_every_generated_line_as_the_checker_does():
 
 def test_nfkc_gives_what_unicodedata_normalize_gives():
     # nfkc puts each run of combining characters in order itself. The pieces hold marks of
-    # several combining classes, U+0344, which decomposes into two marks, U+0F73, a starter
-    # that decomposes into two marks, U+09BE and U+0B3E, starters that compose with the
-    # vowel sign before them, Hangul jamo and a syllable, and compatibility characters.
+    # several combining classes, U+0344 COMBINING GREEK DIALYTIKA TONOS, which decomposes
+    # into two marks, U+0F73 TIBETAN VOWEL SIGN II, a starter that decomposes into two marks,
+    # U+09BE and U+0B3E, the Bengali and Oriya vowel signs AA, starters that compose with the
+    # vowel sign before them, Hangul jamo and a syllable, and compatibility characters. Each
+    # is written as an escape: saved in NFC, U+0344, U+0F73 and U+2126 OHM SIGN written raw
+    # become other characters, and U+00A0 and U+3000 read as the space beside them.
     checker = load_checker()
-    pieces = [*"AaeouDVx ", "́", "̖", "̈", "̣", "̈́", "ְ",
-              "ּ", "़", "्", "ཱ", "ི", "ཱི", "ྀ", "⃝",
-              "\U0001d165", "\U0001d16d", "ে", "া", "େ", "ା", "ᄀ",
-              "ᅡ", "ᆨ", "가", "Á", "ẛ", "Ω", "ﬃ",
-              "\N{FULLWIDTH LATIN CAPITAL LETTER A}",
-              "　", " ", "\N{CYRILLIC CAPITAL LETTER A}"]
+    pieces = [
+        *"AaeouDVx ",
+        "\N{COMBINING ACUTE ACCENT}", "\N{COMBINING GRAVE ACCENT BELOW}",
+        "\N{COMBINING DIAERESIS}", "\N{COMBINING DOT BELOW}",
+        "\N{COMBINING GREEK DIALYTIKA TONOS}", "\N{HEBREW POINT SHEVA}",
+        "\N{HEBREW POINT DAGESH OR MAPIQ}", "\N{DEVANAGARI SIGN NUKTA}",
+        "\N{DEVANAGARI SIGN VIRAMA}", "\N{TIBETAN VOWEL SIGN AA}", "\N{TIBETAN VOWEL SIGN I}",
+        "\N{TIBETAN VOWEL SIGN II}", "\N{TIBETAN VOWEL SIGN REVERSED I}",
+        "\N{COMBINING ENCLOSING CIRCLE}", "\U0001d165", "\U0001d16d",
+        "\N{BENGALI VOWEL SIGN E}", "\N{BENGALI VOWEL SIGN AA}", "\N{ORIYA VOWEL SIGN E}",
+        "\N{ORIYA VOWEL SIGN AA}", "\N{HANGUL CHOSEONG KIYEOK}", "\N{HANGUL JUNGSEONG A}",
+        "\N{HANGUL JONGSEONG KIYEOK}", "\N{HANGUL SYLLABLE GA}",
+        "\N{LATIN CAPITAL LETTER A WITH ACUTE}", "\N{LATIN SMALL LETTER LONG S WITH DOT ABOVE}",
+        "\N{OHM SIGN}", "\N{LATIN SMALL LIGATURE FFI}", "\N{FULLWIDTH LATIN CAPITAL LETTER A}",
+        "\N{IDEOGRAPHIC SPACE}", "\N{NO-BREAK SPACE}", "\N{CYRILLIC CAPITAL LETTER A}",
+    ]
     rng = random.Random(80)
     for _ in range(50_000):
         text = "".join(rng.choice(pieces) for _ in range(rng.randint(1, 12)))
         assert checker.nfkc(text) == unicodedata.normalize("NFKC", text), ascii(text)
 
 
-def test_name_form_reads_a_long_run_of_combining_marks_in_n_log_n_time():
+# nfkc puts a run of combining marks in order where the run ends: at the starter that follows
+# it, or after its loop when the run ends the text. Each case times one of the two. Timed on
+# the marks alone, only the second was, and the first could go back to moving one mark at a
+# time with every test passing. Between the two starters, "A" composes with one U+0301: once
+# in order, only marks of a lower combining class stand between them.
+MARK_PAIRS = 100_000
+OUT_OF_ORDER = "\N{COMBINING ACUTE ACCENT}\N{COMBINING GRAVE ACCENT BELOW}" * MARK_PAIRS
+LONG_MARK_RUNS = [
+    ("a run that ends the text", OUT_OF_ORDER,
+     "\N{COMBINING GRAVE ACCENT BELOW}" * MARK_PAIRS + "\N{COMBINING ACUTE ACCENT}" * MARK_PAIRS),
+    ("a run between two starters", "A" + OUT_OF_ORDER + "B",
+     "\N{LATIN CAPITAL LETTER A WITH ACUTE}" + "\N{COMBINING GRAVE ACCENT BELOW}" * MARK_PAIRS
+     + "\N{COMBINING ACUTE ACCENT}" * (MARK_PAIRS - 1) + "B"),
+]
+
+
+@pytest.mark.parametrize("text,form", [(t, f) for _, t, f in LONG_MARK_RUNS],
+                         ids=[name for name, _, _ in LONG_MARK_RUNS])
+def test_name_form_reads_a_long_run_of_combining_marks_in_n_log_n_time(text, form):
     # unicodedata.normalize puts a run of combining marks in order by moving one mark at a
     # time: in name_form, U+0301 U+0316 repeated to 100,000 characters took about 2 s on
     # Python 3.14 and 200,000 about four times as long. Put in order by a sort first,
     # 200,000 take a few hundredths of a second.
     checker = load_checker()
-    marks = "\N{COMBINING ACUTE ACCENT}\N{COMBINING GRAVE ACCENT BELOW}" * 100_000
     start = time.perf_counter()
-    form = checker.name_form(marks)
+    read = checker.name_form(text)
     seconds = time.perf_counter() - start
-    assert form == ("\N{COMBINING GRAVE ACCENT BELOW}" * 100_000
-                    + "\N{COMBINING ACUTE ACCENT}" * 100_000)
+    assert read == form
     assert seconds < 1, f"{seconds:.2f} s"
 
 
@@ -945,7 +977,7 @@ def test_a_wording_a_space_away_from_a_combining_mark_is_still_read():
     td = scratch_tree()
     try:
         mutate_readme(td, "(21 agents: 16 deliberately vulnerable",
-                      "(é 22 agents: 16 deliberately vulnerable")
+                      "(e\N{COMBINING ACUTE ACCENT} 22 agents: 16 deliberately vulnerable")
         r = run_checker(td)
         assert r.returncode == 1, r.stdout
         assert "related-projects.json (DVAA agents: 21)" in r.stderr, r.stderr
@@ -1122,16 +1154,76 @@ def test_a_value_outside_the_code_point_range_is_no_mark():
     assert checker.is_mark(0x0301) is True
 
 
+def source_lines():
+    """(path from the repository root, line number, line) for each line of scripts/*.py and
+    tests/*.py."""
+    for path in sorted([*ROOT.glob("scripts/*.py"), *ROOT.glob("tests/*.py")]):
+        for number, line in enumerate(path.read_text(encoding="utf-8").split("\n"), 1):
+            yield path.relative_to(ROOT), number, line
+
+
+def written_raw(named):
+    """`file:line:column: U+XXXX` for each character of scripts/*.py and tests/*.py that
+    `named` holds for."""
+    return [f"{path}:{number}:{column}: U+{ord(c):04X}"
+            for path, number, line in source_lines()
+            for column, c in enumerate(line, 1) if named(c)]
+
+
 def test_the_scripts_and_tests_write_each_character_that_fails_a_line_as_an_escape():
     # Written raw, such a character reads as plain text in an editor or a diff: "DV" U+2065
     # "AA" in the cases inside the name read as "DVAA". Each is written as an escape
     # (\N{...}, \x or \U) instead.
     checker = load_checker()
-    raw = [f"{path.relative_to(ROOT)}:{number}:{column}: U+{ord(c):04X}"
-           for path in sorted([*ROOT.glob("scripts/*.py"), *ROOT.glob("tests/*.py")])
-           for number, line in enumerate(path.read_text(encoding="utf-8").split("\n"), 1)
-           for column, c in enumerate(line, 1) if checker.hiding_kind(c)]
+    raw = written_raw(checker.hiding_kind)
     assert raw == [], raw
+
+
+def reads_as_name_letters(c):
+    """Whether `c`, a character outside ASCII, reads as A, D, V or a run of them in a name:
+    it is a key of the confusables table, or NFKC maps it to such letters or to such a key,
+    as it does U+FF21 FULLWIDTH LATIN CAPITAL LETTER A and U+1D6A8 MATHEMATICAL BOLD CAPITAL
+    ALPHA."""
+    form = unicodedata.normalize("NFKC", c).translate(CONFUSABLE_LETTERS)
+    return not c.isascii() and form != "" and set(form) <= set("ADV")
+
+
+def test_the_scripts_and_tests_write_each_letter_read_as_a_d_or_v_as_an_escape():
+    # Written raw, U+0410 CYRILLIC CAPITAL LETTER A looks like the Latin A in an editor or a
+    # diff, so a case that holds it reads as one that holds "A". Only a character that fails
+    # a line had to be an escape, so that letter written raw in the nfkc comparison left
+    # every test passing.
+    read = ["\N{CYRILLIC CAPITAL LETTER A}", "\N{LATIN CAPITAL LETTER AV}",
+            "\N{FULLWIDTH LATIN CAPITAL LETTER A}", "\N{ROMAN NUMERAL FIVE}",
+            "\N{MATHEMATICAL BOLD CAPITAL ALPHA}"]
+    assert [ascii(c) for c in read if not reads_as_name_letters(c)] == []
+    others = [*"ADVa", "\N{LATIN CAPITAL LETTER A WITH ACUTE}", "\N{ROMAN NUMERAL SIX}"]
+    assert [ascii(c) for c in others if reads_as_name_letters(c)] == []
+    raw = written_raw(reads_as_name_letters)
+    assert raw == [], raw
+
+
+def test_the_scripts_and_tests_write_each_space_other_than_u_0020_as_an_escape():
+    # Written raw, U+00A0 NO-BREAK SPACE and U+3000 IDEOGRAPHIC SPACE read as the space
+    # beside them in an editor or a diff. Each separator (category Zs, Zl or Zp) other than
+    # U+0020 is written as an escape instead.
+    raw = written_raw(lambda c: c != " " and unicodedata.category(c).startswith("Z"))
+    assert raw == [], raw
+
+
+def test_the_scripts_and_tests_are_unchanged_by_nfc():
+    # An editor or tool that saves a file in NFC turns U+0344 into U+0308 U+0301, U+0F73
+    # into U+0F71 U+0F72, U+2126 OHM SIGN into U+03A9, U+212A KELVIN SIGN into "K" and "e"
+    # U+0301 into U+00E9 with no visible change, after which a case no longer holds the
+    # character it names. Each character NFC changes where it stands is written as an
+    # escape instead. A line that fails is given with the column where NFC first changes it.
+    changed = []
+    for path, number, line in source_lines():
+        composed = unicodedata.normalize("NFC", line)
+        if composed != line:
+            column = next(i for i, (a, b) in enumerate(zip(line, composed), 1) if a != b)
+            changed.append(f"{path}:{number}:{column}")
+    assert changed == [], changed
 
 
 def test_the_dvaa_category_count_must_be_stated():
