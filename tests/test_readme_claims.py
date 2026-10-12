@@ -9,7 +9,8 @@ while the overview copy still matched.
 
 The attack-class tables are generated from matrix.json: a reworded description, a
 description changed in matrix.json alone, and a missing marker must each go red, and
-``--fix`` must re-render the block without touching the rest of the README.
+``--fix`` must re-render the block without touching the rest of the README. An argument
+other than ``--fix``, ``--help`` or ``-h`` must exit 2 without checking or writing anything.
 
 The DVAA figures are measured in DVAA, not in matrix.json, and are pinned in
 related-projects.json. Every README line naming DVAA must state the pinned numbers: the
@@ -646,17 +647,30 @@ print(f"status={status} calls={calls}")
 """
 
 
-def test_the_check_reads_the_categories_of_readme_characters_only():
+@pytest.mark.parametrize("old, new", [
+    (None, None),
+    # Three combining marks on a line naming DVAA: U+0301 and U+0308 stand in the run
+    # U+0300 to U+036F, which is walked once, and U+20DD in the run U+20D0 to U+20F0.
+    ("The DVAA figures are pinned in",
+     "The DVAA figures (Jose\N{COMBINING ACUTE ACCENT}, Mo\N{COMBINING DIAERESIS}bius, "
+     "O\N{COMBINING ENCLOSING CIRCLE}) are pinned in"),
+])
+def test_the_check_reads_the_categories_of_readme_characters_only(old, new):
     # The combining-mark test used to rebuild a character class from all 1,114,112 code
     # points on every run. The check now looks up the category of each README character
     # outside the line breaks once, to find the characters that fail a line, and of each
     # distinct character of the text of the lines naming DVAA, line break included, once
-    # more, to build the combining-mark class. The budget is that sum, so a second lookup
-    # of every README character fails the test.
+    # more, to build the combining-mark class. Walking each run of consecutive combining
+    # marks that holds a mark of that text, to find where the run ends, it then looks up
+    # every code point of the run but the mark it starts from, and the code point on either
+    # side of the run. The budget is that sum, so a second lookup of every README character
+    # fails the test.
     # The lookups that find the characters that fail a line also decide which lines name
     # DVAA once the characters they find are removed.
     td = scratch_tree()
     try:
+        if old is not None:
+            mutate_readme(td, old, new)
         r = subprocess.run(["python3", "-c", COUNT_CATEGORY_CALLS,
                             str(td / "scripts" / "check_readme_claims.py")],
                            capture_output=True, text=True, timeout=120)
@@ -666,7 +680,10 @@ def test_the_check_reads_the_categories_of_readme_characters_only():
         calls = int(last.rsplit("=", 1)[1])
         text = (td / "README.md").read_text(encoding="utf-8")
         dvaa_text = "\n".join(line if "DVAA" in line else "" for line in text.split("\n"))
-        budget = len(text) - text.count("\n") + len(set(dvaa_text))
+        marks = {ord(c) for c in dvaa_text if unicodedata.category(c).startswith("M")}
+        walked = [(lo, hi) for lo, hi in mark_runs() if any(lo <= code <= hi for code in marks)]
+        budget = (len(text) - text.count("\n") + len(set(dvaa_text))
+                  + sum(hi - lo + 2 for lo, hi in walked))
         assert calls <= budget, f"{last}, budget {budget}"
     finally:
         shutil.rmtree(td)
@@ -731,6 +748,18 @@ def test_every_default_ignorable_code_point_fails_a_line():
     unnamed = [f"U+{code:04X}" for low, high in DEFAULT_IGNORABLE
                for code in range(low, high + 1) if not checker.hiding_kind(chr(code))]
     assert unnamed == [], unnamed
+
+
+def test_a_value_outside_the_code_point_range_is_no_mark():
+    # The walk over a run of marks steps to the code point on either side of it. U+0000
+    # (Cc) and U+10FFFF (Cn) are no marks, so the walk never leaves the code point range,
+    # but is_mark answers for any integer instead of raising from chr().
+    checker = load_checker()
+    assert checker.is_mark(-1) is False
+    assert checker.is_mark(sys.maxunicode + 1) is False
+    assert checker.is_mark(0) is False
+    assert checker.is_mark(sys.maxunicode) is False
+    assert checker.is_mark(0x0301) is True
 
 
 def test_the_dvaa_category_count_must_be_stated():
@@ -828,3 +857,58 @@ def test_a_missing_class_table_marker_is_red(marker):
         assert "the attack-class tables need exactly one" in r.stderr, r.stderr
     finally:
         shutil.rmtree(td)
+
+
+@pytest.mark.parametrize("args,status,unknown", [
+    (["--bogus"], 2, "--bogus"),
+    (["--fixx"], 2, "--fixx"),
+    (["--fi"], 2, "--fi"),
+    (["fix"], 2, "fix"),
+    (["--fix", "--bogus"], 2, "--bogus"),
+    (["--help"], 0, None),
+    (["-h"], 0, None),
+])
+def test_an_argument_other_than_fix_checks_and_writes_nothing(args, status, unknown):
+    # The check used to look only for --fix in its arguments, so an unknown one printed
+    # the normal report and exited 0, and "--fix --bogus" rewrote the tables. The class
+    # tables differ from matrix.json here, so a run that checks exits 1 and --fix writes.
+    td = scratch_tree()
+    try:
+        path = td / "matrix.json"
+        matrix = json.loads(path.read_text(encoding="utf-8"))
+        for cls in matrix["attackClasses"]:
+            if cls["id"] == "GATEWAY-EXPLOIT":
+                cls["description"] = "Rewritten in the data"
+        path.write_text(json.dumps(matrix, indent=2), encoding="utf-8")
+        before = (td / "README.md").read_text(encoding="utf-8")
+
+        r = run_checker(td, *args)
+        assert r.returncode == status, r.stdout + r.stderr
+        if unknown:
+            assert r.stdout == "", r.stdout
+            assert r.stderr.startswith("usage: check_readme_claims.py"), r.stderr
+            assert f"unrecognized arguments: {unknown}\n" in r.stderr, r.stderr
+        else:
+            assert r.stdout.startswith("usage: check_readme_claims.py"), r.stdout
+            assert "--fix" in r.stdout
+            assert r.stderr == "", r.stderr
+        assert (td / "README.md").read_text(encoding="utf-8") == before
+    finally:
+        shutil.rmtree(td)
+
+
+def test_help_prints_the_usage_under_python_oo():
+    # -OO strips docstrings, so the help description cannot be read from __doc__.
+    r = subprocess.run(["python3", "-OO", str(ROOT / "scripts" / "check_readme_claims.py"),
+                        "--help"], capture_output=True, text=True, timeout=120)
+    assert r.returncode == 0, r.stderr
+    assert load_checker().DESCRIPTION in r.stdout
+
+
+def test_the_description_states_what_help_and_other_arguments_do():
+    module = load_checker()
+    doc = module.__doc__
+    assert module.DESCRIPTION == doc.splitlines()[0]
+    assert "``--help`` (or ``-h``) prints\nthe usage and exits 0." in doc
+    assert ("Any other argument, such as a mistyped ``--fixx``, prints the\n"
+            "usage and exits 2 without checking or writing anything.") in doc
