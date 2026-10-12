@@ -189,8 +189,13 @@ python3 scripts/check_evidence_tiers.py
 ```
 
 `docs/evidence-tiers.md` is the single definition of each tier, and `README.md`, this file
-and `EVIDENCE_AUDIT.md` quote it. The check prints `file:line` for each quoted definition that
-differs from that page, and each page that leaves a tier out, and exits 1 if it finds any.
+and `EVIDENCE_AUDIT.md` quote it. The check reads those three pages for definitions written
+as a table row whose first cell is the tier in bold, as in the table at the top of this file,
+or as a list item labelled with the tier in bold, as in `EVIDENCE_AUDIT.md`. It prints
+`file:line` for each such definition that differs from that page, and for each list-item
+definition followed by a line that is neither blank nor a bulleted list item indented no
+further than it, names each page that leaves a tier out, and exits 1 if it finds any. Keep
+each definition on one line.
 
 ## Code of Conduct
 

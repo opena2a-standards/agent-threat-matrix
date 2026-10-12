@@ -4,8 +4,9 @@ Every case runs scripts/check_evidence_tiers.py against a scratch copy of the ca
 the three quoting pages and the schema, so the committed files are never perturbed. The
 shipped tree must be green. Each wording the three pages carried before docs/evidence-tiers.md
 became the single definition is then planted back and must be reported at its own line, as
-must a dropped definition, a definition wrapped over two lines, a canonical edit the quoting
-pages do not follow, and a schema tier the canonical page does not define.
+must a dropped definition, a definition wrapped over two lines or continued on the next line,
+a canonical edit the quoting pages do not follow, and a schema tier the canonical page does
+not define.
 """
 
 import json
@@ -95,6 +96,51 @@ def test_a_definition_wrapped_over_two_lines_is_reported(tree):
     r = run_checker(tree)
     assert r.returncode == 1
     assert f"EVIDENCE_AUDIT.md:{line}: Adapted reads" in r.stderr, r.stderr
+
+
+@pytest.mark.parametrize("after", [
+    # The examples the audit page added to the Observed definition before this check existed,
+    # on an indented line, which Markdown joins to the definition.
+    "  (NemoClaw findings, exposure sweeps, npm attacks)\n",
+    # The same examples on a line of plain text, which Markdown joins to it too.
+    "(NemoClaw findings, exposure sweeps, npm attacks)\n",
+    # A list nested under the definition.
+    "  - NemoClaw findings\n",
+    # A numbered item: a list starting at 2 cannot interrupt the definition's paragraph.
+    "2. NemoClaw findings\n",
+], ids=["indented line", "plain text line", "nested list", "numbered item"])
+def test_a_definition_that_continues_onto_the_next_line_is_reported(tree, after):
+    # The definition's own line matches the canonical page word for word.
+    line = mutate(tree, "EVIDENCE_AUDIT.md", f"- **OBSERVED**: {OBSERVED}\n",
+                  f"- **OBSERVED**: {OBSERVED}\n{after}")
+    r = run_checker(tree)
+    assert r.returncode == 1
+    assert f"EVIDENCE_AUDIT.md:{line}: Observed continues on line {line + 1};" in r.stderr, \
+        r.stderr
+    assert "Observed reads" not in r.stderr, r.stderr
+
+
+def test_a_wrapped_definition_is_reported_although_its_lines_join_to_the_quote(tree):
+    wrapped = ("- **ADAPTED**: Well-understood traditional technique applied to agent "
+               "context,\n  not yet observed agent-specifically\n")
+    joined = " ".join(part.strip() for part in wrapped.split("\n")[:2])
+    assert joined == f"- **ADAPTED**: {ADAPTED}"
+    line = mutate(tree, "EVIDENCE_AUDIT.md", f"- **ADAPTED**: {ADAPTED}\n", wrapped)
+    r = run_checker(tree)
+    assert r.returncode == 1
+    assert f"EVIDENCE_AUDIT.md:{line}: Adapted continues on line {line + 1};" in r.stderr, \
+        r.stderr
+
+
+def test_a_definition_followed_by_a_bulleted_item_indented_no_further_ends_on_its_line(tree):
+    # The tier list nested under an outer item, the outer list's next item after it.
+    old = (f"- **OBSERVED**: {OBSERVED}\n- **VALIDATED**: {VALIDATED}\n"
+           f"- **ADAPTED**: {ADAPTED}\n")
+    mutate(tree, "EVIDENCE_AUDIT.md", old,
+           f"- Tiers:\n  - **OBSERVED**: {OBSERVED}\n  * **VALIDATED**: {VALIDATED}\n"
+           f"  + **ADAPTED**: {ADAPTED}\n- The next item\n")
+    r = run_checker(tree)
+    assert r.returncode == 0, r.stderr
 
 
 @pytest.mark.parametrize("rel, row", [

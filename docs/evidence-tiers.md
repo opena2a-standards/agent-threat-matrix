@@ -8,9 +8,16 @@ three tiers; there is no fourth tier, no sub-tier, and no theoretical tier.
 ## The three tiers
 
 This table is the single definition of each tier. README.md, CONTRIBUTING.md and
-EVIDENCE_AUDIT.md quote the Definition column word for word, and
-`scripts/check_evidence_tiers.py` fails when any of them states a tier differently or
-leaves one out. To change a definition, change it here and in every page that quotes it.
+EVIDENCE_AUDIT.md quote the Definition column word for word.
+`scripts/check_evidence_tiers.py` reads those three pages, where it takes a line written as
+`| **Observed** | <definition> |` (a table row whose first cell is the tier in bold) or as
+`- **OBSERVED**: <definition>` (a list item labelled with the tier in bold) as a definition.
+It fails when such a definition differs from this table, when the line after a list-item
+definition is neither blank nor a bulleted list item indented no further than it (Markdown
+may join such a line to the definition), or when one of the pages leaves a tier out. A
+definition written in any other form, such as inside a block quote, or on another page is
+not read.
+To change a definition, change it here and in every page that quotes it.
 
 | Tier | `evidenceTier` value | Definition |
 |------|----------------------|---------------------|
