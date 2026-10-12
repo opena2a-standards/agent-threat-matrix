@@ -31,28 +31,40 @@ lists as default ignorable without assigning them (U+2065, U+FFF0 to U+FFF8, U+E
 U+E0002 to U+E001F, U+E0080 to U+E00FF, U+E01F0 to U+E0FFF). Inside a wording such a
 character keeps the wording from being read, and a Hangul filler or combining mark does
 so directly beside a DVAA wording, while a character that renders as nothing leaves the
-figure in the rendered line. A line names DVAA when it contains "DVAA" once such
-characters are removed, either as it then stands or after three more steps. First, going
-along the line, its HTML is removed wherever it stands, also where it starts inside a
-link destination or title and ends after the ) that closes them: each comment, processing
-instruction, CDATA section and declaration from its opening <!--, <?, <![CDATA[ or <! and
-an ASCII letter to the first -->, ?>, ]]> or > after it, respectively, or to the end of
-the line when none follows, and each tag from < or </ and a name, which is an ASCII
-letter followed by any ASCII letters, digits and hyphens, to a > right after the name or,
-after / or a character Unicode lists as white space (such as U+00A0 NO-BREAK SPACE), to
-the first > after that if no < comes first. Second, going along what remains, each ]
-followed by ( is removed with the text after it to the first ) if no further ( comes
-first, and each ] followed by [ with the text after it to the first ] if no further [
-comes first, whether or not they make a link, and then the Markdown characters
+figure in the rendered line. A line names DVAA when it contains "DVAA" with no combining
+mark (Unicode category M) directly after it once such characters are removed, either as
+it then stands or after three more steps, so "DVAA" followed by U+0301 COMBINING ACUTE
+ACCENT does not name DVAA. A mark counts as directly after "DVAA" only where it is
+written as itself, not as a character reference, directly after a letter or another mark,
+so "DV**AA**" U+20DD and "DVAA&#x20dd;" name DVAA. A mark that does not count as directly
+after "DVAA" is also kept apart from the name, so that NFKC in the third step below does
+not join it to the last A: "DV**AA**" U+0301, "DV**AA**&#x301;" and "DV**AA&#x301;**"
+name DVAA, while NFKC alone gives "DVA" U+00C1. First, going along the line, its HTML
+is removed wherever it stands, also where it starts inside a link destination or title
+and ends after the ) that closes them: each comment, processing instruction, CDATA
+section and declaration from its opening <!--, <?, <![CDATA[ or <! and an ASCII letter to
+the first -->, ?>, ]]> or > after it, respectively, or to the end of the line when none
+follows, and each tag from < or </ and a name, which is an ASCII letter followed by any
+ASCII letters, digits and hyphens, to a > right after the name or, after / or a character
+Unicode lists as white space (such as U+00A0 NO-BREAK SPACE), to the first > after that
+if no < comes first. Where white space other than a space or tab follows a tag name, the
+line is also read with only a space, a tab or / ending a tag name, and names DVAA when
+either reading does. Second, going along what remains, each ] followed by ( is removed
+with the text after it to the first ) if no further ( comes first, and each ] followed by
+[ with the text after it to the first ] if no further [ comes first, whether or not they
+make a link, then each ! directly before a [, and then the Markdown characters
 * _ ~ ` \\ [ ]. Third, its character references are decoded, each to the characters it
 stands for less any such character, so "&#8203;" (U+200B) leaves nothing, and it is
 brought to NFKC with each character Unicode lists as confusable with A, D or V read as
 that letter (U+0410 CYRILLIC CAPITAL LETTER A reads as A). So the name written as
-"DV&#8203;AA", "**DV**AA", "DV<!-- -->AA", "<b>DV</b>AA", "[DV](url)AA" or in fullwidth
-letters does not take the line out of the check. A line that states one of the
-matrix.json counts once such characters are removed fails the same way when it carries
-one. Each failure names the line, the column of the character's first occurrence on it,
-counted in characters from 1, and the character.
+"DV&#8203;AA", "**DV**AA", "DV<!-- -->AA", "<b>DV</b>AA", "[DV](url)AA",
+"DV![](x.png)AA", "[DV](url "<b" U+00A0 "x=")AA" or in fullwidth letters does not take
+the line out of the check, while "DV!AA" does not name DVAA. On a line that carries one
+of the characters above, a combining mark after "DVAA" does not keep the line from naming
+DVAA, so "DVAA" U+200B U+0301 names DVAA and the line fails on U+200B. A line that states
+one of the matrix.json counts once such characters are removed fails the same way when it
+carries one. Each failure names the line, the column of the character's first occurrence
+on it, counted in characters from 1, and the character.
 
 Exit 0 when every claim matches the data, 1 otherwise. ``--help`` (or ``-h``) prints
 the usage and exits 0. Any other argument, such as a mistyped ``--fixx``, prints the
@@ -138,14 +150,34 @@ RAW_HTML = re.compile(
     r"|</?[A-Za-z][A-Za-z0-9-]*(?:[\s/][^<>]*)?>"
 )
 
+# RAW_HTML with a tag name ending at a space, a tab, "/" or ">" only, so "<b" U+00A0 "x>" is
+# not removed as a tag. The other ASCII white space characters are control characters,
+# removed before a line is read.
+SPACE_OR_TAB_HTML = re.compile(
+    RAW_HTML.pattern.replace(r"(?:[\s/][^<>]*)?>", r"(?:[ \t/][^<>]*)?>"))
+
+# A tag name followed by white space other than a space or tab, such as U+00A0 NO-BREAK
+# SPACE: only on a line that holds one do RAW_HTML and SPACE_OR_TAB_HTML remove different
+# text.
+OTHER_SPACE_AFTER_TAG_NAME = re.compile(r"</?[A-Za-z][A-Za-z0-9-]*[^\S \t]")
+
 # A "]" followed by "(" with the text after it to the first ")" if no further "(" comes
 # first, or a "]" followed by "[" with the text after it to the first "]" if no further "["
 # comes first, whether or not they make a link: "[DV](url)AA" shows "DVAA".
 LINK_TARGET = re.compile(r"\]\([^()]*\)|\]\[[^\[\]]*\]")
 
+# A "!" directly before a "[", removed so that an image reads as its alternative text:
+# "DV![](x.png)AA" names DVAA, while "DV!AA" does not.
+IMAGE = re.compile(r"!(?=\[)")
+
 # Markdown characters that mark up text without showing: emphasis, strikethrough, code
 # span, escape and link text delimiters.
 MARKUP = str.maketrans("", "", "*_~`\\[]")
+
+# A control character, which no line read for the name holds, put before a combining mark
+# written after something other than a letter or another mark, and before a character
+# reference to a mark: "DVAA" `BREAK` U+20DD holds "DVAA" with no mark directly after it.
+BREAK = "\x01"
 
 # A named, decimal or hexadecimal character reference, as CommonMark reads one.
 REFERENCE = re.compile(r"&(?:#[0-9]{1,7}|#[xX][0-9A-Fa-f]{1,6}|[A-Za-z][A-Za-z0-9]{1,31});")
@@ -312,27 +344,85 @@ def nfkc(text):
     return unicodedata.normalize("NFKC", "".join(ordered))
 
 
-def name_form(stripped):
+def name_form(stripped, raw_html=RAW_HTML):
     """`stripped` as a name in it reads, by the three steps the module description states:
-    the raw HTML `RAW_HTML` matches removed; each "](...)" and "][...]" span `LINK_TARGET`
-    matches removed, whether or not it makes a link, and the Markdown characters in
-    `MARKUP`; then the character references decoded, less the characters `hiding_kind`
-    names, and the text brought to NFKC with each character in `CONFUSABLES` read as the
-    letters it resembles. The HTML is removed before the link spans, as HTML can start
-    inside a link destination or title and end after the ")" that closes them, and the
-    markup before the references are decoded, as a reference to "*" shows a star."""
-    text = RAW_HTML.sub("", stripped)
-    text = LINK_TARGET.sub("", text).translate(MARKUP)
+    the raw HTML `raw_html` matches removed, `RAW_HTML` unless another is given; each
+    "](...)" and "][...]" span `LINK_TARGET` matches removed, whether or not it makes a
+    link, then each "!" `IMAGE` matches, and the Markdown characters in `MARKUP`; then the
+    character references decoded, less the characters `hiding_kind` names, and the text
+    brought to NFKC with each character in `CONFUSABLES` read as the letters it resembles.
+    The HTML is removed before the link spans, as HTML can start inside a link destination
+    or title and end after the ")" that closes them, and the markup before the references
+    are decoded, as a reference to "*" shows a star."""
+    text = raw_html.sub("", stripped)
+    text = IMAGE.sub("", LINK_TARGET.sub("", text)).translate(MARKUP)
     text = REFERENCE.sub(decoded, text)
     return nfkc(text).translate(CONFUSABLES)
 
 
-def names(stripped, name):
+def holds(text, name):
+    """Whether `text` holds `name` at some place with no combining mark directly after it,
+    so "DVAA" U+0301 does not hold DVAA and "DVAA" U+20DD " DVAA" does. Only a character
+    after `name` outside ASCII has its category looked up; no ASCII character is a mark."""
+    start = text.find(name)
+    while start >= 0:
+        after = text[start + len(name):start + len(name) + 1]
+        if after.isascii() or not is_mark(ord(after)):
+            return True
+        start = text.find(name, start + 1)
+    return False
+
+
+def detached(stripped):
+    """`stripped` with `BREAK` put before each combining mark that does not stand directly
+    after a letter or another combining mark, and before each character reference to a
+    combining mark. In "DV**AA**" U+20DD the mark stands after "*" and in "DVAA&#x20dd;" it
+    is written as a reference, so each is put apart from the name, while in "DVAA" U+20DD
+    it stays directly after it."""
+    out = []
+    i = 0
+    while i < len(stripped):
+        reference = REFERENCE.match(stripped, i) if stripped[i] == "&" else None
+        piece = reference.group() if reference else stripped[i]
+        shown = html.unescape(piece)[:1] if reference else piece
+        if i and not shown.isascii() and is_mark(ord(shown)):
+            if reference or not unicodedata.category(stripped[i - 1]).startswith(("L", "M")):
+                out.append(BREAK)
+        out.append(piece)
+        i += len(piece)
+    return "".join(out)
+
+
+def names(stripped, name, hiding=False):
     """Whether a line that is `stripped` once the characters `hiding_kind` names are
-    removed names `name`: it contains `name` as it stands or in its `name_form`.
-    "DV" U+200B "AA", "DV&#8203;AA", "**DV**AA", "DV<!-- -->AA", "DVA" U+0410 and the
-    fullwidth letters each name DVAA."""
-    return name in stripped or name in name_form(stripped)
+    removed names `name`: it `holds` `name` as it stands or in its `name_form`, read with
+    `RAW_HTML` and, where a tag name is followed by white space other than a space or
+    tab, with `SPACE_OR_TAB_HTML` too. Where a name form holds `name` only with a
+    combining mark directly after it or only once its letters are decomposed, the name
+    form of the line `detached` is read too, so a mark counts only where it is written as
+    itself directly after a letter or another mark: "DVAA" U+20DD does not name DVAA,
+    while "DV**AA**" U+20DD and "DV**AA&#x20dd;**" do. "DV" U+200B "AA", "DV&#8203;AA",
+    "**DV**AA", "DV<!-- -->AA", "DVA" U+0410 and the fullwidth letters each name DVAA;
+    "DVAA" U+0301 does not. On a line that carried such a character, `hiding` true, a
+    combining mark after `name` does not keep the line from naming it: removing the
+    character can put a mark directly after the name, so "DVAA" U+200B U+0301 names
+    DVAA."""
+    def found(text):
+        return name in text if hiding else holds(text, name)
+
+    if found(stripped):
+        return True
+    readings = [RAW_HTML]
+    if OTHER_SPACE_AFTER_TAG_NAME.search(stripped):
+        readings.append(SPACE_OR_TAB_HTML)
+    for raw_html in readings:
+        form = name_form(stripped, raw_html)
+        if found(form):
+            return True
+        decomposed = unicodedata.normalize("NFKD", form).translate(CONFUSABLES)
+        if name in decomposed and found(name_form(detached(stripped), raw_html)):
+            return True
+    return False
 
 
 def hiding_kind(c):
@@ -511,7 +601,7 @@ def main(argv):
     # line also give the line with such characters removed, which decides whether it names
     # DVAA.
     lines = [classified(line) for line in readme.split("\n")]
-    naming = [names(stripped, "DVAA") for _, stripped, _ in lines]
+    naming = [names(stripped, "DVAA", bool(hidden)) for _, stripped, hidden in lines]
     dvaa_lines = lines_naming(lines, naming)
     pinned = "related-projects.json"
     # Every DVAA wording is read in any letter case: DVAA itself writes "Attack Categories".

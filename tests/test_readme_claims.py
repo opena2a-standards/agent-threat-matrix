@@ -24,11 +24,15 @@ states a matrix.json count once such characters are removed. Inside a wording su
 character keeps the wording from being read, and a Hangul filler or combining mark does so
 directly beside a DVAA wording, while a character that renders as nothing leaves the figure
 in the rendered line. Markup, a character reference or a confusable letter written inside
-the name as the cases below write it leaves the line read, and a character that fails a
-line still fails a line that names DVAA only in that way. The three steps README states
-for reading the name are also written below as a plain scan, which must read generated
-lines as the checker does, so the sentence and the checker's patterns cannot drift apart
-with every test passing.
+the name as the cases below write it leaves the line read, and so does a backtick written in
+a link destination, a link title, two table cells, an autolink or an HTML attribute holding
+"<"; a character that fails a line still fails a line that names DVAA only in that way.
+Written with a combining mark directly after it, or with a "!" inside it that does not
+stand before a "[", the name does not name DVAA; on a line that also carries a character
+that fails it, a mark directly after the name leaves the line naming DVAA, and the line
+goes red. The three steps README states for reading the name are also written below as a
+plain scan, which must read generated lines as the checker does, so the sentence and the
+checker's patterns cannot drift apart with every test passing.
 """
 
 import html
@@ -490,8 +494,24 @@ NAME_CHARACTERS = [
 ]
 
 
-@pytest.mark.parametrize("name,named", [(n, c) for _, n, c in NAME_CHARACTERS],
-                         ids=[case for case, _, _ in NAME_CHARACTERS])
+# A character that fails a line, written where removing it puts a combining mark directly
+# after the name. Such a line names DVAA, so its figures are read and the character fails
+# it.
+JOINING_CHARACTERS = [
+    ("U+200B ZERO WIDTH SPACE between the name and U+0301",
+     "DVAA\N{ZERO WIDTH SPACE}\N{COMBINING ACUTE ACCENT}",
+     "U+200B ZERO WIDTH SPACE, a format character"),
+    ("U+200B ZERO WIDTH SPACE between the name and U+20DD in strong emphasis",
+     "**DVAA\N{ZERO WIDTH SPACE}\N{COMBINING ENCLOSING CIRCLE}**",
+     "U+200B ZERO WIDTH SPACE, a format character"),
+]
+
+
+CHARACTER_CASES = NAME_CHARACTERS + JOINING_CHARACTERS
+
+
+@pytest.mark.parametrize("name,named", [(n, c) for _, n, c in CHARACTER_CASES],
+                         ids=[case for case, _, _ in CHARACTER_CASES])
 def test_a_character_inside_the_name_dvaa_leaves_the_line_read(name, named):
     td = scratch_tree()
     try:
@@ -556,6 +576,47 @@ WRITTEN_NAMES = [
     ("HTML comment in a link title", f'[DV]{DVAA_URL[:-1]} "<!-- ) -->")AA'),
     ("link text", f"[DV]{DVAA_URL}AA"),
     ("emphasis with underscores", f"[_DV_]{DVAA_URL}AA"),
+    # No backslash escape is read: the backslash is removed with the Markdown characters.
+    ("backslash before an asterisk", f"[DV\\*AA]{DVAA_URL}"),
+    # The "!" of an image is removed, so the name reads "DVAA"; it was kept, and the name
+    # read "DV!AA".
+    ("image with no alternative text", f"[DV![](x.png)AA]{DVAA_URL}"),
+    # A no-break or ideographic space after a tag name, read as ending it, makes a tag of
+    # the text to the final ">", which takes "AA" with it. The line is also read with only
+    # a space, a tab or "/" ending a tag name: there "<b" and the space are removed with the
+    # link title and the name reads "DVAA>".
+    ("U+00A0 NO-BREAK SPACE after a tag name in a link title",
+     f'[DV]({DVAA_URL[1:-1]} "<b\N{NO-BREAK SPACE}x=")AA>'),
+    ("U+3000 IDEOGRAPHIC SPACE after a tag name in a link title",
+     f'[DV]({DVAA_URL[1:-1]} "<b\N{IDEOGRAPHIC SPACE}x=")AA>'),
+    # In that second reading a space, a tab or "/" after a tag name ends it, so the tag
+    # inside the name is removed too.
+    ("space after a tag name in the second reading",
+     f'[D<b x>V]({DVAA_URL[1:-1]} "<b\N{NO-BREAK SPACE}x=")AA>'),
+    ("tab after a tag name in the second reading",
+     f'[D<b\tx>V]({DVAA_URL[1:-1]} "<b\N{NO-BREAK SPACE}x=")AA>'),
+    ("slash after a tag name in the second reading",
+     f'[D<br/>V]({DVAA_URL[1:-1]} "<b\N{NO-BREAK SPACE}x=")AA>'),
+    # Read with the no-break space ending the tag name, "<b" U+00A0 "x>" is removed.
+    ("U+00A0 NO-BREAK SPACE after a tag name", f"[DV<b\N{NO-BREAK SPACE}x>AA]{DVAA_URL}"),
+    # A combining mark after the first "DVAA" leaves the second one read.
+    ("U+20DD COMBINING ENCLOSING CIRCLE after a first DVAA",
+     f"[DVAA\N{COMBINING ENCLOSING CIRCLE} DVAA]{DVAA_URL}"),
+    # A combining mark that stands after markup rather than directly after a letter, and a
+    # character reference to a mark, do not count as directly after the name.
+    ("U+20DD COMBINING ENCLOSING CIRCLE after strong emphasis",
+     f"[DV**AA**\N{COMBINING ENCLOSING CIRCLE}]{DVAA_URL}"),
+    ("U+0301 COMBINING ACUTE ACCENT after strong emphasis",
+     f"[DV**AA**\N{COMBINING ACUTE ACCENT}]{DVAA_URL}"),
+    ("reference to U+20DD after strong emphasis", f"[DV**AA**&#x20dd;]{DVAA_URL}"),
+    ("reference to U+20DD after the name", f"[DVAA&#x20dd;]{DVAA_URL}"),
+    ("reference to U+20DD after the name in strong emphasis",
+     f"[DV**AA&#x20dd;**]{DVAA_URL}"),
+    # Such a mark is also kept apart from the name, so that NFKC does not join U+0301 to
+    # the last A and read "DVA" U+00C1.
+    ("reference to U+0301 after strong emphasis", f"[DV**AA**&#x301;]{DVAA_URL}"),
+    ("reference to U+0301 after the name in strong emphasis",
+     f"[DV**AA&#x301;**]{DVAA_URL}"),
     ("fullwidth letters",
      "[\N{FULLWIDTH LATIN CAPITAL LETTER D}\N{FULLWIDTH LATIN CAPITAL LETTER V}"
      f"\N{FULLWIDTH LATIN CAPITAL LETTER A}\N{FULLWIDTH LATIN CAPITAL LETTER A}]{DVAA_URL}"),
@@ -591,11 +652,57 @@ def test_a_name_written_with_markup_a_reference_or_a_confusable_letter_leaves_th
         shutil.rmtree(td)
 
 
-# Names that show as something other than DVAA: a reference to "*" or "&" shows that
-# character rather than marking up text, a letter with an accent is not confusable with A,
-# NFKC leaves U+00C1 composed, a comment that no line closes shows as text and runs to the
-# end of the line, and a character read as letters that do not stand together in "DVAA"
-# shows them in another order. Such a line does not name DVAA, so its figures are not read.
+# The DVAA row of the related-projects table rewritten with "DVAA" in markup beside a
+# backtick and two wrong figures: the backtick stands in a link destination, in a link
+# title, in each of two table cells, in an autolink, or in an HTML attribute that holds
+# "<", and the line ends with another backtick. No code span is read, so each backtick is
+# removed with the Markdown characters and the line goes red on both figures.
+DVAA_ROW = f"| {DVAA_LINK} |"
+BACKTICK_LINES = [
+    ("backtick in a link destination",
+     f"| [DV]({DVAA_URL[1:-1]}`)AA | Lab validation environment "
+     "(99 agents, 77 vulnerability categories) ` |"),
+    ("backtick in a link title",
+     f'| [DV]({DVAA_URL[1:-1]} "`")AA | Lab validation environment '
+     "(99 agents, 77 vulnerability categories) ` |"),
+    ("backticks in two table cells",
+     "| Lab ` | **DV**AA environment (99 agents, 77 vulnerability categories) ` |"),
+    ("backtick in an autolink",
+     "| <https://example.org/`> | **DV**AA environment "
+     "(99 agents, 77 vulnerability categories) ` |"),
+    ("backtick in an HTML attribute that holds <",
+     "| <span title='<`'>**DV**AA</span> | Lab validation environment "
+     "(99 agents, 77 vulnerability categories) ` |"),
+]
+
+
+@pytest.mark.parametrize("line", [line for _, line in BACKTICK_LINES],
+                         ids=[case for case, _ in BACKTICK_LINES])
+def test_a_backtick_beside_the_name_dvaa_leaves_the_line_read(line):
+    td = scratch_tree()
+    try:
+        mutate_readme(td, DVAA_ROW, line)
+        number = line_of(td, line)
+        r = run_checker(td)
+        assert r.returncode == 1, r.stdout
+        for failure in (
+            f"README.md:{number}: \"99 agents\" does not match related-projects.json "
+            "(DVAA agents: 21)",
+            f"README.md:{number}: \"77 vulnerability categories\" does not match "
+            "related-projects.json (DVAA vulnerability categories: 12)",
+        ):
+            assert failure in r.stderr, r.stderr
+    finally:
+        shutil.rmtree(td)
+
+
+# Names the check does not read as DVAA: a reference to "*" or "&" shows that character
+# rather than marking up text, a letter with an accent is not confusable with A, NFKC
+# leaves U+00C1 composed, a comment that no line closes shows as text and runs to the end
+# of the line, a character read as letters that do not stand together in "DVAA" shows them
+# in another order, "DVAA" directly followed by a combining mark does not name DVAA, and a
+# "!" that does not stand before a "[" stays. Such a line does not name DVAA, so its
+# figures are not read.
 OTHER_NAMES = [
     ("reference to an asterisk", "[DV&#42;AA]"),
     ("reference to an ampersand", "[DV&amp;AA]"),
@@ -604,6 +711,11 @@ OTHER_NAMES = [
     ("U+00C1 LATIN CAPITAL LETTER A WITH ACUTE for the last A",
      "[DVA\N{LATIN CAPITAL LETTER A WITH ACUTE}]"),
     ("comment opened in a link destination that no line closes", "[DV](x <!-- y)AA"),
+    ("U+0301 COMBINING ACUTE ACCENT after the name", "[DVAA\N{COMBINING ACUTE ACCENT}]"),
+    ("U+0301 COMBINING ACUTE ACCENT after U+0410",
+     "[DVA\N{CYRILLIC CAPITAL LETTER A}\N{COMBINING ACUTE ACCENT}]"),
+    ("U+20DD COMBINING ENCLOSING CIRCLE after the name", "[DVAA\N{COMBINING ENCLOSING CIRCLE}]"),
+    ("exclamation mark", "[DV!AA]"),
 ] + [
     (confusable_case(code), f"[D{chr(code)}A]")
     for code, letters in CONFUSABLE_LETTERS.items() if letters not in "DVAA"
@@ -671,9 +783,10 @@ def test_a_character_fails_a_line_that_names_dvaa_only_by_the_steps(written):
 # What a line reads as, where each case turns on one part of the three steps README
 # states: the HTML is removed before the link spans, each kind of HTML is removed, closed
 # or running to the end of the line, a tag ends after a quoted attribute, U+00A0 or "/",
-# the "][...]" span goes as the "](...)" span does whether or not a link is made, "_" is
-# removed, a reference that fails a line leaves nothing, a reference to "*" shows it, and
-# NFKC composes a mark with the letter before it.
+# the "][...]" span goes as the "](...)" span does whether or not a link is made, a "!"
+# goes where it stands before a "[" once the link spans are removed and stays elsewhere,
+# "_" is removed, a reference that fails a line leaves nothing, a reference to "*" shows
+# it, and NFKC composes a mark with the letter before it.
 NAME_FORMS = [
     ("HTML before the link spans", '[DV](url "<!-- ) -->")AA', "DVAA"),
     ("tag with a quoted attribute", 'DV<span title="x">AA', "DVAA"),
@@ -690,6 +803,9 @@ NAME_FORMS = [
     ("closing tag with text after its name", '</b ")AA>', ""),
     ("reference label", "[DV][dvaa]AA", "DVAA"),
     ("link span that makes no link", "[x](see **DV**AA)", "x"),
+    ("image", "DV![](x.png)AA", "DVAA"),
+    ("exclamation mark before a link span", "DV!](x)[A]A", "DVAA"),
+    ("exclamation mark not before a [", "DV!AA", "DV!AA"),
     ("underscores", "_DV_AA", "DVAA"),
     ("reference to U+200B", "DV&#8203;AA", "DVAA"),
     ("reference to an asterisk", "DV&#42;AA", "DV*AA"),
@@ -713,8 +829,11 @@ def ascii_letter_at(text, i):
     return i < len(text) and text[i] in string.ascii_letters
 
 
-def stated_html_end(line, i):
-    """Where the HTML that README states starts at the "<" at line[i] ends, or None."""
+def stated_html_end(line, i, any_space=True):
+    """Where the HTML that README states starts at the "<" at line[i] ends, or None. With
+    `any_space` false, as in the second reading README states where white space other than
+    a space or tab follows a tag name, only a space, a tab or "/" lets a tag run on past
+    its name to a ">"."""
     for opening, close in (("<!--", "-->"), ("<?", "?>"), ("<![CDATA[", "]]>")):
         if line.startswith(opening, i):
             end = line.find(close, i + len(opening))
@@ -729,7 +848,8 @@ def stated_html_end(line, i):
         j += 1
     if j < len(line) and line[j] == ">":
         return j + 1
-    if j < len(line) and (line[j] == "/" or line[j].isspace()):
+    if j < len(line) and (line[j] == "/" or (line[j].isspace() if any_space
+                                              else line[j] in " \t")):
         for k in range(j + 1, len(line)):
             if line[k] in "<>":
                 return k + 1 if line[k] == ">" else None
@@ -751,14 +871,15 @@ def stated_reference_end(text, i):
     return end + 1 if 0 < len(number) <= most and all(c in digits for c in number) else None
 
 
-def stated_name_form(checker, line):
+def stated_name_form(checker, line, any_space=True):
     """`line` read by the three steps README states, as a plain scan rather than with the
-    checker's patterns. A reference is decoded by html.unescape, as in the checker, and a
-    decoded character that fails a line is dropped."""
+    checker's patterns, and with `any_space` false as in the second reading. A reference is
+    decoded by html.unescape, as in the checker, and a decoded character that fails a line
+    is dropped."""
     # First, going along the line, its HTML is removed wherever it stands.
     kept, i = [], 0
     while i < len(line):
-        end = stated_html_end(line, i) if line[i] == "<" else None
+        end = stated_html_end(line, i, any_space) if line[i] == "<" else None
         if end is None:
             kept.append(line[i])
             i += 1
@@ -766,8 +887,8 @@ def stated_name_form(checker, line):
             i = end
     text = "".join(kept)
     # Second, going along what remains, each "]" followed by "(" or "[" goes with the text
-    # after it to the first ")" or "]" if no further "(" or "[" comes first, and then the
-    # Markdown characters.
+    # after it to the first ")" or "]" if no further "(" or "[" comes first, then each "!"
+    # directly before a "[", and then the Markdown characters.
     kept, i = [], 0
     while i < len(text):
         if text[i] == "]" and text[i + 1:i + 2] in ("(", "["):
@@ -781,6 +902,7 @@ def stated_name_form(checker, line):
                 continue
         kept.append(text[i])
         i += 1
+    kept = [c for k, c in enumerate(kept) if c != "!" or kept[k + 1:k + 2] != ["["]]
     text = "".join(c for c in kept if c not in "*_~`\\[]")
     # Third, its character references are decoded, less the characters that fail a line,
     # and it is brought to NFKC with each confusable character read as its letters.
@@ -800,7 +922,11 @@ def stated_name_form(checker, line):
 # pieces in five, of longer pieces: the openings and closes of HTML, character references,
 # white space other than a space, and characters NFKC or the confusables read as A, D or V
 # or leave beside them. With these, each pattern alternative and each step, changed or
-# taken out of order, reads at least 30 of the 200,000 lines differently.
+# taken out of order, reads at least 30 of the 200,000 lines differently, with two
+# exceptions a case above also pins: removing each "!" before the link spans rather than
+# after them reads 2 lines differently ("exclamation mark before a link span"), and in
+# the second reading letting only a space and "/" end a tag name reads 13 differently
+# ("tab after a tag name in the second reading").
 MARKUP_CHARACTERS = "[]()DVAx \"*_~`\\<>"
 PIECES = [
     *"/-!?=1&#;\t", "<x", "</A", "<!--", "-->", "<?", "?>", "<![CDATA[", "]]>", "<!",
@@ -821,12 +947,18 @@ def generated_line(rng):
 def test_the_stated_steps_read_every_generated_line_as_the_checker_does():
     # README, the script's description and the changelog state the steps in words, and the
     # checker takes them with three patterns; a step that drifted from its pattern used to
-    # leave every test passing. Any line the two read differently names the step.
+    # leave every test passing. Any line the two read differently names the step. A line
+    # with white space other than a space or tab is also read the second way README states,
+    # with only a space, a tab or "/" ending a tag name; on any other line the two ways
+    # remove the same HTML.
     checker = load_checker()
     rng = random.Random(80)
     for _ in range(STATED_LINES):
         line = generated_line(rng)
         assert checker.name_form(line) == stated_name_form(checker, line), ascii(line)
+        if any(c.isspace() and c not in " \t" for c in line):
+            assert (checker.name_form(line, checker.SPACE_OR_TAB_HTML)
+                    == stated_name_form(checker, line, any_space=False)), ascii(line)
 
 
 def test_nfkc_gives_what_unicodedata_normalize_gives():
@@ -889,6 +1021,21 @@ def test_name_form_reads_a_long_run_of_combining_marks_in_n_log_n_time(text, for
     seconds = time.perf_counter() - start
     assert read == form
     assert seconds < 1, f"{seconds:.2f} s"
+
+
+def test_a_mark_after_markup_or_written_as_a_reference_is_put_apart():
+    checker = load_checker()
+    assert checker.name_form("DV![](x.png)AA") == "DVAA"
+    assert checker.detached("DV**AA**\N{COMBINING ENCLOSING CIRCLE}") == (
+        "DV**AA**" + checker.BREAK + "\N{COMBINING ENCLOSING CIRCLE}")
+    assert checker.detached("DVAA&#x20dd;") == "DVAA" + checker.BREAK + "&#x20dd;"
+    for attached in ("DVAA\N{COMBINING ENCLOSING CIRCLE}",
+                     "DVAA\N{COMBINING ACUTE ACCENT}\N{COMBINING ENCLOSING CIRCLE}",
+                     "DVA\N{CYRILLIC CAPITAL LETTER A}\N{COMBINING ACUTE ACCENT}",
+                     "DVAA&#65;"):
+        assert checker.detached(attached) == attached
+    # No ASCII character is a combining mark, so none after the name needs a lookup.
+    assert not any(checker.is_mark(code) for code in range(128))
 
 
 def test_a_line_naming_dvaa_and_stating_a_count_names_both():
