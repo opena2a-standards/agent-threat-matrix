@@ -612,6 +612,11 @@ WRITTEN_NAMES = [
     ("reference to U+20DD after the name", f"[DVAA&#x20dd;]{DVAA_URL}"),
     ("reference to U+20DD after the name in strong emphasis",
      f"[DV**AA&#x20dd;**]{DVAA_URL}"),
+    # Such a mark is also kept apart from the name, so that NFKC does not join U+0301 to
+    # the last A and read "DVA" U+00C1.
+    ("reference to U+0301 after strong emphasis", f"[DV**AA**&#x301;]{DVAA_URL}"),
+    ("reference to U+0301 after the name in strong emphasis",
+     f"[DV**AA&#x301;**]{DVAA_URL}"),
     ("fullwidth letters",
      "[\N{FULLWIDTH LATIN CAPITAL LETTER D}\N{FULLWIDTH LATIN CAPITAL LETTER V}"
      f"\N{FULLWIDTH LATIN CAPITAL LETTER A}\N{FULLWIDTH LATIN CAPITAL LETTER A}]{DVAA_URL}"),

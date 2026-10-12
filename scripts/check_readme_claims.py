@@ -36,7 +36,10 @@ mark (Unicode category M) directly after it once such characters are removed, ei
 it then stands or after three more steps, so "DVAA" followed by U+0301 COMBINING ACUTE
 ACCENT does not name DVAA. A mark counts as directly after "DVAA" only where it is
 written as itself, not as a character reference, directly after a letter or another mark,
-so "DV**AA**" U+20DD and "DVAA&#x20dd;" name DVAA. First, going along the line, its HTML
+so "DV**AA**" U+20DD and "DVAA&#x20dd;" name DVAA. A mark that does not count as directly
+after "DVAA" is also kept apart from the name, so that NFKC in the third step below does
+not join it to the last A: "DV**AA**" U+0301, "DV**AA**&#x301;" and "DV**AA&#x301;**"
+name DVAA, while NFKC alone gives "DVA" U+00C1. First, going along the line, its HTML
 is removed wherever it stands, also where it starts inside a link destination or title
 and ends after the ) that closes them: each comment, processing instruction, CDATA
 section and declaration from its opening <!--, <?, <![CDATA[ or <! and an ASCII letter to
