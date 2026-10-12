@@ -32,20 +32,24 @@ U+E0002 to U+E001F, U+E0080 to U+E00FF, U+E01F0 to U+E0FFF). Inside a wording su
 character keeps the wording from being read, and a Hangul filler or combining mark does
 so directly beside a DVAA wording, while a character that renders as nothing leaves the
 figure in the rendered line. A line names DVAA when it contains "DVAA" once such
-characters are removed, or once, in addition, its HTML comments, processing instructions,
-CDATA sections and declarations, each from its opening <!--, <?, <![CDATA[ or <! and a
-letter to the first -->, ?>, ]]> or > after it, respectively, or to the end of the line
-when none follows, its tags that hold no < or > inside an attribute value, its link
-destinations and titles unless a parenthesis stands between the ( and ) that hold them,
-its reference labels that hold no bracket and the Markdown characters * _ ~ ` \\ [ ] are
-removed, its character references are decoded, and it is brought to NFKC with each
-character Unicode lists as confusable with A, D or V read as that letter (U+0410 CYRILLIC
-CAPITAL LETTER A reads as A). So the name written as "DV&#8203;AA", "**DV**AA",
-"DV<!-- -->AA", "<b>DV</b>AA", "[DV](url)AA" or in fullwidth letters does not take the
-line out of the check. A line that states one of the matrix.json counts once such
-characters are removed fails the same way when it carries one. Each failure names the
-line, the column of the character's first occurrence on it, counted in characters from 1,
-and the character.
+characters are removed, either as it then stands or after three more steps. First, going
+along the line, its HTML is removed wherever it stands, also where it starts inside a
+link destination or title and ends after the ) that closes them: each comment, processing
+instruction, CDATA section and declaration from its opening <!--, <?, <![CDATA[ or <! and
+an ASCII letter to the first -->, ?>, ]]> or > after it, respectively, or to the end of
+the line when none follows, and each tag from < or </ and a name, which is an ASCII
+letter followed by any ASCII letters, digits and hyphens, to a > right after the name or,
+after white space or /, to the first > after that if no < comes first. Second, from what
+remains, its link destinations and titles are removed unless a parenthesis stands between
+the ( and ) that hold them, its reference labels unless they hold a bracket, and then the
+Markdown characters * _ ~ ` \\ [ ]. Third, its character references are decoded, and it
+is brought to NFKC with each character Unicode lists as confusable with A, D or V read as
+that letter (U+0410 CYRILLIC CAPITAL LETTER A reads as A). So the name written as
+"DV&#8203;AA", "**DV**AA", "DV<!-- -->AA", "<b>DV</b>AA", "[DV](url)AA" or in fullwidth
+letters does not take the line out of the check. A line that states one of the
+matrix.json counts once such characters are removed fails the same way when it carries
+one. Each failure names the line, the column of the character's first occurrence on it,
+counted in characters from 1, and the character.
 
 Exit 0 when every claim matches the data, 1 otherwise. ``--help`` (or ``-h``) prints
 the usage and exits 0. Any other argument, such as a mistyped ``--fixx``, prints the
