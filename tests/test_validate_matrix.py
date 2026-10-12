@@ -10,6 +10,7 @@ import os
 import shutil
 import subprocess
 import tempfile
+from datetime import date
 from pathlib import Path
 
 import pytest
@@ -652,3 +653,104 @@ def test_stix_generator_description_is_its_docstring_summary():
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     assert mod.DESCRIPTION == mod.__doc__.splitlines()[0]
+
+
+# --------------------------------------------------------------------------- S13 updated date
+
+
+def git_scratch_tree(updated: str) -> Path:
+    """A scratch tree with git history whose HEAD holds matrix.json with ``updated`` set to
+    the given date, so S13 has a HEAD copy to compare against. technique-ids.json is
+    stamped with the scratch commit that holds that matrix.json, so S11 resolves it there
+    as it does in this repository."""
+    def stamp(root):
+        set_updated(root, updated)
+        regenerate_stix(root)
+        return commit_all(root, "base")
+    return history_tree(stamp)
+
+
+def edit_technique_name(root: Path, tid: str = "T-1006") -> None:
+    m = load(root, "matrix.json")
+    t = next(t for t in m["techniques"] if t["id"] == tid)
+    t["name"] += " (edited)"
+    dump(root, "matrix.json", m)
+
+
+def edit_class_description(root: Path, cid: str = "PHANTOM-SOUL") -> None:
+    m = load(root, "matrix.json")
+    c = next(c for c in m["attackClasses"] if c["id"] == cid)
+    c["description"] += " (edited)"
+    dump(root, "matrix.json", m)
+
+
+def set_updated(root: Path, updated: str) -> None:
+    m = load(root, "matrix.json")
+    m["updated"] = updated
+    dump(root, "matrix.json", m)
+
+
+def run_in_git_tree(updated_at_head: str, *edits) -> subprocess.CompletedProcess:
+    root = git_scratch_tree(updated_at_head)
+    try:
+        for edit in edits:
+            edit(root)
+        regenerate_stix(root)
+        return run_validator(root)
+    finally:
+        shutil.rmtree(root)
+
+
+def today() -> str:
+    return date.today().isoformat()
+
+
+def test_s13_technique_change_without_moving_updated_is_red():
+    proc = run_in_git_tree("2026-06-03", edit_technique_name)
+    _red(proc, f"S13 matrix.json content differs from HEAD (techniques T-1006) but updated is "
+               f"2026-06-03, older than today {today()}; set updated to {today()}")
+
+
+def test_s13_class_change_without_moving_updated_is_red():
+    proc = run_in_git_tree("2026-06-03", edit_class_description)
+    _red(proc, "S13 matrix.json content differs from HEAD (attackClasses PHANTOM-SOUL) but updated is 2026-06-03")
+
+
+def test_s13_updated_moved_but_still_older_than_today_is_red():
+    proc = run_in_git_tree("2026-06-03", edit_technique_name, lambda r: set_updated(r, "2026-09-08"))
+    _red(proc, f"but updated is 2026-09-08, older than today {today()}")
+
+
+def test_s13_content_change_with_updated_set_to_today_is_green():
+    proc = run_in_git_tree("2026-06-03", edit_technique_name, lambda r: set_updated(r, today()))
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+
+
+def test_s13_second_change_on_the_day_updated_was_set_is_green():
+    proc = run_in_git_tree(today(), edit_class_description)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+
+
+def test_s13_old_updated_with_no_content_change_is_green():
+    proc = run_in_git_tree("2026-06-03")
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+
+
+def test_s13_is_skipped_where_the_tree_has_no_git():
+    def fn(root):
+        set_updated(root, "2026-06-03")
+        edit_technique_name(root)
+        regenerate_stix(root)
+    proc = mutate(fn)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+
+
+def test_shipped_updated_is_no_older_than_the_last_matrix_change():
+    shallow = subprocess.run(["git", "-C", str(ROOT), "rev-parse", "--is-shallow-repository"],
+                             capture_output=True, text=True, timeout=30, env=GIT_ENV)
+    if shallow.returncode != 0 or shallow.stdout.strip() != "false":
+        pytest.skip("needs the full git history of matrix.json")
+    last = subprocess.run(["git", "-C", str(ROOT), "log", "-1", "--format=%ad", "--date=short",
+                           "--", "matrix.json"], capture_output=True, text=True, timeout=30, env=GIT_ENV)
+    assert last.returncode == 0, last.stderr
+    assert load(ROOT, "matrix.json")["updated"] >= last.stdout.strip()

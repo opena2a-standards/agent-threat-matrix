@@ -41,6 +41,11 @@ Standard library only, no network. Two passes:
         summary line says which check ran
    - S12 an ``adapted`` technique carries no ``dvaaValidation``: the tier means
         no lab reproduction, so naming a lab scenario counts it both ways
+   - S13 when matrix.json content (anything but ``updated``) differs from the
+        copy committed at ``HEAD``, ``updated`` is no earlier than today: every
+        STIX object takes its ``modified`` date from it, so a stale ``updated``
+        dates new content before it existed. Skipped where ROOT is not the top of
+        a git work tree or ``HEAD`` carries no matrix.json
 
 Exit 0 when everything holds, 1 otherwise.
 """
@@ -51,6 +56,7 @@ import re
 import subprocess
 import sys
 import tempfile
+from datetime import date
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -363,6 +369,54 @@ def stix_check(errors: list):
             )
 
 
+def committed_matrix():
+    """matrix.json as committed at HEAD, or None when there is no such copy to compare
+    against (ROOT is not the top of a git work tree, or HEAD has no matrix.json file)."""
+    top = git("rev-parse", "--show-toplevel")
+    if top is None or not same_directory(top.strip(), ROOT):
+        return None
+    shown = git("show", "HEAD:matrix.json")
+    if shown is None:
+        return None
+    try:
+        committed = json.loads(shown)
+    except json.JSONDecodeError:
+        return None
+    return committed if isinstance(committed, dict) else None
+
+
+def changed_sections(before: dict, after: dict) -> list:
+    """Top-level keys other than ``updated`` whose value differs, each with the ids of
+    the entries that were added, removed or edited when the value is a list of ids."""
+    changed = []
+    for key in sorted((set(before) | set(after)) - {"updated"}):
+        old, new = before.get(key), after.get(key)
+        if old == new:
+            continue
+        ids = []
+        if isinstance(old, list) and isinstance(new, list) and all(
+                isinstance(e, dict) and isinstance(e.get("id"), str) for e in old + new):
+            old_by_id = {e["id"]: e for e in old}
+            new_by_id = {e["id"]: e for e in new}
+            ids = sorted(i for i in set(old_by_id) | set(new_by_id) if old_by_id.get(i) != new_by_id.get(i))
+        if len(ids) > 10:
+            ids = ids[:10] + [f"and {len(ids) - 10} more"]
+        changed.append(f"{key} {', '.join(ids)}" if ids else key)
+    return changed
+
+
+def freshness_check(matrix: dict, committed, today: str, errors: list):
+    if committed is None:
+        return
+    changed = changed_sections(committed, matrix)
+    if changed and matrix["updated"] < today:
+        errors.append(
+            f"S13 matrix.json content differs from HEAD ({'; '.join(changed)}) but updated is "
+            f"{matrix['updated']}, older than today {today}; set updated to {today} and "
+            f"regenerate the STIX bundle, whose modified dates take it"
+        )
+
+
 def load_json(path: Path):
     try:
         return json.loads(path.read_text(encoding="utf-8"))
@@ -392,6 +446,7 @@ def main() -> int:
     commit_note = ""
     if not errors:
         commit_note = semantic_checks(matrix, readiness, technique_ids_file, errors)
+        freshness_check(matrix, committed_matrix(), date.today().isoformat(), errors)
         stix_check(errors)
     else:
         errors.append("semantic checks skipped until the schema violations above are fixed")
