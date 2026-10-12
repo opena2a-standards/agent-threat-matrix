@@ -15,11 +15,12 @@ The DVAA figures are measured in DVAA, not in matrix.json, and are pinned in
 related-projects.json. Every README line naming DVAA must state the pinned numbers: the
 line that called all 21 agents vulnerable, while DVAA labels one hardened and four
 control-protected, must go red. A README line naming DVAA that carries a format character,
-a control character other than a tab, a Hangul filler or a default-ignorable combining mark
-must go red too, and so must a line that states a matrix.json count once such characters
-are removed. Inside a wording such a character keeps the wording from being read, and a
-Hangul filler or combining mark does so directly beside a DVAA wording, while a character
-that renders as nothing leaves the figure in the rendered line.
+a control character other than a tab, a Hangul filler, a default-ignorable combining mark
+or an unassigned default-ignorable code point must go red too, and so must a line that
+states a matrix.json count once such characters are removed. Inside a wording such a
+character keeps the wording from being read, and a Hangul filler or combining mark does so
+directly beside a DVAA wording, while a character that renders as nothing leaves the figure
+in the rendered line.
 """
 
 import importlib.util
@@ -365,12 +366,27 @@ INVISIBLE_CHARACTERS = [
     ("U+180B MONGOLIAN FREE VARIATION SELECTOR ONE before the agent count", AGENT_COUNT,
      "(\N{MONGOLIAN FREE VARIATION SELECTOR ONE}22 agents: 16 deliberately vulnerable",
      "U+180B MONGOLIAN FREE VARIATION SELECTOR ONE, a default-ignorable combining mark"),
+    ("U+180F MONGOLIAN FREE VARIATION SELECTOR FOUR inside agents", AGENT_COUNT,
+     "(22 age\N{MONGOLIAN FREE VARIATION SELECTOR FOUR}nts: 16 deliberately vulnerable",
+     "U+180F MONGOLIAN FREE VARIATION SELECTOR FOUR, a default-ignorable combining mark"),
     ("U+17B4 KHMER VOWEL INHERENT AQ after categories", CATEGORY_COUNT,
      "variants; 13 vulnerability categories\N{KHMER VOWEL INHERENT AQ}",
      "U+17B4 KHMER VOWEL INHERENT AQ, a default-ignorable combining mark"),
     ("U+E0100 VARIATION SELECTOR-17 inside categories", CATEGORY_COUNT,
      "variants; 13 vulnerability categ\N{VARIATION SELECTOR-17}ories",
      "U+E0100 VARIATION SELECTOR-17, a default-ignorable combining mark"),
+    ("U+2065, unassigned, inside agents", AGENT_COUNT,
+     "(22 age⁥nts: 16 deliberately vulnerable",
+     "U+2065, an unassigned default-ignorable code point"),
+    ("U+FFF8, unassigned, between the number and the noun", AGENT_COUNT,
+     "(22￸ agents: 16 deliberately vulnerable",
+     "U+FFF8, an unassigned default-ignorable code point"),
+    ("U+E0000, unassigned, inside categories", CATEGORY_COUNT,
+     "variants; 13 vulnerability categ\U000e0000ories",
+     "U+E0000, an unassigned default-ignorable code point"),
+    ("U+E0FFF, unassigned, between the category count and the noun", CATEGORY_COUNT,
+     "variants; 13\U000e0fff vulnerability categories",
+     "U+E0FFF, an unassigned default-ignorable code point"),
     ("U+FEFF on a line naming DVAA with the right numbers",
      "environment (21 agents, 12 vulnerability categories)",
      "environment (21 agents,\N{ZERO WIDTH NO-BREAK SPACE} 12 vulnerability categories)",
@@ -412,6 +428,9 @@ COUNT_LINE_CHARACTERS = [
      "U+034F COMBINING GRAPHEME JOINER, a default-ignorable combining mark"),
     ("U+007F, a control character, between the class count and the noun",
      "**40 attack classes**", "**41\x7f attack classes**", "U+007F, a control character"),
+    ("U+E0080, unassigned, inside techniques",
+     "**61 techniques** across 9 tactics", "**62 tech\U000e0080niques** across 9 tactics",
+     "U+E0080, an unassigned default-ignorable code point"),
     ("U+00AD SOFT HYPHEN in the only count a line states", "cite, and build upon.",
      "cite, and build upon. It spans 8 tac\N{SOFT HYPHEN}tics.",
      "U+00AD SOFT HYPHEN, a format character"),
@@ -586,13 +605,11 @@ print(f"status={status} calls={calls}")
 
 def test_the_check_reads_the_categories_of_readme_characters_only():
     # The combining-mark test used to rebuild a character class from all 1,114,112 code
-    # points on every run. It now looks up every character of every README line for
-    # format and control characters, each distinct character of the lines naming DVAA
-    # once more for combining marks, and the code points of each run of combining marks
-    # found there and the one on either side of it.
-    # The format and control lookups skip the newlines between lines, and the shipped
-    # README has more newlines than the check makes combining-mark lookups, so on it the
-    # check makes fewer lookups than README has characters.
+    # points on every run. The check now looks up the category of each README character
+    # outside the line breaks once, to find the characters that fail a line, and of each
+    # distinct character of the text of the lines naming DVAA, line break included, once
+    # more, to build the combining-mark class. The budget is that sum, so a second lookup
+    # of every README character fails the test.
     td = scratch_tree()
     try:
         r = subprocess.run(["python3", "-c", COUNT_CATEGORY_CALLS,
@@ -602,7 +619,10 @@ def test_the_check_reads_the_categories_of_readme_characters_only():
         last = r.stdout.strip().splitlines()[-1]
         assert last.startswith("status=0 calls="), r.stdout
         calls = int(last.rsplit("=", 1)[1])
-        assert calls <= len((td / "README.md").read_text(encoding="utf-8")), last
+        text = (td / "README.md").read_text(encoding="utf-8")
+        dvaa_text = "\n".join(line if "DVAA" in line else "" for line in text.split("\n"))
+        budget = len(text) - text.count("\n") + len(set(dvaa_text))
+        assert calls <= budget, f"{last}, budget {budget}"
     finally:
         shutil.rmtree(td)
 
@@ -648,6 +668,24 @@ def test_the_combining_mark_class_holds_one_range_per_run_of_marks():
     scattered = "DVAA " + " ".join(f"{chr(lo)}x{chr(hi)}" for lo, hi in some)
     assert class_ranges(checker.combining_marks_in(scattered)) == some
     assert checker.combining_marks_in("DVAA: 21 agents") == ""
+
+
+# The Default_Ignorable_Code_Point ranges of Unicode 16.0 (DerivedCoreProperties.txt).
+DEFAULT_IGNORABLE = (
+    (0x00AD, 0x00AD), (0x034F, 0x034F), (0x061C, 0x061C), (0x115F, 0x1160), (0x17B4, 0x17B5),
+    (0x180B, 0x180F), (0x200B, 0x200F), (0x202A, 0x202E), (0x2060, 0x206F), (0x3164, 0x3164),
+    (0xFE00, 0xFE0F), (0xFEFF, 0xFEFF), (0xFFA0, 0xFFA0), (0xFFF0, 0xFFF8),
+    (0x1BCA0, 0x1BCA3), (0x1D173, 0x1D17A), (0xE0000, 0xE0FFF),
+)
+
+
+def test_every_default_ignorable_code_point_fails_a_line():
+    # A renderer may draw each as nothing, so each, assigned or not, is a character that
+    # fails a line naming DVAA or stating a count.
+    checker = load_checker()
+    unnamed = [f"U+{code:04X}" for low, high in DEFAULT_IGNORABLE
+               for code in range(low, high + 1) if not checker.hiding_kind(chr(code))]
+    assert unnamed == [], unnamed
 
 
 def test_the_dvaa_category_count_must_be_stated():

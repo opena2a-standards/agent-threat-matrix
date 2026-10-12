@@ -24,15 +24,17 @@ the 21 a hardened reference and four control-protected variants.
 
 A line naming DVAA fails when it carries a format character (Unicode category Cf, such
 as U+00AD SOFT HYPHEN or U+200B ZERO WIDTH SPACE), a control character (category Cc)
-other than a tab, a Hangul filler (U+115F, U+1160, U+3164, U+FFA0) or one of the
+other than a tab, a Hangul filler (U+115F, U+1160, U+3164, U+FFA0), one of the
 combining marks Unicode lists as default ignorable (U+034F, U+17B4, U+17B5, U+180B to
-U+180D, U+180F, U+FE00 to U+FE0F, U+E0100 to U+E01EF). Inside a wording such a character
-keeps the wording from being read, and a Hangul filler or combining mark does so directly
-beside a DVAA wording, while a character that renders as nothing leaves the figure in the
-rendered line. A line that states one of the matrix.json counts once such characters are
-removed fails the same way when it carries one. Each failure names the line, the column
-of the character's first occurrence on it, counted in characters from 1, and the
-character.
+U+180D, U+180F, U+FE00 to U+FE0F, U+E0100 to U+E01EF) or one of the code points Unicode
+lists as default ignorable without assigning them (U+2065, U+FFF0 to U+FFF8, U+E0000,
+U+E0002 to U+E001F, U+E0080 to U+E00FF, U+E01F0 to U+E0FFF). Inside a wording such a
+character keeps the wording from being read, and a Hangul filler or combining mark does
+so directly beside a DVAA wording, while a character that renders as nothing leaves the
+figure in the rendered line. A line that states one of the matrix.json counts once such
+characters are removed fails the same way when it carries one. Each failure names the
+line, the column of the character's first occurrence on it, counted in characters from
+1, and the character.
 
 Exit 0 when every claim matches the data, 1 otherwise.
 """
@@ -63,8 +65,8 @@ CATEGORY_LABELS = {
 }
 
 # Letters (category Lo) that render as blank space. Each is a word character, so a DVAA
-# wording directly beside one is not read, and \b does not hold between one and a digit
-# or letter beside it.
+# wording directly beside one is not read, and neither is a matrix.json count wording
+# bounded by \b, which does not hold between a filler and a digit or letter beside it.
 HANGUL_FILLERS = (
     "\N{HANGUL CHOSEONG FILLER}\N{HANGUL JUNGSEONG FILLER}"
     "\N{HANGUL FILLER}\N{HALFWIDTH HANGUL FILLER}"
@@ -77,6 +79,16 @@ IGNORABLE_MARKS = frozenset(
     chr(code)
     for low, high in ((0x034F, 0x034F), (0x17B4, 0x17B5), (0x180B, 0x180D), (0x180F, 0x180F),
                       (0xFE00, 0xFE0F), (0xE0100, 0xE01EF))
+    for code in range(low, high + 1)
+)
+
+# The code points Unicode lists as default ignorable without assigning them (category Cn):
+# U+2065, U+FFF0 to U+FFF8 and the unassigned part of the tag and variation selector
+# blocks, 3,769 code points. A renderer may draw one as nothing.
+UNASSIGNED_IGNORABLES = frozenset(
+    chr(code)
+    for low, high in ((0x2065, 0x2065), (0xFFF0, 0xFFF8), (0xE0000, 0xE0000),
+                      (0xE0002, 0xE001F), (0xE0080, 0xE00FF), (0xE01F0, 0xE0FFF))
     for code in range(low, high + 1)
 )
 
@@ -210,6 +222,8 @@ def hiding_kind(c):
         return "a Hangul filler"
     if c in IGNORABLE_MARKS:
         return "a default-ignorable combining mark"
+    if c in UNASSIGNED_IGNORABLES:
+        return "an unassigned default-ignorable code point"
     return None
 
 
