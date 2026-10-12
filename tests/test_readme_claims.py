@@ -646,17 +646,30 @@ print(f"status={status} calls={calls}")
 """
 
 
-def test_the_check_reads_the_categories_of_readme_characters_only():
+@pytest.mark.parametrize("old, new", [
+    (None, None),
+    # Three combining marks on a line naming DVAA: U+0301 and U+0308 stand in the run
+    # U+0300 to U+036F, which is walked once, and U+20DD in the run U+20D0 to U+20F0.
+    ("The DVAA figures are pinned in",
+     "The DVAA figures (Jose\N{COMBINING ACUTE ACCENT}, Mo\N{COMBINING DIAERESIS}bius, "
+     "O\N{COMBINING ENCLOSING CIRCLE}) are pinned in"),
+])
+def test_the_check_reads_the_categories_of_readme_characters_only(old, new):
     # The combining-mark test used to rebuild a character class from all 1,114,112 code
     # points on every run. The check now looks up the category of each README character
     # outside the line breaks once, to find the characters that fail a line, and of each
     # distinct character of the text of the lines naming DVAA, line break included, once
-    # more, to build the combining-mark class. The budget is that sum, so a second lookup
-    # of every README character fails the test.
+    # more, to build the combining-mark class. Walking each run of consecutive combining
+    # marks that holds a mark of that text, to find where the run ends, it then looks up
+    # every code point of the run but the mark it starts from, and the code point on either
+    # side of the run. The budget is that sum, so a second lookup of every README character
+    # fails the test.
     # The lookups that find the characters that fail a line also decide which lines name
     # DVAA once the characters they find are removed.
     td = scratch_tree()
     try:
+        if old is not None:
+            mutate_readme(td, old, new)
         r = subprocess.run(["python3", "-c", COUNT_CATEGORY_CALLS,
                             str(td / "scripts" / "check_readme_claims.py")],
                            capture_output=True, text=True, timeout=120)
@@ -666,7 +679,10 @@ def test_the_check_reads_the_categories_of_readme_characters_only():
         calls = int(last.rsplit("=", 1)[1])
         text = (td / "README.md").read_text(encoding="utf-8")
         dvaa_text = "\n".join(line if "DVAA" in line else "" for line in text.split("\n"))
-        budget = len(text) - text.count("\n") + len(set(dvaa_text))
+        marks = {ord(c) for c in dvaa_text if unicodedata.category(c).startswith("M")}
+        walked = [(lo, hi) for lo, hi in mark_runs() if any(lo <= code <= hi for code in marks)]
+        budget = (len(text) - text.count("\n") + len(set(dvaa_text))
+                  + sum(hi - lo + 2 for lo, hi in walked))
         assert calls <= budget, f"{last}, budget {budget}"
     finally:
         shutil.rmtree(td)
