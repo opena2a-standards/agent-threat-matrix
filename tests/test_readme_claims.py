@@ -455,6 +455,49 @@ def test_a_count_line_carrying_an_invisible_character_is_red(old, new, named):
         shutil.rmtree(td)
 
 
+# A character that fails a line, written inside the name "DVAA". The line still shows the
+# name, so it names DVAA once the character is removed: its DVAA figures are read and the
+# character fails it. Read only where "DVAA" is written unbroken, such a line was not read
+# at all and two wrong figures passed.
+DVAA_LINK = ("[DVAA](https://github.com/opena2a-org/damn-vulnerable-ai-agent) "
+             "| Lab validation environment (21 agents, 12 vulnerability categories)")
+NAME_CHARACTERS = [
+    ("U+200B ZERO WIDTH SPACE", "DV\N{ZERO WIDTH SPACE}AA",
+     "U+200B ZERO WIDTH SPACE, a format character"),
+    ("U+00AD SOFT HYPHEN", "D\N{SOFT HYPHEN}VAA", "U+00AD SOFT HYPHEN, a format character"),
+    ("U+007F, a control character", "DVA\x7fA", "U+007F, a control character"),
+    ("U+FFA0 HALFWIDTH HANGUL FILLER", "DV\N{HALFWIDTH HANGUL FILLER}AA",
+     "U+FFA0 HALFWIDTH HANGUL FILLER, a Hangul filler"),
+    ("U+034F COMBINING GRAPHEME JOINER", "DVA\N{COMBINING GRAPHEME JOINER}A",
+     "U+034F COMBINING GRAPHEME JOINER, a default-ignorable combining mark"),
+    ("U+2065, unassigned", "DV⁥AA", "U+2065, an unassigned default-ignorable code point"),
+]
+
+
+@pytest.mark.parametrize("name,named", [(n, c) for _, n, c in NAME_CHARACTERS],
+                         ids=[case for case, _, _ in NAME_CHARACTERS])
+def test_a_character_inside_the_name_dvaa_leaves_the_line_read(name, named):
+    td = scratch_tree()
+    try:
+        new = (DVAA_LINK.replace("[DVAA]", f"[{name}]")
+               .replace("(21 agents, 12 vulnerability", "(22 agents, 13 vulnerability"))
+        mutate_readme(td, DVAA_LINK, new)
+        line = line_of(td, new)
+        r = run_checker(td)
+        assert r.returncode == 1, r.stdout
+        for failure in (
+            f"README.md:{line}: \"22 agents\" does not match related-projects.json "
+            "(DVAA agents: 21)",
+            f"README.md:{line}: \"13 vulnerability categories\" does not match "
+            "related-projects.json (DVAA vulnerability categories: 12)",
+            f"README.md:{line}:{column_of(td, new, named)}: a line naming DVAA carries {named}, "
+            "which can hide a figure from the DVAA wordings; remove it",
+        ):
+            assert failure in r.stderr, r.stderr
+    finally:
+        shutil.rmtree(td)
+
+
 def test_a_line_naming_dvaa_and_stating_a_count_names_both():
     td = scratch_tree()
     try:
@@ -610,6 +653,8 @@ def test_the_check_reads_the_categories_of_readme_characters_only():
     # distinct character of the text of the lines naming DVAA, line break included, once
     # more, to build the combining-mark class. The budget is that sum, so a second lookup
     # of every README character fails the test.
+    # The lookups that find the characters that fail a line also decide which lines name
+    # DVAA once the characters they find are removed.
     td = scratch_tree()
     try:
         r = subprocess.run(["python3", "-c", COUNT_CATEGORY_CALLS,
