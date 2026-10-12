@@ -27,6 +27,7 @@ in the rendered line. Markup, a character reference or a confusable letter writt
 the name as the cases below write it leaves the line read.
 """
 
+import ast
 import importlib.util
 import json
 import re
@@ -585,6 +586,22 @@ def test_each_confusable_reads_as_a_run_of_dvaa_letters_and_is_left_by_nfkc():
     for code, letters in checker.CONFUSABLES.items():
         assert unicodedata.normalize("NFKC", chr(code)) == chr(code), f"U+{code:04X}"
         assert letters and set(letters) <= set("ADV"), f"U+{code:04X}"
+
+
+def test_the_name_cases_write_their_character_as_an_escape():
+    # Written raw, a character that shows nothing leaves a case reading as plain "DVAA", and
+    # an editor can drop it without a visible change. Each case writes its character as an
+    # escape, so the source shows which character the case holds.
+    checker = load_checker()
+    source = Path(__file__).read_text(encoding="utf-8")
+    table = next(node for node in ast.parse(source).body if isinstance(node, ast.Assign)
+                 and any(isinstance(target, ast.Name) and target.id == "NAME_CHARACTERS"
+                         for target in node.targets))
+    lines = source.split("\n")[table.lineno - 1:table.end_lineno]
+    raw = [f"{Path(__file__).name}:{number}:{column} U+{ord(c):04X}"
+           for number, line in enumerate(lines, table.lineno)
+           for column, c in enumerate(line, 1) if checker.hiding_kind(c)]
+    assert raw == [], raw
 
 
 def test_a_line_naming_dvaa_and_stating_a_count_names_both():
