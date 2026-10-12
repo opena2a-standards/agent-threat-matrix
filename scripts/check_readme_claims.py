@@ -12,11 +12,14 @@ between the BEGIN/END GENERATED markers. Typed by hand, they reworded 34 of the
 must re-render byte-identically; run with ``--fix`` to rewrite only that block.
 
 The per-tactic table and the evidence-tier table are measurements over matrix.json too.
-Each tactic row must state the tactic's name, kill chain stage and technique count, and
-each tier row its technique count and that count as a whole percentage of all techniques,
-rounded half up; a row naming no tactic or tier, a second row for one, and a tactic or
-tier without a row each fail. The "## Attack Classes (N)" heading must state the number
-of attack classes.
+A tactic row is read where a line starts ``| [Name](tactics/<id>.md) | N | N |``, and a
+tier row where a line starts ``| **Tier** |`` and ends ``| N (P%) |`` with nothing after
+the last "|", each spaced exactly as shown; a row written any other way is not read. Each
+tactic row read must state the tactic's name, kill chain stage and technique count, and
+each tier row read its technique count and that count as a whole percentage of all
+techniques, rounded half up; a row read that names no tactic or tier, a second row read for
+one, and a tactic or tier with no row read each fail. The "## Attack Classes (N)" heading
+must state the number of attack classes.
 
 The README also states figures about related projects. Those are measured in the
 other project, so they are pinned in related-projects.json with the release each was

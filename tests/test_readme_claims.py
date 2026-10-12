@@ -286,6 +286,22 @@ def test_a_tactic_row_dropped_from_the_overview_table_is_red():
         shutil.rmtree(td)
 
 
+def test_a_tactic_or_tier_row_written_another_way_is_not_read():
+    # The script's description says a row is read only in the forms it shows: a stale tactic
+    # row with no link and a stale tier row with a space after its last "|" are not read.
+    td = scratch_tree()
+    try:
+        text = (td / "README.md").read_text(encoding="utf-8")
+        row = next(l for l in text.splitlines(keepends=True)
+                   if l.startswith("| [Impact](tactics/impact.md) |"))
+        mutate_readme(td, row,
+                      row + "| Impact | 9 | 5 | stale |\n| **Observed** | dup | 17 (28%) | \n")
+        r = run_checker(td)
+        assert r.returncode == 0, r.stderr
+    finally:
+        shutil.rmtree(td)
+
+
 @pytest.mark.parametrize("line,kilobytes,last", [
     # Lines that start a tactic row and never close its bracket. With a name class that
     # crossed line breaks, the row pattern scanned from each such line to the end of the
