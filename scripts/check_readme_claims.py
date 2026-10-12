@@ -32,10 +32,25 @@ U+E0002 to U+E001F, U+E0080 to U+E00FF, U+E01F0 to U+E0FFF). Inside a wording su
 character keeps the wording from being read, and a Hangul filler or combining mark does
 so directly beside a DVAA wording, while a character that renders as nothing leaves the
 figure in the rendered line. A line names DVAA when it contains "DVAA" once such
-characters are removed, so one written inside the name does not take the line out of the
-check, and a line that states one of the matrix.json counts once they are removed fails
-the same way when it carries one. Each failure names the line, the column of the
-character's first occurrence on it, counted in characters from 1, and the character.
+characters are removed, either as it then stands or after three more steps. First, going
+along the line, its HTML is removed wherever it stands, also where it starts inside a
+link destination or title and ends after the ) that closes them: each comment, processing
+instruction, CDATA section and declaration from its opening <!--, <?, <![CDATA[ or <! and
+an ASCII letter to the first -->, ?>, ]]> or > after it, respectively, or to the end of
+the line when none follows, and each tag from < or </ and a name, which is an ASCII
+letter followed by any ASCII letters, digits and hyphens, to a > right after the name or,
+after white space or /, to the first > after that if no < comes first. Second, going
+along what remains, each ] followed by ( is removed with the text after it to the first )
+if no further ( comes first, and each ] followed by [ with the text after it to the first
+] if no further [ comes first, whether or not they make a link, and then the Markdown
+characters * _ ~ ` \\ [ ]. Third, its character references are decoded, and it
+is brought to NFKC with each character Unicode lists as confusable with A, D or V read as
+that letter (U+0410 CYRILLIC CAPITAL LETTER A reads as A). So the name written as
+"DV&#8203;AA", "**DV**AA", "DV<!-- -->AA", "<b>DV</b>AA", "[DV](url)AA" or in fullwidth
+letters does not take the line out of the check. A line that states one of the
+matrix.json counts once such characters are removed fails the same way when it carries
+one. Each failure names the line, the column of the character's first occurrence on it,
+counted in characters from 1, and the character.
 
 Exit 0 when every claim matches the data, 1 otherwise. ``--help`` (or ``-h``) prints
 the usage and exits 0. Any other argument, such as a mistyped ``--fixx``, prints the
@@ -43,6 +58,7 @@ usage and exits 2 without checking or writing anything.
 """
 
 import argparse
+import html
 import json
 import pathlib
 import re
@@ -98,6 +114,40 @@ UNASSIGNED_IGNORABLES = frozenset(
                       (0xE0002, 0xE001F), (0xE0080, 0xE00FF), (0xE01F0, 0xE0FFF))
     for code in range(low, high + 1)
 )
+
+# Raw HTML a renderer draws as nothing: a comment, processing instruction, CDATA section or
+# declaration, each from its opening to the first close after that opening, or to the end
+# of the line when none follows, and an open or closing tag. An autolink such as
+# <https://example.org> is not a tag and stays. A tag ends at the first ">" before any "<",
+# so a failed match scans no further than the next "<" and the line is read in linear time.
+RAW_HTML = re.compile(
+    r"<!--.*?(?:-->|$)|<\?.*?(?:\?>|$)|<!\[CDATA\[.*?(?:\]\]>|$)|<![A-Za-z][^>]*(?:>|$)"
+    r"|</?[A-Za-z][A-Za-z0-9-]*(?:[\s/][^<>]*)?>"
+)
+
+# A "]" followed by "(" with the text after it to the first ")" if no further "(" comes
+# first, or a "]" followed by "[" with the text after it to the first "]" if no further "["
+# comes first, whether or not they make a link: "[DV](url)AA" shows "DVAA".
+LINK_TARGET = re.compile(r"\]\([^()]*\)|\]\[[^\[\]]*\]")
+
+# Markdown characters that mark up text without showing: emphasis, strikethrough, code
+# span, escape and link text delimiters.
+MARKUP = str.maketrans("", "", "*_~`\\[]")
+
+# A named, decimal or hexadecimal character reference, as CommonMark reads one.
+REFERENCE = re.compile(r"&(?:#[0-9]{1,7}|#[xX][0-9A-Fa-f]{1,6}|[A-Za-z][A-Za-z0-9]{1,31});")
+
+# The characters Unicode lists as confusable with A, D, V or a run of them, other than
+# those NFKC already maps to such letters: every code point whose UTS #39 skeleton in the
+# confusables data of Unicode 17.0 is such a run and that NFKC leaves unchanged, 26 code
+# points. With NFKC first, every code point whose skeleton is such a run reads as it.
+CONFUSABLES = {
+    0x0391: "A", 0x0410: "A", 0x0474: "V", 0x0667: "V", 0x06F7: "V", 0x13A0: "D",
+    0x13AA: "A", 0x13D9: "V", 0x142F: "V", 0x15C5: "A", 0x15DE: "D", 0x15EA: "D",
+    0x2D38: "V", 0xA4D3: "D", 0xA4E6: "V", 0xA4EE: "A", 0xA6DF: "V", 0xA732: "AA",
+    0xA738: "AV", 0xA73A: "AV", 0x102A0: "A", 0x1051D: "V", 0x118A0: "V", 0x16F08: "V",
+    0x16F40: "A", 0x1D20D: "V",
+}
 
 
 def is_mark(code):
@@ -212,12 +262,37 @@ def fix_class_tables(matrix, readme):
     return readme[:start] + render_class_tables(matrix) + readme[end:]
 
 
-def lines_naming(lines, name):
-    """The README with every line blanked that does not contain `name` once the characters
-    `hiding_kind` names are removed, so a match offset still converts to its README line
-    number. `lines` holds each README line as `classified` returns it. "DV" U+200B "AA"
-    shows as DVAA, so that line names DVAA."""
-    return "\n".join(line if name in shown else "" for line, shown, _ in lines)
+def lines_naming(lines, naming):
+    """The README with every line blanked that does not name DVAA, so a match offset still
+    converts to its README line number. `lines` holds each README line as `classified`
+    returns it, and `naming` whether `names` finds DVAA on it."""
+    return "\n".join(line if named else "" for (line, _, _), named in zip(lines, naming))
+
+
+def decoded(reference):
+    """A character reference match as the characters it stands for, less those `hiding_kind`
+    names: "&#8203;" stands for U+200B, which shows nothing."""
+    return "".join(c for c in html.unescape(reference.group()) if not hiding_kind(c))
+
+
+def name_form(stripped):
+    """`stripped` as a name in it reads: the raw HTML `RAW_HTML` matches, the link
+    destinations and reference labels `LINK_TARGET` matches and the Markdown characters
+    that mark up text removed, character references decoded, and the text brought to NFKC
+    with each character in `CONFUSABLES` read as the letters it resembles. The markup is
+    removed before the references are decoded, as a reference to "*" shows a star."""
+    text = RAW_HTML.sub("", stripped)
+    text = LINK_TARGET.sub("", text).translate(MARKUP)
+    text = REFERENCE.sub(decoded, text)
+    return unicodedata.normalize("NFKC", text).translate(CONFUSABLES)
+
+
+def names(stripped, name):
+    """Whether a line that is `stripped` once the characters `hiding_kind` names are
+    removed names `name`: it contains `name` as it stands or in its `name_form`.
+    "DV" U+200B "AA", "DV&#8203;AA", "**DV**AA", "DV<!-- -->AA", "DVA" U+0410 and the
+    fullwidth letters each name DVAA."""
+    return name in stripped or name in name_form(stripped)
 
 
 def hiding_kind(c):
@@ -238,12 +313,12 @@ def hiding_kind(c):
 
 
 def classified(line):
-    """(line, shown, hidden) for `line`: `shown` is `line` with every character
+    """(line, stripped, hidden) for `line`: `stripped` is `line` with every character
     `hiding_kind` names removed, and `hidden` holds (column, character) for the first
     occurrence of each such character, the column counted in characters from 1. One
     lookup per character gives both; a repeat of a character already found is removed
     without another."""
-    shown = []
+    stripped = []
     hidden = []
     seen = set()
     for column, c in enumerate(line, 1):
@@ -253,8 +328,8 @@ def classified(line):
             seen.add(c)
             hidden.append((column, c))
         else:
-            shown.append(c)
-    return line, "".join(shown), hidden
+            stripped.append(c)
+    return line, "".join(stripped), hidden
 
 
 def empty(value):
@@ -390,9 +465,11 @@ def main(argv):
             f"dvaa.agents is {dvaa['agents']}"
         )
     # Each README line is classified once: the lookups that find the characters failing a
-    # line also give the line as it shows, and that decides whether it names DVAA.
+    # line also give the line with such characters removed, which decides whether it names
+    # DVAA.
     lines = [classified(line) for line in readme.split("\n")]
-    dvaa_lines = lines_naming(lines, "DVAA")
+    naming = [names(stripped, "DVAA") for _, stripped, _ in lines]
+    dvaa_lines = lines_naming(lines, naming)
     pinned = "related-projects.json"
     # Every DVAA wording is read in any letter case: DVAA itself writes "Attack Categories".
     # re.ASCII keeps that to ASCII letters and digits: without it "[A-Za-z]" also matches
@@ -439,13 +516,13 @@ def main(argv):
     # every line that names DVAA or states a matrix.json count once such characters are
     # removed: "DV" U+200B "AA" names DVAA, and "8 tac" U+00AD "tics" states a count the
     # check cannot read.
-    for number, (line, shown, hidden) in enumerate(lines, 1):
+    for number, ((line, stripped, hidden), named) in enumerate(zip(lines, naming), 1):
         if not hidden:
             continue
         readers = []
-        if "DVAA" in shown:
+        if named:
             readers.append(("naming DVAA", "DVAA"))
-        if any(re.search(pattern, shown) for pattern in count_wordings):
+        if any(re.search(pattern, stripped) for pattern in count_wordings):
             readers.append(("stating a matrix.json count", "count"))
         if not readers:
             continue
