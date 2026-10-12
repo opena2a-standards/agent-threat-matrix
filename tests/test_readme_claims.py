@@ -21,7 +21,8 @@ or an unassigned default-ignorable code point must go red too, and so must a lin
 states a matrix.json count once such characters are removed. Inside a wording such a
 character keeps the wording from being read, and a Hangul filler or combining mark does so
 directly beside a DVAA wording, while a character that renders as nothing leaves the figure
-in the rendered line.
+in the rendered line. A line names DVAA when it shows the name, so markup, a character
+reference or a confusable letter written inside the name leaves the line read.
 """
 
 import importlib.util
@@ -497,6 +498,91 @@ def test_a_character_inside_the_name_dvaa_leaves_the_line_read(name, named):
             assert failure in r.stderr, r.stderr
     finally:
         shutil.rmtree(td)
+
+
+# The name "DVAA" written with markup, a character reference or a confusable letter inside
+# it, each of which a renderer shows as DVAA. Read only where "DVAA" stood in the source
+# text once the characters that fail a line were removed, such a line was not read at all
+# and two wrong figures passed.
+DVAA_URL = "(https://github.com/opena2a-org/damn-vulnerable-ai-agent)"
+WRITTEN_NAMES = [
+    ("decimal reference to U+200B", f"[DV&#8203;AA]{DVAA_URL}"),
+    ("hexadecimal reference to D", f"[&#x44;VAA]{DVAA_URL}"),
+    ("named reference to U+200B", f"[DV&ZeroWidthSpace;AA]{DVAA_URL}"),
+    ("reference to U+0410", f"[DVA&#x410;]{DVAA_URL}"),
+    ("strong emphasis", f"[**DV**AA]{DVAA_URL}"),
+    ("strikethrough", f"[~~DV~~AA]{DVAA_URL}"),
+    ("code span", f"[`DV`AA]{DVAA_URL}"),
+    ("HTML comment", f"[DV<!-- -->AA]{DVAA_URL}"),
+    ("HTML tag", f"[<b>DV</b>AA]{DVAA_URL}"),
+    ("link text", f"[DV]{DVAA_URL}AA"),
+    ("U+0410 CYRILLIC CAPITAL LETTER A", f"[DVA\N{CYRILLIC CAPITAL LETTER A}]{DVAA_URL}"),
+    ("U+0391 GREEK CAPITAL LETTER ALPHA", f"[DV\N{GREEK CAPITAL LETTER ALPHA}A]{DVAA_URL}"),
+    ("U+A732 LATIN CAPITAL LETTER AA", f"[DV\N{LATIN CAPITAL LETTER AA}]{DVAA_URL}"),
+    ("fullwidth letters",
+     "[\N{FULLWIDTH LATIN CAPITAL LETTER D}\N{FULLWIDTH LATIN CAPITAL LETTER V}"
+     f"\N{FULLWIDTH LATIN CAPITAL LETTER A}\N{FULLWIDTH LATIN CAPITAL LETTER A}]{DVAA_URL}"),
+    ("mathematical bold letters",
+     "[\N{MATHEMATICAL BOLD CAPITAL D}\N{MATHEMATICAL BOLD CAPITAL V}"
+     f"\N{MATHEMATICAL BOLD CAPITAL A}\N{MATHEMATICAL BOLD CAPITAL A}]{DVAA_URL}"),
+]
+
+
+@pytest.mark.parametrize("written", [w for _, w in WRITTEN_NAMES],
+                         ids=[case for case, _ in WRITTEN_NAMES])
+def test_a_name_written_with_markup_a_reference_or_a_confusable_letter_leaves_the_line_read(
+        written):
+    td = scratch_tree()
+    try:
+        new = (DVAA_LINK.replace(f"[DVAA]{DVAA_URL}", written)
+               .replace("(21 agents, 12 vulnerability", "(22 agents, 13 vulnerability"))
+        mutate_readme(td, DVAA_LINK, new)
+        line = line_of(td, new)
+        r = run_checker(td)
+        assert r.returncode == 1, r.stdout
+        for failure in (
+            f"README.md:{line}: \"22 agents\" does not match related-projects.json "
+            "(DVAA agents: 21)",
+            f"README.md:{line}: \"13 vulnerability categories\" does not match "
+            "related-projects.json (DVAA vulnerability categories: 12)",
+        ):
+            assert failure in r.stderr, r.stderr
+    finally:
+        shutil.rmtree(td)
+
+
+# Names that show as something other than DVAA: a reference to "*" or "&" shows that
+# character rather than marking up text, and a letter with an accent is not confusable
+# with A. Such a line does not name DVAA, so its figures are not read.
+OTHER_NAMES = [
+    ("reference to an asterisk", "[DV&#42;AA]"),
+    ("reference to an ampersand", "[DV&amp;AA]"),
+    ("hyphen", "[DV-AA]"),
+    ("U+00C1 LATIN CAPITAL LETTER A WITH ACUTE", "[DV\N{LATIN CAPITAL LETTER A WITH ACUTE}A]"),
+]
+
+
+@pytest.mark.parametrize("written", [w for _, w in OTHER_NAMES],
+                         ids=[case for case, _ in OTHER_NAMES])
+def test_a_name_that_shows_as_another_name_does_not_name_dvaa(written):
+    td = scratch_tree()
+    try:
+        new = (DVAA_LINK.replace("[DVAA]", written)
+               .replace("(21 agents, 12 vulnerability", "(22 agents, 13 vulnerability"))
+        mutate_readme(td, DVAA_LINK, new)
+        r = run_checker(td)
+        assert r.returncode == 0, r.stderr
+    finally:
+        shutil.rmtree(td)
+
+
+def test_each_confusable_reads_as_a_run_of_dvaa_letters_and_is_left_by_nfkc():
+    # The table holds only what NFKC leaves unchanged; NFKC maps the fullwidth and
+    # mathematical letters itself.
+    checker = load_checker()
+    for code, letters in checker.CONFUSABLES.items():
+        assert unicodedata.normalize("NFKC", chr(code)) == chr(code), f"U+{code:04X}"
+        assert letters and set(letters) <= set("ADV"), f"U+{code:04X}"
 
 
 def test_a_line_naming_dvaa_and_stating_a_count_names_both():
