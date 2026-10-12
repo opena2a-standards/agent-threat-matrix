@@ -11,14 +11,21 @@ JUnit report; it had no such entry.
 The report names a testcase after the test function followed by the parametrize id in
 brackets, so it is the parametrize id that leads with the criterion id, not the testcase
 name. Those modules said "Leaf test names begin with the criterion id"; a test here fails
-when such a docstring, or the message of the last test, holds the word "name" or "names"
-and then, at most eight words later and before a full stop, colon, semicolon, question mark
-or exclamation mark, a form of "begin with", "lead with" or "start with". A word "id" or
-"ids" in between makes the parametrize id the subject, so that sentence passes. A claim
-worded any other way, such as "names are prefixed with", is not read. The Unreleased
-section records that change in a second entry that names this file, quotes the old and the
-new wording of the docstrings and of the message, and names each module whose docstring
-holds the new wording; it had no such entry.
+when such a docstring, or the message of the last test, holds certain words in a row, in
+any letter case. A word here is whatever stands between white space, line breaks included,
+and a mark is any character of a word other than a letter, a digit or an underscore. The
+words are, in this order: one that, a comma at its end aside, is "name" or "names" or ends
+in either right after a mark; at most eight words, none holding a full stop, colon,
+semicolon, question mark or exclamation mark, and none that, marks at its start aside, is
+"id" or "ids" or begins with either right before a mark, as such a word is taken to make
+the parametrize id the subject; one that is a form of "begin", "lead" or "start"; and one
+that is "with" or begins with it right before a mark. A claim worded any other way is not
+read: "names are prefixed with" is not, and neither are `"names" begin with`,
+`*names* begin with`, `names "begin with"`, `names *begin* with` or
+`names—each of them—begin with`, where a mark stands right after "names" or beside the
+verb. The Unreleased section records that change in a second entry that names this file,
+quotes the old and the new wording of the docstrings and of the message, and names each
+module whose docstring holds the new wording; it had no such entry.
 """
 
 import ast
@@ -35,8 +42,8 @@ TESTS = ROOT / "tests"
 CHANGELOG = ROOT / "CHANGELOG.md"
 COMMAND = "pytest --junitxml"
 CRITERION_RE = re.compile(r"\(([A-Z]+-\d+)\.ACn\)")
-# "name" or "names", up to eight words of the same sentence, none of them "id" or "ids",
-# then a form of one of the three verbs.
+# The words the module docstring lists, in a row: the name word, at most eight words that
+# hold none of the five marks and are no "id" or "ids" word, a verb form and the "with" word.
 NAME_CLAIM_RE = re.compile(
     r"\bnames?(?:,? (?![^\w\s]*ids?\b)[^\s.:;?!]+){0,8}?,? "
     r"(?:begin(?:s|ning)?|began|begun|lead(?:s|ing)?|led|start(?:s|ed|ing)?) with\b", re.I)
@@ -161,6 +168,27 @@ def test_name_claims_stop_at_an_id_at_the_end_of_a_sentence_and_after_eight_word
     # A wording outside the three verbs is not read, as the module docstring says.
     assert name_claims("Testcase names are prefixed with the criterion id") == []
     assert name_claims("Testcase names begin within the report") == []
+
+
+def test_name_claims_pass_a_mark_right_after_the_name_beside_the_verb_or_before_with():
+    # The name word ends in "name" or "names", a comma aside, the verb is a word of its own
+    # and the word after it begins with "with", so none of these is read. The module
+    # docstring gives the first five.
+    for claim in ('Leaf test "names" begin with the criterion id',
+                  "Leaf test *names* begin with the criterion id",
+                  'Leaf test names "begin with" the criterion id',
+                  "Leaf test names *begin* with the criterion id",
+                  "Leaf test names\N{EM DASH}each of them\N{EM DASH}begin with the criterion id",
+                  "Leaf test names begin, with the criterion id",
+                  "Leaf test names begin *with* the criterion id"):
+        assert name_claims(claim) == [], claim
+    # These are read: a quotation mark at the start of the name word and at the end of the
+    # "with" word, brackets around a word in between, and a hyphen that is a word of its own.
+    assert name_claims('Leaf test "names begin with" the criterion id') == ["names begin with"]
+    assert name_claims("Leaf test names (each) begin with the criterion id") == [
+        "names (each) begin with"]
+    assert name_claims("Leaf test names - each of them - begin with the criterion id") == [
+        "names - each of them - begin with"]
 
 
 def test_the_unreleased_changelog_records_the_wording_and_this_test():
