@@ -21,8 +21,8 @@ or an unassigned default-ignorable code point must go red too, and so must a lin
 states a matrix.json count once such characters are removed. Inside a wording such a
 character keeps the wording from being read, and a Hangul filler or combining mark does so
 directly beside a DVAA wording, while a character that renders as nothing leaves the figure
-in the rendered line. A line names DVAA when it shows the name, so markup, a character
-reference or a confusable letter written inside the name leaves the line read.
+in the rendered line. Markup, a character reference or a confusable letter written inside
+the name as the cases below write it leaves the line read.
 """
 
 import importlib.util

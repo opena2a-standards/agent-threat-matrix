@@ -32,16 +32,20 @@ U+E0002 to U+E001F, U+E0080 to U+E00FF, U+E01F0 to U+E0FFF). Inside a wording su
 character keeps the wording from being read, and a Hangul filler or combining mark does
 so directly beside a DVAA wording, while a character that renders as nothing leaves the
 figure in the rendered line. A line names DVAA when it contains "DVAA" once such
-characters are removed, or once, in addition, its raw HTML (comments, tags, processing
-instructions, declarations and CDATA sections), its link destinations and the Markdown
-characters * _ ~ ` \\ [ ] are removed, its character references are decoded, and it is
-brought to NFKC with each character Unicode lists as confusable with A, D or V read as
-that letter (U+0410 CYRILLIC CAPITAL LETTER A reads as A). So none of these written inside
-the name, such as "DV&#8203;AA", "**DV**AA", "DV<!-- -->AA" or the fullwidth letters,
-takes the line out of the check. A line that states one of the matrix.json counts once
-such characters are removed fails the same way when it carries one. Each failure names
-the line, the column of the character's first occurrence on it, counted in characters
-from 1, and the character.
+characters are removed, or once, in addition, its HTML comments, processing instructions,
+CDATA sections and declarations, each from its opening <!--, <?, <![CDATA[ or <! and a
+letter to the first -->, ?>, ]]> or > after it, respectively, or to the end of the line
+when none follows, its tags that hold no < or > inside an attribute value, its link
+destinations and titles unless a parenthesis stands between the ( and ) that hold them,
+its reference labels that hold no bracket and the Markdown characters * _ ~ ` \\ [ ] are
+removed, its character references are decoded, and it is brought to NFKC with each
+character Unicode lists as confusable with A, D or V read as that letter (U+0410 CYRILLIC
+CAPITAL LETTER A reads as A). So the name written as "DV&#8203;AA", "**DV**AA",
+"DV<!-- -->AA", "<b>DV</b>AA", "[DV](url)AA" or in fullwidth letters does not take the
+line out of the check. A line that states one of the matrix.json counts once such
+characters are removed fails the same way when it carries one. Each failure names the
+line, the column of the character's first occurrence on it, counted in characters from 1,
+and the character.
 
 Exit 0 when every claim matches the data, 1 otherwise. ``--help`` (or ``-h``) prints
 the usage and exits 0. Any other argument, such as a mistyped ``--fixx``, prints the
@@ -107,16 +111,17 @@ UNASSIGNED_IGNORABLES = frozenset(
 )
 
 # Raw HTML a renderer draws as nothing: a comment, processing instruction, CDATA section or
-# declaration, each to the end of the line when it does not close on it, and an open or
-# closing tag. An autolink such as <https://example.org> is not a tag and stays. A tag
-# ends at the first ">" before any "<", so a failed match scans no further than the next
-# "<" and the line is read in linear time.
+# declaration, each from its opening to the first close after that opening, or to the end
+# of the line when none follows, and an open or closing tag. An autolink such as
+# <https://example.org> is not a tag and stays. A tag ends at the first ">" before any "<",
+# so a failed match scans no further than the next "<" and the line is read in linear time.
 RAW_HTML = re.compile(
     r"<!--.*?(?:-->|$)|<\?.*?(?:\?>|$)|<!\[CDATA\[.*?(?:\]\]>|$)|<![A-Za-z][^>]*(?:>|$)"
     r"|</?[A-Za-z][A-Za-z0-9-]*(?:[\s/][^<>]*)?>"
 )
 
-# A link destination or reference label after the link text: "[DV](url)AA" shows "DVAA".
+# A link destination and title with no parenthesis between the ( and ) that hold them, or a
+# reference label with no bracket, after the link text: "[DV](url)AA" shows "DVAA".
 LINK_TARGET = re.compile(r"\]\([^()]*\)|\]\[[^\[\]]*\]")
 
 # Markdown characters that mark up text without showing: emphasis, strikethrough, code
@@ -265,11 +270,11 @@ def decoded(reference):
 
 
 def name_form(shown):
-    """`shown` as a name in it reads: raw HTML, link destinations and the Markdown
-    characters that mark up text removed, character references decoded, and the text
-    brought to NFKC with each character in `CONFUSABLES` read as the letters it resembles.
-    The markup is removed before the references are decoded, as a reference to "*" shows
-    a star."""
+    """`shown` as a name in it reads: the raw HTML `RAW_HTML` matches, the link
+    destinations and reference labels `LINK_TARGET` matches and the Markdown characters
+    that mark up text removed, character references decoded, and the text brought to NFKC
+    with each character in `CONFUSABLES` read as the letters it resembles. The markup is
+    removed before the references are decoded, as a reference to "*" shows a star."""
     text = RAW_HTML.sub("", shown)
     text = LINK_TARGET.sub("", text).translate(MARKUP)
     text = REFERENCE.sub(decoded, text)
