@@ -94,29 +94,6 @@ def test_name_claims_find_the_old_wording_and_pass_the_new():
     assert name_claims(STRAY.format("ATM-06")) == []
 
 
-def test_the_named_command_writes_a_report_whose_parametrize_ids_lead_with_the_criterion_id():
-    prefixes = {}
-    for path in sorted(TESTS.glob("test_*.py")):
-        m = CRITERION_RE.search(docstring(path))
-        if m:
-            prefixes[path.stem] = m.group(1)
-    assert prefixes, "no test module docstring states a criterion id"
-    with tempfile.TemporaryDirectory() as td:
-        report = Path(td) / "report.xml"
-        proc = subprocess.run(
-            [sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider",
-             f"--junitxml={report}", *(str(TESTS / f"{stem}.py") for stem in prefixes)],
-            cwd=ROOT, capture_output=True, text=True, timeout=300)
-        assert report.is_file(), proc.stdout + proc.stderr
-        cases = [(c.get("classname").rsplit(".", 1)[-1], c.get("name"))
-                 for c in ET.parse(report).iter("testcase")]
-    for stem, prefix in prefixes.items():
-        names = [name for module, name in cases if module == stem]
-        assert names, f"{stem}: no testcase in the report\n{proc.stdout}{proc.stderr}"
-        stray = [n for n in names if not re.match(rf"\w+\[{re.escape(prefix)}\.AC\d+ ", n)]
-        assert not stray, f"{stem}: {STRAY.format(prefix)}: {stray}"
-
-
 def test_the_unreleased_changelog_records_the_wording_and_this_test():
     me = f"tests/{HERE.name}"
     entries = unreleased_entries(CHANGELOG.read_text(encoding="utf-8"), me)
@@ -140,3 +117,26 @@ def test_unreleased_entries_stop_at_the_next_section():
                "  `tests/test_junit_report_claim.py` across a line break.\n- Another.\n")
     assert unreleased_entries(wrapped, "test_junit_report_claim") == [
         "- One entry naming `tests/test_junit_report_claim.py` across a line break."]
+
+
+def test_the_named_command_writes_a_report_whose_parametrize_ids_lead_with_the_criterion_id():
+    prefixes = {}
+    for path in sorted(TESTS.glob("test_*.py")):
+        m = CRITERION_RE.search(docstring(path))
+        if m:
+            prefixes[path.stem] = m.group(1)
+    assert prefixes, "no test module docstring states a criterion id"
+    with tempfile.TemporaryDirectory() as td:
+        report = Path(td) / "report.xml"
+        proc = subprocess.run(
+            [sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider",
+             f"--junitxml={report}", *(str(TESTS / f"{stem}.py") for stem in prefixes)],
+            cwd=ROOT, capture_output=True, text=True, timeout=300)
+        assert report.is_file(), proc.stdout + proc.stderr
+        cases = [(c.get("classname").rsplit(".", 1)[-1], c.get("name"))
+                 for c in ET.parse(report).iter("testcase")]
+    for stem, prefix in prefixes.items():
+        names = [name for module, name in cases if module == stem]
+        assert names, f"{stem}: no testcase in the report\n{proc.stdout}{proc.stderr}"
+        stray = [n for n in names if not re.match(rf"\w+\[{re.escape(prefix)}\.AC\d+ ", n)]
+        assert not stray, f"{stem}: {STRAY.format(prefix)}: {stray}"
