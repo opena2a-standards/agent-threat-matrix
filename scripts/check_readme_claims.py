@@ -37,14 +37,20 @@ check, and a line that states one of the matrix.json counts once they are remove
 the same way when it carries one. Each failure names the line, the column of the
 character's first occurrence on it, counted in characters from 1, and the character.
 
-Exit 0 when every claim matches the data, 1 otherwise.
+Exit 0 when every claim matches the data, 1 otherwise. ``--help`` (or ``-h``) prints
+the usage and exits 0. Any other argument, such as a mistyped ``--fixx``, prints the
+usage and exits 2 without checking or writing anything.
 """
 
+import argparse
 import json
 import pathlib
 import re
 import sys
 import unicodedata
+
+# The docstring's first line, held apart so --help still works under python3 -OO.
+DESCRIPTION = "Assert every counted claim in README.md matches matrix.json."
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 MATRIX = ROOT / "matrix.json"
@@ -263,10 +269,17 @@ def empty(value):
 
 
 def main(argv):
+    # An argument this script does not know ends the run with exit 2 before anything is
+    # read or written: a mistyped --fix must not report the README as checked.
+    parser = argparse.ArgumentParser(description=DESCRIPTION, allow_abbrev=False)
+    parser.add_argument("--fix", action="store_true",
+                        help="rewrite the attack-class tables in README.md from matrix.json")
+    args = parser.parse_args(argv)
+
     matrix = json.loads(MATRIX.read_text(encoding="utf-8"))
     readme = README.read_text(encoding="utf-8")
 
-    if "--fix" in argv:
+    if args.fix:
         fixed = fix_class_tables(matrix, readme)
         if fixed != readme:
             README.write_text(fixed, encoding="utf-8")

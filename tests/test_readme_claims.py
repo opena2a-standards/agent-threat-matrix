@@ -9,7 +9,8 @@ while the overview copy still matched.
 
 The attack-class tables are generated from matrix.json: a reworded description, a
 description changed in matrix.json alone, and a missing marker must each go red, and
-``--fix`` must re-render the block without touching the rest of the README.
+``--fix`` must re-render the block without touching the rest of the README. An argument
+other than ``--fix``, ``--help`` or ``-h`` must exit 2 without checking or writing anything.
 
 The DVAA figures are measured in DVAA, not in matrix.json, and are pinned in
 related-projects.json. Every README line naming DVAA must state the pinned numbers: the
@@ -856,3 +857,58 @@ def test_a_missing_class_table_marker_is_red(marker):
         assert "the attack-class tables need exactly one" in r.stderr, r.stderr
     finally:
         shutil.rmtree(td)
+
+
+@pytest.mark.parametrize("args,status,unknown", [
+    (["--bogus"], 2, "--bogus"),
+    (["--fixx"], 2, "--fixx"),
+    (["--fi"], 2, "--fi"),
+    (["fix"], 2, "fix"),
+    (["--fix", "--bogus"], 2, "--bogus"),
+    (["--help"], 0, None),
+    (["-h"], 0, None),
+])
+def test_an_argument_other_than_fix_checks_and_writes_nothing(args, status, unknown):
+    # The check used to look only for --fix in its arguments, so an unknown one printed
+    # the normal report and exited 0, and "--fix --bogus" rewrote the tables. The class
+    # tables differ from matrix.json here, so a run that checks exits 1 and --fix writes.
+    td = scratch_tree()
+    try:
+        path = td / "matrix.json"
+        matrix = json.loads(path.read_text(encoding="utf-8"))
+        for cls in matrix["attackClasses"]:
+            if cls["id"] == "GATEWAY-EXPLOIT":
+                cls["description"] = "Rewritten in the data"
+        path.write_text(json.dumps(matrix, indent=2), encoding="utf-8")
+        before = (td / "README.md").read_text(encoding="utf-8")
+
+        r = run_checker(td, *args)
+        assert r.returncode == status, r.stdout + r.stderr
+        if unknown:
+            assert r.stdout == "", r.stdout
+            assert r.stderr.startswith("usage: check_readme_claims.py"), r.stderr
+            assert f"unrecognized arguments: {unknown}\n" in r.stderr, r.stderr
+        else:
+            assert r.stdout.startswith("usage: check_readme_claims.py"), r.stdout
+            assert "--fix" in r.stdout
+            assert r.stderr == "", r.stderr
+        assert (td / "README.md").read_text(encoding="utf-8") == before
+    finally:
+        shutil.rmtree(td)
+
+
+def test_help_prints_the_usage_under_python_oo():
+    # -OO strips docstrings, so the help description cannot be read from __doc__.
+    r = subprocess.run(["python3", "-OO", str(ROOT / "scripts" / "check_readme_claims.py"),
+                        "--help"], capture_output=True, text=True, timeout=120)
+    assert r.returncode == 0, r.stderr
+    assert load_checker().DESCRIPTION in r.stdout
+
+
+def test_the_description_states_what_help_and_other_arguments_do():
+    module = load_checker()
+    doc = module.__doc__
+    assert module.DESCRIPTION == doc.splitlines()[0]
+    assert "``--help`` (or ``-h``) prints\nthe usage and exits 0." in doc
+    assert ("Any other argument, such as a mistyped ``--fixx``, prints the\n"
+            "usage and exits 2 without checking or writing anything.") in doc
