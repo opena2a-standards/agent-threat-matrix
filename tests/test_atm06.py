@@ -1,8 +1,8 @@
 """ATM-06 acceptance tests.
 
-Leaf test names begin with the criterion id (ATM-06.ACn) so each criterion can be traced
-to a passing testcase in a JUnit report written by `pytest --junitxml`: the id is the
-first token of every parametrize id below.
+Every parametrize id below begins with the criterion id (ATM-06.ACn) so each criterion
+can be traced to a passing testcase in a JUnit report written by `pytest --junitxml`:
+the testcase name is the test function followed by the parametrize id in brackets.
 
 The checker under test is scripts/check_attribution.py. AC1 pins the two CONTRIBUTING.md
 clauses (contributor credit, retained change control) around an unchanged tier table and

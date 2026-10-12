@@ -5,6 +5,11 @@ Three acceptance test modules said each criterion can be traced to a passing tes
 workflow runs pytest. The sentence now names the command, `pytest --junitxml`. The last
 test here runs that command on the modules that state a criterion id and reads the report,
 so the sentence holds as written.
+
+The report names a testcase after the test function followed by the parametrize id in
+brackets, so it is the parametrize id that leads with the criterion id, not the testcase
+name. Those modules said "Leaf test names begin with the criterion id"; a test here fails
+when such a docstring, or the message of the last test, says a name leads with it.
 """
 
 import ast
@@ -19,10 +24,18 @@ ROOT = Path(__file__).resolve().parent.parent
 TESTS = ROOT / "tests"
 COMMAND = "pytest --junitxml"
 CRITERION_RE = re.compile(r"\(([A-Z]+-\d+)\.ACn\)")
+NAME_CLAIM_RE = re.compile(
+    r"\bnames? (?:that |which )?(?:do(?:es)? not |don't )?(?:begins?|leads?|starts?) with", re.I)
+STRAY = "testcase names whose parametrize id does not lead with {}.ACn"
 
 
 def docstring(path: Path) -> str:
     return ast.get_docstring(ast.parse(path.read_text(encoding="utf-8"))) or ""
+
+
+def name_claims(text: str):
+    """Return the phrases of a text that say a name, rather than a parametrize id, leads with an id."""
+    return NAME_CLAIM_RE.findall(" ".join(text.split()))
 
 
 def problems(doc: str):
@@ -51,7 +64,24 @@ def test_problems_accept_a_docstring_that_names_the_command():
     assert problems("Leaf test names begin with the criterion id.\n") == []
 
 
-def test_the_named_command_writes_a_report_whose_testcases_lead_with_the_criterion_id():
+def test_docstrings_that_state_a_criterion_id_say_the_parametrize_id_leads_with_it():
+    found = [f"{path.relative_to(ROOT)}: {claim}"
+             for path in sorted(TESTS.glob("test_*.py")) if CRITERION_RE.search(docstring(path))
+             for claim in name_claims(docstring(path))]
+    assert not found, "\n".join(found)
+
+
+def test_name_claims_find_the_old_wording_and_pass_the_new():
+    assert name_claims("Leaf test names begin with the criterion id (ATM-03.ACn) so each\n"
+                       "criterion can be traced") == ["names begin with"]
+    assert name_claims("testcase names that do not lead with ATM-06.ACn") == [
+        "names that do not lead with"]
+    assert name_claims("Every parametrize id below begins with the criterion id (ATM-03.ACn)\n"
+                       "so each criterion can be traced") == []
+    assert name_claims(STRAY.format("ATM-06")) == []
+
+
+def test_the_named_command_writes_a_report_whose_parametrize_ids_lead_with_the_criterion_id():
     prefixes = {}
     for path in sorted(TESTS.glob("test_*.py")):
         m = CRITERION_RE.search(docstring(path))
@@ -71,4 +101,4 @@ def test_the_named_command_writes_a_report_whose_testcases_lead_with_the_criteri
         names = [name for module, name in cases if module == stem]
         assert names, f"{stem}: no testcase in the report\n{proc.stdout}{proc.stderr}"
         stray = [n for n in names if not re.match(rf"\w+\[{re.escape(prefix)}\.AC\d+ ", n)]
-        assert not stray, f"{stem}: testcase names that do not lead with {prefix}.ACn: {stray}"
+        assert not stray, f"{stem}: {STRAY.format(prefix)}: {stray}"

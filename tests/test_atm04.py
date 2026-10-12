@@ -1,8 +1,8 @@
 """ATM-04 acceptance tests.
 
-Leaf test names begin with the criterion id (ATM-04.ACn) so each criterion can be traced
-to a passing testcase in a JUnit report written by `pytest --junitxml`: the id is the
-first token of every parametrize id below.
+Every parametrize id below begins with the criterion id (ATM-04.ACn) so each criterion
+can be traced to a passing testcase in a JUnit report written by `pytest --junitxml`:
+the testcase name is the test function followed by the parametrize id in brackets.
 
 The checker under test is scripts/check_canonical_classes.py. AC1 pins its CI wiring in
 the readme-claims job with an untampered verdict; AC2 proves the check GREEN on the
