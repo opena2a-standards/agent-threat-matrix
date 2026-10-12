@@ -54,7 +54,10 @@ counted in characters from 1, and the character.
 
 Exit 0 when every claim matches the data, 1 otherwise. ``--help`` (or ``-h``) prints
 the usage and exits 0. Any other argument, such as a mistyped ``--fixx``, prints the
-usage and exits 2 without checking or writing anything.
+usage and exits 2 without checking or writing anything. Help takes precedence over an
+argument the script does not know: given together in either order, as in
+``--fixx --help`` or ``-h --bogus``, they print the usage and exit 0, again without
+checking or writing anything.
 """
 
 import argparse
@@ -345,7 +348,10 @@ def empty(value):
 
 def main(argv):
     # An argument this script does not know ends the run with exit 2 before anything is
-    # read or written: a mistyped --fix must not report the README as checked.
+    # read or written: a mistyped --fix must not report the README as checked. argparse
+    # acts on --help or -h where it stands and names the arguments it does not know only
+    # once it has read them all, so help beside such an argument prints the usage and
+    # exits 0; that run reads and writes nothing either.
     parser = argparse.ArgumentParser(description=DESCRIPTION, allow_abbrev=False)
     parser.add_argument("--fix", action="store_true",
                         help="rewrite the attack-class tables in README.md from matrix.json")

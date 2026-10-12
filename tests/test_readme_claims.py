@@ -11,6 +11,8 @@ The attack-class tables are generated from matrix.json: a reworded description, 
 description changed in matrix.json alone, and a missing marker must each go red, and
 ``--fix`` must re-render the block without touching the rest of the README. An argument
 other than ``--fix``, ``--help`` or ``-h`` must exit 2 without checking or writing anything.
+Given together with ``--help`` or ``-h``, in either order, such an argument must leave the
+run printing the usage and exiting 0, again without checking or writing anything.
 
 The DVAA figures are measured in DVAA, not in matrix.json, and are pinned in
 related-projects.json. Every README line naming DVAA must state the pinned numbers: the
@@ -965,11 +967,21 @@ def test_a_missing_class_table_marker_is_red(marker):
     (["--fix", "--bogus"], 2, "--bogus"),
     (["--help"], 0, None),
     (["-h"], 0, None),
+    (["--fixx", "--help"], 0, None),
+    (["--help", "--fixx"], 0, None),
+    (["--bogus", "-h"], 0, None),
+    (["-h", "--bogus"], 0, None),
+    (["fix", "--help"], 0, None),
+    (["--fix", "--bogus", "--help"], 0, None),
+    (["--help", "--fix", "--bogus"], 0, None),
 ])
 def test_an_argument_other_than_fix_checks_and_writes_nothing(args, status, unknown):
     # The check used to look only for --fix in its arguments, so an unknown one printed
     # the normal report and exited 0, and "--fix --bogus" rewrote the tables. The class
     # tables differ from matrix.json here, so a run that checks exits 1 and --fix writes.
+    # Help takes precedence over an unknown argument in either order: the run prints the
+    # usage on standard output and exits 0, and with --fix beside them it still writes
+    # nothing.
     td = scratch_tree()
     try:
         path = td / "matrix.json"
@@ -1010,3 +1022,9 @@ def test_the_description_states_what_help_and_other_arguments_do():
     assert "``--help`` (or ``-h``) prints\nthe usage and exits 0." in doc
     assert ("Any other argument, such as a mistyped ``--fixx``, prints the\n"
             "usage and exits 2 without checking or writing anything.") in doc
+    # The description read as if an unknown argument exited 2 whatever stood beside it,
+    # while "--fixx --help" printed the usage and exited 0.
+    assert ("Help takes precedence over an\n"
+            "argument the script does not know: given together in either order, as in\n"
+            "``--fixx --help`` or ``-h --bogus``, they print the usage and exit 0, again "
+            "without\nchecking or writing anything.") in doc
