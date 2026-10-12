@@ -7,10 +7,19 @@ three tiers; there is no fourth tier, no sub-tier, and no theoretical tier.
 
 ## The three tiers
 
-The definitions are those published in the README's Evidence Standard table, quoted here
-so this page and the README cannot drift apart.
+This table is the single definition of each tier. README.md, CONTRIBUTING.md and
+EVIDENCE_AUDIT.md quote the Definition column word for word.
+`scripts/check_evidence_tiers.py` reads those three pages, where it takes a line written as
+`| **Observed** | <definition> |` (a table row whose first cell is the tier in bold) or as
+`- **OBSERVED**: <definition>` (a list item labelled with the tier in bold) as a definition.
+It fails when such a definition differs from this table, when the line after a list-item
+definition is neither blank nor a bulleted list item with text indented no further than it
+(Markdown may join such a line to the definition), or when one of the pages leaves a tier out. A
+definition written in any other form, such as inside a block quote, or on another page is
+not read.
+To change a definition, change it here and in every page that quotes it.
 
-| Tier | `evidenceTier` value | Definition (README) |
+| Tier | `evidenceTier` value | Definition |
 |------|----------------------|---------------------|
 | Observed | `observed` | Confirmed in real-world production systems |
 | Validated | `validated` | Reproduced in controlled lab environment (DVAA) |

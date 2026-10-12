@@ -20,9 +20,25 @@ The pages under tactics/ carry nothing but data (name, kill chain stage, descrip
 a table of the tactic's techniques in matrix.json order), so each must equal its full
 rendering from matrix.json. Their tables kept the same four superseded classes.
 
-Run with ``--fix`` to rewrite those lines and tactic pages from the data. Every other line
-of a technique page is left alone. A missing or repeated technique-page line has no single
-place to write the data to, so ``--fix`` reports it and still exits 1.
+The ``## Mitigation`` section of a technique page is data too: it lists the OASB controls
+in ``oasbControls``, and says "No documented mitigations yet." only for a technique that
+maps none. Every page said that while every technique mapped to one or more controls. The
+section runs from its heading to the next ``## `` heading outside fenced code blocks. A
+technique page also carries no ``**Severity:**`` line: matrix.json has no severity field,
+and every page printed the label with an empty value.
+
+A page whose technique is ``adapted`` in matrix.json states its evidence gap in words, in
+one ``- **Evidence Gap:**`` line, and no other page carries that line. The three adapted
+pages showed only ``Evidence Tier: adapted`` while EVIDENCE_AUDIT.md said they stated the
+gap.
+
+Run with ``--fix`` to rewrite those lines, the Mitigation section and the tactic pages from
+the data, to drop a Severity line or an Evidence Gap line the data does not back, and to add
+a missing Evidence Gap line directly under the Evidence Tier line. Every other line of a
+technique page is left alone. Any other missing technique-page line, a repeated line or
+Mitigation section, and a missing Mitigation section have no single place to write the data
+to, and a Mitigation section that holds a fenced code block may hold the rest of the page
+behind an unclosed fence, so ``--fix`` reports each of them and still exits 1.
 """
 
 from __future__ import annotations  # "X | None" annotations also load on Python 3.9
@@ -35,7 +51,15 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 NO_PROCEDURES = "No documented procedures yet."
+NO_MITIGATION = "No documented mitigations yet."
+OASB_URL = "https://oasb.ai"
 DVAA_LABEL = "DVAA Validation"
+ADAPTED_GAP = ("- **Evidence Gap:** Adapted from traditional environments. This technique has no "
+               "agent-specific observation and no lab reproduction yet.")
+GAP_RE = re.compile(r"^(?P<line>- \*\*Evidence Gap:\*\*.*)$", re.M)
+SEVERITY_RE = re.compile(r"^(?P<line>\*\*Severity:\*\*.*)$", re.M)
+MITIGATION_RE = re.compile(r"^(?P<line>## Mitigation)$", re.M)
+SECTION_RE = re.compile(r"^(?P<line>## .*)$", re.M)
 
 # (label, pattern whose group ``line`` is the data line, rendering from a technique).
 # A rendering of None means the page must not carry the line.
@@ -59,6 +83,7 @@ FIELD_PATTERNS = (
      lambda t: f"- Tactic: [{t['tactic']}](../tactics/{t['tactic']}.md)"),
 )
 FIELDS = tuple((label, re.compile(pattern, re.M), render) for label, pattern, render in FIELD_PATTERNS)
+TIER_RE = next(regex for label, regex, _ in FIELDS if label == "Evidence Tier")
 NO_PROCEDURES_RE = re.compile(rf"^(?P<line>{re.escape(NO_PROCEDURES)})$", re.M)
 # Block structure, matched in a line from where the markers and indentation of the block
 # quotes and list items that hold it end, after tabs are expanded to stops of four columns.
@@ -298,7 +323,82 @@ def check_technique_page(technique: dict, text: str) -> tuple[list[str], str]:
         if have != want:
             failures.append(f"{tid}: {label} line is '{have}', matrix.json says '{want}'")
             updated = _replace(updated, found[0], want)
+
+    severity = find_lines(SEVERITY_RE, updated)
+    if severity:
+        count = "a Severity line" if len(severity) == 1 else f"{len(severity)} Severity lines"
+        failures.append(f"{tid}: page has {count}, and matrix.json has no severity field")
+        for match in reversed(severity):
+            start, end = match.span("line")
+            updated = updated[:start] + updated[end + 1:]
+
+    gap_failures, updated = check_evidence_gap(technique, updated)
+    failures.extend(gap_failures)
+    mitigation_failures, updated = check_mitigation(technique, updated)
+    failures.extend(mitigation_failures)
     return failures, updated
+
+
+def check_evidence_gap(technique: dict, text: str) -> tuple[list[str], str]:
+    """Return the Evidence Gap line's disagreement with the tier and the page rewritten. An
+    adapted page carries the line once; a missing one goes directly under the tier line."""
+    tid = technique["id"]
+    tier = technique.get("evidenceTier")
+    found = find_lines(GAP_RE, text)
+    if tier != "adapted":
+        if not found:
+            return [], text
+        for match in reversed(found):
+            start, end = match.span("line")
+            text = text[:start] + text[end + 1:]
+        return [f"{tid}: page has an Evidence Gap line, and matrix.json tier is '{tier}', not adapted"], text
+    if len(found) > 1:
+        return [f"{tid}: page has {len(found)} 'Evidence Gap' lines"], text
+    if found:
+        have = found[0].group("line")
+        if have == ADAPTED_GAP:
+            return [], text
+        return ([f"{tid}: Evidence Gap line is '{have}', the adapted tier says '{ADAPTED_GAP}'"],
+                _replace(text, found[0], ADAPTED_GAP))
+    tiers = find_lines(TIER_RE, text)
+    if len(tiers) == 1:
+        end = tiers[0].end("line")
+        text = text[:end] + "\n" + ADAPTED_GAP + text[end:]
+    return [f"{tid}: adapted page does not state its evidence gap; matrix.json tier adapted "
+            f"says '{ADAPTED_GAP}'"], text
+
+
+def expected_mitigation(technique: dict) -> str:
+    """The Mitigation section body: one line per OASB control matrix.json maps."""
+    controls = technique.get("oasbControls") or []
+    if not controls:
+        return NO_MITIGATION
+    lines = [f"Apply the [OASB-1]({OASB_URL}) controls that matrix.json maps to this technique:", ""]
+    lines += [f"- OASB {control}" for control in controls]
+    return "\n".join(lines)
+
+
+def check_mitigation(technique: dict, text: str) -> tuple[list[str], str]:
+    """Return the Mitigation section's disagreement with the data and the page with the
+    section rewritten. A section that holds a fenced code block is not rewritten."""
+    tid = technique["id"]
+    headings = find_lines(MITIGATION_RE, text)
+    if len(headings) > 1:
+        return [f"{tid}: page has {len(headings)} '## Mitigation' sections"], text
+    if not headings:
+        return [f"{tid}: page has no '## Mitigation' section"], text
+    start = headings[0].end("line")
+    following = [m.start() for m in find_lines(SECTION_RE, text) if m.start() > start]
+    end = following[0] if following else len(text)
+    want = expected_mitigation(technique)
+    if text[start:end].strip("\n") == want:
+        return [], text
+    controls = ", ".join(technique.get("oasbControls") or []) or "none"
+    failures = [f"{tid}: Mitigation section does not list the OASB controls matrix.json maps ({controls})"]
+    if any(start <= fence_start < end for fence_start, _ in fenced_spans(text)):
+        return failures, text
+    trailer = "\n\n" if end < len(text) else "\n"
+    return failures, text[:start] + "\n\n" + want + trailer + text[end:]
 
 
 def _replace(text: str, match: re.Match, line: str) -> str:
@@ -383,7 +483,8 @@ def check_pages(matrix: dict, fix: bool) -> list[str]:
 
 
 def report(heading: str, failures: list[str]) -> None:
-    print(f"{heading} {len(failures)} technique- or tactic-page line(s) that disagree with matrix.json:")
+    print(f"{heading} {len(failures)} technique- or tactic-page line(s) or section(s) that disagree "
+          "with matrix.json:")
     for failure in failures:
         print(f"  - {failure}")
 
@@ -408,7 +509,8 @@ def main(argv: list[str]) -> int:
             return 1
 
     print(f"OK: {len(matrix['techniques'])} technique pages and {len(matrix['tactics'])} tactic "
-          "pages agree with matrix.json on every data line")
+          "pages agree with matrix.json on every data line and Mitigation section, every adapted "
+          "page states its evidence gap, and no technique page carries a Severity line")
     return 0
 
 

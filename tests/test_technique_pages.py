@@ -7,11 +7,13 @@ page's technique table, is then changed in one place: the checker must go red na
 page and the line, and ``--fix`` must restore the shipped text. The checker used to compare
 only the Attack Class and OASB Controls lines, so a class move in the data left the HMA
 Checks line, the References class link and the tactic tables on the old values while CI
-stayed green.
+stayed green. The Mitigation section, rendered from ``oasbControls``, the absent Severity
+line and the Evidence Gap line every adapted page carries are checked the same way.
 """
 
 import importlib.util
 import json
+import re
 import shutil
 import subprocess
 import tempfile
@@ -487,3 +489,218 @@ def test_tactic_row_follows_a_class_move_in_the_data(tree):
     assert result.returncode == 1
     assert "tactics/lateral-movement.md: line 14 is" in result.stdout
     assert "T-5002: References attack class line is" in result.stdout
+
+
+# Every technique maps to one or more OASB controls, yet every page said "No documented
+# mitigations yet." under Mitigation and printed an empty Severity line that no matrix.json
+# field backs.
+NO_MITIGATION = "No documented mitigations yet."
+MITIGATION_SECTION_RE = re.compile(r"^## Mitigation\n(.*?)(?=^## |\Z)", re.M | re.S)
+TECHNIQUES = json.loads((ROOT / "matrix.json").read_text(encoding="utf-8"))["techniques"]
+
+
+def test_no_shipped_page_says_no_mitigation_is_documented():
+    pages = sorted((ROOT / "techniques").glob("*.md"))
+    assert pages
+    assert [p.name for p in pages if NO_MITIGATION in p.read_text(encoding="utf-8")] == []
+
+
+def test_no_shipped_page_prints_a_severity_line():
+    pages = sorted((ROOT / "techniques").glob("*.md"))
+    assert [p.name for p in pages
+            if re.search(r"^\*\*Severity:\*\*", p.read_text(encoding="utf-8"), re.M)] == []
+
+
+@pytest.mark.parametrize("technique", TECHNIQUES, ids=[t["id"] for t in TECHNIQUES])
+def test_mitigation_section_names_every_mapped_control_in_order(technique):
+    text = (ROOT / "techniques" / f"{technique['id']}.md").read_text(encoding="utf-8")
+    found = MITIGATION_SECTION_RE.search(text)
+    assert found, "page has a Mitigation section"
+    assert re.findall(r"^- OASB (\S+)$", found.group(1), re.M) == technique["oasbControls"]
+
+
+def test_placeholder_mitigation_is_red_and_fixed(tree):
+    page = tree / "techniques" / "T-1001.md"
+    before = page.read_text(encoding="utf-8")
+    found = MITIGATION_SECTION_RE.search(before)
+    page.write_text(before[:found.start(1)] + f"\n{NO_MITIGATION}\n\n" + before[found.end(1):],
+                    encoding="utf-8")
+
+    result = run_checker(tree)
+    assert result.returncode == 1, result.stdout
+    assert ("T-1001: Mitigation section does not list the OASB controls matrix.json maps "
+            "(1.1, 1.2, 1.3, 1.4, 10.5)") in result.stdout
+
+    assert run_checker(tree, "--fix").returncode == 0
+    assert page.read_text(encoding="utf-8") == before
+    assert run_checker(tree).returncode == 0
+
+
+def test_mitigation_follows_a_control_change_in_the_data(tree):
+    matrix_path = tree / "matrix.json"
+    matrix = json.loads(matrix_path.read_text(encoding="utf-8"))
+    technique = next(t for t in matrix["techniques"] if t["id"] == "T-1006")
+    technique["oasbControls"] = ["7.1"]
+    matrix_path.write_text(json.dumps(matrix, indent=2), encoding="utf-8")
+
+    result = run_checker(tree)
+    assert result.returncode == 1
+    assert "T-1006: Mitigation section does not list the OASB controls matrix.json maps (7.1)" \
+        in result.stdout
+
+    assert run_checker(tree, "--fix").returncode == 0
+    section = MITIGATION_SECTION_RE.search((tree / "techniques" / "T-1006.md").read_text(encoding="utf-8"))
+    assert re.findall(r"^- OASB (\S+)$", section.group(1), re.M) == ["7.1"]
+
+
+def test_severity_line_is_red_and_dropped(tree):
+    page = tree / "techniques" / "T-1001.md"
+    before = page.read_text(encoding="utf-8")
+    mutate(page, "**Tactic:** reconnaissance\n", "**Tactic:** reconnaissance\n**Severity:** \n")
+
+    result = run_checker(tree)
+    assert result.returncode == 1, result.stdout
+    assert "T-1001: page has a Severity line, and matrix.json has no severity field" in result.stdout
+
+    assert run_checker(tree, "--fix").returncode == 0
+    assert page.read_text(encoding="utf-8") == before
+
+
+def test_severity_line_inside_a_fenced_block_is_not_a_data_line(tree):
+    page = tree / "techniques" / "T-1001.md"
+    mutate(page, "## Mitigation\n", "```markdown\n**Severity:** high\n```\n\n## Mitigation\n")
+    assert run_checker(tree).returncode == 0
+
+
+def test_missing_mitigation_section_is_red(tree):
+    page = tree / "techniques" / "T-1001.md"
+    page.write_text(MITIGATION_SECTION_RE.sub("", page.read_text(encoding="utf-8"), count=1),
+                    encoding="utf-8")
+    result = run_checker(tree)
+    assert result.returncode == 1, result.stdout
+    assert "T-1001: page has no '## Mitigation' section" in result.stdout
+
+    fixed = run_checker(tree, "--fix")
+    assert fixed.returncode == 1, "--fix cannot invent the section's place, so it stays red"
+    assert "FAIL: could not rewrite 1" in fixed.stdout
+
+
+def test_mitigation_section_holding_a_fence_is_red_and_left_alone(tree):
+    # An unclosed fence carries the rest of the page into the section; rewriting the section
+    # would delete the Evidence and References sections behind it.
+    page = tree / "techniques" / "T-1001.md"
+    mutate(page, "## Mitigation\n\n", "## Mitigation\n\n```\n")
+    before = page.read_text(encoding="utf-8")
+
+    result = run_checker(tree)
+    assert result.returncode == 1
+    assert "T-1001: Mitigation section does not list the OASB controls" in result.stdout
+
+    assert run_checker(tree, "--fix").returncode == 1
+    assert page.read_text(encoding="utf-8") == before
+
+
+def test_heading_inside_a_fenced_block_does_not_end_the_mitigation_section(tree):
+    page = tree / "techniques" / "T-1001.md"
+    mutate(page, "- OASB 10.5\n", "- OASB 10.5\n\n```markdown\n## Evidence\n```\n")
+
+    result = run_checker(tree)
+    assert result.returncode == 1
+    assert "T-1001: Mitigation section does not list the OASB controls" in result.stdout
+
+
+def test_rendered_section_for_a_technique_without_controls_keeps_the_placeholder():
+    assert CHK.expected_mitigation({"oasbControls": []}) == NO_MITIGATION
+    rendered = CHK.expected_mitigation({"oasbControls": ["1.1", "10.5"]})
+    assert re.findall(r"^- OASB (\S+)$", rendered, re.M) == ["1.1", "10.5"]
+    assert NO_MITIGATION not in rendered
+
+
+# The adapted pages showed only "Evidence Tier: adapted" while EVIDENCE_AUDIT.md said each
+# page stated the gap.
+GAP_LINE_RE = re.compile(r"^- \*\*Evidence Gap:\*\*.*\n", re.M)
+
+
+@pytest.mark.parametrize("technique", TECHNIQUES, ids=[t["id"] for t in TECHNIQUES])
+def test_adapted_page_states_the_gap_and_no_other_page_does(technique):
+    text = (ROOT / "techniques" / f"{technique['id']}.md").read_text(encoding="utf-8")
+    gap = re.findall(r"^- \*\*Evidence Gap:\*\* (.*)$", text, re.M)
+    if technique["evidenceTier"] == "adapted":
+        assert len(gap) == 1
+        assert "no agent-specific observation and no lab reproduction" in gap[0]
+    else:
+        assert gap == []
+
+
+@pytest.mark.parametrize("technique", TECHNIQUES, ids=[t["id"] for t in TECHNIQUES])
+def test_procedure_examples_name_the_lab_scenario_matrix_json_carries(technique):
+    text = (ROOT / "techniques" / f"{technique['id']}.md").read_text(encoding="utf-8")
+    listed = re.findall(r"^- \*\*DVAA Validation:\*\* (.*)$", text, re.M)
+    assert listed == ([technique["dvaaValidation"]] if technique["dvaaValidation"] else [])
+
+
+def test_adapted_page_without_the_gap_is_red_and_fixed(tree):
+    page = tree / "techniques" / "T-9004.md"
+    before = page.read_text(encoding="utf-8")
+    page.write_text(GAP_LINE_RE.sub("", before), encoding="utf-8")
+
+    result = run_checker(tree)
+    assert result.returncode == 1, result.stdout
+    assert "T-9004: adapted page does not state its evidence gap" in result.stdout
+
+    assert run_checker(tree, "--fix").returncode == 0
+    assert page.read_text(encoding="utf-8") == before
+
+
+def test_stale_gap_line_is_red_and_fixed(tree):
+    page = tree / "techniques" / "T-8003.md"
+    before = page.read_text(encoding="utf-8")
+    mutate(page, CHK.ADAPTED_GAP, "- **Evidence Gap:** none")
+
+    result = run_checker(tree)
+    assert result.returncode == 1, result.stdout
+    assert "T-8003: Evidence Gap line is '- **Evidence Gap:** none'" in result.stdout
+
+    assert run_checker(tree, "--fix").returncode == 0
+    assert page.read_text(encoding="utf-8") == before
+
+
+def test_gap_line_on_a_page_that_is_not_adapted_is_red_and_dropped(tree):
+    page = tree / "techniques" / "T-1001.md"
+    before = page.read_text(encoding="utf-8")
+    mutate(page, "- **Evidence Tier:** observed\n", "- **Evidence Tier:** observed\n" + CHK.ADAPTED_GAP + "\n")
+
+    result = run_checker(tree)
+    assert result.returncode == 1, result.stdout
+    assert ("T-1001: page has an Evidence Gap line, and matrix.json tier is 'observed', "
+            "not adapted") in result.stdout
+
+    assert run_checker(tree, "--fix").returncode == 0
+    assert page.read_text(encoding="utf-8") == before
+
+
+def test_two_gap_lines_are_red_and_left_for_a_hand_edit(tree):
+    page = tree / "techniques" / "T-8003.md"
+    mutate(page, CHK.ADAPTED_GAP + "\n", CHK.ADAPTED_GAP + "\n" + CHK.ADAPTED_GAP + "\n")
+
+    result = run_checker(tree)
+    assert result.returncode == 1
+    assert "T-8003: page has 2 'Evidence Gap' lines" in result.stdout
+    assert run_checker(tree, "--fix").returncode == 1
+
+
+def test_gap_line_follows_a_tier_change_in_the_data(tree):
+    matrix_path = tree / "matrix.json"
+    matrix = json.loads(matrix_path.read_text(encoding="utf-8"))
+    technique = next(t for t in matrix["techniques"] if t["id"] == "T-1001")
+    technique["evidenceTier"] = "adapted"
+    matrix_path.write_text(json.dumps(matrix, indent=2), encoding="utf-8")
+
+    result = run_checker(tree)
+    assert result.returncode == 1
+    assert "T-1001: Evidence Tier line is" in result.stdout
+    assert "T-1001: adapted page does not state its evidence gap" in result.stdout
+
+    assert run_checker(tree, "--fix").returncode == 0
+    page = (tree / "techniques" / "T-1001.md").read_text(encoding="utf-8")
+    assert "- **Evidence Tier:** adapted\n" + CHK.ADAPTED_GAP + "\n" in page

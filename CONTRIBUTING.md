@@ -4,13 +4,15 @@ We welcome contributions of new techniques, attack classes, evidence reports, an
 
 ## Evidence Requirements
 
-Every technique in this matrix must meet one of these evidence bars:
+Every technique in this matrix must meet one of these evidence bars. The definitions are
+quoted from [docs/evidence-tiers.md](docs/evidence-tiers.md); the last column is the
+evidence a submission includes to show its tier.
 
-| Tier | Requirement |
-|------|------------|
-| **Observed** | Documented in a real-world production system, security incident report, or internet-wide exposure assessment |
-| **Validated** | Reproduced in a controlled lab environment with documented steps, expected output, and independent verification |
-| **Adapted** | Well-understood technique from traditional security (MITRE ATT&CK) applied to the AI agent context with a clear explanation of how the agent-specific variant differs |
+| Tier | Definition | Evidence to include |
+|------|------------|---------------------|
+| **Observed** | Confirmed in real-world production systems | The real-world production system, security incident report, or internet-wide exposure assessment where it was documented |
+| **Validated** | Reproduced in controlled lab environment (DVAA) | The documented reproduction steps and the expected output |
+| **Adapted** | Well-understood traditional technique applied to agent context, not yet observed agent-specifically | The named traditional technique (the MITRE ATT&CK id where one exists) and a clear explanation of how the agent-specific variant differs |
 
 We do not accept purely theoretical techniques. If you have a plausible attack vector but no evidence, file an issue describing the hypothesis and we will evaluate it for future research.
 
@@ -179,6 +181,21 @@ checked, and neither are `CHANGELOG.md` and test fixture directories. A new file
 before you stage it; a file that git ignores is not checked. For a finding in
 `attack-classes/`, make the fix in the class description in `matrix.json` and regenerate the
 page.
+
+If your pull request touches an evidence tier definition, also run:
+
+```bash
+python3 scripts/check_evidence_tiers.py
+```
+
+`docs/evidence-tiers.md` is the single definition of each tier, and `README.md`, this file
+and `EVIDENCE_AUDIT.md` quote it. The check reads those three pages for definitions on a
+line of the form `| **Observed** | <definition> |`, as in the table at the top of this file,
+or `- **OBSERVED**: <definition>`, as in `EVIDENCE_AUDIT.md`. It prints `file:line` for each
+such definition that differs from that page, and for each list-item definition followed by
+a line that is neither blank nor a bulleted list item with text indented no further than
+it, names each page that leaves a tier out, and exits 1 if it finds any. Keep each
+definition on one line.
 
 ## Code of Conduct
 

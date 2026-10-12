@@ -5,7 +5,10 @@ matrix.json so the committed files are never perturbed. The shipped tree must be
 Each count the README states is then changed by one in a single place and the checker
 must go red, including the counts repeated in the "Use cases" section: the checker used
 to accept a claim when the right number appeared anywhere, so a stale repeat passed
-while the overview copy still matched.
+while the overview copy still matched. The same holds for the per-tactic table, the
+evidence-tier counts and percentages, the "Attack Classes (N)" heading and the HackMyAgent
+and OASB figures pinned in related-projects.json, which the checker did not read at all,
+so a HackMyAgent check count went stale without failing CI.
 
 The attack-class tables are generated from matrix.json: a reworded description, a
 description changed in matrix.json alone, and a missing marker must each go red, and
@@ -32,7 +35,9 @@ stand before a "[", the name does not name DVAA; on a line that also carries a c
 that fails it, a mark directly after the name leaves the line naming DVAA, and the line
 goes red. The three steps README states for reading the name are also written below as a
 plain scan, which must read generated lines as the checker does, so the sentence and the
-checker's patterns cannot drift apart with every test passing.
+checker's patterns cannot drift apart with every test passing. The example README and the
+checker's description give of a no-break space after a tag name must be a form that only
+the second reading names, and the two must give the same form.
 """
 
 import html
@@ -99,7 +104,7 @@ MUTATIONS = [
      "into 8 tactics and 61 techniques along a kill chain"),
     ("into 9 tactics and 61 techniques along a kill chain",
      "into 9 tactics and 62 techniques along a kill chain"),
-    ("and 60 of the 61 carry a reproducible lab scenario",
+    ("and 58 of the 61 carry a reproducible lab scenario",
      "and 59 of the 61 carry a reproducible lab scenario"),
     # Use cases: the evidence-tier sentence.
     ("16 of the 61 techniques carry real-world evidence",
@@ -113,8 +118,8 @@ MUTATIONS = [
     # Purpose.
     ("into 9 tactics and 61 techniques, organized by kill chain stage",
      "into 9 tactics and 60 techniques, organized by kill chain stage"),
-    ("60 of the 61 also carry a reproducible lab scenario",
-     "61 of the 61 also carry a reproducible lab scenario"),
+    ("58 of the 61 also carry a reproducible lab scenario",
+     "60 of the 61 also carry a reproducible lab scenario"),
     # Matrix overview.
     ("**61 techniques** across 9 tactics", "**61 techniques** across 10 tactics"),
     ("**40 attack classes**", "**41 attack classes**"),
@@ -150,6 +155,26 @@ MUTATIONS = [
      "environment (21 agents, 11 vulnerability categories)"),
     ("environment (21 agents, 12 vulnerability categories)",
      "environment (21 vulnerable agents, 12 vulnerability categories)"),
+    # Matrix overview: the per-tactic table (kill chain stage, technique count, name).
+    ("| [Initial Access](tactics/initial-access.md) | 2 | 9 |",
+     "| [Initial Access](tactics/initial-access.md) | 2 | 8 |"),
+    ("| [Impact](tactics/impact.md) | 9 | 6 |", "| [Impact](tactics/impact.md) | 8 | 6 |"),
+    ("| [Collection](tactics/collection.md) |", "| [Data Collection](tactics/collection.md) |"),
+    # Evidence Standard: the tier table counts and percentages.
+    ("| 16 (26%) |", "| 16 (27%) |"),
+    ("| 42 (69%) |", "| 43 (69%) |"),
+    ("| 3 (5%) |", "| 3 (4%) |"),
+    # Attack Classes: the section heading.
+    ("## Attack Classes (40)", "## Attack Classes (41)"),
+    # The HackMyAgent and OASB figures pinned in related-projects.json, in Cross-Framework
+    # Mapping and in Related Projects.
+    ("(318 static checks, 164 attack payloads)", "(310 static checks, 164 attack payloads)"),
+    ("(318 static checks, 164 attack payloads)", "(318 static checks, 165 attack payloads)"),
+    ("(318 static checks, 164 payloads)", "(310 static checks, 164 payloads)"),
+    ("(318 static checks, 164 payloads)", "(318 static checks, 163 payloads)"),
+    ("(46 controls across 10 domains)", "(45 controls across 10 domains)"),
+    ("(46 controls across 10 domains)", "(46 controls across 11 domains)"),
+    ("Defensive benchmark (46 controls)", "Defensive benchmark (47 controls)"),
 ]
 
 
@@ -179,10 +204,10 @@ def test_a_claim_reworded_out_of_the_readme_is_red():
         shutil.rmtree(td)
 
 
-def mutate_related(root: Path, edit) -> None:
+def mutate_related(root: Path, edit, project: str = "dvaa") -> None:
     path = root / "related-projects.json"
     data = json.loads(path.read_text(encoding="utf-8"))
-    edit(data["dvaa"])
+    edit(data[project])
     path.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
 
@@ -213,6 +238,98 @@ def test_a_dvaa_figure_changed_in_the_pinned_file_is_red_on_every_readme_line():
                        "environment (21 agents, 12 vulnerability categories)"):
             assert f"README.md:{line_of(td, needle)}:" in r.stderr, r.stderr
         assert "related-projects.json (DVAA vulnerability categories: 13)" in r.stderr, r.stderr
+    finally:
+        shutil.rmtree(td)
+
+
+def test_a_refreshed_hackmyagent_figure_turns_every_stale_readme_copy_red():
+    # A HackMyAgent release changes the check count: the pinned file is refreshed and both
+    # README copies of the old figure must fail, each named by line.
+    td = scratch_tree()
+    try:
+        mutate_related(td, lambda d: d.update(staticChecks=319), project="hackmyagent")
+        r = run_checker(td)
+        assert r.returncode == 1, r.stdout
+        for needle in ("(318 static checks, 164 attack payloads)",
+                       "(318 static checks, 164 payloads)"):
+            assert f"README.md:{line_of(td, needle)}:" in r.stderr, r.stderr
+        assert ("related-projects.json (hackmyagent.staticChecks, read from release 0.33.2: "
+                "319)") in r.stderr, r.stderr
+    finally:
+        shutil.rmtree(td)
+
+
+@pytest.mark.parametrize("project,field", [("oasb", "domains"), ("hackmyagent", "attackPayloads")])
+def test_a_pinned_figure_missing_from_the_file_is_red(project, field):
+    td = scratch_tree()
+    try:
+        mutate_related(td, lambda d: d.pop(field), project=project)
+        r = run_checker(td)
+        assert r.returncode == 1, r.stdout
+        assert f"related-projects.json: {project}.{field} is not a whole number" in r.stderr, \
+            r.stderr
+    finally:
+        shutil.rmtree(td)
+
+
+def test_a_tactic_row_dropped_from_the_overview_table_is_red():
+    td = scratch_tree()
+    try:
+        text = (td / "README.md").read_text(encoding="utf-8")
+        row = next(l for l in text.splitlines(keepends=True)
+                   if l.startswith("| [Persistence](tactics/persistence.md) |"))
+        mutate_readme(td, row, "")
+        r = run_checker(td)
+        assert r.returncode == 1, r.stdout
+        assert "README per-tactic table has no row for tactic persistence" in r.stderr, r.stderr
+    finally:
+        shutil.rmtree(td)
+
+
+def test_a_tactic_or_tier_row_written_another_way_is_not_read():
+    # The script's description says a row is read only in the forms it shows: a stale tactic
+    # row with no link and a stale tier row with a space after its last "|" are not read.
+    td = scratch_tree()
+    try:
+        text = (td / "README.md").read_text(encoding="utf-8")
+        row = next(l for l in text.splitlines(keepends=True)
+                   if l.startswith("| [Impact](tactics/impact.md) |"))
+        mutate_readme(td, row,
+                      row + "| Impact | 9 | 5 | stale |\n| **Observed** | dup | 17 (28%) | \n")
+        r = run_checker(td)
+        assert r.returncode == 0, r.stderr
+    finally:
+        shutil.rmtree(td)
+
+
+@pytest.mark.parametrize("line,kilobytes,last", [
+    # Lines that start a tactic row and never close its bracket. With a name class that
+    # crossed line breaks, the row pattern scanned from each such line to the end of the
+    # README and back: these 200 KB took about 16 s on Python 3.14.
+    ("| [a\n", 200, None),
+    # Copies of a tactic row, each reported as a second row for the tactic. Counting the
+    # line breaks before each reported row to name its line took about 28 s for these.
+    ("| [Impact](tactics/impact.md) | 9 | 6 | Modify data |\n", 3200,
+     "second row for tactic impact"),
+], ids=["unclosed tactic row starts", "repeated tactic rows"])
+def test_many_tactic_row_lines_are_read_in_linear_time(line, kilobytes, last):
+    td = scratch_tree()
+    try:
+        readme = td / "README.md"
+        text = readme.read_text(encoding="utf-8")
+        copies = kilobytes * 1024 // len(line)
+        readme.write_text(text + line * copies, encoding="utf-8")
+        start = time.perf_counter()
+        r = run_checker(td)
+        seconds = time.perf_counter() - start
+        if last is None:
+            assert r.returncode == 0, r.stderr
+        else:
+            # The last copy is reported at its own line.
+            assert r.returncode == 1, r.stdout
+            assert f"README.md:{text.count(chr(10)) + copies}: {last} " in r.stderr, \
+                r.stderr[-2000:]
+        assert seconds < 6, f"{seconds:.2f} s"
     finally:
         shutil.rmtree(td)
 
@@ -501,8 +618,10 @@ JOINING_CHARACTERS = [
     ("U+200B ZERO WIDTH SPACE between the name and U+0301",
      "DVAA\N{ZERO WIDTH SPACE}\N{COMBINING ACUTE ACCENT}",
      "U+200B ZERO WIDTH SPACE, a format character"),
-    ("U+200B ZERO WIDTH SPACE between the name and U+20DD in strong emphasis",
-     "**DVAA\N{ZERO WIDTH SPACE}\N{COMBINING ENCLOSING CIRCLE}**",
+    # NFKC leaves U+20DD apart from the A, so "DVAA" U+20DD names DVAA without the
+    # character; U+0301 past U+0332 is joined to it.
+    ("U+200B ZERO WIDTH SPACE between the name and U+0332 U+0301 in strong emphasis",
+     "**DVAA\N{ZERO WIDTH SPACE}\N{COMBINING LOW LINE}\N{COMBINING ACUTE ACCENT}**",
      "U+200B ZERO WIDTH SPACE, a format character"),
 ]
 
@@ -600,8 +719,27 @@ WRITTEN_NAMES = [
     # Read with the no-break space ending the tag name, "<b" U+00A0 "x>" is removed.
     ("U+00A0 NO-BREAK SPACE after a tag name", f"[DV<b\N{NO-BREAK SPACE}x>AA]{DVAA_URL}"),
     # A combining mark after the first "DVAA" leaves the second one read.
-    ("U+20DD COMBINING ENCLOSING CIRCLE after a first DVAA",
-     f"[DVAA\N{COMBINING ENCLOSING CIRCLE} DVAA]{DVAA_URL}"),
+    ("U+0301 COMBINING ACUTE ACCENT after a first DVAA",
+     f"[DVAA\N{COMBINING ACUTE ACCENT} DVAA]{DVAA_URL}"),
+    # A combining mark that NFKC leaves apart from the last A, drawn under, through or
+    # around it, does not make another name; at 0d1bad2 each such line was read, and
+    # treating any mark after the name as making one took it out of the check.
+    ("U+0332 COMBINING LOW LINE after the name", f"[DVAA\N{COMBINING LOW LINE}]{DVAA_URL}"),
+    ("U+0335 COMBINING SHORT STROKE OVERLAY after the name",
+     f"[DVAA\N{COMBINING SHORT STROKE OVERLAY}]{DVAA_URL}"),
+    ("U+0338 COMBINING LONG SOLIDUS OVERLAY after the name",
+     f"[DVAA\N{COMBINING LONG SOLIDUS OVERLAY}]{DVAA_URL}"),
+    ("U+20DD COMBINING ENCLOSING CIRCLE after the name",
+     f"[DVAA\N{COMBINING ENCLOSING CIRCLE}]{DVAA_URL}"),
+    ("U+0332 U+0338 after the name",
+     f"[DVAA\N{COMBINING LOW LINE}\N{COMBINING LONG SOLIDUS OVERLAY}]{DVAA_URL}"),
+    # U+20DD has combining class 0, so NFKC joins no mark after it to the A.
+    ("U+20DD U+0301 after the name",
+     f"[DVAA\N{COMBINING ENCLOSING CIRCLE}\N{COMBINING ACUTE ACCENT}]{DVAA_URL}"),
+    ("U+0332 COMBINING LOW LINE after U+0410",
+     f"[DVA\N{CYRILLIC CAPITAL LETTER A}\N{COMBINING LOW LINE}]{DVAA_URL}"),
+    ("U+0332 COMBINING LOW LINE after strong emphasis",
+     f"[DV**AA**\N{COMBINING LOW LINE}]{DVAA_URL}"),
     # A combining mark that stands after markup rather than directly after a letter, and a
     # character reference to a mark, do not count as directly after the name.
     ("U+20DD COMBINING ENCLOSING CIRCLE after strong emphasis",
@@ -615,6 +753,7 @@ WRITTEN_NAMES = [
     # Such a mark is also kept apart from the name, so that NFKC does not join U+0301 to
     # the last A and read "DVA" U+00C1.
     ("reference to U+0301 after strong emphasis", f"[DV**AA**&#x301;]{DVAA_URL}"),
+    ("reference to U+0301 after the name", f"[DVAA&#x301;]{DVAA_URL}"),
     ("reference to U+0301 after the name in strong emphasis",
      f"[DV**AA&#x301;**]{DVAA_URL}"),
     ("fullwidth letters",
@@ -700,7 +839,8 @@ def test_a_backtick_beside_the_name_dvaa_leaves_the_line_read(line):
 # rather than marking up text, a letter with an accent is not confusable with A, NFKC
 # leaves U+00C1 composed, a comment that no line closes shows as text and runs to the end
 # of the line, a character read as letters that do not stand together in "DVAA" shows them
-# in another order, "DVAA" directly followed by a combining mark does not name DVAA, and a
+# in another order, "DVAA" directly followed by a combining mark that NFKC joins to the last
+# A shows another letter, also where the mark is joined past one NFKC leaves apart, and a
 # "!" that does not stand before a "[" stays. Such a line does not name DVAA, so its
 # figures are not read.
 OTHER_NAMES = [
@@ -714,7 +854,11 @@ OTHER_NAMES = [
     ("U+0301 COMBINING ACUTE ACCENT after the name", "[DVAA\N{COMBINING ACUTE ACCENT}]"),
     ("U+0301 COMBINING ACUTE ACCENT after U+0410",
      "[DVA\N{CYRILLIC CAPITAL LETTER A}\N{COMBINING ACUTE ACCENT}]"),
-    ("U+20DD COMBINING ENCLOSING CIRCLE after the name", "[DVAA\N{COMBINING ENCLOSING CIRCLE}]"),
+    ("U+0332 COMBINING LOW LINE and U+0301 after the name",
+     "[DVAA\N{COMBINING LOW LINE}\N{COMBINING ACUTE ACCENT}]"),
+    ("U+0301 COMBINING ACUTE ACCENT and U+0332 after the name",
+     "[DVAA\N{COMBINING ACUTE ACCENT}\N{COMBINING LOW LINE}]"),
+    ("U+0308 COMBINING DIAERESIS after the name", "[DVAA\N{COMBINING DIAERESIS}]"),
     ("exclamation mark", "[DV!AA]"),
 ] + [
     (confusable_case(code), f"[D{chr(code)}A]")
@@ -922,11 +1066,12 @@ def stated_name_form(checker, line, any_space=True):
 # pieces in five, of longer pieces: the openings and closes of HTML, character references,
 # white space other than a space, and characters NFKC or the confusables read as A, D or V
 # or leave beside them. With these, each pattern alternative and each step, changed or
-# taken out of order, reads at least 30 of the 200,000 lines differently, with two
+# taken out of order, reads at least 30 of the 200,000 lines differently, with three
 # exceptions a case above also pins: removing each "!" before the link spans rather than
 # after them reads 2 lines differently ("exclamation mark before a link span"), and in
 # the second reading letting only a space and "/" end a tag name reads 13 differently
-# ("tab after a tag name in the second reading").
+# ("tab after a tag name in the second reading") and letting only a space and a tab end
+# it reads 22 differently ("slash after a tag name in the second reading").
 MARKUP_CHARACTERS = "[]()DVAx \"*_~`\\<>"
 PIECES = [
     *"/-!?=1&#;\t", "<x", "</A", "<!--", "-->", "<?", "?>", "<![CDATA[", "]]>", "<!",
@@ -1023,6 +1168,23 @@ def test_name_form_reads_a_long_run_of_combining_marks_in_n_log_n_time(text, for
     assert seconds < 1, f"{seconds:.2f} s"
 
 
+def test_names_reads_a_long_run_of_combining_marks_after_the_name_in_linear_time():
+    # names decomposes each name form with unicodedata.normalize("NFKD"), which puts a run of
+    # combining marks in order by moving one mark at a time. It is linear only because nfkc
+    # has already put the form in order: on this line, U+0301 U+0316 repeated 100,000 times
+    # took about 0.3 s on Python 3.14 and 400,000 about 1 s. Decomposed as written, out of
+    # order, the run took about 2 s at 50,000 and about four times as long at each doubling.
+    # The no-break space after "<b" adds the second reading, and the form holds the name only
+    # once decomposed, as "A" composes with one U+0301, so the line is read with every step.
+    checker = load_checker()
+    line = "<b\N{NO-BREAK SPACE} DVAA" + OUT_OF_ORDER
+    start = time.perf_counter()
+    named = checker.names(line, "DVAA")
+    seconds = time.perf_counter() - start
+    assert not named
+    assert seconds < 3, f"{seconds:.2f} s"
+
+
 def test_a_mark_after_markup_or_written_as_a_reference_is_put_apart():
     checker = load_checker()
     assert checker.name_form("DV![](x.png)AA") == "DVAA"
@@ -1036,6 +1198,25 @@ def test_a_mark_after_markup_or_written_as_a_reference_is_put_apart():
         assert checker.detached(attached) == attached
     # No ASCII character is a combining mark, so none after the name needs a lookup.
     assert not any(checker.is_mark(code) for code in range(128))
+
+
+def test_the_no_break_space_example_is_a_form_only_the_second_reading_names():
+    # README and the checker's description gave '[DV](url "<b' U+00A0 'x=")AA' as the form a
+    # no-break space after a tag name no longer hides. No ">" follows it, so no tag is
+    # removed and the first reading already named DVAA; with the final ">" the first reading
+    # removes "AA" with the tag, and only the second reading names DVAA.
+    checker = load_checker()
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    sentence = next(line for line in readme.split("\n") if "So the name written as" in line)
+    examples = re.findall(r"`([^`]*)` U\+00A0 `([^`]*)`", sentence)
+    assert len(examples) == 1, examples
+    before, after = examples[0]
+    assert f'"{before}" U+00A0 "{after}"' in " ".join(checker.__doc__.split())
+    written = before + "\N{NO-BREAK SPACE}" + after
+    assert checker.OTHER_SPACE_AFTER_TAG_NAME.search(written)
+    assert not checker.holds(checker.name_form(written, checker.RAW_HTML), "DVAA")
+    assert checker.holds(checker.name_form(written, checker.SPACE_OR_TAB_HTML), "DVAA")
+    assert checker.names(written, "DVAA")
 
 
 def test_a_line_naming_dvaa_and_stating_a_count_names_both():

@@ -65,7 +65,11 @@
           "x-semantic": "must be the id of an entry in attackClasses[]"
         },
         "hmaChecks": { "type": "array", "items": { "type": "string" } },
-        "dvaaValidation": { "type": ["string", "null"], "description": "Null when the technique carries no lab scenario." },
+        "dvaaValidation": {
+          "type": ["string", "null"],
+          "description": "Null when the technique carries no lab scenario.",
+          "x-semantic": "must be null when evidenceTier is adapted"
+        },
         "oasbControls": { "type": "array", "items": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+$" } },
         "parentId": {
           "$ref": "#/$defs/parentTechniqueId",

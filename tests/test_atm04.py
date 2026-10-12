@@ -7,7 +7,8 @@ the testcase name is the test function followed by the parametrize id in bracket
 The checker under test is scripts/check_canonical_classes.py. AC1 pins its CI wiring in
 the readme-claims job with an untampered verdict; AC2 proves the check GREEN on the
 shipped tree and RED on a scratch copy with one technique id dropped from a primary
-array; AC3 and AC4 pin the CHANGELOG states (a resolvable docstring pointer, no
+array, or with a matrixVersion stamp other than the matrix.json version or a matrixCommit
+stamp that is not a 40-hex commit sha (V6); AC3 and AC4 pin the CHANGELOG states (a resolvable docstring pointer, no
 internal role name).
 """
 
@@ -269,4 +270,63 @@ AC4_CASES = [
 
 @pytest.mark.parametrize("case", [pytest.param(fn, id=name) for name, fn in AC4_CASES])
 def test_ac4(case):
+    case()
+
+
+# --------------------------------------------------------------------------- V6 stamps
+
+def _scratch_tree_stamped(**stamps) -> Path:
+    """A scratch copy of the tree with canonical-classes.json stamps overridden."""
+    td = Path(tempfile.mkdtemp(prefix="atm04-"))
+    (td / "scripts").mkdir()
+    shutil.copy(CHECKER, td / "scripts" / "check_canonical_classes.py")
+    shutil.copy(ROOT / "matrix.json", td / "matrix.json")
+    data = json.loads((ROOT / "canonical-classes.json").read_text())
+    data.update(stamps)
+    (td / "canonical-classes.json").write_text(json.dumps(data, indent=2) + "\n")
+    return td
+
+
+def _ac2_shipped_stamps_carry_the_matrix_version_and_a_full_commit():
+    data = json.loads((ROOT / "canonical-classes.json").read_text())
+    matrix = json.loads((ROOT / "matrix.json").read_text())
+    assert data["matrixVersion"] == matrix["version"]
+    assert re.match(r"^[0-9a-f]{40}$", data["matrixCommit"]), data["matrixCommit"]
+
+
+def _ac2_stamp_turns_the_checker_red(stamps: dict, line: str):
+    def case():
+        scratch = _scratch_tree_stamped(**stamps)
+        try:
+            proc = _run_checker(scratch)
+            assert proc.returncode == 1, proc.stdout + proc.stderr
+            err = proc.stderr.splitlines()
+            assert line in err
+            assert "canonical-classes.json: 1 violation(s)" in err
+        finally:
+            shutil.rmtree(scratch)
+    return case
+
+
+AC2_STAMP_CASES = [
+    ("ATM-04.AC2 the shipped stamps carry the matrix.json version and a 40-hex commit sha",
+     _ac2_shipped_stamps_carry_the_matrix_version_and_a_full_commit),
+    ("ATM-04.AC2 a stale matrixVersion turns the checker red with the V6 line",
+     _ac2_stamp_turns_the_checker_red(
+         {"matrixVersion": "1.1"}, "V6 matrixVersion '1.1' differs from matrix.json version '1.2'")),
+    ("ATM-04.AC2 an abbreviated matrixCommit turns the checker red with the V6 line",
+     _ac2_stamp_turns_the_checker_red(
+         {"matrixCommit": "298eba0"}, "V6 matrixCommit '298eba0' is not a 40-hex commit sha")),
+    ("ATM-04.AC2 the PENDING-AT-MERGE placeholder turns the checker red with the V6 line",
+     _ac2_stamp_turns_the_checker_red(
+         {"matrixCommit": "PENDING-AT-MERGE"},
+         "V6 matrixCommit 'PENDING-AT-MERGE' is not a 40-hex commit sha")),
+    ("ATM-04.AC2 a null matrixCommit turns the checker red with the V6 line",
+     _ac2_stamp_turns_the_checker_red(
+         {"matrixCommit": None}, "V6 matrixCommit None is not a 40-hex commit sha")),
+]
+
+
+@pytest.mark.parametrize("case", [pytest.param(fn, id=name) for name, fn in AC2_STAMP_CASES])
+def test_ac2_stamps(case):
     case()

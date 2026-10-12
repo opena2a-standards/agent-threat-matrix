@@ -189,7 +189,7 @@ def test_name_claims_stop_at_id_or_ids_with_no_letter_or_digit_beside_it():
     # Such a word names an id wherever in it "id" or "ids" stands; only a word that began
     # with either stopped the check, so the first sentence was read as a name claim.
     assert name_claims("Testcase names whose parametrize-ids begin with ATM-06.ACn") == []
-    for word in ("test_ids", "id-values", "ids=", "(node-id),"):
+    for word in ("test_ids", "id_values", "id-values", "ids=", "(node-id),"):
         assert name_claims(f"Testcase names whose {word} begin with ATM-06.ACn") == [], word
     # A letter or a digit beside it makes another word of it, and the name stays the subject.
     for word in ("valid", "identical", "provided", "kids", "id3", "3ids"):
@@ -219,6 +219,11 @@ def test_name_claims_read_past_a_mark_inside_a_word_and_stop_where_only_marks_fo
         inside = f"test_atm03{mark}py"
         assert name_claims(f"Leaf test names in {inside} begin with the criterion id") == [
             f"names in {inside} begin with"], mark
+        # An underscore is not a mark, so with one after it, marks or none after that, it
+        # ends no sentence either.
+        for word in (f"suffix{mark}_", f"suffix{mark}_)", f"{mark}_"):
+            assert name_claims(f"Leaf test names in {word} begin with the criterion id") == [
+                f"names in {word} begin with"], word
         # With nothing but marks after it, also in a word of marks alone, it ends a sentence.
         for end in (f"suffix{mark})", f'"suffix{mark}"', f"suffix{mark}{mark}", f"({mark})",
                     mark):

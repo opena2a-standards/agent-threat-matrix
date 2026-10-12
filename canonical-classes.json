@@ -1,7 +1,7 @@
 {
  "description": "Maps the ten canonical attack classes (the classifier label set, nanomind-security-classifier id2label) to matrix.json technique ids. This axis is behavior; matrix.json attackClasses are attack vectors. Each technique has exactly one primary class; secondary lists other classes whose definition the technique also satisfies. Technique-to-class resolution uses primary only. Authored content: do not derive, do not edit without a taxonomy ruling.",
- "matrixVersion": "1.1",
- "matrixCommit": "298eba0",
+ "matrixVersion": "1.2",
+ "matrixCommit": "b554a22db7fce6826b776e730b8955aed3583cf8",
  "classes": {
   "injection":            {"primary": ["T-1007","T-2001","T-2002","T-2003","T-2004","T-2005","T-2007","T-2008","T-2009","T-7007"], "secondary": ["T-1003","T-2006","T-4003","T-4006","T-4007","T-6001","T-6007","T-7002"]},
   "exfiltration":         {"primary": ["T-1003","T-7001","T-7002","T-7003","T-7004","T-7006","T-8001","T-8002","T-8003","T-8004","T-8005","T-8006"], "secondary": ["T-3001","T-3002","T-3006","T-7005"]},

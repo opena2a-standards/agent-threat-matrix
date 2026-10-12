@@ -15,8 +15,9 @@ Checks:
 - V3 the primary arrays partition the matrix technique ids -- each id exactly once
 - V4 ``benign`` carries no ids at all
 - V5 per class, primary and secondary are disjoint, strictly ascending, duplicate-free
-
-``matrixVersion`` and ``matrixCommit`` are informational and deliberately unchecked.
+- V6 ``matrixVersion`` equals the matrix.json ``version`` and ``matrixCommit`` is the
+  40-hex sha of the commit whose matrix.json the mapping maps; an abbreviated sha is
+  refused. No git is consulted, so only the shape of the sha is checked
 
 Exit 0 when the mapping holds, 1 otherwise, printing one line per violation.
 """
@@ -47,6 +48,7 @@ CLASS_NAMES = [
 ]
 
 ID_RE = re.compile(r"^T-[0-9]{4}(\.[0-9]{3})?$")
+COMMIT_SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 
 ARRAYS = ("primary", "secondary")
 
@@ -149,6 +151,17 @@ def check_ordering(mapping, errors):
             errors.append(f"V5 {name}: id in both primary and secondary: {tid}")
 
 
+def check_stamps(data, matrix_version, errors):
+    """V6: the mapping names the matrix version and the full commit it maps. An absent
+    key is already a V1 finding."""
+    version = data.get("matrixVersion")
+    if "matrixVersion" in data and version != matrix_version:
+        errors.append(f"V6 matrixVersion {version!r} differs from matrix.json version {matrix_version!r}")
+    commit = data.get("matrixCommit")
+    if "matrixCommit" in data and not (isinstance(commit, str) and COMMIT_SHA_RE.match(commit)):
+        errors.append(f"V6 matrixCommit {commit!r} is not a 40-hex commit sha")
+
+
 def main():
     try:
         data = json.loads(CANONICAL.read_text(encoding="utf-8"))
@@ -164,6 +177,8 @@ def main():
 
     errors = []
     mapping = check_shape(data, errors)
+    if isinstance(data, dict):
+        check_stamps(data, matrix.get("version"), errors)
     if mapping is not None:
         check_ids(mapping, matrix_ids, errors)
         check_partition(mapping, matrix_ids, errors)

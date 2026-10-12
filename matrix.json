@@ -2,7 +2,7 @@
   "version": "1.2",
   "name": "AI Agent Threat Matrix",
   "created": "2026-03-24",
-  "updated": "2026-06-03",
+  "updated": "2026-10-12",
   "stixNamespace": "d43c7092-69ad-4822-b2cb-a48e459c4580",
   "tactics": [
     {
@@ -1195,7 +1195,7 @@
       "hmaChecks": [
         "SUPPLY-001"
       ],
-      "dvaaValidation": "consensus-manipulation",
+      "dvaaValidation": null,
       "oasbControls": [
         "7.1",
         "7.2",
@@ -1213,7 +1213,7 @@
       "hmaChecks": [
         "SUPPLY-001"
       ],
-      "dvaaValidation": "malicious output generation",
+      "dvaaValidation": null,
       "oasbControls": [
         "4.1",
         "4.4",

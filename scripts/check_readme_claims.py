@@ -11,9 +11,19 @@ between the BEGIN/END GENERATED markers. Typed by hand, they reworded 34 of the
 40 class descriptions and four of them described a different attack. The block
 must re-render byte-identically; run with ``--fix`` to rewrite only that block.
 
+The per-tactic table and the evidence-tier table are measurements over matrix.json too.
+A tactic row is read where a line starts ``| [Name](tactics/<id>.md) | N | N |``, and a
+tier row where a line starts ``| **Tier** |`` and ends ``| N (P%) |`` with nothing after
+the last "|", each spaced exactly as shown; a row written any other way is not read. Each
+tactic row read must state the tactic's name, kill chain stage and technique count, and
+each tier row read its technique count and that count as a whole percentage of all
+techniques, rounded half up; a row read that names no tactic or tier, a second row read for
+one, and a tactic or tier with no row read each fail. The "## Attack Classes (N)" heading
+must state the number of attack classes.
+
 The README also states figures about related projects. Those are measured in the
-other project, so they are pinned in related-projects.json with the release and
-commit each was read from, and every README line naming the project must state the
+other project, so they are pinned in related-projects.json with the release each was
+read from, and for DVAA the commit, and every README line naming DVAA must state the
 pinned number wherever it uses one of the wordings read here. For DVAA those are
 "N agents", "N deliberately vulnerable", "N hardened reference", "N control-protected
 variant(s)", "N vulnerable agent(s)" and "N categories", where up to two words, each a
@@ -21,6 +31,13 @@ run of ASCII letters and hyphens, may stand between the number and "categories".
 is read in any letter case with one space between words; a figure worded any other way
 is not checked. DVAA was described as "21 vulnerable agents" while DVAA labels one of
 the 21 a hardened reference and four control-protected variants.
+
+The HackMyAgent and OASB figures are pinned in related-projects.json too, with the
+HackMyAgent release they were read from, and are read on every README line: "N static
+checks" and "N payloads" or "N attack payloads" must state the pinned HackMyAgent figures,
+and "N controls" and "N domains" the pinned OASB figures. Each wording is read in the
+letter case written here. The README stated 310 static checks after HackMyAgent 0.33.2
+reported 318, and no check read the figure.
 
 A line naming DVAA fails when it carries a format character (Unicode category Cf, such
 as U+00AD SOFT HYPHEN or U+200B ZERO WIDTH SPACE), a control character (category Cc)
@@ -31,16 +48,20 @@ lists as default ignorable without assigning them (U+2065, U+FFF0 to U+FFF8, U+E
 U+E0002 to U+E001F, U+E0080 to U+E00FF, U+E01F0 to U+E0FFF). Inside a wording such a
 character keeps the wording from being read, and a Hangul filler or combining mark does
 so directly beside a DVAA wording, while a character that renders as nothing leaves the
-figure in the rendered line. A line names DVAA when it contains "DVAA" with no combining
-mark (Unicode category M) directly after it once such characters are removed, either as
-it then stands or after three more steps, so "DVAA" followed by U+0301 COMBINING ACUTE
-ACCENT does not name DVAA. A mark counts as directly after "DVAA" only where it is
-written as itself, not as a character reference, directly after a letter or another mark,
-so "DV**AA**" U+20DD and "DVAA&#x20dd;" name DVAA. A mark that does not count as directly
-after "DVAA" is also kept apart from the name, so that NFKC in the third step below does
-not join it to the last A: "DV**AA**" U+0301, "DV**AA**&#x301;" and "DV**AA&#x301;**"
-name DVAA, while NFKC alone gives "DVA" U+00C1. First, going along the line, its HTML
-is removed wherever it stands, also where it starts inside a link destination or title
+figure in the rendered line. A line names DVAA when it contains "DVAA" once such
+characters are removed, either as it then stands or after three more steps, with no
+combining mark (Unicode category M) directly after it that NFKC joins to the last A. So
+"DVAA" followed by U+0301 COMBINING ACUTE ACCENT, which NFKC joins to the A as U+00C1,
+does not name DVAA, nor does "DVAA" followed by U+0332 COMBINING LOW LINE and U+0301,
+while "DVAA" followed by U+0332, U+0335 COMBINING SHORT STROKE OVERLAY, U+0338 COMBINING
+LONG SOLIDUS OVERLAY or U+20DD COMBINING ENCLOSING CIRCLE, which NFKC leaves apart from
+the A, names DVAA. A mark counts as directly after "DVAA" only where it is written as
+itself, not as a character reference, directly after a letter or another mark, and a mark
+that does not is kept apart from the name, so that NFKC in the third step below does not
+join it to the last A: "DV**AA**" U+0301, "DVAA&#x301;", "DV**AA**&#x301;" and
+"DV**AA&#x301;**" name DVAA, while NFKC alone gives "DVA" U+00C1. First, going along the
+line, its HTML is removed wherever it stands, also where it starts inside a link
+destination or title
 and ends after the ) that closes them: each comment, processing instruction, CDATA
 section and declaration from its opening <!--, <?, <![CDATA[ or <! and an ASCII letter to
 the first -->, ?>, ]]> or > after it, respectively, or to the end of the line when none
@@ -58,7 +79,7 @@ stands for less any such character, so "&#8203;" (U+200B) leaves nothing, and it
 brought to NFKC with each character Unicode lists as confusable with A, D or V read as
 that letter (U+0410 CYRILLIC CAPITAL LETTER A reads as A). So the name written as
 "DV&#8203;AA", "**DV**AA", "DV<!-- -->AA", "<b>DV</b>AA", "[DV](url)AA",
-"DV![](x.png)AA", "[DV](url "<b" U+00A0 "x=")AA" or in fullwidth letters does not take
+"DV![](x.png)AA", "[DV](url "<b" U+00A0 "x=")AA>" or in fullwidth letters does not take
 the line out of the check, while "DV!AA" does not name DVAA. On a line that carries one
 of the characters above, a combining mark after "DVAA" does not keep the line from naming
 DVAA, so "DVAA" U+200B U+0301 names DVAA and the line fails on U+200B. A line that states
@@ -75,6 +96,7 @@ checking or writing anything.
 """
 
 import argparse
+import bisect
 import html
 import json
 import pathlib
@@ -103,6 +125,18 @@ CATEGORY_LABELS = {
     "identity": "Identity",
     "sandbox": "Sandbox",
 }
+
+# The evidence tiers, each with one row in the README evidence-tier table.
+TIERS = ("observed", "validated", "adapted")
+
+# Related-project figures other than DVAA's, read on every README line: the project and
+# field each is pinned under in related-projects.json, and the wording that states it.
+RELATED_WORDINGS = (
+    ("hackmyagent", "staticChecks", r"\b(\d+) static checks\b"),
+    ("hackmyagent", "attackPayloads", r"\b(\d+) (?:attack )?payloads\b"),
+    ("oasb", "controls", r"\b(\d+) controls\b"),
+    ("oasb", "domains", r"\b(\d+) domains\b"),
+)
 
 # Letters (category Lo) that render as blank space. Each is a word character, so a DVAA
 # wording directly beside one is not read, and neither is a matrix.json count wording
@@ -361,13 +395,18 @@ def name_form(stripped, raw_html=RAW_HTML):
 
 
 def holds(text, name):
-    """Whether `text` holds `name` at some place with no combining mark directly after it,
-    so "DVAA" U+0301 does not hold DVAA and "DVAA" U+20DD " DVAA" does. Only a character
-    after `name` outside ASCII has its category looked up; no ASCII character is a mark."""
+    """Whether `text` holds `name` at some place where NFKC does not join the combining
+    marks directly after it to its last letter. "DVAA" U+0301 does not hold DVAA, as NFKC
+    gives "DVA" U+00C1, and neither does "DVAA" U+0332 U+0301, where NFKC joins U+0301 to
+    the A past U+0332; "DVAA" U+0332 COMBINING LOW LINE, "DVAA" U+20DD and "DVAA" U+0301
+    " DVAA" do. Only a character after `name` outside ASCII has its category looked up; no
+    ASCII character is a mark."""
     start = text.find(name)
     while start >= 0:
-        after = text[start + len(name):start + len(name) + 1]
-        if after.isascii() or not is_mark(ord(after)):
+        end = run = start + len(name)
+        while run < len(text) and not text[run].isascii() and is_mark(ord(text[run])):
+            run += 1
+        if run == end or nfkc(name[-1] + text[end:run])[0] == name[-1]:
             return True
         start = text.find(name, start + 1)
     return False
@@ -397,11 +436,12 @@ def names(stripped, name, hiding=False):
     """Whether a line that is `stripped` once the characters `hiding_kind` names are
     removed names `name`: it `holds` `name` as it stands or in its `name_form`, read with
     `RAW_HTML` and, where a tag name is followed by white space other than a space or
-    tab, with `SPACE_OR_TAB_HTML` too. Where a name form holds `name` only with a
-    combining mark directly after it or only once its letters are decomposed, the name
-    form of the line `detached` is read too, so a mark counts only where it is written as
-    itself directly after a letter or another mark: "DVAA" U+20DD does not name DVAA,
-    while "DV**AA**" U+20DD and "DV**AA&#x20dd;**" do. "DV" U+200B "AA", "DV&#8203;AA",
+    tab, with `SPACE_OR_TAB_HTML` too. Where a name form holds `name` only with combining
+    marks directly after it that NFKC joins to its last letter, or only once its letters
+    are decomposed, the name form of the line `detached` is read too, so a mark counts only
+    where it is written as itself directly after a letter or another mark: "DVAA" U+0301
+    does not name DVAA, while "DV**AA**" U+0301 and "DV**AA&#x301;**" do, and "DVAA"
+    U+0332, which NFKC leaves apart from the A, names DVAA. "DV" U+200B "AA", "DV&#8203;AA",
     "**DV**AA", "DV<!-- -->AA", "DVA" U+0410 and the fullwidth letters each name DVAA;
     "DVAA" U+0301 does not. On a line that carried such a character, `hiding` true, a
     combining mark after `name` does not keep the line from naming it: removing the
@@ -471,6 +511,11 @@ def empty(value):
     if isinstance(value, (list, tuple)):
         return all(empty(v) for v in value) if value else True
     return False
+
+
+def percent(count, total):
+    """`count` as a whole percentage of `total`, rounded half up."""
+    return (200 * count + total) // (2 * total)
 
 
 def main(argv):
@@ -552,6 +597,7 @@ def main(argv):
           "tactics and techniques")
     count(r"\b(\d+) attack classes\b", [len(classes)], "attack classes")
     count(r"\*\*(\d+) attack classes\*\*", [len(classes)], "attack classes")
+    count(r"(?m)^## Attack Classes \((\d+)\)$", [len(classes)], "attack classes")
 
     # Evidence tiers, in the overview wording and in the Use cases wording.
     count(r"\*\*(\d+) techniques with real-world evidence\*\*", [observed], "observed")
@@ -585,6 +631,73 @@ def main(argv):
         [with_lab, total],
         "lab scenario of total",
     )
+
+    # The offset of every line break, found once: a row's line number is then a bisection,
+    # where counting the breaks before each row made many rows take time in proportion to
+    # their number times the size of the README.
+    breaks = [m.start() for m in re.finditer("\n", readme)]
+
+    def line_of(pos):
+        return bisect.bisect_left(breaks, pos) + 1
+
+    # Matrix overview: one row per tactic, stating its name, kill chain stage (`order`)
+    # and technique count. The name and the link target stop at a line break: a row is one
+    # line, and a class that crosses line breaks scanned from every line that starts "| ["
+    # to the end of the README and back.
+    per_tactic = {}
+    for t in techniques:
+        per_tactic[t.get("tactic")] = per_tactic.get(t.get("tactic"), 0) + 1
+    tactic_by_id = {t["id"]: t for t in tactics}
+    tactic_rows = {}
+    for m in re.finditer(
+            r"(?m)^\| \[([^\]\n]+)\]\(tactics/([^)\n]+)\.md\) \| (\d+) \| (\d+) \|", readme):
+        name, tid, stage, stated = m.groups()
+        line = line_of(m.start())
+        tactic = tactic_by_id.get(tid)
+        if tactic is None:
+            failures.append(f"README.md:{line}: tactic row links tactics/{tid}.md, "
+                            f"which is not a tactic in matrix.json")
+            continue
+        if tid in tactic_rows:
+            failures.append(f"README.md:{line}: second row for tactic {tid} "
+                            f"(first at line {tactic_rows[tid]})")
+            continue
+        tactic_rows[tid] = line
+        want = (tactic["name"], str(tactic["order"]), str(per_tactic.get(tid, 0)))
+        if (name, stage, stated) != want:
+            failures.append(
+                f"README.md:{line}: tactic row \"{name} | {stage} | {stated}\" does not match "
+                f"matrix.json ({tid} name, kill chain stage, techniques: {' | '.join(want)})"
+            )
+    for tid in tactic_by_id:
+        if tid not in tactic_rows:
+            failures.append(f"README per-tactic table has no row for tactic {tid}")
+
+    # Evidence Standard: one row per tier, stating its count and its share of all
+    # techniques as a whole percentage.
+    tier_rows = {}
+    for m in re.finditer(r"(?m)^\| \*\*(\w+)\*\* \|.*\| (\d+) \((\d+)%\) \|$", readme):
+        tier, stated, pct = m.group(1).lower(), m.group(2), m.group(3)
+        line = line_of(m.start())
+        if tier not in TIERS:
+            failures.append(f"README.md:{line}: \"{m.group(1)}\" is not an evidence tier "
+                            f"({', '.join(TIERS)})")
+            continue
+        if tier in tier_rows:
+            failures.append(f"README.md:{line}: second row for tier {tier} "
+                            f"(first at line {tier_rows[tier]})")
+            continue
+        tier_rows[tier] = line
+        n = tiers.get(tier, 0)
+        want = (str(n), str(percent(n, total)))
+        if (stated, pct) != want:
+            failures.append(
+                f"README.md:{line}: \"{stated} ({pct}%)\" does not match matrix.json "
+                f"({tier}: {want[0]} of {total}, {want[1]}%)"
+            )
+    for tier in TIERS:
+        if tier not in tier_rows:
+            failures.append(f"README evidence tier table has no row for {tier}")
 
     failures.extend(check_class_tables(matrix, readme))
 
@@ -642,6 +755,19 @@ def main(argv):
     require(wording("(?:[A-Za-z-]+ ){0,2}categories"), [dvaa["vulnerabilityCategories"]],
             "DVAA vulnerability categories", **on_dvaa_lines)
 
+    # The HackMyAgent and OASB figures, read on every README line.
+    figures = []
+    for project, field, pattern in RELATED_WORDINGS:
+        entry = related.get(project)
+        value = entry.get(field) if isinstance(entry, dict) else None
+        if type(value) is not int:
+            failures.append(f"{pinned}: {project}.{field} is not a whole number")
+            continue
+        require(pattern, [value],
+                f"{project}.{field}, read from release {entry.get('sourceVersion')}",
+                source=pinned)
+        figures.append(f"{project}.{field}={value}")
+
     # A wording is not read when a character `hiding_kind` names stands inside it ("age"
     # U+00AD "nts", "22" U+200B " agents", "tac" U+00AD "tics"), or when a Hangul filler or
     # combining mark is glued to a DVAA wording (U+3164 "22 agents", "agents" U+034F), so
@@ -669,10 +795,10 @@ def main(argv):
                 f"remove it"
             )
 
-    dvaa_summary = (
+    related_summary = (
         f"DVAA {dvaa['sourceVersion']}: {dvaa['agents']} agents "
         f"({', '.join(f'{k}={v}' for k, v in kinds.items())}), "
-        f"{dvaa['vulnerabilityCategories']} vulnerability categories"
+        f"{dvaa['vulnerabilityCategories']} vulnerability categories; {', '.join(figures)}"
     )
 
     tier_total = sum(tiers.values())
@@ -691,7 +817,7 @@ def main(argv):
             f"\nmeasured: {len(tactics)} tactics, {total} techniques, "
             f"{len(classes)} attack classes, tiers={tiers}, "
             f"detection={with_detection}/{total}, control={with_control}/{total}, "
-            f"lab={with_lab}/{total}\npinned: {dvaa_summary}",
+            f"lab={with_lab}/{total}\npinned: {related_summary}",
             file=sys.stderr,
         )
         return 1
@@ -700,7 +826,7 @@ def main(argv):
         f"README claims match matrix.json: {len(tactics)} tactics, {total} techniques, "
         f"{len(classes)} attack classes, tiers={tiers}, "
         f"detection={with_detection}/{total}, control={with_control}/{total}, "
-        f"lab={with_lab}/{total}; and related-projects.json: {dvaa_summary}"
+        f"lab={with_lab}/{total}; and related-projects.json: {related_summary}"
     )
     return 0
 

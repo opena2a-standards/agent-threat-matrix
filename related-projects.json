@@ -1,5 +1,5 @@
 {
-  "description": "Figures README.md states about related projects. They are measured in those projects, not in matrix.json, so each is pinned here with the release and commit it was read from. scripts/check_readme_claims.py fails when a README line naming the project states a different number in one of the wordings the script reads; a figure worded any other way is not checked. For DVAA the wordings are 'N agents', 'N deliberately vulnerable', 'N hardened reference', 'N control-protected variant(s)', 'N vulnerable agent(s)' and 'N categories' (up to two words, each a run of ASCII letters and hyphens, may stand between the number and 'categories'), each read in any letter case with one space between words. A README line naming the project that carries a format character (Unicode category Cf), a control character (category Cc) other than a tab, a Hangul filler, a combining mark Unicode lists as default ignorable or a code point Unicode lists as default ignorable without assigning it fails, because such a character can keep a figure from being read. Re-measure with the refresh command when the project releases.",
+  "description": "Figures README.md states about related projects. They are measured in those projects, not in matrix.json, so each is pinned here with the release it was read from, and for DVAA the commit. scripts/check_readme_claims.py fails when a README line states a different number in one of the wordings the script reads; a figure worded any other way is not checked. For DVAA the wordings are read on a README line naming DVAA: 'N agents', 'N deliberately vulnerable', 'N hardened reference', 'N control-protected variant(s)', 'N vulnerable agent(s)' and 'N categories' (up to two words, each a run of ASCII letters and hyphens, may stand between the number and 'categories'), each read in any letter case with one space between words. For HackMyAgent the wordings are 'N static checks' and 'N payloads' or 'N attack payloads', and for OASB 'N controls' and 'N domains', each read on every README line in the letter case written here. A README line naming DVAA that carries a format character (Unicode category Cf), a control character (category Cc) other than a tab, a Hangul filler, a combining mark Unicode lists as default ignorable or a code point Unicode lists as default ignorable without assigning it fails, because such a character can keep a figure from being read. Re-measure with the refresh command when the project releases.",
   "dvaa": {
     "repository": "https://github.com/opena2a-org/damn-vulnerable-ai-agent",
     "sourceVersion": "0.9.3",
@@ -23,5 +23,26 @@
     },
     "vulnerabilityCategories": 12,
     "refresh": "curl -s https://raw.githubusercontent.com/opena2a-org/damn-vulnerable-ai-agent/main/README.md | grep -E \"^\\| [A-Za-z-]+ \\| 70[0-9]{2} \\|\" | awk -F'|' '{gsub(/ /,\"\",$4); print $4}' | sort | uniq -c"
+  },
+  "hackmyagent": {
+    "repository": "https://github.com/opena2a-org/hackmyagent",
+    "sourceVersion": "0.33.2",
+    "source": "the hackmyagent 0.33.2 npm package",
+    "staticChecks": 318,
+    "attackPayloads": 164,
+    "readWith": {
+      "staticChecks": "npx -y hackmyagent@0.33.2 check-metadata --json | jq .staticChecks",
+      "attackPayloads": "ALL_PAYLOADS.length exported by hackmyagent@0.33.2 dist/attack/payloads/index.js"
+    }
+  },
+  "oasb": {
+    "sourceVersion": "1.0.0",
+    "source": "OASB-1 1.0.0 as bundled in the hackmyagent 0.33.2 npm package",
+    "controls": 46,
+    "domains": 10,
+    "readWith": {
+      "controls": "sum of controls over OASB_1_CATEGORIES exported by hackmyagent@0.33.2 dist/benchmarks/oasb-1.js",
+      "domains": "OASB_1_CATEGORIES.length exported by hackmyagent@0.33.2 dist/benchmarks/oasb-1.js"
+    }
   }
 }

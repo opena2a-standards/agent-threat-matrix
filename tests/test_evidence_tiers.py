@@ -1,0 +1,255 @@
+"""Evidence tier definition checker tests.
+
+Every case runs scripts/check_evidence_tiers.py against a scratch copy of the canonical page,
+the three quoting pages and the schema, so the committed files are never perturbed. The
+shipped tree must be green. Each wording the three pages carried before docs/evidence-tiers.md
+became the single definition is then planted back and must be reported at its own line, as
+must a dropped definition, a definition wrapped over two lines or continued on the next line,
+a canonical edit the quoting pages do not follow, and a schema tier the canonical page does
+not define. A long line on the canonical page that does not complete a row, and a table row
+or list item on a quoting page that holds a long run of white space before more text, must be
+read in linear time.
+"""
+
+import json
+import shutil
+import subprocess
+import tempfile
+import time
+from pathlib import Path
+
+import pytest
+
+ROOT = Path(__file__).resolve().parent.parent
+FILES = (
+    "README.md",
+    "CONTRIBUTING.md",
+    "EVIDENCE_AUDIT.md",
+    "docs/evidence-tiers.md",
+    "schema/threat-matrix-v1.2.schema.json",
+    "scripts/check_evidence_tiers.py",
+)
+
+OBSERVED = "Confirmed in real-world production systems"
+VALIDATED = "Reproduced in controlled lab environment (DVAA)"
+ADAPTED = ("Well-understood traditional technique applied to agent context, "
+           "not yet observed agent-specifically")
+
+
+@pytest.fixture
+def tree():
+    td = Path(tempfile.mkdtemp(prefix="atm-tiers-"))
+    for rel in FILES:
+        dst = td / rel
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy(ROOT / rel, dst)
+    yield td
+    shutil.rmtree(td)
+
+
+def run_checker(root: Path) -> subprocess.CompletedProcess:
+    return subprocess.run(["python3", str(root / "scripts" / "check_evidence_tiers.py")],
+                          capture_output=True, text=True, timeout=120)
+
+
+def mutate(root: Path, rel: str, old: str, new: str) -> int:
+    """Replace the one occurrence of `old` in `rel` and return the line it starts on."""
+    path = root / rel
+    text = path.read_text(encoding="utf-8")
+    assert text.count(old) == 1, f"mutation target must occur exactly once in {rel}: {old!r}"
+    path.write_text(text.replace(old, new), encoding="utf-8")
+    return text.count("\n", 0, text.index(old)) + 1
+
+
+def test_shipped_tree_is_green(tree):
+    r = run_checker(tree)
+    assert r.returncode == 0, r.stderr
+    assert "Evidence tier definitions match docs/evidence-tiers.md: 3 tiers" in r.stdout
+
+
+@pytest.mark.parametrize("rel, old, new", [
+    # The wordings the pages carried before this check existed.
+    ("CONTRIBUTING.md", f"| **Observed** | {OBSERVED} |",
+     "| **Observed** | Documented in a real-world production system, security incident "
+     "report, or internet-wide exposure assessment |"),
+    ("CONTRIBUTING.md", f"| **Validated** | {VALIDATED} |",
+     "| **Validated** | Reproduced in a controlled lab environment with documented steps, "
+     "expected output, and independent verification |"),
+    ("EVIDENCE_AUDIT.md", f"- **OBSERVED**: {OBSERVED}\n",
+     f"- **OBSERVED**: {OBSERVED} (NemoClaw findings, exposure sweeps, npm attacks)\n"),
+    ("EVIDENCE_AUDIT.md", f"- **VALIDATED**: {VALIDATED}\n",
+     "- **VALIDATED**: Reproducible in controlled lab environment (DVAA challenges, "
+     "HMA scan results)\n"),
+    # One word changed in the README table.
+    ("README.md", f"| **Adapted** | {ADAPTED} |",
+     f"| **Adapted** | {ADAPTED.replace('Well-understood', 'Known')} |"),
+])
+def test_a_quote_that_differs_is_reported_at_its_line(tree, rel, old, new):
+    line = mutate(tree, rel, old, new)
+    r = run_checker(tree)
+    assert r.returncode == 1
+    assert f"{rel}:{line}:" in r.stderr, r.stderr
+    assert "quote docs/evidence-tiers.md" in r.stderr
+
+
+def test_a_definition_wrapped_over_two_lines_is_reported(tree):
+    line = mutate(tree, "EVIDENCE_AUDIT.md", f"- **ADAPTED**: {ADAPTED}\n",
+                  "- **ADAPTED**: Well-understood traditional technique applied to agent "
+                  "context,\n  not yet observed agent-specifically\n")
+    r = run_checker(tree)
+    assert r.returncode == 1
+    assert f"EVIDENCE_AUDIT.md:{line}: Adapted reads" in r.stderr, r.stderr
+
+
+@pytest.mark.parametrize("after", [
+    # The examples the audit page added to the Observed definition before this check existed,
+    # on an indented line, which Markdown joins to the definition.
+    "  (NemoClaw findings, exposure sweeps, npm attacks)\n",
+    # The same examples on a line of plain text, which Markdown joins to it too.
+    "(NemoClaw findings, exposure sweeps, npm attacks)\n",
+    # A list nested under the definition.
+    "  - NemoClaw findings\n",
+    # A numbered item: a list starting at 2 cannot interrupt the definition's paragraph.
+    "2. NemoClaw findings\n",
+], ids=["indented line", "plain text line", "nested list", "numbered item"])
+def test_a_definition_that_continues_onto_the_next_line_is_reported(tree, after):
+    # The definition's own line matches the canonical page word for word.
+    line = mutate(tree, "EVIDENCE_AUDIT.md", f"- **OBSERVED**: {OBSERVED}\n",
+                  f"- **OBSERVED**: {OBSERVED}\n{after}")
+    r = run_checker(tree)
+    assert r.returncode == 1
+    assert f"EVIDENCE_AUDIT.md:{line}: Observed continues on line {line + 1};" in r.stderr, \
+        r.stderr
+    assert "Observed reads" not in r.stderr, r.stderr
+
+
+def test_a_wrapped_definition_is_reported_although_its_lines_join_to_the_quote(tree):
+    wrapped = ("- **ADAPTED**: Well-understood traditional technique applied to agent "
+               "context,\n  not yet observed agent-specifically\n")
+    joined = " ".join(part.strip() for part in wrapped.split("\n")[:2])
+    assert joined == f"- **ADAPTED**: {ADAPTED}"
+    line = mutate(tree, "EVIDENCE_AUDIT.md", f"- **ADAPTED**: {ADAPTED}\n", wrapped)
+    r = run_checker(tree)
+    assert r.returncode == 1
+    assert f"EVIDENCE_AUDIT.md:{line}: Adapted continues on line {line + 1};" in r.stderr, \
+        r.stderr
+
+
+def test_a_definition_followed_by_a_bulleted_item_indented_no_further_ends_on_its_line(tree):
+    # The tier list nested under an outer item, the outer list's next item after it.
+    old = (f"- **OBSERVED**: {OBSERVED}\n- **VALIDATED**: {VALIDATED}\n"
+           f"- **ADAPTED**: {ADAPTED}\n")
+    mutate(tree, "EVIDENCE_AUDIT.md", old,
+           f"- Tiers:\n  - **OBSERVED**: {OBSERVED}\n  * **VALIDATED**: {VALIDATED}\n"
+           f"  + **ADAPTED**: {ADAPTED}\n- The next item\n")
+    r = run_checker(tree)
+    assert r.returncode == 0, r.stderr
+
+
+@pytest.mark.parametrize("rel, row", [
+    ("README.md", f"| **Validated** | {VALIDATED} |"),
+    ("CONTRIBUTING.md", f"| **Adapted** | {ADAPTED} |"),
+    ("EVIDENCE_AUDIT.md", f"- **OBSERVED**: {OBSERVED}\n"),
+])
+def test_a_page_that_leaves_a_tier_out_is_reported(tree, rel, row):
+    path = tree / rel
+    text = path.read_text(encoding="utf-8")
+    start = text.index(row)
+    end = text.index("\n", start) + 1
+    path.write_text(text[:start] + text[end:], encoding="utf-8")
+    r = run_checker(tree)
+    assert r.returncode == 1
+    tier = {"README.md": "Validated", "CONTRIBUTING.md": "Adapted",
+            "EVIDENCE_AUDIT.md": "Observed"}[rel]
+    assert f"{rel} does not define {tier}" in r.stderr, r.stderr
+
+
+def test_a_canonical_edit_the_quotes_do_not_follow_is_reported_on_every_page(tree):
+    mutate(tree, "docs/evidence-tiers.md", f"| `observed` | {OBSERVED} |",
+           f"| `observed` | {OBSERVED} and incident reports |")
+    r = run_checker(tree)
+    assert r.returncode == 1
+    for rel in ("README.md", "CONTRIBUTING.md", "EVIDENCE_AUDIT.md"):
+        assert f"{rel}:" in r.stderr and "Observed reads" in r.stderr, r.stderr
+    assert r.stderr.count("Observed reads") == 3, r.stderr
+
+
+def test_a_canonical_edit_every_page_follows_is_green(tree):
+    new = f"{OBSERVED} and incident reports"
+    mutate(tree, "docs/evidence-tiers.md", f"| `observed` | {OBSERVED} |",
+           f"| `observed` | {new} |")
+    mutate(tree, "README.md", f"| **Observed** | {OBSERVED} |", f"| **Observed** | {new} |")
+    mutate(tree, "CONTRIBUTING.md", f"| **Observed** | {OBSERVED} |",
+           f"| **Observed** | {new} |")
+    mutate(tree, "EVIDENCE_AUDIT.md", f"- **OBSERVED**: {OBSERVED}\n",
+           f"- **OBSERVED**: {new}\n")
+    r = run_checker(tree)
+    assert r.returncode == 0, r.stderr
+
+
+def test_a_canonical_tier_defined_twice_is_reported(tree):
+    row = f"| Adapted | `adapted` | {ADAPTED} |\n"
+    line = mutate(tree, "docs/evidence-tiers.md", row, row + row) + 1
+    r = run_checker(tree)
+    assert r.returncode == 1
+    assert f"docs/evidence-tiers.md:{line}: defines `adapted` a second time" in r.stderr
+
+
+def test_canonical_lines_that_do_not_complete_a_row_are_read_in_linear_time(tree):
+    # Each line starts with "|" and a long run of white space and does not complete a row.
+    # Matched with one pattern for the whole row, "|", 2,000 spaces and "x" took about 3 s on
+    # Python 3.14, and the same after the Observed name and value about 13 s, eight times as
+    # long at each doubling of the run.
+    run = " " * 128_000
+    path = tree / "docs" / "evidence-tiers.md"
+    path.write_text(path.read_text(encoding="utf-8")
+                    + f"\n|{run}x\n\n| Observed | `observed` |{run}x\n", encoding="utf-8")
+    start = time.perf_counter()
+    r = run_checker(tree)
+    seconds = time.perf_counter() - start
+    assert r.returncode == 0, r.stderr
+    assert seconds < 3, f"{seconds:.2f} s"
+
+
+@pytest.mark.parametrize("rel, form, tier", [
+    ("README.md", "| **{}** | x{}y |", "Observed"),
+    ("EVIDENCE_AUDIT.md", "- **{}**: x{}y", "OBSERVED"),
+], ids=["table row", "list item"])
+def test_quoting_page_lines_with_a_long_run_of_white_space_are_read_in_linear_time(
+        tree, rel, form, tier):
+    # Each line starts a bold-labelled table row or list item and holds a long run of white
+    # space before more text; the label need not be a tier. Matched with white space on both
+    # sides of a lazy definition, the table row with 40,000 spaces took over 7 s on Python 3.14
+    # and the list item over 4 s, about four times as long at each doubling of the run. The
+    # tier's line is still read, stripped of the white space around it, and reported at its line.
+    run = " " * 128_000
+    path = tree / rel
+    head = path.read_text(encoding="utf-8") + "\n" + form.format("Note", run) + "\n\n"
+    line = head.count("\n") + 1
+    path.write_text(head + form.format(tier, run) + "\n", encoding="utf-8")
+    start = time.perf_counter()
+    r = run_checker(tree)
+    seconds = time.perf_counter() - start
+    assert r.returncode == 1
+    assert r.stderr.count(" reads \"") == 1
+    assert f"{rel}:{line}: Observed reads \"x{run}y\";" in r.stderr
+    assert seconds < 3, f"{seconds:.2f} s"
+
+
+def test_a_schema_tier_the_canonical_page_does_not_define_is_reported(tree):
+    path = tree / "schema" / "threat-matrix-v1.2.schema.json"
+    schema = json.loads(path.read_text(encoding="utf-8"))
+    schema["$defs"]["technique"]["properties"]["evidenceTier"]["enum"].append("theoretical")
+    path.write_text(json.dumps(schema), encoding="utf-8")
+    r = run_checker(tree)
+    assert r.returncode == 1
+    assert "docs/evidence-tiers.md does not define the `theoretical` tier" in r.stderr
+
+
+def test_a_definition_inside_a_code_fence_is_not_a_quote(tree):
+    path = tree / "CONTRIBUTING.md"
+    path.write_text(path.read_text(encoding="utf-8")
+                    + "\n```markdown\n| **Observed** | Anything at all |\n```\n",
+                    encoding="utf-8")
+    r = run_checker(tree)
+    assert r.returncode == 0, r.stderr
