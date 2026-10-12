@@ -189,7 +189,7 @@ def test_name_claims_stop_at_id_or_ids_with_no_letter_or_digit_beside_it():
     # Such a word names an id wherever in it "id" or "ids" stands; only a word that began
     # with either stopped the check, so the first sentence was read as a name claim.
     assert name_claims("Testcase names whose parametrize-ids begin with ATM-06.ACn") == []
-    for word in ("test_ids", "id-values", "ids=", "(node-id),"):
+    for word in ("test_ids", "id_values", "id-values", "ids=", "(node-id),"):
         assert name_claims(f"Testcase names whose {word} begin with ATM-06.ACn") == [], word
     # A letter or a digit beside it makes another word of it, and the name stays the subject.
     for word in ("valid", "identical", "provided", "kids", "id3", "3ids"):
