@@ -39,12 +39,14 @@ instruction, CDATA section and declaration from its opening <!--, <?, <![CDATA[ 
 an ASCII letter to the first -->, ?>, ]]> or > after it, respectively, or to the end of
 the line when none follows, and each tag from < or </ and a name, which is an ASCII
 letter followed by any ASCII letters, digits and hyphens, to a > right after the name or,
-after white space or /, to the first > after that if no < comes first. Second, going
-along what remains, each ] followed by ( is removed with the text after it to the first )
-if no further ( comes first, and each ] followed by [ with the text after it to the first
-] if no further [ comes first, whether or not they make a link, and then the Markdown
-characters * _ ~ ` \\ [ ]. Third, its character references are decoded, and it
-is brought to NFKC with each character Unicode lists as confusable with A, D or V read as
+after / or a character Unicode lists as white space (such as U+00A0 NO-BREAK SPACE), to
+the first > after that if no < comes first. Second, going along what remains, each ]
+followed by ( is removed with the text after it to the first ) if no further ( comes
+first, and each ] followed by [ with the text after it to the first ] if no further [
+comes first, whether or not they make a link, and then the Markdown characters
+* _ ~ ` \\ [ ]. Third, its character references are decoded, each to the characters it
+stands for less any such character, so "&#8203;" (U+200B) leaves nothing, and it is
+brought to NFKC with each character Unicode lists as confusable with A, D or V read as
 that letter (U+0410 CYRILLIC CAPITAL LETTER A reads as A). So the name written as
 "DV&#8203;AA", "**DV**AA", "DV<!-- -->AA", "<b>DV</b>AA", "[DV](url)AA" or in fullwidth
 letters does not take the line out of the check. A line that states one of the
@@ -118,11 +120,19 @@ UNASSIGNED_IGNORABLES = frozenset(
     for code in range(low, high + 1)
 )
 
-# Raw HTML a renderer draws as nothing: a comment, processing instruction, CDATA section or
-# declaration, each from its opening to the first close after that opening, or to the end
-# of the line when none follows, and an open or closing tag. An autolink such as
-# <https://example.org> is not a tag and stays. A tag ends at the first ">" before any "<",
-# so a failed match scans no further than the next "<" and the line is read in linear time.
+# Raw HTML and text that only starts like it: a comment, processing instruction, CDATA
+# section or declaration, each from its opening to the first close after that opening, or
+# to the end of the line when none follows, and a tag from "<" or "</" and a name to a ">"
+# right after the name or, after "/" or white space, to the first ">" before any "<".
+# CommonMark reads a comment, processing instruction, CDATA section or declaration as raw
+# HTML only when its close follows, on this line or a later one, so it shows "DV<!-- AA"
+# or "DV<!X AA" as text when no line closes it. The tag alternative does not read
+# attributes, so it also matches '<b x=")AA>' and '</b ")AA>', which CommonMark shows as
+# text. White space is what \s matches: a space, a tab or any other character Unicode
+# lists as white space, such as U+00A0 NO-BREAK SPACE, which CommonMark does not take
+# inside a tag. An autolink such as <https://example.org> is not matched and stays. A tag
+# ends at the first ">" before any "<", so a failed match scans no further than the next
+# "<" and the pattern reads a line in linear time.
 RAW_HTML = re.compile(
     r"<!--.*?(?:-->|$)|<\?.*?(?:\?>|$)|<!\[CDATA\[.*?(?:\]\]>|$)|<![A-Za-z][^>]*(?:>|$)"
     r"|</?[A-Za-z][A-Za-z0-9-]*(?:[\s/][^<>]*)?>"
@@ -278,16 +288,43 @@ def decoded(reference):
     return "".join(c for c in html.unescape(reference.group()) if not hiding_kind(c))
 
 
+def nfkc(text):
+    """`text` brought to NFKC, as unicodedata.normalize gives it, in O(n log n) time.
+    unicodedata.normalize puts each run of characters with a nonzero canonical combining
+    class in order by moving one character at a time, which takes quadratic time on a long
+    run out of order: U+0301 U+0316 repeated to 100,000 characters took about 2 s. Here
+    each character is decomposed alone, each such run is put in order by a stable sort on
+    the combining class, and unicodedata.normalize composes the text, which is then already
+    in order. ASCII text is its own NFKC."""
+    if text.isascii():
+        return text
+    decomposed = "".join(unicodedata.normalize("NFKD", c) for c in text)
+    ordered = []
+    run = []
+    for c in decomposed:
+        if unicodedata.combining(c):
+            run.append(c)
+            continue
+        ordered.extend(sorted(run, key=unicodedata.combining))
+        run.clear()
+        ordered.append(c)
+    ordered.extend(sorted(run, key=unicodedata.combining))
+    return unicodedata.normalize("NFKC", "".join(ordered))
+
+
 def name_form(stripped):
-    """`stripped` as a name in it reads: the raw HTML `RAW_HTML` matches, the link
-    destinations and reference labels `LINK_TARGET` matches and the Markdown characters
-    that mark up text removed, character references decoded, and the text brought to NFKC
-    with each character in `CONFUSABLES` read as the letters it resembles. The markup is
-    removed before the references are decoded, as a reference to "*" shows a star."""
+    """`stripped` as a name in it reads, by the three steps the module description states:
+    the raw HTML `RAW_HTML` matches removed; each "](...)" and "][...]" span `LINK_TARGET`
+    matches removed, whether or not it makes a link, and the Markdown characters in
+    `MARKUP`; then the character references decoded, less the characters `hiding_kind`
+    names, and the text brought to NFKC with each character in `CONFUSABLES` read as the
+    letters it resembles. The HTML is removed before the link spans, as HTML can start
+    inside a link destination or title and end after the ")" that closes them, and the
+    markup before the references are decoded, as a reference to "*" shows a star."""
     text = RAW_HTML.sub("", stripped)
     text = LINK_TARGET.sub("", text).translate(MARKUP)
     text = REFERENCE.sub(decoded, text)
-    return unicodedata.normalize("NFKC", text).translate(CONFUSABLES)
+    return nfkc(text).translate(CONFUSABLES)
 
 
 def names(stripped, name):
@@ -535,9 +572,9 @@ def main(argv):
         where = " and ".join(phrase for phrase, _ in readers)
         wordings = " and ".join(name for _, name in readers)
         for column, c in hidden:
-            named = " ".join(filter(None, (f"U+{ord(c):04X}", unicodedata.name(c, ""))))
+            label = " ".join(filter(None, (f"U+{ord(c):04X}", unicodedata.name(c, ""))))
             failures.append(
-                f"README.md:{number}:{column}: a line {where} carries {named}, "
+                f"README.md:{number}:{column}: a line {where} carries {label}, "
                 f"{hiding_kind(c)}, which can hide a figure from the {wordings} wordings; "
                 f"remove it"
             )
