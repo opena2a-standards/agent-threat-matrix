@@ -102,11 +102,28 @@ def _ac1_readme_cell_updated():
     assert "Gap analysis" not in row
 
 
+def _unreleased(changelog: str) -> str:
+    return changelog.split("## Unreleased", 1)[1].split("\n## ", 1)[0]
+
+
 def _ac1_changelog_names_both_paths():
-    text = (ROOT / "CHANGELOG.md").read_text()
-    unreleased = text.split("## Unreleased", 1)[1].split("\n## ", 1)[0]
+    unreleased = _unreleased((ROOT / "CHANGELOG.md").read_text())
     assert "cross-references/gap-analysis.md" in unreleased
     assert "cross-references/technique-overlap-index.md" in unreleased
+
+
+def _ac1_a_released_entry_is_not_read_as_unreleased():
+    # The Unreleased section ends at the next section heading, so a rename entry that
+    # stands only under a released version does not satisfy the check above.
+    changelog = ("# Changelog\n\n## Unreleased\n\n### Fixed\n\n- An unrelated fix.\n\n"
+                 "## v1.2.0 (2026-09-08)\n\n### Changed\n\n"
+                 "- `cross-references/gap-analysis.md` is now "
+                 "`cross-references/technique-overlap-index.md`.\n\n"
+                 "## v1.1 (2026-06-04)\n\n### Added\n\n- An earlier entry.\n")
+    unreleased = _unreleased(changelog)
+    assert "- An unrelated fix." in unreleased
+    assert "cross-references/gap-analysis.md" not in unreleased
+    assert "cross-references/technique-overlap-index.md" not in unreleased
 
 
 def _ac1_git_mv_history_preserved():
@@ -143,6 +160,7 @@ AC1_CASES = [
     ("ATM-03.AC1 no banned word in any heading or table header", _ac1_no_banned_word_in_headings_or_headers),
     ("ATM-03.AC1 README cross-reference row is updated", _ac1_readme_cell_updated),
     ("ATM-03.AC1 CHANGELOG Unreleased names both paths", _ac1_changelog_names_both_paths),
+    ("ATM-03.AC1 a rename entry under a released version is not read as Unreleased", _ac1_a_released_entry_is_not_read_as_unreleased),
     ("ATM-03.AC1 git mv preserved the file history", _ac1_git_mv_history_preserved),
 ]
 

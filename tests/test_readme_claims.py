@@ -24,17 +24,25 @@ states a matrix.json count once such characters are removed. Inside a wording su
 character keeps the wording from being read, and a Hangul filler or combining mark does so
 directly beside a DVAA wording, while a character that renders as nothing leaves the figure
 in the rendered line. Markup, a character reference or a confusable letter written inside
-the name as the cases below write it leaves the line read.
+the name as the cases below write it leaves the line read, and a character that fails a
+line still fails a line that names DVAA only in that way. The three steps README states
+for reading the name are also written below as a plain scan, which must read generated
+lines as the checker does, so the sentence and the checker's patterns cannot drift apart
+with every test passing.
 """
 
-import ast
+import html
+import html.entities
 import importlib.util
 import json
+import random
 import re
 import shutil
+import string
 import subprocess
 import sys
 import tempfile
+import time
 import unicodedata
 from pathlib import Path
 
@@ -503,10 +511,27 @@ def test_a_character_inside_the_name_dvaa_leaves_the_line_read(name, named):
         shutil.rmtree(td)
 
 
+# The characters Unicode lists as confusable with A, D, V or a run of them that NFKC leaves
+# unchanged, each with the letters it reads as. They are written out here apart from the
+# checker's table, so that an entry changed there alone goes red.
+CONFUSABLE_LETTERS = {
+    0x0391: "A", 0x0410: "A", 0x0474: "V", 0x0667: "V", 0x06F7: "V", 0x13A0: "D",
+    0x13AA: "A", 0x13D9: "V", 0x142F: "V", 0x15C5: "A", 0x15DE: "D", 0x15EA: "D",
+    0x2D38: "V", 0xA4D3: "D", 0xA4E6: "V", 0xA4EE: "A", 0xA6DF: "V", 0xA732: "AA",
+    0xA738: "AV", 0xA73A: "AV", 0x102A0: "A", 0x1051D: "V", 0x118A0: "V", 0x16F08: "V",
+    0x16F40: "A", 0x1D20D: "V",
+}
+
+
+def confusable_case(code):
+    return f"U+{code:04X} {unicodedata.name(chr(code))}"
+
+
 # The name "DVAA" written with markup, a character reference or a confusable letter inside
 # it, each of which a renderer shows as DVAA. Read only where "DVAA" stood in the source
 # text once the characters that fail a line were removed, such a line was not read at all
-# and two wrong figures passed.
+# and two wrong figures passed. Each confusable character stands in place of the letters it
+# reads as.
 DVAA_URL = "(https://github.com/opena2a-org/damn-vulnerable-ai-agent)"
 WRITTEN_NAMES = [
     ("decimal reference to U+200B", f"[DV&#8203;AA]{DVAA_URL}"),
@@ -518,16 +543,25 @@ WRITTEN_NAMES = [
     ("code span", f"[`DV`AA]{DVAA_URL}"),
     ("HTML comment", f"[DV<!-- -->AA]{DVAA_URL}"),
     ("HTML tag", f"[<b>DV</b>AA]{DVAA_URL}"),
+    ("HTML tag with a quoted attribute", f'[DV<span title="d">AA]{DVAA_URL}'),
+    ("self-closing HTML tag", f"[DV<span/>AA]{DVAA_URL}"),
+    ("processing instruction", f"[DV<?x?>AA]{DVAA_URL}"),
+    ("CDATA section", f"[DV<![CDATA[]]>AA]{DVAA_URL}"),
+    ("declaration", f"[DV<!x>AA]{DVAA_URL}"),
+    # The comment stands in the link title and ends after the ")" that the link
+    # destination pattern would take as the end of the destination.
+    ("HTML comment in a link title", f'[DV]{DVAA_URL[:-1]} "<!-- ) -->")AA'),
     ("link text", f"[DV]{DVAA_URL}AA"),
-    ("U+0410 CYRILLIC CAPITAL LETTER A", f"[DVA\N{CYRILLIC CAPITAL LETTER A}]{DVAA_URL}"),
-    ("U+0391 GREEK CAPITAL LETTER ALPHA", f"[DV\N{GREEK CAPITAL LETTER ALPHA}A]{DVAA_URL}"),
-    ("U+A732 LATIN CAPITAL LETTER AA", f"[DV\N{LATIN CAPITAL LETTER AA}]{DVAA_URL}"),
+    ("emphasis with underscores", f"[_DV_]{DVAA_URL}AA"),
     ("fullwidth letters",
      "[\N{FULLWIDTH LATIN CAPITAL LETTER D}\N{FULLWIDTH LATIN CAPITAL LETTER V}"
      f"\N{FULLWIDTH LATIN CAPITAL LETTER A}\N{FULLWIDTH LATIN CAPITAL LETTER A}]{DVAA_URL}"),
     ("mathematical bold letters",
      "[\N{MATHEMATICAL BOLD CAPITAL D}\N{MATHEMATICAL BOLD CAPITAL V}"
      f"\N{MATHEMATICAL BOLD CAPITAL A}\N{MATHEMATICAL BOLD CAPITAL A}]{DVAA_URL}"),
+] + [
+    (confusable_case(code), f"[{'DVAA'.replace(letters, chr(code), 1)}]{DVAA_URL}")
+    for code, letters in CONFUSABLE_LETTERS.items() if letters in "DVAA"
 ]
 
 
@@ -555,13 +589,21 @@ def test_a_name_written_with_markup_a_reference_or_a_confusable_letter_leaves_th
 
 
 # Names that show as something other than DVAA: a reference to "*" or "&" shows that
-# character rather than marking up text, and a letter with an accent is not confusable
-# with A. Such a line does not name DVAA, so its figures are not read.
+# character rather than marking up text, a letter with an accent is not confusable with A,
+# NFKC leaves U+00C1 composed, a comment that no line closes shows as text and runs to the
+# end of the line, and a character read as letters that do not stand together in "DVAA"
+# shows them in another order. Such a line does not name DVAA, so its figures are not read.
 OTHER_NAMES = [
     ("reference to an asterisk", "[DV&#42;AA]"),
     ("reference to an ampersand", "[DV&amp;AA]"),
     ("hyphen", "[DV-AA]"),
     ("U+00C1 LATIN CAPITAL LETTER A WITH ACUTE", "[DV\N{LATIN CAPITAL LETTER A WITH ACUTE}A]"),
+    ("U+00C1 LATIN CAPITAL LETTER A WITH ACUTE for the last A",
+     "[DVA\N{LATIN CAPITAL LETTER A WITH ACUTE}]"),
+    ("comment opened in a link destination that no line closes", "[DV](x <!-- y)AA"),
+] + [
+    (confusable_case(code), f"[D{chr(code)}A]")
+    for code, letters in CONFUSABLE_LETTERS.items() if letters not in "DVAA"
 ]
 
 
@@ -588,20 +630,233 @@ def test_each_confusable_reads_as_a_run_of_dvaa_letters_and_is_left_by_nfkc():
         assert letters and set(letters) <= set("ADV"), f"U+{code:04X}"
 
 
-def test_the_name_cases_write_their_character_as_an_escape():
-    # Written raw, a character that shows nothing leaves a case reading as plain "DVAA", and
-    # an editor can drop it without a visible change. Each case writes its character as an
-    # escape, so the source shows which character the case holds.
+def test_each_confusable_reads_as_the_letters_written_out_here():
+    # Checked only for being a run of A, D and V, an entry could be changed to other such
+    # letters (U+13A0 from D to A) with every test passing.
+    assert load_checker().CONFUSABLES == CONFUSABLE_LETTERS
+
+
+# A line that names DVAA only once markup is removed, a reference is decoded or a confusable
+# letter is read, with U+00AD inside "agents". The character keeps "21 agents" from being
+# read, and it must fail the line by the name the line reads as, not only where "DVAA"
+# stands unbroken.
+NAMES_READ_BY_THE_STEPS = [
+    ("strong emphasis", "[**DV**AA]"),
+    ("decimal reference to U+200B", "[DV&#8203;AA]"),
+    ("U+0410 CYRILLIC CAPITAL LETTER A", "[DVA\N{CYRILLIC CAPITAL LETTER A}]"),
+]
+
+
+@pytest.mark.parametrize("written", [w for _, w in NAMES_READ_BY_THE_STEPS],
+                         ids=[case for case, _ in NAMES_READ_BY_THE_STEPS])
+def test_a_character_fails_a_line_that_names_dvaa_only_by_the_steps(written):
+    td = scratch_tree()
+    try:
+        new = (DVAA_LINK.replace("[DVAA]", written)
+               .replace("(21 agents,", "(21 age\N{SOFT HYPHEN}nts,"))
+        mutate_readme(td, DVAA_LINK, new)
+        named = "U+00AD SOFT HYPHEN, a format character"
+        r = run_checker(td)
+        assert r.returncode == 1, r.stdout
+        assert (f"README.md:{line_of(td, new)}:{column_of(td, new, named)}: a line naming DVAA "
+                f"carries {named}, which can hide a figure from the DVAA wordings; "
+                "remove it") in r.stderr, r.stderr
+    finally:
+        shutil.rmtree(td)
+
+
+# What a line reads as, where each case turns on one part of the three steps README
+# states: the HTML is removed before the link spans, each kind of HTML is removed, closed
+# or running to the end of the line, a tag ends after a quoted attribute, U+00A0 or "/",
+# the "][...]" span goes as the "](...)" span does whether or not a link is made, "_" is
+# removed, a reference that fails a line leaves nothing, a reference to "*" shows it, and
+# NFKC composes a mark with the letter before it.
+NAME_FORMS = [
+    ("HTML before the link spans", '[DV](url "<!-- ) -->")AA', "DVAA"),
+    ("tag with a quoted attribute", 'DV<span title="x">AA', "DVAA"),
+    ("tag with U+00A0 after its name", "DV<span\N{NO-BREAK SPACE}title=x>AA", "DVAA"),
+    ("tag with / after its name", "DV<span/>AA", "DVAA"),
+    ("processing instruction", "DV<?x?>AA", "DVAA"),
+    ("CDATA section", "DV<![CDATA[x]]>AA", "DVAA"),
+    ("declaration", "DV<!x>AA", "DVAA"),
+    ("comment no close follows", "DV<!-- AA", "DV"),
+    ("processing instruction no close follows", "DV<? AA", "DV"),
+    ("CDATA section no close follows", "DV<![CDATA[ AA", "DV"),
+    ("declaration no close follows", "DV<!X AA", "DV"),
+    ("tag whose quote does not close", '<b x=")AA>', ""),
+    ("closing tag with text after its name", '</b ")AA>', ""),
+    ("reference label", "[DV][dvaa]AA", "DVAA"),
+    ("link span that makes no link", "[x](see **DV**AA)", "x"),
+    ("underscores", "_DV_AA", "DVAA"),
+    ("reference to U+200B", "DV&#8203;AA", "DVAA"),
+    ("reference to an asterisk", "DV&#42;AA", "DV*AA"),
+    ("combining mark after the last A", "DVAA\N{COMBINING ACUTE ACCENT}",
+     "DVA\N{LATIN CAPITAL LETTER A WITH ACUTE}"),
+]
+
+
+@pytest.mark.parametrize("text,form", [(t, f) for _, t, f in NAME_FORMS],
+                         ids=[case for case, _, _ in NAME_FORMS])
+def test_each_step_reads_a_line_as_stated(text, form):
     checker = load_checker()
-    source = Path(__file__).read_text(encoding="utf-8")
-    table = next(node for node in ast.parse(source).body if isinstance(node, ast.Assign)
-                 and any(isinstance(target, ast.Name) and target.id == "NAME_CHARACTERS"
-                         for target in node.targets))
-    lines = source.split("\n")[table.lineno - 1:table.end_lineno]
-    raw = [f"{Path(__file__).name}:{number}:{column} U+{ord(c):04X}"
-           for number, line in enumerate(lines, table.lineno)
-           for column, c in enumerate(line, 1) if checker.hiding_kind(c)]
-    assert raw == [], raw
+    assert checker.name_form(text) == form
+    assert stated_name_form(checker, text) == form
+
+
+TAG_NAME = string.ascii_letters + string.digits + "-"
+
+
+def ascii_letter_at(text, i):
+    return i < len(text) and text[i] in string.ascii_letters
+
+
+def stated_html_end(line, i):
+    """Where the HTML that README states starts at the "<" at line[i] ends, or None."""
+    for opening, close in (("<!--", "-->"), ("<?", "?>"), ("<![CDATA[", "]]>")):
+        if line.startswith(opening, i):
+            end = line.find(close, i + len(opening))
+            return len(line) if end < 0 else end + len(close)
+    if line.startswith("<!", i) and ascii_letter_at(line, i + 2):
+        end = line.find(">", i + 3)
+        return len(line) if end < 0 else end + 1
+    j = i + 2 if line.startswith("</", i) else i + 1
+    if not ascii_letter_at(line, j):
+        return None
+    while j < len(line) and line[j] in TAG_NAME:
+        j += 1
+    if j < len(line) and line[j] == ">":
+        return j + 1
+    if j < len(line) and (line[j] == "/" or line[j].isspace()):
+        for k in range(j + 1, len(line)):
+            if line[k] in "<>":
+                return k + 1 if line[k] == ">" else None
+    return None
+
+
+def stated_reference_end(text, i):
+    """Where the character reference CommonMark reads at the "&" at text[i] ends, or None."""
+    end = text.find(";", i)
+    if end < 0:
+        return None
+    body = text[i + 1:end]
+    if body.startswith(("#x", "#X")):
+        number, digits, most = body[2:], string.hexdigits, 6
+    elif body.startswith("#"):
+        number, digits, most = body[1:], string.digits, 7
+    else:
+        return end + 1 if f"{body};" in html.entities.html5 else None
+    return end + 1 if 0 < len(number) <= most and all(c in digits for c in number) else None
+
+
+def stated_name_form(checker, line):
+    """`line` read by the three steps README states, as a plain scan rather than with the
+    checker's patterns. A reference is decoded by html.unescape, as in the checker, and a
+    decoded character that fails a line is dropped."""
+    # First, going along the line, its HTML is removed wherever it stands.
+    kept, i = [], 0
+    while i < len(line):
+        end = stated_html_end(line, i) if line[i] == "<" else None
+        if end is None:
+            kept.append(line[i])
+            i += 1
+        else:
+            i = end
+    text = "".join(kept)
+    # Second, going along what remains, each "]" followed by "(" or "[" goes with the text
+    # after it to the first ")" or "]" if no further "(" or "[" comes first, and then the
+    # Markdown characters.
+    kept, i = [], 0
+    while i < len(text):
+        if text[i] == "]" and text[i + 1:i + 2] in ("(", "["):
+            opening = text[i + 1]
+            close = ")" if opening == "(" else "]"
+            j = i + 2
+            while j < len(text) and text[j] not in (opening, close):
+                j += 1
+            if j < len(text) and text[j] == close:
+                i = j + 1
+                continue
+        kept.append(text[i])
+        i += 1
+    text = "".join(c for c in kept if c not in "*_~`\\[]")
+    # Third, its character references are decoded, less the characters that fail a line,
+    # and it is brought to NFKC with each confusable character read as its letters.
+    kept, i = [], 0
+    while i < len(text):
+        end = stated_reference_end(text, i) if text[i] == "&" else None
+        if end is None:
+            kept.append(text[i])
+            i += 1
+        else:
+            kept.extend(c for c in html.unescape(text[i:end]) if not checker.hiding_kind(c))
+            i = end
+    return unicodedata.normalize("NFKC", "".join(kept)).translate(CONFUSABLE_LETTERS)
+
+
+# The generated lines are made of characters the first two steps act on and, for two
+# pieces in five, of longer pieces: the openings and closes of HTML, character references,
+# white space other than a space, and characters NFKC or the confusables read as A, D or V
+# or leave beside them. With these, each pattern alternative and each step, changed or
+# taken out of order, reads at least 30 of the 200,000 lines differently.
+MARKUP_CHARACTERS = "[]()DVAx \"*_~`\\<>"
+PIECES = [
+    *"/-!?=1&#;\t", "<x", "</A", "<!--", "-->", "<?", "?>", "<![CDATA[", "]]>", "<!",
+    "&#68;", "&#x41;", "&#8203;", "&DD;", "&amp;", "&ast;", "&lowbar;",
+    "\N{NO-BREAK SPACE}", "\N{IDEOGRAPHIC SPACE}", "\N{COMBINING ACUTE ACCENT}",
+    "\N{LATIN CAPITAL LETTER A WITH ACUTE}", "\N{CYRILLIC CAPITAL LETTER A}",
+    "\N{FULLWIDTH LATIN CAPITAL LETTER A}", "\N{LATIN CAPITAL LETTER AV}",
+    "\N{CHEROKEE LETTER A}",
+]
+STATED_LINES = 200_000
+
+
+def generated_line(rng):
+    return "".join(rng.choice(PIECES) if rng.random() < 0.4 else rng.choice(MARKUP_CHARACTERS)
+                   for _ in range(rng.randint(1, 16)))
+
+
+def test_the_stated_steps_read_every_generated_line_as_the_checker_does():
+    # README, the script's description and the changelog state the steps in words, and the
+    # checker takes them with three patterns; a step that drifted from its pattern used to
+    # leave every test passing. Any line the two read differently names the step.
+    checker = load_checker()
+    rng = random.Random(80)
+    for _ in range(STATED_LINES):
+        line = generated_line(rng)
+        assert checker.name_form(line) == stated_name_form(checker, line), ascii(line)
+
+
+def test_nfkc_gives_what_unicodedata_normalize_gives():
+    # nfkc puts each run of combining characters in order itself. The pieces hold marks of
+    # several combining classes, U+0344, which decomposes into two marks, U+0F73, a starter
+    # that decomposes into two marks, U+09BE and U+0B3E, starters that compose with the
+    # vowel sign before them, Hangul jamo and a syllable, and compatibility characters.
+    checker = load_checker()
+    pieces = [*"AaeouDVx ", "́", "̖", "̈", "̣", "̈́", "ְ",
+              "ּ", "़", "्", "ཱ", "ི", "ཱི", "ྀ", "⃝",
+              "\U0001d165", "\U0001d16d", "ে", "া", "େ", "ା", "ᄀ",
+              "ᅡ", "ᆨ", "가", "Á", "ẛ", "Ω", "ﬃ",
+              "\N{FULLWIDTH LATIN CAPITAL LETTER A}",
+              "　", " ", "\N{CYRILLIC CAPITAL LETTER A}"]
+    rng = random.Random(80)
+    for _ in range(50_000):
+        text = "".join(rng.choice(pieces) for _ in range(rng.randint(1, 12)))
+        assert checker.nfkc(text) == unicodedata.normalize("NFKC", text), ascii(text)
+
+
+def test_name_form_reads_a_long_run_of_combining_marks_in_n_log_n_time():
+    # unicodedata.normalize puts a run of combining marks in order by moving one mark at a
+    # time: in name_form, U+0301 U+0316 repeated to 100,000 characters took about 2 s on
+    # Python 3.14 and 200,000 about four times as long. Put in order by a sort first,
+    # 200,000 take a few hundredths of a second.
+    checker = load_checker()
+    marks = "\N{COMBINING ACUTE ACCENT}\N{COMBINING GRAVE ACCENT BELOW}" * 100_000
+    start = time.perf_counter()
+    form = checker.name_form(marks)
+    seconds = time.perf_counter() - start
+    assert form == ("\N{COMBINING GRAVE ACCENT BELOW}" * 100_000
+                    + "\N{COMBINING ACUTE ACCENT}" * 100_000)
+    assert seconds < 1, f"{seconds:.2f} s"
 
 
 def test_a_line_naming_dvaa_and_stating_a_count_names_both():

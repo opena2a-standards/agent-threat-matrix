@@ -174,12 +174,12 @@ def test_ac2(case):
 
 # --------------------------------------------------------------------------- AC3
 
-def _unreleased() -> str:
-    return CHANGELOG.read_text().split("## Unreleased", 1)[1].split("\n## ", 1)[0]
+def _unreleased(changelog: str) -> str:
+    return changelog.split("## Unreleased", 1)[1].split("\n## ", 1)[0]
 
 
 def _ac3_changelog_records_the_derivation_ruling():
-    text = _unreleased()
+    text = _unreleased(CHANGELOG.read_text())
     entry = next((l for l in text.splitlines() if "hmaChecks" in l and "2026-08-25" in l), None)
     assert entry, "Unreleased must carry the hmaChecks-derivation entry dated 2026-08-25"
     assert "TAXONOMY_MAP" in entry and "derive_class_checks.py" in entry
@@ -188,13 +188,28 @@ def _ac3_changelog_records_the_derivation_ruling():
 def _ac3_docstring_pointer_resolves_or_is_gone():
     doc = DOCSTRING_SCRIPT.read_text()
     if "see CHANGELOG" in doc:
-        assert any("hmaChecks" in l and "2026-08-25" in l for l in _unreleased().splitlines()), \
+        assert any("hmaChecks" in l and "2026-08-25" in l
+                   for l in _unreleased(CHANGELOG.read_text()).splitlines()), \
             "a surviving pointer must land on the entry"
+
+
+def _ac3_a_released_entry_is_not_read_as_unreleased():
+    # The Unreleased section ends at the next section heading, so the derivation entry
+    # standing only under a released version satisfies neither check above.
+    changelog = ("# Changelog\n\n## Unreleased\n\n### Fixed\n\n- An unrelated fix.\n\n"
+                 "## v1.2.0 (2026-09-08)\n\n### Changed\n\n"
+                 "- Class-level `hmaChecks` are derived from `TAXONOMY_MAP` by "
+                 "`scripts/derive_class_checks.py` (ruled 2026-08-25).\n\n"
+                 "## v1.1 (2026-06-04)\n\n### Added\n\n- An earlier entry.\n")
+    unreleased = _unreleased(changelog)
+    assert "- An unrelated fix." in unreleased
+    assert "hmaChecks" not in unreleased and "2026-08-25" not in unreleased
 
 
 AC3_CASES = [
     ("ATM-04.AC3 CHANGELOG records the 2026-08-25 hmaChecks derivation ruling", _ac3_changelog_records_the_derivation_ruling),
     ("ATM-04.AC3 the derive_class_checks.py pointer resolves or is gone", _ac3_docstring_pointer_resolves_or_is_gone),
+    ("ATM-04.AC3 a derivation entry under a released version is not read as Unreleased", _ac3_a_released_entry_is_not_read_as_unreleased),
 ]
 
 
