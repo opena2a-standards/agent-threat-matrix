@@ -6,8 +6,9 @@ shipped tree must be green. Each wording the three pages carried before docs/evi
 became the single definition is then planted back and must be reported at its own line, as
 must a dropped definition, a definition wrapped over two lines or continued on the next line,
 a canonical edit the quoting pages do not follow, and a schema tier the canonical page does
-not define. A long line on the canonical page that does not complete a row must be read in
-linear time.
+not define. A long line on the canonical page that does not complete a row, and a table row
+or list item on a quoting page that holds a long run of white space before more text, must be
+read in linear time.
 """
 
 import json
@@ -207,6 +208,31 @@ def test_canonical_lines_that_do_not_complete_a_row_are_read_in_linear_time(tree
     r = run_checker(tree)
     seconds = time.perf_counter() - start
     assert r.returncode == 0, r.stderr
+    assert seconds < 3, f"{seconds:.2f} s"
+
+
+@pytest.mark.parametrize("rel, form, tier", [
+    ("README.md", "| **{}** | x{}y |", "Observed"),
+    ("EVIDENCE_AUDIT.md", "- **{}**: x{}y", "OBSERVED"),
+], ids=["table row", "list item"])
+def test_quoting_page_lines_with_a_long_run_of_white_space_are_read_in_linear_time(
+        tree, rel, form, tier):
+    # Each line starts a bold-labelled table row or list item and holds a long run of white
+    # space before more text; the label need not be a tier. Matched with white space on both
+    # sides of a lazy definition, the table row with 40,000 spaces took over 7 s on Python 3.14
+    # and the list item over 4 s, about four times as long at each doubling of the run. The
+    # tier's line is still read, stripped of the white space around it, and reported at its line.
+    run = " " * 128_000
+    path = tree / rel
+    head = path.read_text(encoding="utf-8") + "\n" + form.format("Note", run) + "\n\n"
+    line = head.count("\n") + 1
+    path.write_text(head + form.format(tier, run) + "\n", encoding="utf-8")
+    start = time.perf_counter()
+    r = run_checker(tree)
+    seconds = time.perf_counter() - start
+    assert r.returncode == 1
+    assert r.stderr.count(" reads \"") == 1
+    assert f"{rel}:{line}: Observed reads \"x{run}y\";" in r.stderr
     assert seconds < 3, f"{seconds:.2f} s"
 
 

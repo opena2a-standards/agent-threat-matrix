@@ -38,8 +38,12 @@ QUOTING = ("README.md", "CONTRIBUTING.md", "EVIDENCE_AUDIT.md")
 
 FENCE_RE = re.compile(r"^ {0,3}(`{3,}|~{3,})")
 VALUE_RE = re.compile(r"`([a-z]+)`")
-TABLE_ROW_RE = re.compile(r"^\|\s*\*\*([A-Za-z]+)\*\*\s*\|\s*(.*?)\s*(?:\||$)")
-LIST_ITEM_RE = re.compile(r"^\s*[-*+]\s+\*\*([A-Za-z]+)\*\*:\s*(.*?)\s*$")
+# A quoting page's definition is the rest of the cell, or of the line for a list item,
+# stripped of white space after the match. Stripped by the pattern, with white space on both
+# sides of a lazy definition, a long run of white space followed by more text took quadratic
+# time.
+TABLE_ROW_RE = re.compile(r"^\|\s*\*\*([A-Za-z]+)\*\*\s*\|([^|]*)")
+LIST_ITEM_RE = re.compile(r"^\s*[-*+]\s+\*\*([A-Za-z]+)\*\*:(.*)")
 BULLET_RE = re.compile(r"^(\s*)[-*+]\s+\S")
 
 
@@ -126,7 +130,7 @@ def quoted_definitions(text, tiers):
             m = LIST_ITEM_RE.match(line)
             continued = bool(m) and continues(lines, n, line)
         if m and m.group(1).lower() in tiers:
-            yield n, m.group(1).lower(), m.group(2), continued
+            yield n, m.group(1).lower(), m.group(2).strip(), continued
 
 
 def check(root=ROOT):
