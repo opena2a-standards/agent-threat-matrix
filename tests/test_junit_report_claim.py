@@ -11,7 +11,21 @@ JUnit report; it had no such entry.
 The report names a testcase after the test function followed by the parametrize id in
 brackets, so it is the parametrize id that leads with the criterion id, not the testcase
 name. Those modules said "Leaf test names begin with the criterion id"; a test here fails
-when such a docstring, or the message of the last test, says a name leads with it.
+when such a docstring, or the message of the last test, holds certain words in a row, in
+any letter case. A word here is whatever stands between white space, line breaks included,
+and a mark is any character of a word other than a letter, a digit or an underscore. The
+words are, in this order: one that, a comma at its end aside, is "name" or "names" or ends
+in either right after a mark; at most eight words, none holding a full stop, colon,
+semicolon, question mark or exclamation mark, and none that, marks at its start aside, is
+"id" or "ids" or begins with either right before a mark, as such a word is taken to make
+the parametrize id the subject; one that is a form of "begin", "lead" or "start"; and one
+that is "with" or begins with it right before a mark. A claim worded any other way is not
+read: "names are prefixed with" is not, and neither are `"names" begin with`,
+`*names* begin with`, `names "begin with"`, `names *begin* with` or
+`names—each of them—begin with`, where a mark stands right after "names" or beside the
+verb. The Unreleased section records that change in a second entry that names this file,
+quotes the old and the new wording of the docstrings and of the message, and names each
+module whose docstring holds the new wording; it had no such entry.
 """
 
 import ast
@@ -28,9 +42,15 @@ TESTS = ROOT / "tests"
 CHANGELOG = ROOT / "CHANGELOG.md"
 COMMAND = "pytest --junitxml"
 CRITERION_RE = re.compile(r"\(([A-Z]+-\d+)\.ACn\)")
+# The words the module docstring lists, in a row: the name word, at most eight words that
+# hold none of the five marks and are no "id" or "ids" word, a verb form and the "with" word.
 NAME_CLAIM_RE = re.compile(
-    r"\bnames? (?:that |which )?(?:do(?:es)? not |don't )?(?:begins?|leads?|starts?) with", re.I)
+    r"\bnames?(?:,? (?![^\w\s]*ids?\b)[^\s.:;?!]+){0,8}?,? "
+    r"(?:begin(?:s|ning)?|began|begun|lead(?:s|ing)?|led|start(?:s|ed|ing)?) with\b", re.I)
 STRAY = "testcase names whose parametrize id does not lead with {}.ACn"
+OLD_STRAY = "testcase names that do not lead with {}.ACn"
+WORDING = "Every parametrize id below begins with the criterion id"
+OLD_WORDING = "Leaf test names begin with the criterion id"
 
 
 def docstring(path: Path) -> str:
@@ -56,6 +76,20 @@ def unreleased_entries(changelog: str, needle: str):
     section = changelog.split("## Unreleased", 1)[1].split("\n## ", 1)[0]
     items = re.split(r"\n(?=- |#)", section)
     return [" ".join(item.split()) for item in items if needle in item]
+
+
+def lead(message: str) -> str:
+    """Return a failure message up to the criterion id it is formatted with."""
+    return message.split(" {}")[0]
+
+
+def wording_gaps(entries, modules):
+    """Return what the first entry quoting the old docstring wording leaves out, or that wording."""
+    quoting = [entry for entry in entries if OLD_WORDING in entry]
+    if not quoting:
+        return [OLD_WORDING]
+    return [part for part in (WORDING, lead(OLD_STRAY), lead(STRAY), *modules)
+            if part not in quoting[0]]
 
 
 def test_docstrings_that_mention_a_junit_report_name_the_command():
@@ -87,11 +121,74 @@ def test_docstrings_that_state_a_criterion_id_say_the_parametrize_id_leads_with_
 def test_name_claims_find_the_old_wording_and_pass_the_new():
     assert name_claims("Leaf test names begin with the criterion id (ATM-03.ACn) so each\n"
                        "criterion can be traced") == ["names begin with"]
-    assert name_claims("testcase names that do not lead with ATM-06.ACn") == [
-        "names that do not lead with"]
+    assert name_claims(OLD_STRAY.format("ATM-06")) == ["names that do not lead with"]
     assert name_claims("Every parametrize id below begins with the criterion id (ATM-03.ACn)\n"
                        "so each criterion can be traced") == []
     assert name_claims(STRAY.format("ATM-06")) == []
+
+
+def test_name_claims_find_a_claim_with_words_between_the_name_and_the_verb():
+    # Each sentence says a name leads with the id, and none of them was found.
+    assert name_claims("Testcase names all begin with the criterion id") == [
+        "names all begin with"]
+    assert name_claims("Leaf test names, which begin with the criterion id") == [
+        "names, which begin with"]
+    assert name_claims("Test names now start with the criterion id") == [
+        "names now start with"]
+    assert name_claims("Every testcase name in the report leads with the criterion id") == [
+        "name in the report leads with"]
+    assert name_claims("requiring the name of every testcase in the report to lead with\n"
+                       "that id") == ["name of every testcase in the report to lead with"]
+    assert name_claims("Names of leaf tests Begin With the criterion id") == [
+        "Names of leaf tests Begin With"]
+    for verb in ("begin", "begins", "beginning", "began", "begun", "lead", "leads", "leading",
+                 "led", "start", "starts", "started", "starting"):
+        assert name_claims(f"Test names {verb} with the criterion id") == [
+            f"names {verb} with"], verb
+
+
+def test_name_claims_stop_at_an_id_at_the_end_of_a_sentence_and_after_eight_words():
+    # "id" or "ids" between the name and the verb makes the parametrize id the subject.
+    assert name_claims("Each testcase name carries a parametrize id that leads with\n"
+                       "ATM-06.ACn") == []
+    assert name_claims("Testcase names, whose parametrize ids all begin with ATM-06.ACn") == []
+    assert name_claims("Each testcase name ends in a bracketed (id) that starts with\n"
+                       "ATM-06.ACn") == []
+    assert name_claims("Fixture filenames begin with the criterion id") == []
+    # The mark ends the sentence right after the name or after a later word.
+    for mark in ".:;?!":
+        assert name_claims(f"The report gives each testcase a name{mark} Every bracketed\n"
+                           "part begins with the criterion id") == [], mark
+        assert name_claims(f"The report gives each testcase name a suffix{mark} Every\n"
+                           "bracketed part begins with the criterion id") == [], mark
+    eight = "name of each and every testcase in the report starts with"
+    assert name_claims(f"The {eight} the criterion id") == [eight]
+    assert name_claims("The name of each and every testcase in the whole report starts with\n"
+                       "the criterion id") == []
+    # A wording outside the three verbs is not read, as the module docstring says.
+    assert name_claims("Testcase names are prefixed with the criterion id") == []
+    assert name_claims("Testcase names begin within the report") == []
+
+
+def test_name_claims_pass_a_mark_right_after_the_name_beside_the_verb_or_before_with():
+    # The name word ends in "name" or "names", a comma aside, the verb is a word of its own
+    # and the word after it begins with "with", so none of these is read. The module
+    # docstring gives the first five.
+    for claim in ('Leaf test "names" begin with the criterion id',
+                  "Leaf test *names* begin with the criterion id",
+                  'Leaf test names "begin with" the criterion id',
+                  "Leaf test names *begin* with the criterion id",
+                  "Leaf test names\N{EM DASH}each of them\N{EM DASH}begin with the criterion id",
+                  "Leaf test names begin, with the criterion id",
+                  "Leaf test names begin *with* the criterion id"):
+        assert name_claims(claim) == [], claim
+    # These are read: a quotation mark at the start of the name word and at the end of the
+    # "with" word, brackets around a word in between, and a hyphen that is a word of its own.
+    assert name_claims('Leaf test "names begin with" the criterion id') == ["names begin with"]
+    assert name_claims("Leaf test names (each) begin with the criterion id") == [
+        "names (each) begin with"]
+    assert name_claims("Leaf test names - each of them - begin with the criterion id") == [
+        "names - each of them - begin with"]
 
 
 def test_the_unreleased_changelog_records_the_wording_and_this_test():
@@ -117,6 +214,33 @@ def test_unreleased_entries_stop_at_the_next_section():
                "  `tests/test_junit_report_claim.py` across a line break.\n- Another.\n")
     assert unreleased_entries(wrapped, "test_junit_report_claim") == [
         "- One entry naming `tests/test_junit_report_claim.py` across a line break."]
+
+
+def test_the_unreleased_changelog_records_the_parametrize_id_wording():
+    me = f"tests/{HERE.name}"
+    modules = [f"tests/{path.name}" for path in sorted(TESTS.glob("test_*.py"))
+               if path.resolve() != HERE and WORDING in " ".join(docstring(path).split())]
+    assert modules, f"no test module docstring says {WORDING!r}"
+    entries = unreleased_entries(CHANGELOG.read_text(encoding="utf-8"), me)
+    missing = wording_gaps(entries, modules)
+    assert not missing, f"CHANGELOG.md: the Unreleased entries naming {me} do not record {missing}"
+
+
+def test_wording_gaps_find_an_entry_that_records_only_the_command():
+    modules = ["tests/test_atm03.py", "tests/test_atm04.py"]
+    command = ("- The module docstrings of `tests/test_atm03.py` and `tests/test_atm04.py` say "
+               "each criterion can be traced to a passing testcase in a JUnit report written by "
+               "`pytest --junitxml`. `tests/test_junit_report_claim.py` runs the command.")
+    wording = (f'- The module docstrings of `{modules[0]}` and `{modules[1]}` say "{WORDING}"; '
+               f'they said "{OLD_WORDING}". The message of the report check speaks of '
+               f'"{lead(STRAY)}" the id; it spoke of "{lead(OLD_STRAY)}" it.')
+    assert wording_gaps([], modules) == [OLD_WORDING]
+    assert wording_gaps([command], modules) == [OLD_WORDING]
+    assert wording_gaps([command, wording], modules) == []
+    assert wording_gaps([wording.replace(WORDING, "the parametrize id")], modules) == [WORDING]
+    assert wording_gaps([wording.replace(lead(OLD_STRAY), "names")], modules) == [lead(OLD_STRAY)]
+    assert wording_gaps([wording.replace(lead(STRAY), "ids")], modules) == [lead(STRAY)]
+    assert wording_gaps([wording], [*modules, "tests/test_atm06.py"]) == ["tests/test_atm06.py"]
 
 
 def test_the_named_command_writes_a_report_whose_parametrize_ids_lead_with_the_criterion_id():
