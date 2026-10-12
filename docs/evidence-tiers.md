@@ -13,8 +13,8 @@ EVIDENCE_AUDIT.md quote the Definition column word for word.
 `| **Observed** | <definition> |` (a table row whose first cell is the tier in bold) or as
 `- **OBSERVED**: <definition>` (a list item labelled with the tier in bold) as a definition.
 It fails when such a definition differs from this table, when the line after a list-item
-definition is neither blank nor a bulleted list item indented no further than it (Markdown
-may join such a line to the definition), or when one of the pages leaves a tier out. A
+definition is neither blank nor a bulleted list item with text indented no further than it
+(Markdown may join such a line to the definition), or when one of the pages leaves a tier out. A
 definition written in any other form, such as inside a block quote, or on another page is
 not read.
 To change a definition, change it here and in every page that quotes it.
