@@ -11,7 +11,10 @@ JUnit report; it had no such entry.
 The report names a testcase after the test function followed by the parametrize id in
 brackets, so it is the parametrize id that leads with the criterion id, not the testcase
 name. Those modules said "Leaf test names begin with the criterion id"; a test here fails
-when such a docstring, or the message of the last test, says a name leads with it.
+when such a docstring, or the message of the last test, says a name leads with it. The
+Unreleased section records that change in a second entry that names this file, quotes the
+old and the new wording of the docstrings and of the message, and names each module whose
+docstring holds the new wording; it had no such entry.
 """
 
 import ast
@@ -31,6 +34,9 @@ CRITERION_RE = re.compile(r"\(([A-Z]+-\d+)\.ACn\)")
 NAME_CLAIM_RE = re.compile(
     r"\bnames? (?:that |which )?(?:do(?:es)? not |don't )?(?:begins?|leads?|starts?) with", re.I)
 STRAY = "testcase names whose parametrize id does not lead with {}.ACn"
+OLD_STRAY = "testcase names that do not lead with {}.ACn"
+WORDING = "Every parametrize id below begins with the criterion id"
+OLD_WORDING = "Leaf test names begin with the criterion id"
 
 
 def docstring(path: Path) -> str:
@@ -56,6 +62,20 @@ def unreleased_entries(changelog: str, needle: str):
     section = changelog.split("## Unreleased", 1)[1].split("\n## ", 1)[0]
     items = re.split(r"\n(?=- |#)", section)
     return [" ".join(item.split()) for item in items if needle in item]
+
+
+def lead(message: str) -> str:
+    """Return a failure message up to the criterion id it is formatted with."""
+    return message.split(" {}")[0]
+
+
+def wording_gaps(entries, modules):
+    """Return what the first entry quoting the old docstring wording leaves out, or that wording."""
+    quoting = [entry for entry in entries if OLD_WORDING in entry]
+    if not quoting:
+        return [OLD_WORDING]
+    return [part for part in (WORDING, lead(OLD_STRAY), lead(STRAY), *modules)
+            if part not in quoting[0]]
 
 
 def test_docstrings_that_mention_a_junit_report_name_the_command():
@@ -87,8 +107,7 @@ def test_docstrings_that_state_a_criterion_id_say_the_parametrize_id_leads_with_
 def test_name_claims_find_the_old_wording_and_pass_the_new():
     assert name_claims("Leaf test names begin with the criterion id (ATM-03.ACn) so each\n"
                        "criterion can be traced") == ["names begin with"]
-    assert name_claims("testcase names that do not lead with ATM-06.ACn") == [
-        "names that do not lead with"]
+    assert name_claims(OLD_STRAY.format("ATM-06")) == ["names that do not lead with"]
     assert name_claims("Every parametrize id below begins with the criterion id (ATM-03.ACn)\n"
                        "so each criterion can be traced") == []
     assert name_claims(STRAY.format("ATM-06")) == []
@@ -117,6 +136,33 @@ def test_unreleased_entries_stop_at_the_next_section():
                "  `tests/test_junit_report_claim.py` across a line break.\n- Another.\n")
     assert unreleased_entries(wrapped, "test_junit_report_claim") == [
         "- One entry naming `tests/test_junit_report_claim.py` across a line break."]
+
+
+def test_the_unreleased_changelog_records_the_parametrize_id_wording():
+    me = f"tests/{HERE.name}"
+    modules = [f"tests/{path.name}" for path in sorted(TESTS.glob("test_*.py"))
+               if path.resolve() != HERE and WORDING in " ".join(docstring(path).split())]
+    assert modules, f"no test module docstring says {WORDING!r}"
+    entries = unreleased_entries(CHANGELOG.read_text(encoding="utf-8"), me)
+    missing = wording_gaps(entries, modules)
+    assert not missing, f"CHANGELOG.md: the Unreleased entries naming {me} do not record {missing}"
+
+
+def test_wording_gaps_find_an_entry_that_records_only_the_command():
+    modules = ["tests/test_atm03.py", "tests/test_atm04.py"]
+    command = ("- The module docstrings of `tests/test_atm03.py` and `tests/test_atm04.py` say "
+               "each criterion can be traced to a passing testcase in a JUnit report written by "
+               "`pytest --junitxml`. `tests/test_junit_report_claim.py` runs the command.")
+    wording = (f'- The module docstrings of `{modules[0]}` and `{modules[1]}` say "{WORDING}"; '
+               f'they said "{OLD_WORDING}". The message of the report check speaks of '
+               f'"{lead(STRAY)}" the id; it spoke of "{lead(OLD_STRAY)}" it.')
+    assert wording_gaps([], modules) == [OLD_WORDING]
+    assert wording_gaps([command], modules) == [OLD_WORDING]
+    assert wording_gaps([command, wording], modules) == []
+    assert wording_gaps([wording.replace(WORDING, "the parametrize id")], modules) == [WORDING]
+    assert wording_gaps([wording.replace(lead(OLD_STRAY), "names")], modules) == [lead(OLD_STRAY)]
+    assert wording_gaps([wording.replace(lead(STRAY), "ids")], modules) == [lead(STRAY)]
+    assert wording_gaps([wording], [*modules, "tests/test_atm06.py"]) == ["tests/test_atm06.py"]
 
 
 def test_the_named_command_writes_a_report_whose_parametrize_ids_lead_with_the_criterion_id():
