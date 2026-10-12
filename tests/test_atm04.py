@@ -1,8 +1,8 @@
 """ATM-04 acceptance tests.
 
-Leaf test names begin with the criterion id (ATM-04.ACn) so the QGF gate can trace each
-criterion to a passing testcase in the JUnit output (ID_SCHEME.md 3.3): the id is the
-first token of every parametrize id below.
+Leaf test names begin with the criterion id (ATM-04.ACn) so each criterion can be traced
+to a passing testcase in the JUnit output: the id is the first token of every parametrize
+id below.
 
 The checker under test is scripts/check_canonical_classes.py. AC1 pins its CI wiring in
 the readme-claims job with an untampered verdict; AC2 proves the check GREEN on the
@@ -228,7 +228,7 @@ def _oasb_entry() -> str:
 
 
 def _ac4_no_internal_role_named():
-    assert "Chief Architect" not in CHANGELOG.read_text()
+    assert not re.search(r"Chief\s+[A-Z]", CHANGELOG.read_text())
 
 
 def _ac4_entry_keeps_its_technical_content():
