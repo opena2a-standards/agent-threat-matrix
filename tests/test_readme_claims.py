@@ -286,6 +286,38 @@ def test_a_tactic_row_dropped_from_the_overview_table_is_red():
         shutil.rmtree(td)
 
 
+@pytest.mark.parametrize("line,kilobytes,last", [
+    # Lines that start a tactic row and never close its bracket. With a name class that
+    # crossed line breaks, the row pattern scanned from each such line to the end of the
+    # README and back: these 200 KB took about 16 s on Python 3.14.
+    ("| [a\n", 200, None),
+    # Copies of a tactic row, each reported as a second row for the tactic. Counting the
+    # line breaks before each reported row to name its line took about 28 s for these.
+    ("| [Impact](tactics/impact.md) | 9 | 6 | Modify data |\n", 3200,
+     "second row for tactic impact"),
+], ids=["unclosed tactic row starts", "repeated tactic rows"])
+def test_many_tactic_row_lines_are_read_in_linear_time(line, kilobytes, last):
+    td = scratch_tree()
+    try:
+        readme = td / "README.md"
+        text = readme.read_text(encoding="utf-8")
+        copies = kilobytes * 1024 // len(line)
+        readme.write_text(text + line * copies, encoding="utf-8")
+        start = time.perf_counter()
+        r = run_checker(td)
+        seconds = time.perf_counter() - start
+        if last is None:
+            assert r.returncode == 0, r.stderr
+        else:
+            # The last copy is reported at its own line.
+            assert r.returncode == 1, r.stdout
+            assert f"README.md:{text.count(chr(10)) + copies}: {last} " in r.stderr, \
+                r.stderr[-2000:]
+        assert seconds < 6, f"{seconds:.2f} s"
+    finally:
+        shutil.rmtree(td)
+
+
 def test_a_category_count_with_three_words_before_the_noun_is_not_read():
     # README states that a DVAA figure worded any other way than the wordings it lists is
     # not checked; three words between the number and "categories" is such a wording.

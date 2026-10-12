@@ -93,6 +93,7 @@ checking or writing anything.
 """
 
 import argparse
+import bisect
 import html
 import json
 import pathlib
@@ -628,18 +629,25 @@ def main(argv):
         "lab scenario of total",
     )
 
+    # The offset of every line break, found once: a row's line number is then a bisection,
+    # where counting the breaks before each row made many rows take time in proportion to
+    # their number times the size of the README.
+    breaks = [m.start() for m in re.finditer("\n", readme)]
+
     def line_of(pos):
-        return readme.count("\n", 0, pos) + 1
+        return bisect.bisect_left(breaks, pos) + 1
 
     # Matrix overview: one row per tactic, stating its name, kill chain stage (`order`)
-    # and technique count.
+    # and technique count. The name and the link target stop at a line break: a row is one
+    # line, and a class that crosses line breaks scanned from every line that starts "| ["
+    # to the end of the README and back.
     per_tactic = {}
     for t in techniques:
         per_tactic[t.get("tactic")] = per_tactic.get(t.get("tactic"), 0) + 1
     tactic_by_id = {t["id"]: t for t in tactics}
     tactic_rows = {}
-    for m in re.finditer(r"(?m)^\| \[([^\]]+)\]\(tactics/([^)]+)\.md\) \| (\d+) \| (\d+) \|",
-                         readme):
+    for m in re.finditer(
+            r"(?m)^\| \[([^\]\n]+)\]\(tactics/([^)\n]+)\.md\) \| (\d+) \| (\d+) \|", readme):
         name, tid, stage, stated = m.groups()
         line = line_of(m.start())
         tactic = tactic_by_id.get(tid)
