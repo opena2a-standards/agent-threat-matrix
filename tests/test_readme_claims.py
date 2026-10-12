@@ -835,8 +835,9 @@ def test_nfkc_gives_what_unicodedata_normalize_gives():
     pieces = [*"AaeouDVx ", "́", "̖", "̈", "̣", "̈́", "ְ",
               "ּ", "़", "्", "ཱ", "ི", "ཱི", "ྀ", "⃝",
               "\U0001d165", "\U0001d16d", "ে", "া", "େ", "ା", "ᄀ",
-              "ᅡ", "ᆨ", "가", "Á", "ẛ", "Ω", "ﬃ", "Ａ",
-              "　", " ", "А"]
+              "ᅡ", "ᆨ", "가", "Á", "ẛ", "Ω", "ﬃ",
+              "\N{FULLWIDTH LATIN CAPITAL LETTER A}",
+              "　", " ", "\N{CYRILLIC CAPITAL LETTER A}"]
     rng = random.Random(80)
     for _ in range(50_000):
         text = "".join(rng.choice(pieces) for _ in range(rng.randint(1, 12)))
