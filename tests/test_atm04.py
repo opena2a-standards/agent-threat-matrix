@@ -175,7 +175,7 @@ def test_ac2(case):
 # --------------------------------------------------------------------------- AC3
 
 def _unreleased() -> str:
-    return CHANGELOG.read_text().split("## Unreleased", 1)[1].split("## v1.1", 1)[0]
+    return CHANGELOG.read_text().split("## Unreleased", 1)[1].split("\n## ", 1)[0]
 
 
 def _ac3_changelog_records_the_derivation_ruling():

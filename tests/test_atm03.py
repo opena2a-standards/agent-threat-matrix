@@ -104,7 +104,7 @@ def _ac1_readme_cell_updated():
 
 def _ac1_changelog_names_both_paths():
     text = (ROOT / "CHANGELOG.md").read_text()
-    unreleased = text.split("## Unreleased", 1)[1].split("## v1.1", 1)[0]
+    unreleased = text.split("## Unreleased", 1)[1].split("\n## ", 1)[0]
     assert "cross-references/gap-analysis.md" in unreleased
     assert "cross-references/technique-overlap-index.md" in unreleased
 
