@@ -216,8 +216,8 @@ def lines_naming(lines, name):
     """The README with every line blanked that does not contain `name` once the characters
     `hiding_kind` names are removed, so a match offset still converts to its README line
     number. `lines` holds each README line as `classified` returns it. "DV" U+200B "AA"
-    shows as DVAA, so that line names DVAA."""
-    return "\n".join(line if name in shown else "" for line, shown, _ in lines)
+    is DVAA once U+200B is removed, so that line names DVAA."""
+    return "\n".join(line if name in stripped else "" for line, stripped, _ in lines)
 
 
 def hiding_kind(c):
@@ -238,12 +238,12 @@ def hiding_kind(c):
 
 
 def classified(line):
-    """(line, shown, hidden) for `line`: `shown` is `line` with every character
+    """(line, stripped, hidden) for `line`: `stripped` is `line` with every character
     `hiding_kind` names removed, and `hidden` holds (column, character) for the first
     occurrence of each such character, the column counted in characters from 1. One
     lookup per character gives both; a repeat of a character already found is removed
     without another."""
-    shown = []
+    stripped = []
     hidden = []
     seen = set()
     for column, c in enumerate(line, 1):
@@ -253,8 +253,8 @@ def classified(line):
             seen.add(c)
             hidden.append((column, c))
         else:
-            shown.append(c)
-    return line, "".join(shown), hidden
+            stripped.append(c)
+    return line, "".join(stripped), hidden
 
 
 def empty(value):
@@ -390,7 +390,8 @@ def main(argv):
             f"dvaa.agents is {dvaa['agents']}"
         )
     # Each README line is classified once: the lookups that find the characters failing a
-    # line also give the line as it shows, and that decides whether it names DVAA.
+    # line also give the line with such characters removed, which decides whether it names
+    # DVAA.
     lines = [classified(line) for line in readme.split("\n")]
     dvaa_lines = lines_naming(lines, "DVAA")
     pinned = "related-projects.json"
@@ -439,13 +440,13 @@ def main(argv):
     # every line that names DVAA or states a matrix.json count once such characters are
     # removed: "DV" U+200B "AA" names DVAA, and "8 tac" U+00AD "tics" states a count the
     # check cannot read.
-    for number, (line, shown, hidden) in enumerate(lines, 1):
+    for number, (line, stripped, hidden) in enumerate(lines, 1):
         if not hidden:
             continue
         readers = []
-        if "DVAA" in shown:
+        if "DVAA" in stripped:
             readers.append(("naming DVAA", "DVAA"))
-        if any(re.search(pattern, shown) for pattern in count_wordings):
+        if any(re.search(pattern, stripped) for pattern in count_wordings):
             readers.append(("stating a matrix.json count", "count"))
         if not readers:
             continue

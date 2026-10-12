@@ -377,10 +377,10 @@ INVISIBLE_CHARACTERS = [
      "variants; 13 vulnerability categ\N{VARIATION SELECTOR-17}ories",
      "U+E0100 VARIATION SELECTOR-17, a default-ignorable combining mark"),
     ("U+2065, unassigned, inside agents", AGENT_COUNT,
-     "(22 age⁥nts: 16 deliberately vulnerable",
+     "(22 age\U00002065nts: 16 deliberately vulnerable",
      "U+2065, an unassigned default-ignorable code point"),
     ("U+FFF8, unassigned, between the number and the noun", AGENT_COUNT,
-     "(22￸ agents: 16 deliberately vulnerable",
+     "(22\U0000fff8 agents: 16 deliberately vulnerable",
      "U+FFF8, an unassigned default-ignorable code point"),
     ("U+E0000, unassigned, inside categories", CATEGORY_COUNT,
      "variants; 13 vulnerability categ\U000e0000ories",
@@ -456,8 +456,8 @@ def test_a_count_line_carrying_an_invisible_character_is_red(old, new, named):
         shutil.rmtree(td)
 
 
-# A character that fails a line, written inside the name "DVAA". The line still shows the
-# name, so it names DVAA once the character is removed: its DVAA figures are read and the
+# A character that fails a line, written inside the name "DVAA". The line contains the
+# name once the character is removed, so it names DVAA: its DVAA figures are read and the
 # character fails it. Read only where "DVAA" is written unbroken, such a line was not read
 # at all and two wrong figures passed.
 DVAA_LINK = ("[DVAA](https://github.com/opena2a-org/damn-vulnerable-ai-agent) "
@@ -471,7 +471,7 @@ NAME_CHARACTERS = [
      "U+FFA0 HALFWIDTH HANGUL FILLER, a Hangul filler"),
     ("U+034F COMBINING GRAPHEME JOINER", "DVA\N{COMBINING GRAPHEME JOINER}A",
      "U+034F COMBINING GRAPHEME JOINER, a default-ignorable combining mark"),
-    ("U+2065, unassigned", "DV⁥AA", "U+2065, an unassigned default-ignorable code point"),
+    ("U+2065, unassigned", "DV\U00002065AA", "U+2065, an unassigned default-ignorable code point"),
 ]
 
 
@@ -760,6 +760,18 @@ def test_a_value_outside_the_code_point_range_is_no_mark():
     assert checker.is_mark(0) is False
     assert checker.is_mark(sys.maxunicode) is False
     assert checker.is_mark(0x0301) is True
+
+
+def test_the_scripts_and_tests_write_each_character_that_fails_a_line_as_an_escape():
+    # Written raw, such a character reads as plain text in an editor or a diff: "DV" U+2065
+    # "AA" in the cases inside the name read as "DVAA". Each is written as an escape
+    # (\N{...}, \x or \U) instead.
+    checker = load_checker()
+    raw = [f"{path.relative_to(ROOT)}:{number}:{column}: U+{ord(c):04X}"
+           for path in sorted([*ROOT.glob("scripts/*.py"), *ROOT.glob("tests/*.py")])
+           for number, line in enumerate(path.read_text(encoding="utf-8").split("\n"), 1)
+           for column, c in enumerate(line, 1) if checker.hiding_kind(c)]
+    assert raw == [], raw
 
 
 def test_the_dvaa_category_count_must_be_stated():
