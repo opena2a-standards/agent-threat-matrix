@@ -95,7 +95,8 @@ UNASSIGNED_IGNORABLES = frozenset(
 
 
 def is_mark(code):
-    """Whether code point `code` is a combining mark (Unicode category M: Mn, Mc or Me)."""
+    """Whether code point `code` is a combining mark (Unicode category M: Mn, Mc or Me).
+    A value outside 0 to sys.maxunicode is no code point, so it is no mark."""
     return 0 <= code <= sys.maxunicode and unicodedata.category(chr(code)).startswith("M")
 
 

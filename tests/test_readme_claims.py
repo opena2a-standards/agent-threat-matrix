@@ -733,6 +733,18 @@ def test_every_default_ignorable_code_point_fails_a_line():
     assert unnamed == [], unnamed
 
 
+def test_a_value_outside_the_code_point_range_is_no_mark():
+    # The walk over a run of marks steps to the code point on either side of it. U+0000
+    # (Cc) and U+10FFFF (Cn) are no marks, so the walk never leaves the code point range,
+    # but is_mark answers for any integer instead of raising from chr().
+    checker = load_checker()
+    assert checker.is_mark(-1) is False
+    assert checker.is_mark(sys.maxunicode + 1) is False
+    assert checker.is_mark(0) is False
+    assert checker.is_mark(sys.maxunicode) is False
+    assert checker.is_mark(0x0301) is True
+
+
 def test_the_dvaa_category_count_must_be_stated():
     td = scratch_tree()
     try:
