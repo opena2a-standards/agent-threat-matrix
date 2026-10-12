@@ -192,10 +192,12 @@ python3 scripts/check_evidence_tiers.py
 and `EVIDENCE_AUDIT.md` quote it. The check reads those three pages for definitions on a
 line of the form `| **Observed** | <definition> |`, as in the table at the top of this file,
 or `- **OBSERVED**: <definition>`, as in `EVIDENCE_AUDIT.md`. It prints `file:line` for each
-such definition that differs from that page, and for each list-item definition followed by
-a line that is neither blank nor a bulleted list item with text indented no further than
-it, names each page that leaves a tier out, and exits 1 if it finds any. Keep each
-definition on one line.
+such definition that differs from that page, for each list-item definition followed by a
+line that is neither blank nor a bulleted list item with text indented no further than it,
+and for each list-item definition followed by blank lines and then a line indented as far
+as its label, which Markdown reads as more of the same list item. It names each page that
+leaves a tier out, and exits 1 if it finds any. Keep each definition on one line and alone
+in its list item.
 
 ## Code of Conduct
 
