@@ -39,10 +39,11 @@ instruction, CDATA section and declaration from its opening <!--, <?, <![CDATA[ 
 an ASCII letter to the first -->, ?>, ]]> or > after it, respectively, or to the end of
 the line when none follows, and each tag from < or </ and a name, which is an ASCII
 letter followed by any ASCII letters, digits and hyphens, to a > right after the name or,
-after white space or /, to the first > after that if no < comes first. Second, from what
-remains, its link destinations and titles are removed unless a parenthesis stands between
-the ( and ) that hold them, its reference labels unless they hold a bracket, and then the
-Markdown characters * _ ~ ` \\ [ ]. Third, its character references are decoded, and it
+after white space or /, to the first > after that if no < comes first. Second, going
+along what remains, each ] followed by ( is removed with the text after it to the first )
+if no further ( comes first, and each ] followed by [ with the text after it to the first
+] if no further [ comes first, whether or not they make a link, and then the Markdown
+characters * _ ~ ` \\ [ ]. Third, its character references are decoded, and it
 is brought to NFKC with each character Unicode lists as confusable with A, D or V read as
 that letter (U+0410 CYRILLIC CAPITAL LETTER A reads as A). So the name written as
 "DV&#8203;AA", "**DV**AA", "DV<!-- -->AA", "<b>DV</b>AA", "[DV](url)AA" or in fullwidth
@@ -124,8 +125,9 @@ RAW_HTML = re.compile(
     r"|</?[A-Za-z][A-Za-z0-9-]*(?:[\s/][^<>]*)?>"
 )
 
-# A link destination and title with no parenthesis between the ( and ) that hold them, or a
-# reference label with no bracket, after the link text: "[DV](url)AA" shows "DVAA".
+# A "]" followed by "(" with the text after it to the first ")" if no further "(" comes
+# first, or a "]" followed by "[" with the text after it to the first "]" if no further "["
+# comes first, whether or not they make a link: "[DV](url)AA" shows "DVAA".
 LINK_TARGET = re.compile(r"\]\([^()]*\)|\]\[[^\[\]]*\]")
 
 # Markdown characters that mark up text without showing: emphasis, strikethrough, code
