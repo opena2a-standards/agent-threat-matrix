@@ -6,13 +6,15 @@ shipped tree must be green. Each wording the three pages carried before docs/evi
 became the single definition is then planted back and must be reported at its own line, as
 must a dropped definition, a definition wrapped over two lines or continued on the next line,
 a canonical edit the quoting pages do not follow, and a schema tier the canonical page does
-not define.
+not define. A long line on the canonical page that does not complete a row must be read in
+linear time.
 """
 
 import json
 import shutil
 import subprocess
 import tempfile
+import time
 from pathlib import Path
 
 import pytest
@@ -190,6 +192,22 @@ def test_a_canonical_tier_defined_twice_is_reported(tree):
     r = run_checker(tree)
     assert r.returncode == 1
     assert f"docs/evidence-tiers.md:{line}: defines `adapted` a second time" in r.stderr
+
+
+def test_canonical_lines_that_do_not_complete_a_row_are_read_in_linear_time(tree):
+    # Each line starts with "|" and a long run of white space and does not complete a row.
+    # Matched with one pattern for the whole row, "|", 2,000 spaces and "x" took about 3 s on
+    # Python 3.14, and the same after the Observed name and value about 13 s, eight times as
+    # long at each doubling of the run.
+    run = " " * 128_000
+    path = tree / "docs" / "evidence-tiers.md"
+    path.write_text(path.read_text(encoding="utf-8")
+                    + f"\n|{run}x\n\n| Observed | `observed` |{run}x\n", encoding="utf-8")
+    start = time.perf_counter()
+    r = run_checker(tree)
+    seconds = time.perf_counter() - start
+    assert r.returncode == 0, r.stderr
+    assert seconds < 3, f"{seconds:.2f} s"
 
 
 def test_a_schema_tier_the_canonical_page_does_not_define_is_reported(tree):

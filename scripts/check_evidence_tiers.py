@@ -37,7 +37,7 @@ CANONICAL = "docs/evidence-tiers.md"
 QUOTING = ("README.md", "CONTRIBUTING.md", "EVIDENCE_AUDIT.md")
 
 FENCE_RE = re.compile(r"^ {0,3}(`{3,}|~{3,})")
-CANONICAL_ROW_RE = re.compile(r"^\|\s*([^|`]+?)\s*\|\s*`([a-z]+)`\s*\|\s*(.*?)\s*\|\s*$")
+VALUE_RE = re.compile(r"`([a-z]+)`")
 TABLE_ROW_RE = re.compile(r"^\|\s*\*\*([A-Za-z]+)\*\*\s*\|\s*(.*?)\s*(?:\||$)")
 LIST_ITEM_RE = re.compile(r"^\s*[-*+]\s+\*\*([A-Za-z]+)\*\*:\s*(.*?)\s*$")
 BULLET_RE = re.compile(r"^(\s*)[-*+]\s+\S")
@@ -62,14 +62,32 @@ def prose_lines(text):
             fence = None
 
 
+def canonical_row(line):
+    """(name, value, definition) for a row ``| Name | `value` | definition |``, else None.
+
+    The line is split on "|" and each cell stripped of white space. One pattern for the whole
+    row took cubic time on a line that starts with "|" and a long run of white space and does
+    not complete the row, as the white space around a cell and the cell itself divided the
+    run between them in every way. The definition runs from the third "|" to the last one,
+    after which only white space may follow; the name holds no backtick.
+    """
+    cells = line.split("|")
+    if cells[0] or len(cells) < 5 or cells[-1].strip() or not cells[1] or "`" in cells[1]:
+        return None
+    value = VALUE_RE.fullmatch(cells[2].strip())
+    if not value:
+        return None
+    return cells[1].strip(), value.group(1), "|".join(cells[3:-1]).strip()
+
+
 def canonical_definitions(text, tiers, failures):
     """Map each tier to (line, name, definition) from the canonical page's tier table."""
     found = {}
     for n, line in prose_lines(text):
-        m = CANONICAL_ROW_RE.match(line)
-        if not m or m.group(2) not in tiers:
+        row = canonical_row(line)
+        if not row or row[1] not in tiers:
             continue
-        name, value, definition = m.groups()
+        name, value, definition = row
         if value in found:
             failures.append(f"{CANONICAL}:{n}: defines `{value}` a second time "
                             f"(first at line {found[value][0]})")
