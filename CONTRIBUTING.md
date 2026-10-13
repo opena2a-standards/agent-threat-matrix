@@ -195,9 +195,13 @@ or `- **OBSERVED**: <definition>`, as in `EVIDENCE_AUDIT.md`. It prints `file:li
 such definition that differs from that page, for each list-item definition followed by a
 line that is neither blank nor a bulleted list item with text indented no further than it,
 and for each list-item definition followed by blank lines and then a line indented as far
-as its label, which Markdown reads as more of the same list item. It names each page that
-leaves a tier out, and exits 1 if it finds any. Keep each definition on one line and alone
-in its list item.
+as the item's text, which Markdown reads as more of the same list item. The item's text
+starts after the spaces and tabs that follow the marker, or one column after the marker
+when those cover five or more columns. The check names each page that leaves a tier out,
+and exits 1 if it finds any. A list-item definition is read only where CommonMark reads a
+bulleted list item, so write the marker at the margin or under the text of the list item it
+is nested in, follow it with a space, and keep each definition on one line and alone in its
+list item.
 
 ## Code of Conduct
 
