@@ -334,6 +334,29 @@ def test_many_tactic_row_lines_are_read_in_linear_time(line, kilobytes, last):
         shutil.rmtree(td)
 
 
+def test_many_differing_count_wordings_are_read_in_linear_time():
+    # Each line states a tactic count that differs from matrix.json and is reported at its own
+    # line. Counting the line breaks from the start of the README for each one took about 9 s
+    # for 80,000 such lines on Python 3.14.
+    td = scratch_tree()
+    try:
+        readme = td / "README.md"
+        text = readme.read_text(encoding="utf-8")
+        copies = 120_000
+        readme.write_text(text + "1 tactics\n" * copies, encoding="utf-8")
+        start = time.perf_counter()
+        r = run_checker(td)
+        seconds = time.perf_counter() - start
+        assert r.returncode == 1, r.stdout
+        # The first and the last copy are each reported at their own line.
+        for line in (text.count("\n") + 1, text.count("\n") + copies):
+            assert f"README.md:{line}: \"1 tactics\" does not match matrix.json" in r.stderr, \
+                r.stderr[-2000:]
+        assert seconds < 6, f"{seconds:.2f} s"
+    finally:
+        shutil.rmtree(td)
+
+
 def test_a_category_count_with_three_words_before_the_noun_is_not_read():
     # README states that a DVAA figure worded any other way than the wordings it lists is
     # not checked; three words between the number and "categories" is such a wording.

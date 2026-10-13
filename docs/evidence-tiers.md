@@ -14,9 +14,13 @@ EVIDENCE_AUDIT.md quote the Definition column word for word.
 `- **OBSERVED**: <definition>` (a list item labelled with the tier in bold) as a definition.
 It fails when such a definition differs from this table, when the line after a list-item
 definition is neither blank nor a bulleted list item with text indented no further than it
-(Markdown may join such a line to the definition), or when one of the pages leaves a tier out. A
-definition written in any other form, such as inside a block quote, or on another page is
-not read.
+(Markdown may join such a line to the definition), when blank lines after a list-item
+definition are followed by a line indented as far as its label (Markdown reads that line as
+more of the same list item), or when one of the pages leaves a tier out. A blank line holds
+nothing but spaces and tabs, a bullet is followed by a space or tab, a tab indents to the
+next stop of four columns, and lines end only at a line feed or carriage return, as in
+CommonMark. A definition written in any other form, such as inside a block quote, or on
+another page is not read.
 To change a definition, change it here and in every page that quotes it.
 
 | Tier | `evidenceTier` value | Definition |

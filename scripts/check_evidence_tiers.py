@@ -10,20 +10,26 @@ A quoting page defines a tier on a line that names the tier in bold, either as t
 cell of a table row (``| **Observed** | <definition> | ...``) or as the label of a list item
 (``- **OBSERVED**: <definition>``). Every such line must carry the canonical definition word
 for word, and every quoting page must define every tier. A list-item definition must also
-end on its own line: the page must end after it, or the next line must be blank (nothing but
-spaces and tabs) or a bulleted list item with text (``-``, ``*`` or ``+``, white space, then
-text) indented no further than it. Any other line there is read as continuing the
-definition, as Markdown reads an indented line or a line of plain text directly after a list
-item, and the definition is reported even when the joined text matches: keep each
-definition on one line. A definition written in any other form, such as inside a block
-quote, is not read, and neither is a page other than these three. Fenced code blocks are
-skipped.
+end on its own line: the page must end after it, or the next line must be a bulleted list
+item with text (``-``, ``*`` or ``+``, a space or tab, then text) indented no further than
+it, or the next line must be blank (nothing but spaces and tabs) and the first line after
+the blank lines that is not blank, if there is one, must be indented less than the
+definition's label. Any other line there is read as continuing the definition, as Markdown
+reads an indented line or a line of plain text directly after a list item, and a line
+indented as far as the item's text after a blank line as a further paragraph of the item,
+and the definition is reported even when the joined text matches: keep each definition on
+one line and alone in its list item. Lines end at ``\\n``, ``\\r\\n`` or ``\\r`` only, as in
+CommonMark: a form feed, U+0085 or U+2028 does not end a line. Indentation is counted in
+columns, a tab reaching the next stop of four, and a no-break space or other white space
+character is not a space or tab here. A definition written in any other form, such as
+inside a block quote, is not read, and neither is a page other than these three. Fenced
+code blocks are skipped.
 
 The tiers are the ``evidenceTier`` enum in the schema, so a tier added there fails this check
 until the canonical page defines it and every quoting page quotes it.
 
 Exit 0 when all of the above holds, 1 otherwise, printing ``file:line`` for each definition
-that differs or continues onto the next line and naming each page that leaves a tier out.
+that differs or continues past its line and naming each page that leaves a tier out.
 """
 
 import json
@@ -44,7 +50,14 @@ VALUE_RE = re.compile(r"`([a-z]+)`")
 # time.
 TABLE_ROW_RE = re.compile(r"^\|\s*\*\*([A-Za-z]+)\*\*\s*\|([^|]*)")
 LIST_ITEM_RE = re.compile(r"^\s*[-*+]\s+\*\*([A-Za-z]+)\*\*:(.*)")
-BULLET_RE = re.compile(r"^(\s*)[-*+]\s+\S")
+# The white space before and after the marker of a line LIST_ITEM_RE matches, which places
+# the item's text.
+ITEM_START_RE = re.compile(r"(\s*)[-*+](\s*)")
+# A bulleted list item with text. CommonMark separates the marker from the text with spaces
+# or tabs only, so a marker followed by any other white space character is plain text.
+BULLET_RE = re.compile(r"^([ \t]*)[-*+][ \t]+\S")
+INDENT_RE = re.compile(r"[ \t]*")
+LINE_END_RE = re.compile(r"\r\n|\r|\n")
 
 
 def tiers_from_schema():
@@ -52,10 +65,26 @@ def tiers_from_schema():
     return schema["$defs"]["technique"]["properties"]["evidenceTier"]["enum"]
 
 
+def split_lines(text):
+    """Split at CommonMark's line endings only. ``str.splitlines`` also breaks at a form feed,
+    U+0085, U+2028 and other characters that CommonMark keeps inside a line."""
+    lines = LINE_END_RE.split(text)
+    return lines[:-1] if lines[-1] == "" else lines
+
+
+def width(prefix):
+    """The column ``prefix`` ends at: a tab reaches the next stop of four columns, and any
+    other character takes one."""
+    column = 0
+    for c in prefix:
+        column += 4 - column % 4 if c == "\t" else 1
+    return column
+
+
 def prose_lines(text):
     """Yield (line number, line) for every line outside a fenced code block."""
     fence = None
-    for n, line in enumerate(text.splitlines(), 1):
+    for n, line in enumerate(split_lines(text), 1):
         m = FENCE_RE.match(line)
         if fence is None:
             if m:
@@ -109,26 +138,44 @@ def canonical_definitions(text, tiers, failures):
     return found
 
 
-def continues(lines, n, item):
-    """Whether list item ``item``, on line ``n`` of ``lines``, continues onto the next line:
-    there is a next line, it holds a character other than a space or tab, and it is not a
-    bulleted list item with text indented no further than ``item``."""
-    if n >= len(lines) or not lines[n].strip(" \t"):
-        return False
+def continuation(lines, n, item):
+    """The number of the line on which list item ``item``, on line ``n`` of ``lines``,
+    continues, or None when it ends on its own line.
+
+    The next line continues it when it holds a character other than a space or tab and is
+    not a bulleted list item with text indented no further than ``item``. After one or more
+    blank lines, the first line that is not blank continues it when it is indented as far as
+    the item's text, which starts after the marker and the spaces and tabs after it, or one
+    column after the marker when those reach five columns, as CommonMark reads indented code
+    there.
+    """
+    start = ITEM_START_RE.match(item)
+    indent = width(start.group(1))
+    content = width(start.group(1) + "-" + start.group(2))
+    if content - indent - 1 > 4:
+        content = indent + 2
+    i = n
+    while i < len(lines) and not lines[i].strip(" \t"):
+        i += 1
+    if i == len(lines):
+        return None
+    if i > n:
+        return i + 1 if width(INDENT_RE.match(lines[i]).group()) >= content else None
     bullet = BULLET_RE.match(lines[n])
-    return not (bullet and len(bullet.group(1)) <= len(item) - len(item.lstrip()))
+    return None if bullet and width(bullet.group(1)) <= indent else n + 1
 
 
 def quoted_definitions(text, tiers):
     """Yield (line, tier, definition, continued) for every tier definition on a quoting page,
-    where ``continued`` says whether a list-item definition continues onto the next line."""
-    lines = text.splitlines()
+    where ``continued`` is the number of the line on which a list-item definition continues,
+    or None."""
+    lines = split_lines(text)
     for n, line in prose_lines(text):
         m = TABLE_ROW_RE.match(line)
-        continued = False
+        continued = None
         if not m:
             m = LIST_ITEM_RE.match(line)
-            continued = bool(m) and continues(lines, n, line)
+            continued = continuation(lines, n, line) if m else None
         if m and m.group(1).lower() in tiers:
             yield n, m.group(1).lower(), m.group(2).strip(), continued
 
@@ -150,9 +197,10 @@ def check(root=ROOT):
                 failures.append(f"{page}:{n}: {canonical[tier][1]} reads \"{definition}\"; "
                                 f"quote {CANONICAL}: \"{want}\"")
             if continued:
-                failures.append(f"{page}:{n}: {canonical[tier][1]} continues on line {n + 1}; "
-                                f"keep the definition on one line, with a blank line or the "
-                                f"next list item after it, and quote {CANONICAL}: \"{want}\"")
+                failures.append(f"{page}:{n}: {canonical[tier][1]} continues on line "
+                                f"{continued}; keep the definition on one line and alone in "
+                                f"its list item, with the next list item or a blank line "
+                                f"after it, and quote {CANONICAL}: \"{want}\"")
         for tier in tiers:
             if tier not in seen and tier in canonical:
                 failures.append(f"{page} does not define {canonical[tier][1]}; quote "

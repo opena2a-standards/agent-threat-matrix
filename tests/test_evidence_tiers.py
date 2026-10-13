@@ -4,9 +4,11 @@ Every case runs scripts/check_evidence_tiers.py against a scratch copy of the ca
 the three quoting pages and the schema, so the committed files are never perturbed. The
 shipped tree must be green. Each wording the three pages carried before docs/evidence-tiers.md
 became the single definition is then planted back and must be reported at its own line, as
-must a dropped definition, a definition wrapped over two lines or continued on the next line,
-a canonical edit the quoting pages do not follow, and a schema tier the canonical page does
-not define. A long line on the canonical page that does not complete a row, and a table row
+must a dropped definition, a definition wrapped over two lines or continued on the next line
+or, after a blank line, by a line indented as far as its label, a canonical edit the quoting
+pages do not follow, and a schema tier the canonical page does not define. Lines end where
+CommonMark ends them, and indentation is counted in columns with tab stops of four. A long
+line on the canonical page that does not complete a row, and a table row
 or list item on a quoting page that holds a long run of white space before more text, must be
 read in linear time.
 """
@@ -111,7 +113,18 @@ def test_a_definition_wrapped_over_two_lines_is_reported(tree):
     "  - NemoClaw findings\n",
     # A numbered item: a list starting at 2 cannot interrupt the definition's paragraph.
     "2. NemoClaw findings\n",
-], ids=["indented line", "plain text line", "nested list", "numbered item"])
+    # A marker followed by a no-break space: CommonMark separates a bullet from its text with
+    # a space or tab only, so this is a line of plain text too.
+    "-\N{NO-BREAK SPACE}(NemoClaw findings, exposure sweeps, npm attacks)\n",
+    # A marker with no text: only a bulleted list item with text ends the definition.
+    "-\n",
+    # A line holding a no-break space or a form feed is not blank: a blank line holds
+    # nothing but spaces and tabs.
+    "\N{NO-BREAK SPACE}\n",
+    "\f\n",
+], ids=["indented line", "plain text line", "nested list", "numbered item",
+        "no-break space after the marker", "empty bullet", "no-break space line",
+        "form feed line"])
 def test_a_definition_that_continues_onto_the_next_line_is_reported(tree, after):
     # The definition's own line matches the canonical page word for word.
     line = mutate(tree, "EVIDENCE_AUDIT.md", f"- **OBSERVED**: {OBSERVED}\n",
@@ -133,6 +146,100 @@ def test_a_wrapped_definition_is_reported_although_its_lines_join_to_the_quote(t
     assert r.returncode == 1
     assert f"EVIDENCE_AUDIT.md:{line}: Adapted continues on line {line + 1};" in r.stderr, \
         r.stderr
+
+
+@pytest.mark.parametrize("after, skipped", [
+    # A paragraph indented as far as the definition's label, after a blank line, is a second
+    # paragraph of the same list item.
+    ("\n  (NemoClaw findings, exposure sweeps, npm attacks)\n", 1),
+    # Any number of blank lines, holding spaces and tabs, may stand before it.
+    ("\n \t\n\n  (NemoClaw findings, exposure sweeps, npm attacks)\n", 3),
+    ("\n\t(NemoClaw findings, exposure sweeps, npm attacks)\n", 1),
+    # A nested list or a fence indented as far as the label belongs to the item too.
+    ("\n  - NemoClaw findings\n", 1),
+    ("\n  ```\n  NemoClaw findings\n  ```\n", 1),
+], ids=["indented paragraph", "after several blank lines", "tab-indented paragraph",
+        "nested list", "fence"])
+def test_a_definition_followed_by_a_blank_line_and_more_of_its_item_is_reported(
+        tree, after, skipped):
+    line = mutate(tree, "EVIDENCE_AUDIT.md", f"- **OBSERVED**: {OBSERVED}\n",
+                  f"- **OBSERVED**: {OBSERVED}\n{after}")
+    r = run_checker(tree)
+    assert r.returncode == 1
+    assert (f"EVIDENCE_AUDIT.md:{line}: Observed continues on line {line + skipped + 1};"
+            in r.stderr), r.stderr
+    assert "Observed reads" not in r.stderr, r.stderr
+
+
+@pytest.mark.parametrize("item, after", [
+    # Indented less than the label, the paragraph after the blank line is outside the item.
+    ("- ", "\n(NemoClaw findings, exposure sweeps, npm attacks)\n"),
+    ("- ", "\n (NemoClaw findings, exposure sweeps, npm attacks)\n"),
+    ("- ", " \t\n(NemoClaw findings, exposure sweeps, npm attacks)\n"),
+    # The label starts after the spaces that follow the marker.
+    ("-   ", "\n  (NemoClaw findings, exposure sweeps, npm attacks)\n"),
+    ("-\t", "\n   (NemoClaw findings, exposure sweeps, npm attacks)\n"),
+], ids=["unindented paragraph", "paragraph indented one column", "blank line of white space",
+        "three spaces after the marker", "tab after the marker"])
+def test_a_definition_followed_by_a_blank_line_and_text_outside_its_item_ends_on_its_line(
+        tree, item, after):
+    mutate(tree, "EVIDENCE_AUDIT.md", f"- **OBSERVED**: {OBSERVED}\n",
+           f"{item}**OBSERVED**: {OBSERVED}\n{after}")
+    r = run_checker(tree)
+    assert r.returncode == 0, r.stderr
+
+
+def test_five_spaces_after_the_marker_put_the_items_text_one_column_after_it(tree):
+    # With five or more columns between the marker and the label, CommonMark starts the
+    # item's text one column after the marker, so a paragraph indented two columns after a
+    # blank line belongs to the item.
+    line = mutate(tree, "EVIDENCE_AUDIT.md", f"- **OBSERVED**: {OBSERVED}\n",
+                  f"-     **OBSERVED**: {OBSERVED}\n\n  (NemoClaw findings)\n")
+    r = run_checker(tree)
+    assert r.returncode == 1
+    assert f"EVIDENCE_AUDIT.md:{line}: Observed continues on line {line + 2};" in r.stderr, \
+        r.stderr
+
+
+@pytest.mark.parametrize("old, new, reported", [
+    # A tab reaches column four, as far as the text of an item indented two columns: the
+    # bullet starts a list nested under the definition.
+    (f"- **OBSERVED**: {OBSERVED}\n",
+     f"  - **OBSERVED**: {OBSERVED}\n\t- NemoClaw findings\n", True),
+    # Under an item indented with a tab, a bullet indented two columns is indented no
+    # further, and ends the definition.
+    (f"- **OBSERVED**: {OBSERVED}\n- **VALIDATED**: {VALIDATED}\n",
+     f"- Tiers:\n\t- **OBSERVED**: {OBSERVED}\n  - **VALIDATED**: {VALIDATED}\n", False),
+], ids=["tab-indented bullet under a space-indented item",
+        "space-indented bullet under a tab-indented item"])
+def test_a_tab_counts_to_the_next_stop_of_four_columns(tree, old, new, reported):
+    line = mutate(tree, "EVIDENCE_AUDIT.md", old, new)
+    r = run_checker(tree)
+    if reported:
+        assert r.returncode == 1
+        assert f"EVIDENCE_AUDIT.md:{line}: Observed continues on line {line + 1};" in r.stderr, \
+            r.stderr
+    else:
+        assert r.returncode == 0, r.stderr
+
+
+@pytest.mark.parametrize("separator", ["\N{LINE SEPARATOR}", "\x85", "\f"],
+                         ids=["line separator", "next line", "form feed"])
+def test_a_character_that_does_not_end_a_markdown_line_leaves_the_text_after_it_read(
+        tree, separator):
+    # CommonMark ends a line at a line feed or carriage return only, so a bullet after one of
+    # these characters is part of the definition's line, not the next list item.
+    line = mutate(tree, "EVIDENCE_AUDIT.md", f"- **OBSERVED**: {OBSERVED}\n",
+                  f"- **OBSERVED**: {OBSERVED}{separator}- NemoClaw findings\n")
+    r = run_checker(tree)
+    assert r.returncode == 1
+    assert f"EVIDENCE_AUDIT.md:{line}: Observed reads" in r.stderr, r.stderr
+    # The lines after it keep their numbers.
+    validated = mutate(tree, "EVIDENCE_AUDIT.md", f"- **VALIDATED**: {VALIDATED}\n",
+                       "- **VALIDATED**: Reproduced\n")
+    assert validated == line + 1
+    r = run_checker(tree)
+    assert f"EVIDENCE_AUDIT.md:{validated}: Validated reads" in r.stderr, r.stderr
 
 
 def test_a_definition_followed_by_a_bulleted_item_indented_no_further_ends_on_its_line(tree):

@@ -572,9 +572,14 @@ def main(argv):
         found = list(re.finditer(pattern, text, flags))
         if not found and stated:
             failures.append(f"README does not state {label} ({', '.join(want)})")
+        # The line breaks are counted on from the previous occurrence: counting them from
+        # the start of the text for each one made many differing occurrences take time in
+        # proportion to their number times the size of the README.
+        line, counted = 1, 0
         for m in found:
             if m.groups() != want:
-                line = text.count("\n", 0, m.start()) + 1
+                line += text.count("\n", counted, m.start())
+                counted = m.start()
                 failures.append(
                     f"README.md:{line}: \"{m.group(0)}\" does not match {source} "
                     f"({label}: {', '.join(want)})"
