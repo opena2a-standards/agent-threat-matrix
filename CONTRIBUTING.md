@@ -2,6 +2,39 @@
 
 We welcome contributions of new techniques, attack classes, evidence reports, and detection methods.
 
+## Contributing
+
+The sections below give the full process. In summary:
+
+1. Every new technique must meet one evidence tier: a real-world observation (Observed), a reproducible lab scenario (Validated), or an established traditional precedent (Adapted)
+2. Assign the next available technique ID in the appropriate stage range
+3. Include HMA detection check ID, DVAA validation (if applicable), and OASB control mapping
+4. Submit as a pull request with evidence documentation
+
+## Repository Structure
+
+```
+agent-threat-matrix/
+├── README.md                 # What the matrix is and where to start
+├── EVIDENCE_AUDIT.md         # Evidence tier justification for every technique
+├── matrix.json               # Machine-readable matrix (full data)
+├── technique-ids.json        # The technique id list, checked against matrix.json
+├── schema/                   # JSON Schema for matrix.json and the consumer-readiness gate
+├── stix/                     # STIX 2.1 bundle rendered from matrix.json
+├── tactics/                  # One file per tactic (kill chain stage)
+├── techniques/               # One file per technique (T-XXXX)
+├── attack-classes/           # One file per attack class
+├── cross-references/         # MITRE ATT&CK, ATLAS, OWASP LLM mappings
+├── docs/                     # Evidence tiers, schema and the reference pages the README links
+├── CONTRIBUTING.md           # How to propose new techniques
+├── CHANGELOG.md
+└── LICENSE                   # Apache-2.0
+```
+
+`canonical-classes.json` maps the canonical attack classes to the technique ids in `matrix.json`, and is validated by `scripts/check_canonical_classes.py`. Its `matrixVersion` and `matrixCommit` name the matrix version and the full 40-character sha of the commit whose `matrix.json` it maps; the check refuses a version other than the one in `matrix.json` and an abbreviated sha.
+
+The schema, and what `scripts/validate_matrix.py` checks beyond it, are described in [docs/schema.md](docs/schema.md).
+
 ## Evidence Requirements
 
 Every technique in this matrix must meet one of these evidence bars. The definitions are

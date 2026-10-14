@@ -48,8 +48,9 @@ read, and neither is a page other than these three. List items and fences inside
 quote are not followed, and neither are HTML blocks and tables, whose lines are read as
 paragraph text.
 
-A message that quotes a definition from a quoting page writes each character in it that
-does not print as an escape, ``\\xa0`` for a no-break space and ``\\u2028`` for U+2028.
+A message that quotes a definition, from a quoting page or from the canonical page, or the
+name of a tier from the canonical page writes each character in it that does not print as
+an escape, ``\\xa0`` for a no-break space and ``\\u2028`` for U+2028.
 
 The tiers are the ``evidenceTier`` enum in the schema, so a tier added there fails this check
 until the canonical page defines it and every quoting page quotes it.
@@ -272,8 +273,8 @@ def canonical_definitions(text, tiers, failures):
                             f"(first at line {found[value][0]})")
             continue
         if name != value.capitalize():
-            failures.append(f"{CANONICAL}:{n}: the tier named \"{name}\" carries the value "
-                            f"`{value}`; name it \"{value.capitalize()}\"")
+            failures.append(f"{CANONICAL}:{n}: the tier named \"{shown(name)}\" carries the "
+                            f"value `{value}`; name it \"{value.capitalize()}\"")
         if not definition:
             failures.append(f"{CANONICAL}:{n}: `{value}` has an empty definition")
         found[value] = (n, value.capitalize(), definition)
@@ -346,16 +347,17 @@ def check(root=ROOT):
             want = canonical[tier][2]
             if definition != want:
                 failures.append(f"{page}:{n}: {canonical[tier][1]} reads "
-                                f"\"{shown(definition)}\"; quote {CANONICAL}: \"{want}\"")
+                                f"\"{shown(definition)}\"; quote {CANONICAL}: "
+                                f"\"{shown(want)}\"")
             if continued:
                 failures.append(f"{page}:{n}: {canonical[tier][1]} continues on line "
                                 f"{continued}; keep the definition on one line and alone in "
                                 f"its list item, with the next list item or a blank line "
-                                f"after it, and quote {CANONICAL}: \"{want}\"")
+                                f"after it, and quote {CANONICAL}: \"{shown(want)}\"")
         for tier in tiers:
             if tier not in seen and tier in canonical:
                 failures.append(f"{page} does not define {canonical[tier][1]}; quote "
-                                f"{CANONICAL}: \"{canonical[tier][2]}\"")
+                                f"{CANONICAL}: \"{shown(canonical[tier][2])}\"")
     return tiers, failures
 
 
