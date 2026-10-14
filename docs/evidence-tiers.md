@@ -15,12 +15,22 @@ EVIDENCE_AUDIT.md quote the Definition column word for word.
 It fails when such a definition differs from this table, when the line after a list-item
 definition is neither blank nor a bulleted list item with text indented no further than it
 (Markdown may join such a line to the definition), when blank lines after a list-item
-definition are followed by a line indented as far as its label (Markdown reads that line as
-more of the same list item), or when one of the pages leaves a tier out. A blank line holds
-nothing but spaces and tabs, a bullet is followed by a space or tab, a tab indents to the
-next stop of four columns, and lines end only at a line feed or carriage return, as in
-CommonMark. A definition written in any other form, such as inside a block quote, or on
-another page is not read.
+definition are followed by a line indented as far as the item's text (Markdown reads that
+line as more of the same list item), or when one of the pages leaves a tier out. A blank
+line holds nothing but spaces and tabs, a bullet is followed by a space or tab, a tab
+indents to the next stop of four columns, and lines end only at a line feed or carriage
+return, as in CommonMark. A list item's text starts after the spaces and tabs that follow
+its marker, or one column after the marker when those cover five or more columns. A bullet
+indented four or more columns past the text of the list item it is inside, or past the
+margin when it is inside none, starts no list item, so such a line is not a definition and
+does not end one. Code blocks are skipped as CommonMark delimits them: a fence closes on a
+line that holds only a run of its own character at least as long as the opening one, does
+not open on a run of backticks with a backtick later on the line, and ends with the list
+item it is in. The check is stricter than CommonMark in one respect: only a bulleted list
+item with text ends a definition, so a bullet with no text, a numbered item or a thematic
+break directly after a definition is reported although CommonMark ends the list item
+there. A definition written in any other form, such as inside a block quote, or on another
+page is not read.
 To change a definition, change it here and in every page that quotes it.
 
 | Tier | `evidenceTier` value | Definition |
