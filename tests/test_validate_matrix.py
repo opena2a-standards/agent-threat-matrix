@@ -386,8 +386,9 @@ def test_atm07_ac3(case):
 
 
 def _ac4_readme_schema_paragraph_documents_matrix_commit():
-    text = (ROOT / "README.md").read_text(encoding="utf-8")
-    schema_section = text.split("### Schema", 1)[1].split("\n---", 1)[0]
+    # The README's Schema paragraph moved to its own page.
+    text = (ROOT / "docs" / "schema.md").read_text(encoding="utf-8")
+    schema_section = text.split("# Schema", 1)[1].split("\n---", 1)[0]
     sentence = next((s for s in schema_section.replace("\n", " ").split(". ")
                      if "`matrixCommit`" in s), None)
     assert sentence is not None, schema_section

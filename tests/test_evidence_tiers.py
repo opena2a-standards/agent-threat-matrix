@@ -666,7 +666,7 @@ def test_the_pages_that_describe_the_check_say_where_an_items_text_starts():
     # which is not the label's column when five or more columns follow the marker.
     script = (ROOT / "scripts" / "check_evidence_tiers.py").read_text(encoding="utf-8")
     described = {
-        "README.md": (ROOT / "README.md").read_text(encoding="utf-8"),
+        "docs/schema.md": (ROOT / "docs" / "schema.md").read_text(encoding="utf-8"),
         "CONTRIBUTING.md": (ROOT / "CONTRIBUTING.md").read_text(encoding="utf-8"),
         "docs/evidence-tiers.md": (ROOT / "docs" / "evidence-tiers.md").read_text(
             encoding="utf-8"),

@@ -1,7 +1,10 @@
 """README claim checker tests.
 
-Every case runs scripts/check_readme_claims.py against a scratch copy of README.md and
-matrix.json so the committed files are never perturbed. The shipped tree must be green.
+Every case runs scripts/check_readme_claims.py against a scratch copy of README.md, the
+pages that took its reference text (the checker's PAGES) and matrix.json so the committed
+files are never perturbed. "The README" below is README.md together with those pages: a
+passage that moved to one of them is changed there, and its failure is named by that page
+and line. The shipped tree must be green.
 Each count the README states is then changed by one in a single place and the checker
 must go red, including the counts repeated in the "Use cases" section: the checker used
 to accept a claim when the right number appeared anywhere, so a stale repeat passed
@@ -40,6 +43,7 @@ checker's description give of a no-break space after a tag name must be a form t
 the second reading names, and the two must give the same form.
 """
 
+import functools
 import html
 import html.entities
 import importlib.util
@@ -58,7 +62,9 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
-FILES = ("README.md", "matrix.json", "related-projects.json", "scripts/check_readme_claims.py")
+FILES = ("matrix.json", "related-projects.json", "scripts/check_readme_claims.py")
+# The attack-class tables moved from README.md to this page, which links up one level.
+CLASS_PAGE = "docs/attack-classes.md"
 BEGIN = "<!-- BEGIN GENERATED: attack-class-tables -->"
 END = "<!-- END GENERATED: attack-class-tables -->"
 GATEWAY_DESCRIPTION = (
@@ -66,9 +72,16 @@ GATEWAY_DESCRIPTION = (
 )
 
 
+@functools.lru_cache(maxsize=None)
+def readme_pages() -> tuple:
+    """README.md and the pages that took its reference text, in the order the checker reads
+    them."""
+    return load_checker().PAGES
+
+
 def scratch_tree() -> Path:
     td = Path(tempfile.mkdtemp(prefix="atm-readme-"))
-    for rel in FILES:
+    for rel in (*FILES, *readme_pages()):
         dst = td / rel
         dst.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy(ROOT / rel, dst)
@@ -80,11 +93,30 @@ def run_checker(root: Path, *args: str) -> subprocess.CompletedProcess:
                           capture_output=True, text=True, timeout=120)
 
 
+def locate(root: Path, needle: str):
+    """(page, text, offset): the first page, in the order the checker reads them, holding
+    `needle`, its text and the offset of `needle` in it."""
+    for rel in readme_pages():
+        text = (root / rel).read_text(encoding="utf-8")
+        if needle in text:
+            return rel, text, text.index(needle)
+    raise AssertionError(f"no README page holds {needle!r}")
+
+
+def where_of(root: Path, needle: str) -> str:
+    """"<page>:<line>" of the first occurrence of `needle` on the README pages."""
+    rel, text, offset = locate(root, needle)
+    return f"{rel}:{text[:offset].count(chr(10)) + 1}"
+
+
 def mutate_readme(root: Path, old: str, new: str) -> None:
-    readme = root / "README.md"
-    text = readme.read_text(encoding="utf-8")
-    assert text.count(old) == 1, f"mutation target must occur exactly once: {old!r}"
-    readme.write_text(text.replace(old, new), encoding="utf-8")
+    """Replace `old` on the README page that holds it, README.md or a page that took its
+    reference text; `old` must occur exactly once across those pages."""
+    counts = [(root / rel).read_text(encoding="utf-8").count(old) for rel in readme_pages()]
+    assert sum(counts) == 1, f"mutation target must occur exactly once: {old!r}"
+    page = root / readme_pages()[next(i for i, n in enumerate(counts) if n)]
+    text = page.read_text(encoding="utf-8")
+    page.write_text(text.replace(old, new), encoding="utf-8")
 
 
 def test_shipped_readme_is_green():
@@ -183,11 +215,10 @@ def test_a_wrong_count_in_one_place_is_red(old, new):
     td = scratch_tree()
     try:
         mutate_readme(td, old, new)
-        text = (td / "README.md").read_text(encoding="utf-8")
-        line = text[:text.index(new)].count("\n") + 1
+        where = where_of(td, new)
         r = run_checker(td)
         assert r.returncode == 1, f"checker passed with {new!r}:\n{r.stdout}"
-        assert f"README.md:{line}:" in r.stderr, r.stderr
+        assert f"{where}:" in r.stderr, r.stderr
     finally:
         shutil.rmtree(td)
 
@@ -211,11 +242,6 @@ def mutate_related(root: Path, edit, project: str = "dvaa") -> None:
     path.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
 
-def line_of(root: Path, needle: str) -> int:
-    text = (root / "README.md").read_text(encoding="utf-8")
-    return text[:text.index(needle)].count("\n") + 1
-
-
 def test_dvaa_kinds_must_add_up_to_the_agent_count():
     td = scratch_tree()
     try:
@@ -236,7 +262,7 @@ def test_a_dvaa_figure_changed_in_the_pinned_file_is_red_on_every_readme_line():
         assert r.returncode == 1, r.stdout
         for needle in ("variants; 12 vulnerability categories",
                        "environment (21 agents, 12 vulnerability categories)"):
-            assert f"README.md:{line_of(td, needle)}:" in r.stderr, r.stderr
+            assert f"{where_of(td, needle)}:" in r.stderr, r.stderr
         assert "related-projects.json (DVAA vulnerability categories: 13)" in r.stderr, r.stderr
     finally:
         shutil.rmtree(td)
@@ -252,7 +278,7 @@ def test_a_refreshed_hackmyagent_figure_turns_every_stale_readme_copy_red():
         assert r.returncode == 1, r.stdout
         for needle in ("(318 static checks, 164 attack payloads)",
                        "(318 static checks, 164 payloads)"):
-            assert f"README.md:{line_of(td, needle)}:" in r.stderr, r.stderr
+            assert f"{where_of(td, needle)}:" in r.stderr, r.stderr
         assert ("related-projects.json (hackmyagent.staticChecks, read from release 0.33.2: "
                 "319)") in r.stderr, r.stderr
     finally:
@@ -477,8 +503,8 @@ def column_of(root: Path, needle: str, named: str) -> int:
     """The column, counted in characters from 1, of the first occurrence of the character
     `named` (as "U+XXXX ...") on the README line holding `needle`."""
     character = chr(int(re.match(r"U\+([0-9A-F]+)", named).group(1), 16))
-    text = (root / "README.md").read_text(encoding="utf-8")
-    start = text.rindex("\n", 0, text.index(needle)) + 1
+    _, text, offset = locate(root, needle)
+    start = text.rindex("\n", 0, offset) + 1
     return text.index(character, start) - start + 1
 
 
@@ -562,7 +588,7 @@ def test_a_dvaa_line_carrying_an_invisible_character_is_red(old, new, named):
         mutate_readme(td, old, new)
         r = run_checker(td)
         assert r.returncode == 1, r.stdout
-        assert (f"README.md:{line_of(td, new)}:{column_of(td, new, named)}: a line naming DVAA "
+        assert (f"{where_of(td, new)}:{column_of(td, new, named)}: a line naming DVAA "
                 f"carries {named}, which can hide a figure from the DVAA wordings; "
                 "remove it") in r.stderr, r.stderr
     finally:
@@ -608,7 +634,7 @@ def test_a_count_line_carrying_an_invisible_character_is_red(old, new, named):
         mutate_readme(td, old, new)
         r = run_checker(td)
         assert r.returncode == 1, r.stdout
-        assert (f"README.md:{line_of(td, new)}:{column_of(td, new, named)}: a line stating a "
+        assert (f"{where_of(td, new)}:{column_of(td, new, named)}: a line stating a "
                 f"matrix.json count carries {named}, which can hide a figure from the count "
                 "wordings; remove it") in r.stderr, r.stderr
     finally:
@@ -660,15 +686,15 @@ def test_a_character_inside_the_name_dvaa_leaves_the_line_read(name, named):
         new = (DVAA_LINK.replace("[DVAA]", f"[{name}]")
                .replace("(21 agents, 12 vulnerability", "(22 agents, 13 vulnerability"))
         mutate_readme(td, DVAA_LINK, new)
-        line = line_of(td, new)
+        line = where_of(td, new)
         r = run_checker(td)
         assert r.returncode == 1, r.stdout
         for failure in (
-            f"README.md:{line}: \"22 agents\" does not match related-projects.json "
+            f"{line}: \"22 agents\" does not match related-projects.json "
             "(DVAA agents: 21)",
-            f"README.md:{line}: \"13 vulnerability categories\" does not match "
+            f"{line}: \"13 vulnerability categories\" does not match "
             "related-projects.json (DVAA vulnerability categories: 12)",
-            f"README.md:{line}:{column_of(td, new, named)}: a line naming DVAA carries {named}, "
+            f"{line}:{column_of(td, new, named)}: a line naming DVAA carries {named}, "
             "which can hide a figure from the DVAA wordings; remove it",
         ):
             assert failure in r.stderr, r.stderr
@@ -800,13 +826,13 @@ def test_a_name_written_with_markup_a_reference_or_a_confusable_letter_leaves_th
         new = (DVAA_LINK.replace(f"[DVAA]{DVAA_URL}", written)
                .replace("(21 agents, 12 vulnerability", "(22 agents, 13 vulnerability"))
         mutate_readme(td, DVAA_LINK, new)
-        line = line_of(td, new)
+        line = where_of(td, new)
         r = run_checker(td)
         assert r.returncode == 1, r.stdout
         for failure in (
-            f"README.md:{line}: \"22 agents\" does not match related-projects.json "
+            f"{line}: \"22 agents\" does not match related-projects.json "
             "(DVAA agents: 21)",
-            f"README.md:{line}: \"13 vulnerability categories\" does not match "
+            f"{line}: \"13 vulnerability categories\" does not match "
             "related-projects.json (DVAA vulnerability categories: 12)",
         ):
             assert failure in r.stderr, r.stderr
@@ -844,13 +870,13 @@ def test_a_backtick_beside_the_name_dvaa_leaves_the_line_read(line):
     td = scratch_tree()
     try:
         mutate_readme(td, DVAA_ROW, line)
-        number = line_of(td, line)
+        number = where_of(td, line)
         r = run_checker(td)
         assert r.returncode == 1, r.stdout
         for failure in (
-            f"README.md:{number}: \"99 agents\" does not match related-projects.json "
+            f"{number}: \"99 agents\" does not match related-projects.json "
             "(DVAA agents: 21)",
-            f"README.md:{number}: \"77 vulnerability categories\" does not match "
+            f"{number}: \"77 vulnerability categories\" does not match "
             "related-projects.json (DVAA vulnerability categories: 12)",
         ):
             assert failure in r.stderr, r.stderr
@@ -940,7 +966,7 @@ def test_a_character_fails_a_line_that_names_dvaa_only_by_the_steps(written):
         named = "U+00AD SOFT HYPHEN, a format character"
         r = run_checker(td)
         assert r.returncode == 1, r.stdout
-        assert (f"README.md:{line_of(td, new)}:{column_of(td, new, named)}: a line naming DVAA "
+        assert (f"{where_of(td, new)}:{column_of(td, new, named)}: a line naming DVAA "
                 f"carries {named}, which can hide a figure from the DVAA wordings; "
                 "remove it") in r.stderr, r.stderr
     finally:
@@ -1227,9 +1253,10 @@ def test_the_no_break_space_example_is_a_form_only_the_second_reading_names():
     # README and the checker's description gave '[DV](url "<b' U+00A0 'x=")AA' as the form a
     # no-break space after a tag name no longer hides. No ">" follows it, so no tag is
     # removed and the first reading already named DVAA; with the final ">" the first reading
-    # removes "AA" with the tag, and only the second reading names DVAA.
+    # removes "AA" with the tag, and only the second reading names DVAA. The README's
+    # description of the check moved to the cross-framework mapping page.
     checker = load_checker()
-    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    readme = (ROOT / "docs" / "cross-framework-mapping.md").read_text(encoding="utf-8")
     sentence = next(line for line in readme.split("\n") if "So the name written as" in line)
     examples = re.findall(r"`([^`]*)` U\+00A0 `([^`]*)`", sentence)
     assert len(examples) == 1, examples
@@ -1250,7 +1277,7 @@ def test_a_line_naming_dvaa_and_stating_a_count_names_both():
         named = "U+200B ZERO WIDTH SPACE, a format character"
         r = run_checker(td)
         assert r.returncode == 1, r.stdout
-        assert (f"README.md:{line_of(td, new)}:{column_of(td, new, named)}: a line naming DVAA "
+        assert (f"{where_of(td, new)}:{column_of(td, new, named)}: a line naming DVAA "
                 f"and stating a matrix.json count carries {named}, which can hide a figure from "
                 "the DVAA and count wordings; remove it") in r.stderr, r.stderr
     finally:
@@ -1264,12 +1291,12 @@ def test_a_character_repeated_on_a_line_fails_it_once():
         new = ("environment\N{ZERO WIDTH SPACE} (21 agents,\N{SOFT HYPHEN} 12\N{ZERO WIDTH SPACE} "
                "vulnerability categories)")
         mutate_readme(td, "environment (21 agents, 12 vulnerability categories)", new)
-        line = line_of(td, new)
+        line = where_of(td, new)
         r = run_checker(td)
         assert r.returncode == 1, r.stdout
-        on_line = [f for f in r.stderr.split("\n") if f.startswith(f"  - README.md:{line}:")]
+        on_line = [f for f in r.stderr.split("\n") if f.startswith(f"  - {line}:")]
         assert on_line == [
-            f"  - README.md:{line}:{column_of(td, new, named)}: a line naming DVAA carries "
+            f"  - {line}:{column_of(td, new, named)}: a line naming DVAA carries "
             f"{named}, which can hide a figure from the DVAA wordings; remove it"
             for named in ("U+200B ZERO WIDTH SPACE, a format character",
                           "U+00AD SOFT HYPHEN, a format character")
@@ -1421,8 +1448,9 @@ def test_the_check_reads_the_categories_of_readme_characters_only(old, new):
         last = r.stdout.strip().splitlines()[-1]
         assert last.startswith("status=0 calls="), r.stdout
         calls = int(last.rsplit("=", 1)[1])
-        text = (td / "README.md").read_text(encoding="utf-8")
-        dvaa_text = "\n".join(line if "DVAA" in line else "" for line in text.split("\n"))
+        # The README as the check reads it: README.md and its pages, joined.
+        text = load_checker().Pages(td).text
+        dvaa_text ="\n".join(line if "DVAA" in line else "" for line in text.split("\n"))
         marks = {ord(c) for c in dvaa_text if unicodedata.category(c).startswith("M")}
         walked = [(lo, hi) for lo, hi in mark_runs() if any(lo <= code <= hi for code in marks)]
         budget = (len(text) - text.count("\n") + len(set(dvaa_text))
@@ -1605,12 +1633,12 @@ def test_dvaa_figures_are_only_read_from_lines_naming_dvaa():
 
 def test_readme_describes_every_class_as_matrix_json_does():
     matrix = json.loads((ROOT / "matrix.json").read_text(encoding="utf-8"))
-    text = (ROOT / "README.md").read_text(encoding="utf-8")
+    text = (ROOT / CLASS_PAGE).read_text(encoding="utf-8")
     block = text[text.index(BEGIN):text.index(END)]
     missing = []
     for cls in matrix["attackClasses"]:
         cell = cls["description"].replace(" — ", ": ").replace("|", "\\|")
-        if f"| [{cls['id']}](attack-classes/{cls['id']}.md) | {cell} |" not in block:
+        if f"| [{cls['id']}](../attack-classes/{cls['id']}.md) | {cell} |" not in block:
             missing.append(cls["id"])
     assert missing == [], f"README rows not matching matrix.json: {missing}"
 
@@ -1620,11 +1648,10 @@ def test_a_reworded_class_description_is_red():
     try:
         mutate_readme(td, f"| {GATEWAY_DESCRIPTION} |",
                       "| Misconfigured API gateways exposing agent infrastructure |")
-        text = (td / "README.md").read_text(encoding="utf-8")
-        line = text[:text.index("Misconfigured API gateways")].count("\n") + 1
+        line = where_of(td, "Misconfigured API gateways")
         r = run_checker(td)
         assert r.returncode == 1, r.stdout
-        assert f"README.md:{line}: the attack-class tables differ from matrix.json" in r.stderr, \
+        assert f"{line}: the attack-class tables differ from matrix.json" in r.stderr, \
             r.stderr
     finally:
         shutil.rmtree(td)
@@ -1639,7 +1666,8 @@ def test_a_class_changed_in_matrix_json_is_red_until_fixed():
             if cls["id"] == "GATEWAY-EXPLOIT":
                 cls["description"] = "Rewritten in the data — with a pipe a|b"
         path.write_text(json.dumps(matrix, indent=2), encoding="utf-8")
-        before = (td / "README.md").read_text(encoding="utf-8")
+        pages = {rel: (td / rel).read_text(encoding="utf-8") for rel in readme_pages()}
+        before = pages[CLASS_PAGE]
 
         r = run_checker(td)
         assert r.returncode == 1, r.stdout
@@ -1648,12 +1676,15 @@ def test_a_class_changed_in_matrix_json_is_red_until_fixed():
         r = run_checker(td, "--fix")
         assert r.returncode == 0, r.stderr
         assert "FIXED: rewrote the attack-class tables" in r.stdout
-        after = (td / "README.md").read_text(encoding="utf-8")
+        after = (td / CLASS_PAGE).read_text(encoding="utf-8")
         assert "| Rewritten in the data: with a pipe a\\|b |" in after
         assert GATEWAY_DESCRIPTION not in after
-        # Only the generated block moved.
+        # Only the generated block moved, and no other page was written.
         assert after[:after.index(BEGIN)] == before[:before.index(BEGIN)]
         assert after[after.index(END):] == before[before.index(END):]
+        for rel, text in pages.items():
+            if rel != CLASS_PAGE:
+                assert (td / rel).read_text(encoding="utf-8") == text, rel
 
         r = run_checker(td, "--fix")
         assert r.returncode == 0, r.stderr
@@ -1672,6 +1703,45 @@ def test_a_missing_class_table_marker_is_red(marker):
         assert "the attack-class tables need exactly one" in r.stderr, r.stderr
     finally:
         shutil.rmtree(td)
+
+
+def test_class_table_markers_on_two_pages_are_red():
+    # BEGIN on the attack-classes page and END on README.md: the block spans two pages,
+    # which neither the check nor --fix can read as one block.
+    td = scratch_tree()
+    try:
+        mutate_readme(td, END, "")
+        readme = td / "README.md"
+        readme.write_text(readme.read_text(encoding="utf-8") + END + "\n", encoding="utf-8")
+        r = run_checker(td)
+        assert r.returncode == 1, r.stdout
+        assert "the attack-class tables need exactly one" in r.stderr, r.stderr
+    finally:
+        shutil.rmtree(td)
+
+
+def test_a_missing_readme_page_is_red():
+    # A page README.md hands its reference text to takes the claims on it out of the check
+    # when it is gone, so it fails the check instead.
+    td = scratch_tree()
+    try:
+        (td / "docs" / "overview.md").unlink()
+        r = run_checker(td)
+        assert r.returncode == 1, r.stdout
+        assert ("docs/overview.md: missing; README.md hands this page text that the check "
+                "reads") in r.stderr, r.stderr
+    finally:
+        shutil.rmtree(td)
+
+
+def test_class_table_links_are_written_from_the_page_that_holds_them():
+    checker = load_checker()
+    assert checker.link_base("README.md") == ""
+    assert checker.link_base(CLASS_PAGE) == "../"
+    matrix = json.loads((ROOT / "matrix.json").read_text(encoding="utf-8"))
+    assert "](attack-classes/GATEWAY-EXPLOIT.md)" in checker.render_class_tables(matrix)
+    assert ("](../attack-classes/GATEWAY-EXPLOIT.md)"
+            in checker.render_class_tables(matrix, checker.link_base(CLASS_PAGE)))
 
 
 @pytest.mark.parametrize("args,status,unknown", [
@@ -1705,7 +1775,7 @@ def test_an_argument_other_than_fix_checks_and_writes_nothing(args, status, unkn
             if cls["id"] == "GATEWAY-EXPLOIT":
                 cls["description"] = "Rewritten in the data"
         path.write_text(json.dumps(matrix, indent=2), encoding="utf-8")
-        before = (td / "README.md").read_text(encoding="utf-8")
+        before = {rel: (td / rel).read_text(encoding="utf-8") for rel in readme_pages()}
 
         r = run_checker(td, *args)
         assert r.returncode == status, r.stdout + r.stderr
@@ -1717,7 +1787,7 @@ def test_an_argument_other_than_fix_checks_and_writes_nothing(args, status, unkn
             assert r.stdout.startswith("usage: check_readme_claims.py"), r.stdout
             assert "--fix" in r.stdout
             assert r.stderr == "", r.stderr
-        assert (td / "README.md").read_text(encoding="utf-8") == before
+        assert {rel: (td / rel).read_text(encoding="utf-8") for rel in readme_pages()} == before
     finally:
         shutil.rmtree(td)
 

@@ -93,8 +93,9 @@ def _ac1_no_banned_word_in_headings_or_headers():
 
 
 def _ac1_readme_cell_updated():
-    # Located by its first cell, not by line number: README sections above it move.
-    rows = [line for line in (ROOT / "README.md").read_text().splitlines()
+    # Located by its first cell, not by line number: sections above it move. The row moved
+    # from the README to the cross-framework mapping page with its section.
+    rows = [line for line in (ROOT / "docs" / "cross-framework-mapping.md").read_text().splitlines()
             if line.startswith("| MITRE ATT&CK / ATLAS / OWASP LLM |")]
     assert len(rows) == 1, rows
     row = rows[0]

@@ -1,15 +1,25 @@
 #!/usr/bin/env python3
-"""Assert every counted claim in README.md matches matrix.json.
+"""Assert every counted claim in README.md and its pages matches matrix.json.
 
 The README states counts (tactics, techniques, attack classes, evidence tiers)
 and coverage claims (detection, defensive control, lab scenario). Those are
 measurements, not prose, so they are checked here and in CI rather than
 maintained by hand.
 
+README.md hands its reference text to the pages PAGES lists after it: the purpose and
+scope to docs/overview.md, the attack-class tables to docs/attack-classes.md, and the
+cross-framework mapping with the related-project figures to
+docs/cross-framework-mapping.md, among others. The check reads README.md and those pages
+as one text, in that order, each page ending in a line break: a claim may stand on any of
+them, every occurrence on any of them is checked, and each failure names the page and its
+line there. A page PAGES lists that does not exist fails the check. Below, "the README"
+is README.md together with those pages.
+
 The attack-class tables are a rendering of matrix.json.attackClasses, held
-between the BEGIN/END GENERATED markers. Typed by hand, they reworded 34 of the
-40 class descriptions and four of them described a different attack. The block
-must re-render byte-identically; run with ``--fix`` to rewrite only that block.
+between the BEGIN/END GENERATED markers, both on one page, with each link written
+relative to that page. Typed by hand, they reworded 34 of the 40 class descriptions
+and four of them described a different attack. The block must re-render
+byte-identically; run with ``--fix`` to rewrite only that block.
 
 The per-tactic table and the evidence-tier table are measurements over matrix.json too.
 A tactic row is read where a line starts ``| [Name](tactics/<id>.md) | N | N |``, and a
@@ -105,12 +115,23 @@ import sys
 import unicodedata
 
 # The docstring's first line, held apart so --help still works under python3 -OO.
-DESCRIPTION = "Assert every counted claim in README.md matches matrix.json."
+DESCRIPTION = "Assert every counted claim in README.md and its pages matches matrix.json."
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 MATRIX = ROOT / "matrix.json"
-README = ROOT / "README.md"
 RELATED = ROOT / "related-projects.json"
+
+# README.md and the pages that took its reference text, read as one text in this order.
+PAGES = (
+    "README.md",
+    "docs/overview.md",
+    "docs/use-cases.md",
+    "docs/attack-classes.md",
+    "docs/cross-framework-mapping.md",
+    "docs/attack-paths.md",
+    "docs/schema.md",
+    "CONTRIBUTING.md",
+)
 
 CLASS_BEGIN = "<!-- BEGIN GENERATED: attack-class-tables -->"
 CLASS_END = "<!-- END GENERATED: attack-class-tables -->"
@@ -261,10 +282,12 @@ def table_cell(text):
     return text.replace(" — ", ": ").replace("|", "\\|")
 
 
-def render_class_tables(matrix):
+def render_class_tables(matrix, base=""):
     """The attack-class tables: one per category, in order of first appearance in
     matrix.json, classes sorted by id. Members are the techniques the class declares
-    plus those whose primary attackClass is the class, as on the class pages."""
+    plus those whose primary attackClass is the class, as on the class pages. `base`
+    leads each link from the page holding the tables to the repository root ("../" for a
+    page in docs/)."""
     primary = {}
     for t in matrix["techniques"]:
         primary.setdefault(t.get("attackClass"), set()).add(t["id"])
@@ -285,7 +308,7 @@ def render_class_tables(matrix):
         for cls in sorted(classes, key=lambda c: c["id"]):
             members = sorted(set(cls.get("techniques") or []) | primary.get(cls["id"], set()))
             lines.append(
-                f"| [{cls['id']}](attack-classes/{cls['id']}.md) "
+                f"| [{cls['id']}]({base}attack-classes/{cls['id']}.md) "
                 f"| {table_cell(cls['description'])} | {', '.join(members)} |"
             )
         sections.append("\n".join(lines))
@@ -304,41 +327,93 @@ def class_block_span(readme):
     return start, end + len(CLASS_END)
 
 
-def check_class_tables(matrix, readme):
+class Pages:
+    """README.md and each page in PAGES that exists, read as one text: each page in turn,
+    each ending in a line break, so no line of one page runs into the next. A line of the
+    text is named by its page and its line on that page."""
+
+    def __init__(self, root):
+        self.names, self.texts, self.missing = [], [], []
+        for name in PAGES:
+            path = root / name
+            if path.is_file():
+                self.names.append(name)
+                self.texts.append(path.read_text(encoding="utf-8"))
+            else:
+                self.missing.append(name)
+        parts = [text if text.endswith("\n") else text + "\n" for text in self.texts]
+        self.starts, self.first_lines = [], []
+        offset, line = 0, 1
+        for part in parts:
+            self.starts.append(offset)
+            self.first_lines.append(line)
+            offset += len(part)
+            line += part.count("\n")
+        self.text = "".join(parts)
+
+    def page_of(self, offset):
+        """The index of the page holding the character at `offset` of the text."""
+        return bisect.bisect_right(self.starts, offset) - 1
+
+    def where(self, line):
+        """Line `line` of the text as "<page>:<line on that page>"."""
+        i = bisect.bisect_right(self.first_lines, line) - 1
+        return f"{self.names[i]}:{line - self.first_lines[i] + 1}"
+
+
+def link_base(name):
+    """The path from page `name` to the repository root: "" for README.md, "../" for a
+    page in docs/."""
+    return "../" * name.count("/")
+
+
+def class_block(pages):
+    """(page index, start, end) of the generated block, offsets in `pages.text` including
+    its markers, or None unless each marker occurs exactly once, BEGIN first, both on one
+    page."""
+    span = class_block_span(pages.text)
+    if span is None or pages.page_of(span[0]) != pages.page_of(span[1] - 1):
+        return None
+    return (pages.page_of(span[0]), *span)
+
+
+def check_class_tables(matrix, pages):
     """Failure lines for the generated attack-class block; empty when it is current."""
-    span = class_block_span(readme)
-    if span is None:
+    block = class_block(pages)
+    if block is None:
         return [
-            f"README.md: the attack-class tables need exactly one '{CLASS_BEGIN}' "
-            f"followed by exactly one '{CLASS_END}'"
+            f"README.md and the pages in PAGES: the attack-class tables need exactly one "
+            f"'{CLASS_BEGIN}' followed by exactly one '{CLASS_END}', both on one page"
         ]
-    start, end = span
-    have = readme[start:end].split("\n")
-    want = render_class_tables(matrix).split("\n")
-    first_line = readme.count("\n", 0, start) + 1
+    page, start, end = block
+    have = pages.text[start:end].split("\n")
+    want = render_class_tables(matrix, link_base(pages.names[page])).split("\n")
+    first_line = pages.text.count("\n", 0, start) + 1
     for i, (h, w) in enumerate(zip(have, want)):
         if h != w:
             return [
-                f"README.md:{first_line + i}: the attack-class tables differ from matrix.json "
-                f"(expected \"{w}\"); run python3 scripts/check_readme_claims.py --fix"
+                f"{pages.where(first_line + i)}: the attack-class tables differ from "
+                f"matrix.json (expected \"{w}\"); run python3 scripts/check_readme_claims.py --fix"
             ]
     if len(have) != len(want):
         line = first_line + min(len(have), len(want))
         return [
-            f"README.md:{line}: the attack-class tables have {len(have)} lines, matrix.json "
+            f"{pages.where(line)}: the attack-class tables have {len(have)} lines, matrix.json "
             f"renders {len(want)}; run python3 scripts/check_readme_claims.py --fix"
         ]
     return []
 
 
-def fix_class_tables(matrix, readme):
-    """README text with only the generated block re-rendered; unchanged when the
-    markers are missing or out of order."""
-    span = class_block_span(readme)
-    if span is None:
-        return readme
-    start, end = span
-    return readme[:start] + render_class_tables(matrix) + readme[end:]
+def fix_class_tables(matrix, pages):
+    """(page, text): the page holding the generated block and its text with only the block
+    re-rendered; None when the markers are missing, out of order or on two pages."""
+    block = class_block(pages)
+    if block is None:
+        return None
+    page, start, end = block
+    text, offset = pages.texts[page], pages.starts[page]
+    rendered = render_class_tables(matrix, link_base(pages.names[page]))
+    return pages.names[page], text[:start - offset] + rendered + text[end - offset:]
 
 
 def lines_naming(lines, naming):
@@ -526,20 +601,22 @@ def main(argv):
     # exits 0; that run reads and writes nothing either.
     parser = argparse.ArgumentParser(description=DESCRIPTION, allow_abbrev=False)
     parser.add_argument("--fix", action="store_true",
-                        help="rewrite the attack-class tables in README.md from matrix.json")
+                        help="rewrite the attack-class tables from matrix.json, on the page "
+                             "that holds them")
     args = parser.parse_args(argv)
 
     matrix = json.loads(MATRIX.read_text(encoding="utf-8"))
-    readme = README.read_text(encoding="utf-8")
+    pages = Pages(ROOT)
 
     if args.fix:
-        fixed = fix_class_tables(matrix, readme)
-        if fixed != readme:
-            README.write_text(fixed, encoding="utf-8")
-            readme = fixed
+        fixed = fix_class_tables(matrix, pages)
+        if fixed is not None and fixed[1] != pages.texts[pages.names.index(fixed[0])]:
+            (ROOT / fixed[0]).write_text(fixed[1], encoding="utf-8")
+            pages = Pages(ROOT)
             print("FIXED: rewrote the attack-class tables from matrix.json")
         else:
             print("OK: attack-class tables already current")
+    readme = pages.text
 
     tactics = matrix["tactics"]
     techniques = matrix["techniques"]
@@ -554,7 +631,8 @@ def main(argv):
     with_lab = sum(1 for t in techniques if not empty(t.get("dvaaValidation")))
 
     total = len(techniques)
-    failures = []
+    failures = [f"{name}: missing; README.md hands this page text that the check reads"
+                for name in pages.missing]
 
     def require(pattern, expected, label, text=readme, source="matrix.json", stated=True,
                 flags=0):
@@ -581,7 +659,7 @@ def main(argv):
                 line += text.count("\n", counted, m.start())
                 counted = m.start()
                 failures.append(
-                    f"README.md:{line}: \"{m.group(0)}\" does not match {source} "
+                    f"{pages.where(line)}: \"{m.group(0)}\" does not match {source} "
                     f"({label}: {', '.join(want)})"
                 )
 
@@ -657,21 +735,21 @@ def main(argv):
     for m in re.finditer(
             r"(?m)^\| \[([^\]\n]+)\]\(tactics/([^)\n]+)\.md\) \| (\d+) \| (\d+) \|", readme):
         name, tid, stage, stated = m.groups()
-        line = line_of(m.start())
+        line = pages.where(line_of(m.start()))
         tactic = tactic_by_id.get(tid)
         if tactic is None:
-            failures.append(f"README.md:{line}: tactic row links tactics/{tid}.md, "
+            failures.append(f"{line}: tactic row links tactics/{tid}.md, "
                             f"which is not a tactic in matrix.json")
             continue
         if tid in tactic_rows:
-            failures.append(f"README.md:{line}: second row for tactic {tid} "
-                            f"(first at line {tactic_rows[tid]})")
+            failures.append(f"{line}: second row for tactic {tid} "
+                            f"(first at {tactic_rows[tid]})")
             continue
         tactic_rows[tid] = line
         want = (tactic["name"], str(tactic["order"]), str(per_tactic.get(tid, 0)))
         if (name, stage, stated) != want:
             failures.append(
-                f"README.md:{line}: tactic row \"{name} | {stage} | {stated}\" does not match "
+                f"{line}: tactic row \"{name} | {stage} | {stated}\" does not match "
                 f"matrix.json ({tid} name, kill chain stage, techniques: {' | '.join(want)})"
             )
     for tid in tactic_by_id:
@@ -683,28 +761,28 @@ def main(argv):
     tier_rows = {}
     for m in re.finditer(r"(?m)^\| \*\*(\w+)\*\* \|.*\| (\d+) \((\d+)%\) \|$", readme):
         tier, stated, pct = m.group(1).lower(), m.group(2), m.group(3)
-        line = line_of(m.start())
+        line = pages.where(line_of(m.start()))
         if tier not in TIERS:
-            failures.append(f"README.md:{line}: \"{m.group(1)}\" is not an evidence tier "
+            failures.append(f"{line}: \"{m.group(1)}\" is not an evidence tier "
                             f"({', '.join(TIERS)})")
             continue
         if tier in tier_rows:
-            failures.append(f"README.md:{line}: second row for tier {tier} "
-                            f"(first at line {tier_rows[tier]})")
+            failures.append(f"{line}: second row for tier {tier} "
+                            f"(first at {tier_rows[tier]})")
             continue
         tier_rows[tier] = line
         n = tiers.get(tier, 0)
         want = (str(n), str(percent(n, total)))
         if (stated, pct) != want:
             failures.append(
-                f"README.md:{line}: \"{stated} ({pct}%)\" does not match matrix.json "
+                f"{line}: \"{stated} ({pct}%)\" does not match matrix.json "
                 f"({tier}: {want[0]} of {total}, {want[1]}%)"
             )
     for tier in TIERS:
         if tier not in tier_rows:
             failures.append(f"README evidence tier table has no row for {tier}")
 
-    failures.extend(check_class_tables(matrix, readme))
+    failures.extend(check_class_tables(matrix, pages))
 
     # Related-project figures, read only from the README lines that name the project.
     related = json.loads(RELATED.read_text(encoding="utf-8"))
@@ -795,7 +873,7 @@ def main(argv):
         for column, c in hidden:
             label = " ".join(filter(None, (f"U+{ord(c):04X}", unicodedata.name(c, ""))))
             failures.append(
-                f"README.md:{number}:{column}: a line {where} carries {label}, "
+                f"{pages.where(number)}:{column}: a line {where} carries {label}, "
                 f"{hiding_kind(c)}, which can hide a figure from the {wordings} wordings; "
                 f"remove it"
             )

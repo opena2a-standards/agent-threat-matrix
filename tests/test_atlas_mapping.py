@@ -17,6 +17,10 @@ CROSSREF = ROOT / "cross-references"
 ATLAS_PAGE = CROSSREF / "mitre-atlas-mapping.md"
 PRE_CHANGE_PAGE = Path(__file__).resolve().parent / "fixtures" / "pre_change" / "mitre-atlas-mapping.md"
 README = ROOT / "README.md"
+# The README's scope lists moved to the overview page, and its sentence on the catalogs that
+# already exist to the use-cases page.
+OVERVIEW = ROOT / "docs" / "overview.md"
+USE_CASES = ROOT / "docs" / "use-cases.md"
 
 
 def _load_checker():
@@ -137,8 +141,9 @@ def test_technique_ids_in_the_table_are_red():
 
 
 def test_readme_scope_lines_do_not_limit_atlas_to_models():
-    text = README.read_text()
-    assert "and models (MITRE ATLAS)" not in text
+    for page in (README, OVERVIEW, USE_CASES):
+        assert "and models (MITRE ATLAS)" not in page.read_text(), page
+    text = OVERVIEW.read_text()
     scope = [line for line in text.splitlines() if line.startswith("- Model-level attacks")]
     assert scope and "agent" in scope[0], scope
 
