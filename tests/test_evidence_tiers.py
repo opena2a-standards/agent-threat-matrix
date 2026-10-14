@@ -422,6 +422,43 @@ def test_a_character_that_does_not_print_is_escaped_in_the_message(tree, charact
     assert character not in r.stderr, r.stderr
 
 
+@pytest.mark.parametrize("character, escaped", [
+    ("\N{LINE SEPARATOR}", "\\u2028"),
+    ("\x85", "\\x85"),
+    ("\f", "\\x0c"),
+    ("\N{NO-BREAK SPACE}", "\\xa0"),
+    ("\N{ZERO WIDTH SPACE}", "\\u200b"),
+], ids=["line separator", "next line", "form feed", "no-break space", "zero width space"])
+def test_a_character_that_does_not_print_on_the_canonical_page_is_escaped_in_the_message(
+        tree, character, escaped):
+    # Printed as it is, the canonical definition in each message would look the same as the
+    # quote it differs from, and the message would not say what to delete.
+    first, rest = OBSERVED.split(" ", 1)
+    canonical = f"{first}{character}{rest}"
+    want = f"{first}{escaped}{rest}"
+    row = mutate(tree, "docs/evidence-tiers.md", f"| Observed | `observed` | {OBSERVED} |",
+                 f"| Obs{character}erved | `observed` | {canonical} |")
+    readme = tree / "README.md"
+    text = readme.read_text(encoding="utf-8")
+    start = text.index(f"| **Observed** | {OBSERVED} |")
+    readme.write_text(text[:start] + text[text.index("\n", start) + 1:], encoding="utf-8")
+    audit = mutate(tree, "EVIDENCE_AUDIT.md", f"- **OBSERVED**: {OBSERVED}\n",
+                   f"- **OBSERVED**: {OBSERVED}\n  NemoClaw findings\n")
+    r = run_checker(tree)
+    assert r.returncode == 1
+    assert (f"docs/evidence-tiers.md:{row}: the tier named \"Obs{escaped}erved\" carries "
+            f"the value `observed`;") in r.stderr, r.stderr
+    # CONTRIBUTING.md and EVIDENCE_AUDIT.md quote the definition as it was.
+    assert r.stderr.count(f"Observed reads \"{OBSERVED}\"; quote docs/evidence-tiers.md: "
+                          f"\"{want}\"") == 2, r.stderr
+    assert (f"EVIDENCE_AUDIT.md:{audit}: Observed continues on line {audit + 1};"
+            in r.stderr), r.stderr
+    assert f"and quote docs/evidence-tiers.md: \"{want}\"" in r.stderr, r.stderr
+    assert (f"README.md does not define Observed; quote docs/evidence-tiers.md: \"{want}\""
+            in r.stderr), r.stderr
+    assert character not in r.stderr, r.stderr
+
+
 @pytest.mark.parametrize("after", [
     # Two markers are a list item that holds an empty one, where three are a thematic break.
     "- -\n",
