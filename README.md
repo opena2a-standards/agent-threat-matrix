@@ -15,7 +15,7 @@ Open [`matrix.json`](matrix.json) first. It holds every tactic, technique, attac
 | `evidenceTier` | `observed`, `validated` or `adapted`, as defined under [Evidence Standard](#evidence-standard) |
 | `attackClass` | The technique's primary attack class, such as `RAG-POISON` |
 | `hmaChecks`, `oasbControls` | The HackMyAgent checks that detect it and the OASB controls that defend against it |
-| `dvaaValidation` | The DVAA agent that reproduces it in the lab, or `null` |
+| `dvaaValidation` | The DVAA challenge, scenario or agent that reproduces it in the lab, or `null` |
 
 The tactics, in kill chain order:
 
