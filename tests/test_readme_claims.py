@@ -1366,12 +1366,27 @@ def test_a_wording_a_space_away_from_a_combining_mark_is_still_read():
 def test_a_wording_at_the_start_of_the_readme_is_read_beside_a_final_combining_mark():
     # The character before a wording at offset 0 is no character, not the last one in
     # the README: a combining mark ending the README does not glue the first wording.
+    # The checker reads README.md and then each page in PAGES, closing each page with a
+    # line break, and reads the DVAA wordings on the lines that name DVAA alone. So the
+    # mark goes at the end of the last page, on a line that names DVAA: only there is it
+    # the last character of the text the wording is read in but for that line break.
     td = scratch_tree()
     try:
-        readme = td / "README.md"
-        text = readme.read_text(encoding="utf-8").rstrip("\n")
-        readme.write_text(f"22 agents in DVAA\n{text}\nDVAA\N{COMBINING ACUTE ACCENT}",
+        first, last = readme_pages()[0], readme_pages()[-1]
+        readme = td / first
+        readme.write_text("22 agents in DVAA\n" + readme.read_text(encoding="utf-8"),
                           encoding="utf-8")
+        page = td / last
+        ending = "DVAA e\N{COMBINING ACUTE ACCENT}"
+        page.write_text(f"{page.read_text(encoding='utf-8').rstrip(chr(10))}\n{ending}",
+                        encoding="utf-8")
+        checker = load_checker()
+        lines = [checker.classified(line) for line in checker.Pages(td).text.split("\n")]
+        naming = [checker.names(stripped, "DVAA", bool(hidden))
+                  for _, stripped, hidden in lines]
+        read = checker.lines_naming(lines, naming)
+        assert read.startswith("22 agents in DVAA\n"), read[:40]
+        assert read.endswith(f"\n{ending}\n"), read[-40:]
         r = run_checker(td)
         assert r.returncode == 1, r.stdout
         assert ('README.md:1: "22 agents" does not match related-projects.json '
