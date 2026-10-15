@@ -1366,12 +1366,27 @@ def test_a_wording_a_space_away_from_a_combining_mark_is_still_read():
 def test_a_wording_at_the_start_of_the_readme_is_read_beside_a_final_combining_mark():
     # The character before a wording at offset 0 is no character, not the last one in
     # the README: a combining mark ending the README does not glue the first wording.
+    # The checker reads README.md and then each page in PAGES, closing each page with a
+    # line break, and reads the DVAA wordings on the lines that name DVAA alone. So the
+    # mark goes at the end of the last page, on a line that names DVAA: only there is it
+    # the last character of the text the wording is read in but for that line break.
     td = scratch_tree()
     try:
-        readme = td / "README.md"
-        text = readme.read_text(encoding="utf-8").rstrip("\n")
-        readme.write_text(f"22 agents in DVAA\n{text}\nDVAA\N{COMBINING ACUTE ACCENT}",
+        first, last = readme_pages()[0], readme_pages()[-1]
+        readme = td / first
+        readme.write_text("22 agents in DVAA\n" + readme.read_text(encoding="utf-8"),
                           encoding="utf-8")
+        page = td / last
+        ending = "DVAA e\N{COMBINING ACUTE ACCENT}"
+        page.write_text(f"{page.read_text(encoding='utf-8').rstrip(chr(10))}\n{ending}",
+                        encoding="utf-8")
+        checker = load_checker()
+        lines = [checker.classified(line) for line in checker.Pages(td).text.split("\n")]
+        naming = [checker.names(stripped, "DVAA", bool(hidden))
+                  for _, stripped, hidden in lines]
+        read = checker.lines_naming(lines, naming)
+        assert read.startswith("22 agents in DVAA\n"), read[:40]
+        assert read.endswith(f"\n{ending}\n"), read[-40:]
         r = run_checker(td)
         assert r.returncode == 1, r.stdout
         assert ('README.md:1: "22 agents" does not match related-projects.json '
@@ -1705,9 +1720,9 @@ def test_a_missing_class_table_marker_is_red(marker):
         shutil.rmtree(td)
 
 
-def test_class_table_markers_on_two_pages_are_red():
-    # BEGIN on the attack-classes page and END on README.md: the block spans two pages,
-    # which neither the check nor --fix can read as one block.
+def test_class_table_end_marker_before_begin_is_red():
+    # BEGIN on the attack-classes page and END on README.md, which the checker reads
+    # first: END comes before BEGIN in the text.
     td = scratch_tree()
     try:
         mutate_readme(td, END, "")
@@ -1716,6 +1731,31 @@ def test_class_table_markers_on_two_pages_are_red():
         r = run_checker(td)
         assert r.returncode == 1, r.stdout
         assert "the attack-class tables need exactly one" in r.stderr, r.stderr
+    finally:
+        shutil.rmtree(td)
+
+
+def test_class_table_markers_on_two_pages_are_red():
+    # BEGIN on the attack-classes page and END on the first line of the page the checker
+    # reads after it: each marker occurs once and BEGIN comes first, so only the one-page
+    # condition rejects the block, which neither the check nor --fix can read as one block.
+    td = scratch_tree()
+    try:
+        pages = readme_pages()
+        mutate_readme(td, END, "")
+        after = td / pages[pages.index(CLASS_PAGE) + 1]
+        after.write_text(END + "\n" + after.read_text(encoding="utf-8"), encoding="utf-8")
+        before = {rel: (td / rel).read_text(encoding="utf-8") for rel in pages}
+
+        r = run_checker(td)
+        assert r.returncode == 1, r.stdout
+        assert "the attack-class tables need exactly one" in r.stderr, r.stderr
+
+        r = run_checker(td, "--fix")
+        assert r.returncode == 1, r.stdout
+        assert "the attack-class tables need exactly one" in r.stderr, r.stderr
+        for rel, text in before.items():
+            assert (td / rel).read_text(encoding="utf-8") == text, rel
     finally:
         shutil.rmtree(td)
 
