@@ -27,8 +27,9 @@ Eight properties:
 
 Run with ``--fix`` to rewrite only the generated block from matrix.json and the mapping
 table. Every other line is left alone; there is no other rewrite, because C3 and C4 are
-editorial placements, not text a script may invent. Exit 0 when all eight hold, 1
-otherwise, printing one line per violation.
+editorial placements, not text a script may invent. With the BEGIN or END marker
+missing, ``--fix`` writes nothing and prints "NOT FIXED" ahead of the C5 failure. Exit 0
+when all eight hold, 1 otherwise, printing one line per violation.
 """
 
 import json
@@ -314,8 +315,9 @@ def run_checks(root: Path) -> list:
     return failures
 
 
-def fix_block(root: Path) -> bool:
-    """Rewrite the generated block from the data. Returns True if the file changed."""
+def fix_block(root: Path):
+    """Rewrite the generated block from the data. Returns True if the file changed, False
+    if the block was already current, and None, writing nothing, if a marker is missing."""
     version, ids, _classes = load_matrix(root)
     owasp_path = root / "cross-references" / OWASP_NAME
     index_path = root / "cross-references" / INDEX_NAME
@@ -323,7 +325,7 @@ def fix_block(root: Path) -> bool:
     text = index_path.read_text()
     parts = extract_block(text)
     if parts is None:
-        return False
+        return None
     before, _body, after = parts
     want = render_block(version, len(ids), len(named))
     rebuilt = f"{before}{BEGIN}\n{want}\n{END}{after}"
@@ -337,7 +339,13 @@ def main(argv: list) -> int:
     fix = "--fix" in argv
     if fix:
         changed = fix_block(ROOT)
-        print("FIXED: rewrote the generated block" if changed else "OK: generated block already current")
+        # Without both markers there is no block to rewrite, so nothing is written and the
+        # block is not reported current; the C5 failure below ends the run with 1.
+        if changed is None:
+            print("NOT FIXED: wrote nothing, as the generated block markers are missing; "
+                  "see the C5 failure below")
+        else:
+            print("FIXED: rewrote the generated block" if changed else "OK: generated block already current")
 
     failures = run_checks(ROOT)
     if failures:
