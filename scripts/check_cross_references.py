@@ -28,8 +28,8 @@ Eight properties:
 Run with ``--fix`` to rewrite only the generated block from matrix.json and the mapping
 table. Every other line is left alone; there is no other rewrite, because C3 and C4 are
 editorial placements, not text a script may invent. With the BEGIN or END marker
-missing, ``--fix`` writes nothing and prints "NOT FIXED" ahead of the C5 failure. Exit 0
-when all eight hold, 1 otherwise, printing one line per violation.
+missing, or END before BEGIN, ``--fix`` writes nothing and prints "NOT FIXED" ahead of
+the C5 failure. Exit 0 when all eight hold, 1 otherwise, printing one line per violation.
 """
 
 import json
@@ -201,14 +201,23 @@ def render_block(version, total: int, named: int) -> str:
 
 
 def extract_block(text: str):
-    """Return (before, body, after) around the generated block, or None if absent."""
-    if BEGIN not in text or END not in text:
+    """Return (before, body, after) around the generated block, or None when no END
+    marker follows the BEGIN marker: either marker is missing, or END comes only before
+    BEGIN."""
+    if BEGIN not in text:
         return None
     before, rest = text.split(BEGIN, 1)
+    if END not in rest:
+        return None
     body, after = rest.split(END, 1)
     # body is everything between the markers; the committed form is
     # "\n<content>\n". Compare the content without those framing newlines.
     return before, body, after
+
+
+def end_before_begin(text: str) -> bool:
+    """True when both markers are present and no END marker follows the BEGIN marker."""
+    return BEGIN in text and END in text and extract_block(text) is None
 
 
 def is_table_header_rows(lines):
@@ -271,7 +280,12 @@ def run_checks(root: Path) -> list:
 
     # C5 -- the generated block re-renders byte-identically.
     parts = extract_block(index_text)
-    if parts is None:
+    if end_before_begin(index_text):
+        failures.append(
+            f"C5 {INDEX_NAME}: the END marker of the generated block comes before its BEGIN "
+            f"marker; move it after the BEGIN marker"
+        )
+    elif parts is None:
         failures.append(f"C5 {INDEX_NAME}: the generated block markers are missing")
     else:
         _before, body, _after = parts
@@ -317,7 +331,8 @@ def run_checks(root: Path) -> list:
 
 def fix_block(root: Path):
     """Rewrite the generated block from the data. Returns True if the file changed, False
-    if the block was already current, and None, writing nothing, if a marker is missing."""
+    if the block was already current, and None, writing nothing, if a marker is missing or
+    END comes before BEGIN."""
     version, ids, _classes = load_matrix(root)
     owasp_path = root / "cross-references" / OWASP_NAME
     index_path = root / "cross-references" / INDEX_NAME
@@ -337,7 +352,13 @@ def fix_block(root: Path):
 
 def main(argv: list) -> int:
     fix = "--fix" in argv
-    if fix:
+    if fix and end_before_begin((ROOT / "cross-references" / INDEX_NAME).read_text()):
+        # An END marker before the BEGIN marker leaves no block to rewrite, so nothing is
+        # written and the block is not reported current; the C5 failure below ends the run
+        # with 1.
+        print("NOT FIXED: wrote nothing, as the END marker of the generated block comes "
+              "before its BEGIN marker; see the C5 failure below")
+    elif fix:
         changed = fix_block(ROOT)
         # Without both markers there is no block to rewrite, so nothing is written and the
         # block is not reported current; the C5 failure below ends the run with 1.
