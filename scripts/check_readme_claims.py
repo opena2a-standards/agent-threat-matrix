@@ -610,7 +610,12 @@ def main(argv):
 
     if args.fix:
         fixed = fix_class_tables(matrix, pages)
-        if fixed is not None and fixed[1] != pages.texts[pages.names.index(fixed[0])]:
+        # Without the markers there is no block to rewrite, so nothing is written and the
+        # tables are not reported current; the marker failure below ends the run with 1.
+        if fixed is None:
+            print("NOT FIXED: wrote nothing, as the attack-class tables could not be found; "
+                  "see the marker failure below", file=sys.stderr)
+        elif fixed[1] != pages.texts[pages.names.index(fixed[0])]:
             (ROOT / fixed[0]).write_text(fixed[1], encoding="utf-8")
             pages = Pages(ROOT)
             print("FIXED: rewrote the attack-class tables from matrix.json")
