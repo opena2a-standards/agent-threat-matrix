@@ -15,7 +15,9 @@ so a HackMyAgent check count went stale without failing CI.
 
 The attack-class tables are generated from matrix.json: a reworded description, a
 description changed in matrix.json alone, and a missing marker must each go red, and
-``--fix`` must re-render the block without touching the rest of the README. An argument
+``--fix`` must re-render the block without touching the rest of the README. With a marker
+missing, the two out of order or on two pages, ``--fix`` must write nothing and say so on
+standard error rather than report the tables current. An argument
 other than ``--fix``, ``--help`` or ``-h`` must exit 2 without checking or writing anything.
 Given together with ``--help`` or ``-h``, in either order, such an argument must leave the
 run printing the usage and exiting 0, again without checking or writing anything.
@@ -1720,14 +1722,29 @@ def test_a_missing_class_table_marker_is_red(marker):
         shutil.rmtree(td)
 
 
+def end_class_table_marker_on_readme(root: Path) -> None:
+    """BEGIN on the attack-classes page and END on README.md, which the checker reads
+    first: END comes before BEGIN in the text."""
+    mutate_readme(root, END, "")
+    readme = root / "README.md"
+    readme.write_text(readme.read_text(encoding="utf-8") + END + "\n", encoding="utf-8")
+
+
+def split_class_table_markers(root: Path) -> None:
+    """BEGIN on the attack-classes page and END on the first line of the page the checker
+    reads after it: each marker occurs once and BEGIN comes first."""
+    pages = readme_pages()
+    mutate_readme(root, END, "")
+    after = root / pages[pages.index(CLASS_PAGE) + 1]
+    after.write_text(END + "\n" + after.read_text(encoding="utf-8"), encoding="utf-8")
+
+
 def test_class_table_end_marker_before_begin_is_red():
     # BEGIN on the attack-classes page and END on README.md, which the checker reads
     # first: END comes before BEGIN in the text.
     td = scratch_tree()
     try:
-        mutate_readme(td, END, "")
-        readme = td / "README.md"
-        readme.write_text(readme.read_text(encoding="utf-8") + END + "\n", encoding="utf-8")
+        end_class_table_marker_on_readme(td)
         r = run_checker(td)
         assert r.returncode == 1, r.stdout
         assert "the attack-class tables need exactly one" in r.stderr, r.stderr
@@ -1741,11 +1758,8 @@ def test_class_table_markers_on_two_pages_are_red():
     # condition rejects the block, which neither the check nor --fix can read as one block.
     td = scratch_tree()
     try:
-        pages = readme_pages()
-        mutate_readme(td, END, "")
-        after = td / pages[pages.index(CLASS_PAGE) + 1]
-        after.write_text(END + "\n" + after.read_text(encoding="utf-8"), encoding="utf-8")
-        before = {rel: (td / rel).read_text(encoding="utf-8") for rel in pages}
+        split_class_table_markers(td)
+        before = {rel: (td / rel).read_text(encoding="utf-8") for rel in readme_pages()}
 
         r = run_checker(td)
         assert r.returncode == 1, r.stdout
@@ -1755,6 +1769,32 @@ def test_class_table_markers_on_two_pages_are_red():
         assert r.returncode == 1, r.stdout
         assert "the attack-class tables need exactly one" in r.stderr, r.stderr
         for rel, text in before.items():
+            assert (td / rel).read_text(encoding="utf-8") == text, rel
+    finally:
+        shutil.rmtree(td)
+
+
+@pytest.mark.parametrize("break_markers", [
+    lambda root: mutate_readme(root, BEGIN, ""),
+    lambda root: mutate_readme(root, END, ""),
+    end_class_table_marker_on_readme,
+    split_class_table_markers,
+], ids=["no-begin", "no-end", "end-before-begin", "two-pages"])
+def test_fix_says_it_wrote_nothing_when_it_cannot_find_the_class_tables(break_markers):
+    # --fix used to print "OK: attack-class tables already current" here, on the same run
+    # that then exited 1 because it could not find the tables.
+    td = scratch_tree()
+    try:
+        break_markers(td)
+        pages = {rel: (td / rel).read_text(encoding="utf-8") for rel in readme_pages()}
+        r = run_checker(td, "--fix")
+        assert r.returncode == 1, r.stdout
+        assert "OK: attack-class tables already current" not in r.stdout, r.stdout
+        assert "FIXED: rewrote" not in r.stdout, r.stdout
+        assert ("NOT FIXED: wrote nothing, as the attack-class tables could not be found"
+                in r.stderr), r.stderr
+        assert "the attack-class tables need exactly one" in r.stderr, r.stderr
+        for rel, text in pages.items():
             assert (td / rel).read_text(encoding="utf-8") == text, rel
     finally:
         shutil.rmtree(td)
