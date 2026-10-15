@@ -1705,9 +1705,9 @@ def test_a_missing_class_table_marker_is_red(marker):
         shutil.rmtree(td)
 
 
-def test_class_table_markers_on_two_pages_are_red():
-    # BEGIN on the attack-classes page and END on README.md: the block spans two pages,
-    # which neither the check nor --fix can read as one block.
+def test_class_table_end_marker_before_begin_is_red():
+    # BEGIN on the attack-classes page and END on README.md, which the checker reads
+    # first: END comes before BEGIN in the text.
     td = scratch_tree()
     try:
         mutate_readme(td, END, "")
@@ -1716,6 +1716,31 @@ def test_class_table_markers_on_two_pages_are_red():
         r = run_checker(td)
         assert r.returncode == 1, r.stdout
         assert "the attack-class tables need exactly one" in r.stderr, r.stderr
+    finally:
+        shutil.rmtree(td)
+
+
+def test_class_table_markers_on_two_pages_are_red():
+    # BEGIN on the attack-classes page and END on the first line of the page the checker
+    # reads after it: each marker occurs once and BEGIN comes first, so only the one-page
+    # condition rejects the block, which neither the check nor --fix can read as one block.
+    td = scratch_tree()
+    try:
+        pages = readme_pages()
+        mutate_readme(td, END, "")
+        after = td / pages[pages.index(CLASS_PAGE) + 1]
+        after.write_text(END + "\n" + after.read_text(encoding="utf-8"), encoding="utf-8")
+        before = {rel: (td / rel).read_text(encoding="utf-8") for rel in pages}
+
+        r = run_checker(td)
+        assert r.returncode == 1, r.stdout
+        assert "the attack-class tables need exactly one" in r.stderr, r.stderr
+
+        r = run_checker(td, "--fix")
+        assert r.returncode == 1, r.stdout
+        assert "the attack-class tables need exactly one" in r.stderr, r.stderr
+        for rel, text in before.items():
+            assert (td / rel).read_text(encoding="utf-8") == text, rel
     finally:
         shutil.rmtree(td)
 
