@@ -50,6 +50,22 @@ that released that version. Neither was read, so a wrong version or month passed
 now go red, and so must a month on a line stating a version no heading releases, and a line
 stating the version that carries a character which fails a line. The citation must state
 the version; the line under the title may leave it out.
+
+The technique ids the README writes, the name, tactic and evidence tier written beside
+them, and the link and year of the technique citation were not read either, so an id
+matrix.json does not hold, a wrong name, tactic or tier, a citation linking another
+technique and a wrong year passed. Each must now go red, and so must a citation year when
+no CHANGELOG.md heading releases the version, a README without the technique citation and
+a line stating an id that carries a character which fails a line. A tactic or tier beside
+an id is read in any letter case.
+
+The STIX version the README states ("ships as a STIX 2.1 bundle"), on README.md, on the
+schema page and in the repository tree on CONTRIBUTING.md, was not read either, so "STIX
+2.0" passed. Each must now go red against the spec_version the objects of the committed
+bundle carry, and so must a missing bundle, a bundle whose objects carry two spec_version
+values, and a line stating the STIX version that carries a character which fails a line.
+The version is read from the bundle, not typed in the checker: a bundle whose objects
+carry 2.2 fails the README that states 2.1.
 """
 
 import functools
@@ -72,7 +88,8 @@ import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
 FILES = ("matrix.json", "related-projects.json", "CHANGELOG.md",
-         "scripts/check_readme_claims.py")
+         "stix/agent-threat-matrix-bundle.json", "scripts/check_readme_claims.py")
+STIX_BUNDLE = "stix/agent-threat-matrix-bundle.json"
 # The attack-class tables moved from README.md to this page, which links up one level.
 CLASS_PAGE = "docs/attack-classes.md"
 BEGIN = "<!-- BEGIN GENERATED: attack-class-tables -->"
@@ -366,6 +383,220 @@ def test_a_version_line_carrying_an_invisible_character_is_red():
         assert (f"{where_of(td, new)}:{column_of(td, new, named)}: a line stating the matrix "
                 f"version carries {named}, which can hide a figure from the version wordings; "
                 "remove it") in r.stderr, r.stderr
+    finally:
+        shutil.rmtree(td)
+
+
+# (old, new, message): a technique id the README writes, in prose, in code or on an attack
+# path, the name, tactic or evidence tier written beside it, or the link or year of the
+# technique citation, moved off matrix.json or the CHANGELOG.md heading that released the
+# matrix version. None was read, so each passed.
+TECHNIQUE_MUTATIONS = [
+    ('(e.g., "ATM T-2001")', '(e.g., "ATM T-2099")',
+     '"T-2099" is not a technique id in matrix.json'),
+    ('.id == "T-3006")', '.id == "T-3060")', '"T-3060" is not a technique id in matrix.json'),
+    ("T-2001 \N{RIGHTWARDS ARROW} T-3001 \N{RIGHTWARDS ARROW} T-5004",
+     "T-2001 \N{RIGHTWARDS ARROW} T-30011 \N{RIGHTWARDS ARROW} T-5004",
+     '"T-30011" is not a technique id in matrix.json'),
+    ("T-2001 (Direct Prompt Injection)", "T-2001 (Indirect Prompt Injection)",
+     '"T-2001 (Indirect Prompt Injection)" does not match matrix.json '
+     "(T-2001 name: Direct Prompt Injection)"),
+    ("Indirect Prompt Injection (T-2002", "Indirect Prompt Injection (T-2001",
+     'the text before "(T-2001" does not end with its name in matrix.json '
+     "(T-2001 name: Direct Prompt Injection)"),
+    ("Credential Leak (T-3006", "Credential Exposure (T-3006",
+     'the text before "(T-3006" does not end with its name in matrix.json '
+     "(T-3006 name: Context Window Credential Leak)"),
+    ("catalogued: Indirect Prompt", "catalogued: Non-Indirect Prompt",
+     'the text before "(T-2002" does not end with its name in matrix.json '
+     "(T-2002 name: Indirect Prompt Injection)"),
+    ("(T-2002, initial access,", "(T-2002, credential harvest,",
+     '"credential harvest" does not match matrix.json (T-2002 tactic: Initial Access)'),
+    ("validated in the lab)", "adapted in the lab)",
+     '"adapted in the lab" does not match matrix.json (T-3006 evidence tier: validated)'),
+    ("techniques/T-2001", "techniques/T-2002",
+     '"T-2002" on the citation of T-2001 names another technique'),
+    ("OpenA2A, 2026.", "OpenA2A, 2025.",
+     '"2025" does not match CHANGELOG.md (version 1.2 released 2026)'),
+]
+
+
+@pytest.mark.parametrize("old,new,message", TECHNIQUE_MUTATIONS,
+                         ids=[n for _, n, _ in TECHNIQUE_MUTATIONS])
+def test_a_technique_id_name_tactic_tier_or_citation_off_the_data_is_red(old, new, message):
+    td = scratch_tree()
+    try:
+        mutate_readme(td, old, new)
+        r = run_checker(td)
+        assert r.returncode == 1, f"checker passed with {new!r}:\n{r.stdout}"
+        assert f"{where_of(td, new)}: {message}" in r.stderr, r.stderr
+    finally:
+        shutil.rmtree(td)
+
+
+def test_a_tactic_or_tier_beside_a_technique_id_is_read_in_any_letter_case():
+    td = scratch_tree()
+    try:
+        mutate_readme(td, "(T-2002, initial access, observed in the wild)",
+                      "(T-2002, Initial Access, Observed in the wild)")
+        r = run_checker(td)
+        assert r.returncode == 0, r.stderr
+    finally:
+        shutil.rmtree(td)
+
+
+def test_the_technique_citation_must_be_stated():
+    td = scratch_tree()
+    try:
+        mutate_readme(td, "> AI Agent Threat Matrix T-2001",
+                      "> AI Agent Threat Matrix, technique T-2001")
+        r = run_checker(td)
+        assert r.returncode == 1, r.stdout
+        assert 'README does not state a technique citation ("Threat Matrix T-N")' in r.stderr, \
+            r.stderr
+    finally:
+        shutil.rmtree(td)
+
+
+def test_a_citation_year_is_red_when_the_changelog_does_not_release_the_version():
+    td = scratch_tree()
+    try:
+        set_matrix_version(td, "1.3")
+        mutate_readme(td, "**Version 1.2**", "**Version 1.3**")
+        mutate_readme(td, "Threat Matrix v1.2.", "Threat Matrix v1.3.")
+        r = run_checker(td)
+        assert r.returncode == 1, r.stdout
+        assert (f'{where_of(td, "OpenA2A, 2026.")}: "2026" is read against the CHANGELOG.md '
+                "release heading of version 1.3, and there is none") in r.stderr, r.stderr
+    finally:
+        shutil.rmtree(td)
+
+
+def test_the_citation_year_is_read_from_the_changelog_heading_of_the_version():
+    td = scratch_tree()
+    try:
+        changelog = td / "CHANGELOG.md"
+        text = changelog.read_text(encoding="utf-8")
+        assert text.count("## Unreleased\n") == 1
+        changelog.write_text(
+            text.replace("## Unreleased\n", "## v1.3.0 (2027-01-15)\n\n## Unreleased\n"),
+            encoding="utf-8")
+        set_matrix_version(td, "1.3")
+        mutate_readme(td, "**Version 1.2** | September 2026", "**Version 1.3** | January 2027")
+        mutate_readme(td, 'Threat Matrix v1.2." September 2026.',
+                      'Threat Matrix v1.3." January 2027.')
+        r = run_checker(td)
+        assert r.returncode == 1, r.stdout
+        assert (f'{where_of(td, "OpenA2A, 2026.")}: "2026" does not match CHANGELOG.md '
+                "(version 1.3 released 2027)") in r.stderr, r.stderr
+        mutate_readme(td, "OpenA2A, 2026.", "OpenA2A, 2027.")
+        r = run_checker(td)
+        assert r.returncode == 0, r.stderr
+    finally:
+        shutil.rmtree(td)
+
+
+def test_a_technique_id_line_carrying_an_invisible_character_is_red():
+    # The line holds "T-2002" once U+00AD is removed, so the character fails the line.
+    td = scratch_tree()
+    try:
+        new = "(such as `T-20\N{SOFT HYPHEN}02`)"
+        named = "U+00AD SOFT HYPHEN, a format character"
+        mutate_readme(td, "(such as `T-2002`)", new)
+        r = run_checker(td)
+        assert r.returncode == 1, r.stdout
+        assert (f"{where_of(td, new)}:{column_of(td, new, named)}: a line stating a technique "
+                f"id carries {named}, which can hide a figure from the technique id wordings; "
+                "remove it") in r.stderr, r.stderr
+    finally:
+        shutil.rmtree(td)
+
+
+# (old, new, message): the STIX version the README states, on README.md, on the schema page
+# and in the repository tree on CONTRIBUTING.md, moved off the spec_version the objects of
+# the committed bundle carry. It was not read, so each passed.
+STIX_MUTATIONS = [
+    ("as a STIX 2.1 bundle", "as a STIX 2.0 bundle",
+     f'"STIX 2.0" does not match {STIX_BUNDLE} (STIX version: 2.1)'),
+    ("a STIX 2.1 rendering", "a STIX 2.11 rendering",
+     f'"STIX 2.11" does not match {STIX_BUNDLE} (STIX version: 2.1)'),
+    ("# STIX 2.1 bundle rendered", "# STIX 3 bundle rendered",
+     f'"STIX 3" does not match {STIX_BUNDLE} (STIX version: 2.1)'),
+]
+
+
+@pytest.mark.parametrize("old,new,message", STIX_MUTATIONS,
+                         ids=[n for _, n, _ in STIX_MUTATIONS])
+def test_a_stix_version_off_the_bundle_is_red(old, new, message):
+    td = scratch_tree()
+    try:
+        mutate_readme(td, old, new)
+        r = run_checker(td)
+        assert r.returncode == 1, f"checker passed with {new!r}:\n{r.stdout}"
+        assert f"{where_of(td, new)}: {message}" in r.stderr, r.stderr
+    finally:
+        shutil.rmtree(td)
+
+
+def set_bundle_spec_versions(root: Path, versions) -> None:
+    """Give the bundle's objects the spec_version values in `versions`, in turn."""
+    path = root / STIX_BUNDLE
+    data = json.loads(path.read_text(encoding="utf-8"))
+    for i, obj in enumerate(data["objects"]):
+        obj["spec_version"] = versions[i % len(versions)]
+    path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+
+
+def test_the_stix_version_is_read_from_the_bundle_objects():
+    td = scratch_tree()
+    try:
+        set_bundle_spec_versions(td, ["2.2"])
+        r = run_checker(td)
+        assert r.returncode == 1, r.stdout
+        assert (f'{where_of(td, "as a STIX 2.1 bundle")}: "STIX 2.1" does not match '
+                f"{STIX_BUNDLE} (STIX version: 2.2)") in r.stderr, r.stderr
+    finally:
+        shutil.rmtree(td)
+
+
+def test_a_missing_bundle_is_red():
+    td = scratch_tree()
+    try:
+        (td / STIX_BUNDLE).unlink()
+        r = run_checker(td)
+        assert r.returncode == 1, r.stdout
+        assert (f"{STIX_BUNDLE}: missing; the STIX version the README states is read from "
+                "its objects' spec_version") in r.stderr, r.stderr
+    finally:
+        shutil.rmtree(td)
+
+
+def test_a_bundle_whose_objects_carry_two_spec_versions_is_red():
+    td = scratch_tree()
+    try:
+        set_bundle_spec_versions(td, ["2.1", "2.2"])
+        r = run_checker(td)
+        assert r.returncode == 1, r.stdout
+        assert (f"{STIX_BUNDLE}: its objects carry 2 spec_version values (2.1, 2.2), and "
+                "the STIX version the README states is read from the one they share"
+                ) in r.stderr, r.stderr
+        assert "STIX version: " not in r.stderr, r.stderr
+    finally:
+        shutil.rmtree(td)
+
+
+def test_a_stix_version_line_carrying_an_invisible_character_is_red():
+    # The line holds "STIX 2.1" once U+00AD is removed, so the character fails the line.
+    td = scratch_tree()
+    try:
+        new = "as a ST\N{SOFT HYPHEN}IX 2.1 bundle"
+        named = "U+00AD SOFT HYPHEN, a format character"
+        mutate_readme(td, "as a STIX 2.1 bundle", new)
+        r = run_checker(td)
+        assert r.returncode == 1, r.stdout
+        assert (f"{where_of(td, new)}:{column_of(td, new, named)}: a line stating the STIX "
+                f"version carries {named}, which can hide a figure from the STIX version "
+                "wordings; remove it") in r.stderr, r.stderr
     finally:
         shutil.rmtree(td)
 

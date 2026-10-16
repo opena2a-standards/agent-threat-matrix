@@ -12,7 +12,7 @@ Open [`matrix.json`](matrix.json) first. It holds every tactic, technique, attac
 |-------|-------|
 | `id`, `name`, `description` | The technique id (such as `T-2002`), its name and what the attacker does |
 | `tactic` | The tactic id, one of the rows of the table below |
-| `evidenceTier` | `observed`, `validated` or `adapted`, as defined under [Evidence Standard](#evidence-standard) |
+| `evidenceTier` | `observed`, `validated` or `adapted`, as defined under [Evidence Standard](docs/evidence-tiers.md#evidence-standard) |
 | `attackClass` | The technique's primary attack class, such as `RAG-POISON` |
 | `hmaChecks`, `oasbControls` | The HackMyAgent checks that detect it and the OASB controls that defend against it |
 | `dvaaValidation` | The DVAA challenge, scenario or agent that reproduces it in the lab, or `null` |
@@ -75,20 +75,6 @@ What you can do today: import `stix/agent-threat-matrix-bundle.json`, or regener
 
 Why you can check this yourself: [`matrix.json`](matrix.json) and its schema in [`schema/`](schema/); [`scripts/validate_matrix.py`](scripts/validate_matrix.py); the per-technique justification in [`EVIDENCE_AUDIT.md`](EVIDENCE_AUDIT.md); the STIX bundle in [`stix/`](stix/); the rendered site at [threats.opena2a.org](https://threats.opena2a.org); and the live API at `https://api.oa2a.org/api/v1/threat-matrix`.
 
-## Evidence Standard
-
-Every technique in this matrix is assigned an evidence tier. The definitions are quoted from [docs/evidence-tiers.md](docs/evidence-tiers.md):
-
-| Tier | Meaning | Count |
-|------|---------|-------|
-| **Observed** | Confirmed in real-world production systems | 16 (26%) |
-| **Validated** | Reproduced in controlled lab environment (DVAA) | 42 (69%) |
-| **Adapted** | Well-understood traditional technique applied to agent context, not yet observed agent-specifically | 3 (5%) |
-
-We do not publish purely theoretical techniques. Every entry has either a real-world observation, a reproducible lab scenario, or an established traditional precedent.
-
-See [EVIDENCE_AUDIT.md](EVIDENCE_AUDIT.md) for the full justification of every technique's evidence tier.
-
 ## How to Use This Framework
 
 ### For Red Teams
@@ -117,7 +103,7 @@ When referencing the framework:
 - [Attack classes](docs/attack-classes.md): every attack class with its description and techniques, rendered from `matrix.json`
 - [Cross-framework mapping](docs/cross-framework-mapping.md): what HackMyAgent, DVAA, OASB and the MITRE and OWASP mapping documents provide, and how `python3 scripts/check_readme_claims.py` checks their figures
 - [Attack paths](docs/attack-paths.md): complete kill chain traversals demonstrated in DVAA
-- [Evidence tiers](docs/evidence-tiers.md) and [EVIDENCE_AUDIT.md](EVIDENCE_AUDIT.md): the tier definitions and the justification of every technique's tier
+- [Evidence tiers](docs/evidence-tiers.md) and [EVIDENCE_AUDIT.md](EVIDENCE_AUDIT.md): the tier definitions, the evidence standard with the number of techniques in each tier, and the justification of every technique's tier
 - [Schema](docs/schema.md): what `python3 scripts/validate_matrix.py` checks in `matrix.json`, `technique-ids.json` and the STIX bundle
 - [Use cases: background](docs/use-cases.md): the catalogs that already cover networks and AI systems
 - [CONTRIBUTING.md](CONTRIBUTING.md): the repository structure, and how to propose a technique or an attack class

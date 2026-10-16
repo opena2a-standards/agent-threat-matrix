@@ -7,9 +7,10 @@ measurements, not prose, so they are checked here and in CI rather than
 maintained by hand.
 
 README.md hands its reference text to the pages PAGES lists after it: the purpose and
-scope to docs/overview.md, the attack-class tables to docs/attack-classes.md, and the
+scope to docs/overview.md, the attack-class tables to docs/attack-classes.md, the
 cross-framework mapping with the related-project figures to
-docs/cross-framework-mapping.md, among others. The check reads README.md and those pages
+docs/cross-framework-mapping.md, and the evidence-tier table to docs/evidence-tiers.md,
+among others. The check reads README.md and those pages
 as one text, in that order, each page ending in a line break: a claim may stand on any of
 them, every occurrence on any of them is checked, and each failure names the page and its
 line there. A page PAGES lists that does not exist fails the check. Below, "the README"
@@ -109,6 +110,34 @@ differs only by trailing ".0" parts is the same version (v1.2.0 for 1.2). A line
 either wording once the characters above are removed fails when it carries one of them, as
 a line stating a count does. A version or month worded any other way is not read.
 
+A technique id is "T-" and digits, with an optional "." and digits, such as T-2001, with no
+ASCII letter or digit directly before or after it, so "T-1XXX" is not read. Every id on
+README.md and its pages, in code as in prose, must be the id of a technique in matrix.json.
+Where an id is followed by a space and a parenthesis, as in "T-2001 (Direct Prompt
+Injection)", the text up to the first ")" must be that technique's name in matrix.json.
+Where an id directly follows a space and "(", as in "Indirect Prompt Injection (T-2002,
+initial access, observed in the wild)", the text before them on the line must end with the
+technique's name, with no letter, digit, "_" or "-" directly before the name, and each item
+after the id up to the ")", each starting ", ", is read: an item that is a tactic name in
+any letter case must be the technique's tactic, and an item whose first word is an evidence
+tier in any letter case must be the technique's tier. The README must state the technique
+citation, "Threat Matrix " and an id. On a line holding it, every id must be the cited one,
+so the link names the technique cited, and each four digits standing as a year, as in
+"OpenA2A, 2026.", with no ASCII letter, digit, ".", "/" or "-" directly before them and no
+ASCII letter, digit, "/", "-", or "." and a digit, directly after them, must be the year
+CHANGELOG.md gives the release of the matrix version, read as for the month. A line holding
+an id once the characters above are removed fails when it carries one of them, as a line
+stating a count does. An id, name, tactic, tier or year written any other way is not read.
+
+The STIX version is read where the README states it as "STIX N", as in "ships as a STIX 2.1
+bundle", in the letter case written here, where N is digits separated by dots with no ASCII
+letter or digit, or "." and a digit, directly after it. Every occurrence must be the
+spec_version that the objects of stix/agent-threat-matrix-bundle.json carry; the check fails
+when that file is missing or its objects carry more than one spec_version, and a README that
+does not state the STIX version passes. A line holding the wording once the characters above
+are removed fails when it carries one of them, as a line stating a count does. A STIX version
+worded any other way is not read.
+
 Exit 0 when every claim matches the data, 1 otherwise. ``--help`` (or ``-h``) prints
 the usage and exits 0. Any other argument, such as a mistyped ``--fixx``, prints the
 usage and exits 2 without checking or writing anything. Help takes precedence over an
@@ -133,6 +162,8 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 MATRIX = ROOT / "matrix.json"
 RELATED = ROOT / "related-projects.json"
 CHANGELOG = ROOT / "CHANGELOG.md"
+# The committed STIX bundle, whose objects carry the spec_version the README states.
+STIX_BUNDLE = ROOT / "stix" / "agent-threat-matrix-bundle.json"
 
 # README.md and the pages that took its reference text, read as one text in this order.
 PAGES = (
@@ -142,6 +173,7 @@ PAGES = (
     "docs/attack-classes.md",
     "docs/cross-framework-mapping.md",
     "docs/attack-paths.md",
+    "docs/evidence-tiers.md",
     "docs/schema.md",
     "CONTRIBUTING.md",
 )
@@ -184,6 +216,24 @@ MONTH_YEAR = re.compile(r"\b(" + "|".join(MONTHS) + r") (\d{4})\b")
 # A CHANGELOG.md release heading, "## v1.2.0 (2026-09-08)": its version, and the year and
 # month of the first date after it.
 RELEASE_HEADING = re.compile(r"(?m)^## v(\d+(?:\.\d+)*)(?!\d)[^\n\d]*(\d{4})-(\d{2})-\d{2}")
+# The STIX version as the README states it, "STIX 2.1", with no ASCII letter or digit, or
+# "." and a digit, directly after it, so "STIX 2.1a" is not read as 2.
+STIX_VERSION = re.compile(r"\bSTIX (\d+(?:\.\d+)*)(?![A-Za-z0-9]|\.\d)")
+
+# A technique id as the README writes one, "T-2001" or "T-2001.001", with no ASCII letter or
+# digit directly before or after it: "T-1XXX" in CONTRIBUTING.md is not an id.
+TECHNIQUE_ID = re.compile(r"(?<![A-Za-z0-9])T-\d+(?:\.\d+)?(?![A-Za-z0-9])")
+# The technique citation, "AI Agent Threat Matrix T-2001 (...)": the id it cites.
+TECHNIQUE_CITATION = re.compile(r"\bThreat Matrix (" + TECHNIQUE_ID.pattern + ")")
+# A technique id followed by a space and a parenthesis, "T-2001 (Direct Prompt Injection)":
+# the text in it, which names the technique.
+NAME_AFTER = re.compile(r" \(([^()]*)\)")
+# The items after a technique id that opens a parenthesis, "(T-2002, initial access,
+# observed in the wild)": each ", " and the text after it, up to the ")" that closes it.
+ITEMS_AFTER = re.compile(r"((?:, [^,()]+)*)\)")
+# A four-digit year on its own, "OpenA2A, 2026.": no ASCII letter, digit, ".", "/" or "-"
+# directly before it, and no ASCII letter, digit, "/" or "-", or a "." and a digit, after.
+YEAR = re.compile(r"(?<![A-Za-z0-9./-])\d{4}(?![A-Za-z0-9/-]|\.\d)")
 
 # Letters (category Lo) that render as blank space. Each is a word character, so a DVAA
 # wording directly beside one is not read, and neither is a matrix.json count wording
@@ -921,6 +971,88 @@ def main(argv):
                     f"(version {version} released {' '.join(released)})"
                 )
 
+    # Each technique id where the README writes one, the name, tactic and evidence tier
+    # written beside it, and the technique citation with its link and its year, which is
+    # the year CHANGELOG.md gives the release of the matrix version.
+    technique_by_id = {t["id"]: t for t in techniques}
+    tactic_by_name = {t["name"].lower(): t for t in tactics}
+    technique_lines = set()
+    cited = False
+    for number, (_, stripped, _) in enumerate(lines, 1):
+        ids = list(TECHNIQUE_ID.finditer(stripped))
+        if not ids:
+            continue
+        technique_lines.add(number)
+        where = pages.where(number)
+        for m in ids:
+            tid = m.group(0)
+            technique = technique_by_id.get(tid)
+            if technique is None:
+                failures.append(f"{where}: \"{tid}\" is not a technique id in matrix.json")
+                continue
+            name = technique["name"]
+            after = NAME_AFTER.match(stripped, m.end())
+            if after and after.group(1) != name:
+                failures.append(f"{where}: \"{tid} ({after.group(1)})\" does not match "
+                                f"matrix.json ({tid} name: {name})")
+            if not stripped.endswith(" (", 0, m.start()):
+                continue
+            before = stripped[:m.start() - 2]
+            if not before.endswith(name) or re.search(r"[\w-]$", before[:-len(name)]):
+                failures.append(f"{where}: the text before \"({tid}\" does not end with its "
+                                f"name in matrix.json ({tid} name: {name})")
+            items = ITEMS_AFTER.match(stripped, m.end())
+            for item in (items.group(1).split(", ")[1:] if items else ()):
+                tactic = tactic_by_name.get(item.lower())
+                if tactic is not None and tactic["id"] != technique.get("tactic"):
+                    want = tactic_by_id.get(technique.get("tactic"), {}).get("name")
+                    failures.append(f"{where}: \"{item}\" does not match matrix.json "
+                                    f"({tid} tactic: {want})")
+                tier = item.split(" ", 1)[0].lower()
+                if tier in TIERS and tier != technique.get("evidenceTier"):
+                    failures.append(f"{where}: \"{item}\" does not match matrix.json "
+                                    f"({tid} evidence tier: {technique.get('evidenceTier')})")
+        cites = [c.group(1) for c in TECHNIQUE_CITATION.finditer(stripped)]
+        if cites:
+            cited = True
+            for m in ids:
+                if m.group(0) not in cites:
+                    failures.append(f"{where}: \"{m.group(0)}\" on the citation of "
+                                    f"{' and '.join(cites)} names another technique")
+            for m in YEAR.finditer(stripped):
+                if released is None:
+                    failures.append(
+                        f"{where}: \"{m.group(0)}\" is read against the CHANGELOG.md release "
+                        f"heading of version {version}, and there is none"
+                    )
+                elif m.group(0) != released[1]:
+                    failures.append(
+                        f"{where}: \"{m.group(0)}\" does not match CHANGELOG.md "
+                        f"(version {version} released {released[1]})"
+                    )
+    if not cited:
+        failures.append("README does not state a technique citation (\"Threat Matrix T-N\")")
+
+    # The STIX version where the README states it, which is the spec_version the objects of
+    # the committed bundle carry; a bundle whose objects disagree gives nothing to read.
+    stix_source = STIX_BUNDLE.relative_to(ROOT).as_posix()
+    stix_lines = {number for number, (_, stripped, _) in enumerate(lines, 1)
+                  if STIX_VERSION.search(stripped)}
+    if not STIX_BUNDLE.is_file():
+        failures.append(f"{stix_source}: missing; the STIX version the README states is "
+                        f"read from its objects' spec_version")
+    else:
+        bundle = json.loads(STIX_BUNDLE.read_text(encoding="utf-8"))
+        spec_versions = sorted({str(o.get("spec_version"))
+                                for o in bundle.get("objects", ())})
+        if len(spec_versions) != 1:
+            failures.append(f"{stix_source}: its objects carry {len(spec_versions)} "
+                            f"spec_version values ({', '.join(spec_versions)}), and the "
+                            f"STIX version the README states is read from the one they share")
+        else:
+            require(STIX_VERSION.pattern, spec_versions, "STIX version", source=stix_source,
+                    stated=False)
+
     # A wording is not read when a character `hiding_kind` names stands inside it ("age"
     # U+00AD "nts", "22" U+200B " agents", "tac" U+00AD "tics"), or when a Hangul filler or
     # combining mark is glued to a DVAA wording (U+3164 "22 agents", "agents" U+034F), so
@@ -938,6 +1070,10 @@ def main(argv):
             readers.append(("stating a matrix.json count", "count"))
         if number in version_lines:
             readers.append(("stating the matrix version", "version"))
+        if number in technique_lines:
+            readers.append(("stating a technique id", "technique id"))
+        if number in stix_lines:
+            readers.append(("stating the STIX version", "STIX version"))
         if not readers:
             continue
         where = " and ".join(phrase for phrase, _ in readers)
@@ -964,8 +1100,8 @@ def main(argv):
         )
 
     if failures:
-        print("README claims do not match matrix.json, related-projects.json and "
-              "CHANGELOG.md:\n",
+        print("README claims do not match matrix.json, related-projects.json, "
+              "CHANGELOG.md and stix/agent-threat-matrix-bundle.json:\n",
               file=sys.stderr)
         for f in failures:
             print(f"  - {f}", file=sys.stderr)

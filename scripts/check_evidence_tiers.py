@@ -3,21 +3,25 @@
 
 docs/evidence-tiers.md is the single definition of the evidence tiers: one table row per
 tier, ``| Observed | `observed` | <definition> |``. README.md, CONTRIBUTING.md and
-EVIDENCE_AUDIT.md restate those definitions for their own readers, and before this check
-existed they carried three different wordings per tier.
+EVIDENCE_AUDIT.md restated those definitions for their own readers, and before this check
+existed they carried three different wordings per tier. The README's table moved, with its
+section, to the Evidence Standard section of docs/evidence-tiers.md, so the quoting pages
+are that page, CONTRIBUTING.md and EVIDENCE_AUDIT.md.
 
 A quoting page defines a tier on a line that names the tier in bold, either as the first
 cell of a table row (``| **Observed** | <definition> | ...``) or as the label of a list item
 (``- **OBSERVED**: <definition>``). Every such line must carry the canonical definition word
-for word, and every quoting page must define every tier.
+for word, and every quoting page must define every tier. README.md is read too: it links to
+docs/evidence-tiers.md and need not define a tier, and every definition written on it is
+checked as on a quoting page.
 
 A list-item definition is read on a line that starts a bulleted list item as CommonMark
 reads one: the marker (``-``, ``*`` or ``+``) is followed by a space or tab and is indented
 less than four columns past the text of the innermost list item the line is inside, or past
 the margin when it is inside none. A line that only looks like one is not a definition: a
 marker followed by a no-break space, a line that starts with one, or a line indented four
-or more columns, which is indented code or more of the paragraph before it. A page whose
-only definition of a tier is written that way is reported as leaving the tier out.
+or more columns, which is indented code or more of the paragraph before it. A quoting page
+whose only definition of a tier is written that way is reported as leaving the tier out.
 
 A list-item definition must also end on its own line: the page must end after it, or the
 next line must start a bulleted list item with text, its marker indented no further than
@@ -44,7 +48,7 @@ closes on a line that holds a run of the same character at least as long and not
 it but spaces and tabs, and ends with the list item it is in. A line indented four or more
 columns that does not continue a paragraph is indented code. A definition written in any
 other form, such as inside a block quote or after another list marker on its line, is not
-read, and neither is a page other than these three. List items and fences inside a block
+read, and neither is a page other than these four. List items and fences inside a block
 quote are not followed, and neither are HTML blocks and tables, whose lines are read as
 paragraph text.
 
@@ -56,7 +60,7 @@ The tiers are the ``evidenceTier`` enum in the schema, so a tier added there fai
 until the canonical page defines it and every quoting page quotes it.
 
 Exit 0 when all of the above holds, 1 otherwise, printing ``file:line`` for each definition
-that differs or continues past its line and naming each page that leaves a tier out.
+that differs or continues past its line and naming each quoting page that leaves a tier out.
 """
 
 import bisect
@@ -68,7 +72,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 SCHEMA = ROOT / "schema" / "threat-matrix-v1.2.schema.json"
 CANONICAL = "docs/evidence-tiers.md"
-QUOTING = ("README.md", "CONTRIBUTING.md", "EVIDENCE_AUDIT.md")
+QUOTING = (CANONICAL, "CONTRIBUTING.md", "EVIDENCE_AUDIT.md")
+# Read for definitions as the quoting pages are, but not required to define every tier.
+LINKING = ("README.md",)
 
 VALUE_RE = re.compile(r"`([a-z]+)`")
 # A quoting page's definition is the rest of the cell, or of the line for a list item,
@@ -337,7 +343,7 @@ def check(root=ROOT):
     tiers = tiers_from_schema()
     canonical = canonical_definitions((root / CANONICAL).read_text(encoding="utf-8"),
                                       tiers, failures)
-    for page in QUOTING:
+    for page in QUOTING + LINKING:
         seen = set()
         for n, tier, definition, continued in quoted_definitions(
                 (root / page).read_text(encoding="utf-8"), tiers):
@@ -354,6 +360,8 @@ def check(root=ROOT):
                                 f"{continued}; keep the definition on one line and alone in "
                                 f"its list item, with the next list item or a blank line "
                                 f"after it, and quote {CANONICAL}: \"{shown(want)}\"")
+        if page in LINKING:
+            continue
         for tier in tiers:
             if tier not in seen and tier in canonical:
                 failures.append(f"{page} does not define {canonical[tier][1]}; quote "
@@ -369,7 +377,7 @@ def main():
             print(f"  - {f}", file=sys.stderr)
         return 1
     print(f"Evidence tier definitions match {CANONICAL}: {len(tiers)} tiers quoted on "
-          f"{', '.join(QUOTING)}")
+          f"{', '.join(QUOTING)}; {', '.join(LINKING)} read too")
     return 0
 
 
