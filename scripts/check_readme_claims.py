@@ -7,9 +7,10 @@ measurements, not prose, so they are checked here and in CI rather than
 maintained by hand.
 
 README.md hands its reference text to the pages PAGES lists after it: the purpose and
-scope to docs/overview.md, the attack-class tables to docs/attack-classes.md, and the
+scope to docs/overview.md, the attack-class tables to docs/attack-classes.md, the
 cross-framework mapping with the related-project figures to
-docs/cross-framework-mapping.md, among others. The check reads README.md and those pages
+docs/cross-framework-mapping.md, and the evidence-tier table to docs/evidence-tiers.md,
+among others. The check reads README.md and those pages
 as one text, in that order, each page ending in a line break: a claim may stand on any of
 them, every occurrence on any of them is checked, and each failure names the page and its
 line there. A page PAGES lists that does not exist fails the check. Below, "the README"
@@ -142,6 +143,7 @@ PAGES = (
     "docs/attack-classes.md",
     "docs/cross-framework-mapping.md",
     "docs/attack-paths.md",
+    "docs/evidence-tiers.md",
     "docs/schema.md",
     "CONTRIBUTING.md",
 )

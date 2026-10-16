@@ -1,8 +1,11 @@
 """Evidence tier definition checker tests.
 
 Every case runs scripts/check_evidence_tiers.py against a scratch copy of the canonical page,
-the three quoting pages and the schema, so the committed files are never perturbed. The
-shipped tree must be green. Each wording the three pages carried before docs/evidence-tiers.md
+the three quoting pages, README.md and the schema, so the committed files are never
+perturbed. The quoting pages are CONTRIBUTING.md, EVIDENCE_AUDIT.md and the canonical page
+itself, whose Evidence Standard table moved there from README.md. README.md defines no tier
+and need not, and a definition written on it is reported when it differs. The shipped tree
+must be green. Each wording the three pages carried before docs/evidence-tiers.md
 became the single definition is then planted back and must be reported at its own line, as
 must a dropped definition, a definition wrapped over two lines or continued on the next line
 or, after a blank line, by a line indented as far as its item's text, a canonical edit the
@@ -17,6 +20,7 @@ line of many list markers must be read in linear time.
 """
 
 import json
+import re
 import shutil
 import subprocess
 import tempfile
@@ -85,8 +89,8 @@ def test_shipped_tree_is_green(tree):
     ("EVIDENCE_AUDIT.md", f"- **VALIDATED**: {VALIDATED}\n",
      "- **VALIDATED**: Reproducible in controlled lab environment (DVAA challenges, "
      "HMA scan results)\n"),
-    # One word changed in the README table.
-    ("README.md", f"| **Adapted** | {ADAPTED} |",
+    # One word changed in the Evidence Standard table, which moved there from README.md.
+    ("docs/evidence-tiers.md", f"| **Adapted** | {ADAPTED} |",
      f"| **Adapted** | {ADAPTED.replace('Well-understood', 'Known')} |"),
 ])
 def test_a_quote_that_differs_is_reported_at_its_line(tree, rel, old, new):
@@ -438,10 +442,12 @@ def test_a_character_that_does_not_print_on_the_canonical_page_is_escaped_in_the
     want = f"{first}{escaped}{rest}"
     row = mutate(tree, "docs/evidence-tiers.md", f"| Observed | `observed` | {OBSERVED} |",
                  f"| Obs{character}erved | `observed` | {canonical} |")
-    readme = tree / "README.md"
-    text = readme.read_text(encoding="utf-8")
+    # The Evidence Standard table, below the canonical table on the same page, leaves the
+    # tier out.
+    page = tree / "docs" / "evidence-tiers.md"
+    text = page.read_text(encoding="utf-8")
     start = text.index(f"| **Observed** | {OBSERVED} |")
-    readme.write_text(text[:start] + text[text.index("\n", start) + 1:], encoding="utf-8")
+    page.write_text(text[:start] + text[text.index("\n", start) + 1:], encoding="utf-8")
     audit = mutate(tree, "EVIDENCE_AUDIT.md", f"- **OBSERVED**: {OBSERVED}\n",
                    f"- **OBSERVED**: {OBSERVED}\n  NemoClaw findings\n")
     r = run_checker(tree)
@@ -454,8 +460,9 @@ def test_a_character_that_does_not_print_on_the_canonical_page_is_escaped_in_the
     assert (f"EVIDENCE_AUDIT.md:{audit}: Observed continues on line {audit + 1};"
             in r.stderr), r.stderr
     assert f"and quote docs/evidence-tiers.md: \"{want}\"" in r.stderr, r.stderr
-    assert (f"README.md does not define Observed; quote docs/evidence-tiers.md: \"{want}\""
-            in r.stderr), r.stderr
+    assert (f"docs/evidence-tiers.md does not define Observed; quote docs/evidence-tiers.md: "
+            f"\"{want}\"" in r.stderr), r.stderr
+    assert "README.md does not define" not in r.stderr, r.stderr
     assert character not in r.stderr, r.stderr
 
 
@@ -498,7 +505,7 @@ def test_a_definition_followed_by_a_bulleted_item_indented_no_further_ends_on_it
 
 
 @pytest.mark.parametrize("rel, row", [
-    ("README.md", f"| **Validated** | {VALIDATED} |"),
+    ("docs/evidence-tiers.md", f"| **Validated** | {VALIDATED} |"),
     ("CONTRIBUTING.md", f"| **Adapted** | {ADAPTED} |"),
     ("EVIDENCE_AUDIT.md", f"- **OBSERVED**: {OBSERVED}\n"),
 ])
@@ -510,9 +517,89 @@ def test_a_page_that_leaves_a_tier_out_is_reported(tree, rel, row):
     path.write_text(text[:start] + text[end:], encoding="utf-8")
     r = run_checker(tree)
     assert r.returncode == 1
-    tier = {"README.md": "Validated", "CONTRIBUTING.md": "Adapted",
+    tier = {"docs/evidence-tiers.md": "Validated", "CONTRIBUTING.md": "Adapted",
             "EVIDENCE_AUDIT.md": "Observed"}[rel]
     assert f"{rel} does not define {tier}" in r.stderr, r.stderr
+
+
+def test_the_evidence_standard_table_is_on_the_canonical_page_and_not_in_the_readme():
+    # The README's Evidence Standard section moved, as written, to docs/evidence-tiers.md,
+    # and the README links that page from its Documentation list.
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    page = (ROOT / "docs" / "evidence-tiers.md").read_text(encoding="utf-8")
+    assert "## Evidence Standard" not in readme
+    assert "](docs/evidence-tiers.md)" in readme
+    assert page.count("\n## Evidence Standard\n") == 1
+    section = page.split("\n## Evidence Standard\n", 1)[1].split("\n## ", 1)[0]
+    for row in (f"| **Observed** | {OBSERVED} |", f"| **Validated** | {VALIDATED} |",
+                f"| **Adapted** | {ADAPTED} |"):
+        assert row in section, row
+        assert row not in readme, row
+    assert "We do not publish purely theoretical techniques." in section
+
+
+def heading_anchors(text: str) -> set:
+    """The anchor GitHub gives each heading outside a code fence on a page: lower case,
+    punctuation other than hyphens dropped, each space a hyphen."""
+    anchors, fenced = set(), False
+    for line in text.splitlines():
+        if line.startswith(("```", "~~~")):
+            fenced = not fenced
+        elif not fenced and re.match(r"#{1,6} ", line):
+            title = line.lstrip("#").strip().lower()
+            anchors.add(re.sub(r"[^\w\- ]", "", title).replace(" ", "-"))
+    return anchors
+
+
+@pytest.mark.parametrize("rel", ["README.md", "docs/evidence-tiers.md"])
+def test_each_link_to_a_heading_from_the_pages_the_section_moved_between_resolves(rel):
+    # The README's field table linked #evidence-standard on the README itself, which no
+    # longer holds that heading.
+    page = ROOT / rel
+    links = re.findall(r"\]\(([^)\s#]*)#([^)\s]+)\)", page.read_text(encoding="utf-8"))
+    assert links, rel
+    for target, anchor in links:
+        path = (page.parent / target).resolve() if target else page
+        assert path.is_file(), f"{rel}: {target}#{anchor}"
+        assert anchor in heading_anchors(path.read_text(encoding="utf-8")), \
+            f"{rel}: {target}#{anchor}"
+
+
+def test_the_readme_need_not_define_a_tier(tree):
+    r = run_checker(tree)
+    assert r.returncode == 0, r.stderr
+    assert "README.md does not define" not in r.stdout + r.stderr
+    assert "README.md read too" in r.stdout
+
+
+def test_a_definition_on_the_readme_that_differs_is_reported_at_its_line(tree):
+    path = tree / "README.md"
+    head = path.read_text(encoding="utf-8") + "\n"
+    line = head.count("\n") + 1
+    path.write_text(head + "| **Validated** | Reproduced in a lab |\n", encoding="utf-8")
+    r = run_checker(tree)
+    assert r.returncode == 1
+    assert (f"README.md:{line}: Validated reads \"Reproduced in a lab\"; quote "
+            f"docs/evidence-tiers.md: \"{VALIDATED}\"") in r.stderr, r.stderr
+    assert "README.md does not define" not in r.stderr, r.stderr
+
+
+def test_a_definition_on_the_readme_that_continues_onto_the_next_line_is_reported(tree):
+    path = tree / "README.md"
+    head = path.read_text(encoding="utf-8") + "\n"
+    line = head.count("\n") + 1
+    path.write_text(head + f"- **OBSERVED**: {OBSERVED}\nand more\n", encoding="utf-8")
+    r = run_checker(tree)
+    assert r.returncode == 1
+    assert f"README.md:{line}: Observed continues on line {line + 1};" in r.stderr, r.stderr
+
+
+def test_a_definition_on_the_readme_that_quotes_the_table_is_green(tree):
+    path = tree / "README.md"
+    path.write_text(path.read_text(encoding="utf-8") + f"\n- **OBSERVED**: {OBSERVED}\n",
+                    encoding="utf-8")
+    r = run_checker(tree)
+    assert r.returncode == 0, r.stderr
 
 
 def test_a_canonical_edit_the_quotes_do_not_follow_is_reported_on_every_page(tree):
@@ -520,8 +607,13 @@ def test_a_canonical_edit_the_quotes_do_not_follow_is_reported_on_every_page(tre
            f"| `observed` | {OBSERVED} and incident reports |")
     r = run_checker(tree)
     assert r.returncode == 1
-    for rel in ("README.md", "CONTRIBUTING.md", "EVIDENCE_AUDIT.md"):
-        assert f"{rel}:" in r.stderr and "Observed reads" in r.stderr, r.stderr
+    quotes = {"docs/evidence-tiers.md": f"| **Observed** | {OBSERVED} |",
+              "CONTRIBUTING.md": f"| **Observed** | {OBSERVED} |",
+              "EVIDENCE_AUDIT.md": f"- **OBSERVED**: {OBSERVED}\n"}
+    for rel, quote in quotes.items():
+        text = (tree / rel).read_text(encoding="utf-8")
+        line = text.count("\n", 0, text.index(quote)) + 1
+        assert f"{rel}:{line}: Observed reads" in r.stderr, r.stderr
     assert r.stderr.count("Observed reads") == 3, r.stderr
 
 
@@ -529,7 +621,8 @@ def test_a_canonical_edit_every_page_follows_is_green(tree):
     new = f"{OBSERVED} and incident reports"
     mutate(tree, "docs/evidence-tiers.md", f"| `observed` | {OBSERVED} |",
            f"| `observed` | {new} |")
-    mutate(tree, "README.md", f"| **Observed** | {OBSERVED} |", f"| **Observed** | {new} |")
+    mutate(tree, "docs/evidence-tiers.md", f"| **Observed** | {OBSERVED} |",
+           f"| **Observed** | {new} |")
     mutate(tree, "CONTRIBUTING.md", f"| **Observed** | {OBSERVED} |",
            f"| **Observed** | {new} |")
     mutate(tree, "EVIDENCE_AUDIT.md", f"- **OBSERVED**: {OBSERVED}\n",

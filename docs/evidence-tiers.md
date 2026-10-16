@@ -7,19 +7,21 @@ three tiers; there is no fourth tier, no sub-tier, and no theoretical tier.
 
 ## The three tiers
 
-This table is the single definition of each tier. README.md, CONTRIBUTING.md and
-EVIDENCE_AUDIT.md quote the Definition column word for word.
-`scripts/check_evidence_tiers.py` reads those three pages, where it takes a line written as
+This table is the single definition of each tier. The [Evidence Standard](#evidence-standard)
+table on this page, CONTRIBUTING.md and EVIDENCE_AUDIT.md quote the Definition column word
+for word. `scripts/check_evidence_tiers.py` reads those three pages, and README.md, which
+links here and defines no tier, where it takes a line written as
 `| **Observed** | <definition> |` (a table row whose first cell is the tier in bold) or as
 `- **OBSERVED**: <definition>` (a list item labelled with the tier in bold) as a definition.
 It fails when such a definition differs from this table, when the line after a list-item
 definition is neither blank nor a bulleted list item with text indented no further than it
 (Markdown may join such a line to the definition), when blank lines after a list-item
 definition are followed by a line indented as far as the item's text (Markdown reads that
-line as more of the same list item), or when one of the pages leaves a tier out. A blank
-line holds nothing but spaces and tabs, a bullet is followed by a space or tab, a tab
-indents to the next stop of four columns, and lines end only at a line feed or carriage
-return, as in CommonMark. A list item's text starts after the spaces and tabs that follow
+line as more of the same list item), or when this page, CONTRIBUTING.md or EVIDENCE_AUDIT.md
+leaves a tier out. README.md need not define a tier, and a definition written there is
+checked as on the other pages. A blank line holds nothing but spaces and tabs, a bullet is
+followed by a space or tab, a tab indents to the next stop of four columns, and lines end
+only at a line feed or carriage return, as in CommonMark. A list item's text starts after the spaces and tabs that follow
 its marker, or one column after the marker when those cover five or more columns. A bullet
 indented four or more columns past the text of the list item it is inside, or past the
 margin when it is inside none, starts no list item, so such a line is not a definition and
@@ -39,10 +41,22 @@ To change a definition, change it here and in every page that quotes it.
 | Validated | `validated` | Reproduced in controlled lab environment (DVAA) |
 | Adapted | `adapted` | Well-understood traditional technique applied to agent context, not yet observed agent-specifically |
 
-The README states the bar behind the tiers: "We do not publish purely theoretical
-techniques. Every entry has either a real-world observation, a reproducible lab scenario,
-or an established traditional precedent." `EVIDENCE_AUDIT.md` records the justification
-for every technique's tier.
+The [Evidence Standard](#evidence-standard) below states the bar behind the tiers, and
+`EVIDENCE_AUDIT.md` records the justification for every technique's tier.
+
+## Evidence Standard
+
+Every technique in this matrix is assigned an evidence tier. The definitions are quoted from [The three tiers](#the-three-tiers):
+
+| Tier | Meaning | Count |
+|------|---------|-------|
+| **Observed** | Confirmed in real-world production systems | 16 (26%) |
+| **Validated** | Reproduced in controlled lab environment (DVAA) | 42 (69%) |
+| **Adapted** | Well-understood traditional technique applied to agent context, not yet observed agent-specifically | 3 (5%) |
+
+We do not publish purely theoretical techniques. Every entry has either a real-world observation, a reproducible lab scenario, or an established traditional precedent.
+
+See [EVIDENCE_AUDIT.md](../EVIDENCE_AUDIT.md) for the full justification of every technique's evidence tier.
 
 ## Evidence entries
 
