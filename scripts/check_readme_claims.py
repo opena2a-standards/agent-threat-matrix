@@ -129,6 +129,15 @@ CHANGELOG.md gives the release of the matrix version, read as for the month. A l
 an id once the characters above are removed fails when it carries one of them, as a line
 stating a count does. An id, name, tactic, tier or year written any other way is not read.
 
+The STIX version is read where the README states it as "STIX N", as in "ships as a STIX 2.1
+bundle", in the letter case written here, where N is digits separated by dots with no ASCII
+letter or digit, or "." and a digit, directly after it. Every occurrence must be the
+spec_version that the objects of stix/agent-threat-matrix-bundle.json carry; the check fails
+when that file is missing or its objects carry more than one spec_version, and a README that
+does not state the STIX version passes. A line holding the wording once the characters above
+are removed fails when it carries one of them, as a line stating a count does. A STIX version
+worded any other way is not read.
+
 Exit 0 when every claim matches the data, 1 otherwise. ``--help`` (or ``-h``) prints
 the usage and exits 0. Any other argument, such as a mistyped ``--fixx``, prints the
 usage and exits 2 without checking or writing anything. Help takes precedence over an
@@ -153,6 +162,8 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 MATRIX = ROOT / "matrix.json"
 RELATED = ROOT / "related-projects.json"
 CHANGELOG = ROOT / "CHANGELOG.md"
+# The committed STIX bundle, whose objects carry the spec_version the README states.
+STIX_BUNDLE = ROOT / "stix" / "agent-threat-matrix-bundle.json"
 
 # README.md and the pages that took its reference text, read as one text in this order.
 PAGES = (
@@ -205,6 +216,9 @@ MONTH_YEAR = re.compile(r"\b(" + "|".join(MONTHS) + r") (\d{4})\b")
 # A CHANGELOG.md release heading, "## v1.2.0 (2026-09-08)": its version, and the year and
 # month of the first date after it.
 RELEASE_HEADING = re.compile(r"(?m)^## v(\d+(?:\.\d+)*)(?!\d)[^\n\d]*(\d{4})-(\d{2})-\d{2}")
+# The STIX version as the README states it, "STIX 2.1", with no ASCII letter or digit, or
+# "." and a digit, directly after it, so "STIX 2.1a" is not read as 2.
+STIX_VERSION = re.compile(r"\bSTIX (\d+(?:\.\d+)*)(?![A-Za-z0-9]|\.\d)")
 
 # A technique id as the README writes one, "T-2001" or "T-2001.001", with no ASCII letter or
 # digit directly before or after it: "T-1XXX" in CONTRIBUTING.md is not an id.
@@ -1019,6 +1033,26 @@ def main(argv):
     if not cited:
         failures.append("README does not state a technique citation (\"Threat Matrix T-N\")")
 
+    # The STIX version where the README states it, which is the spec_version the objects of
+    # the committed bundle carry; a bundle whose objects disagree gives nothing to read.
+    stix_source = STIX_BUNDLE.relative_to(ROOT).as_posix()
+    stix_lines = {number for number, (_, stripped, _) in enumerate(lines, 1)
+                  if STIX_VERSION.search(stripped)}
+    if not STIX_BUNDLE.is_file():
+        failures.append(f"{stix_source}: missing; the STIX version the README states is "
+                        f"read from its objects' spec_version")
+    else:
+        bundle = json.loads(STIX_BUNDLE.read_text(encoding="utf-8"))
+        spec_versions = sorted({str(o.get("spec_version"))
+                                for o in bundle.get("objects", ())})
+        if len(spec_versions) != 1:
+            failures.append(f"{stix_source}: its objects carry {len(spec_versions)} "
+                            f"spec_version values ({', '.join(spec_versions)}), and the "
+                            f"STIX version the README states is read from the one they share")
+        else:
+            require(STIX_VERSION.pattern, spec_versions, "STIX version", source=stix_source,
+                    stated=False)
+
     # A wording is not read when a character `hiding_kind` names stands inside it ("age"
     # U+00AD "nts", "22" U+200B " agents", "tac" U+00AD "tics"), or when a Hangul filler or
     # combining mark is glued to a DVAA wording (U+3164 "22 agents", "agents" U+034F), so
@@ -1038,6 +1072,8 @@ def main(argv):
             readers.append(("stating the matrix version", "version"))
         if number in technique_lines:
             readers.append(("stating a technique id", "technique id"))
+        if number in stix_lines:
+            readers.append(("stating the STIX version", "STIX version"))
         if not readers:
             continue
         where = " and ".join(phrase for phrase, _ in readers)
@@ -1064,8 +1100,8 @@ def main(argv):
         )
 
     if failures:
-        print("README claims do not match matrix.json, related-projects.json and "
-              "CHANGELOG.md:\n",
+        print("README claims do not match matrix.json, related-projects.json, "
+              "CHANGELOG.md and stix/agent-threat-matrix-bundle.json:\n",
               file=sys.stderr)
         for f in failures:
             print(f"  - {f}", file=sys.stderr)

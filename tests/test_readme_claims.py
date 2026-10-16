@@ -58,6 +58,14 @@ technique and a wrong year passed. Each must now go red, and so must a citation 
 no CHANGELOG.md heading releases the version, a README without the technique citation and
 a line stating an id that carries a character which fails a line. A tactic or tier beside
 an id is read in any letter case.
+
+The STIX version the README states ("ships as a STIX 2.1 bundle"), on README.md, on the
+schema page and in the repository tree on CONTRIBUTING.md, was not read either, so "STIX
+2.0" passed. Each must now go red against the spec_version the objects of the committed
+bundle carry, and so must a missing bundle, a bundle whose objects carry two spec_version
+values, and a line stating the STIX version that carries a character which fails a line.
+The version is read from the bundle, not typed in the checker: a bundle whose objects
+carry 2.2 fails the README that states 2.1.
 """
 
 import functools
@@ -80,7 +88,8 @@ import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
 FILES = ("matrix.json", "related-projects.json", "CHANGELOG.md",
-         "scripts/check_readme_claims.py")
+         "stix/agent-threat-matrix-bundle.json", "scripts/check_readme_claims.py")
+STIX_BUNDLE = "stix/agent-threat-matrix-bundle.json"
 # The attack-class tables moved from README.md to this page, which links up one level.
 CLASS_PAGE = "docs/attack-classes.md"
 BEGIN = "<!-- BEGIN GENERATED: attack-class-tables -->"
@@ -499,6 +508,95 @@ def test_a_technique_id_line_carrying_an_invisible_character_is_red():
         assert (f"{where_of(td, new)}:{column_of(td, new, named)}: a line stating a technique "
                 f"id carries {named}, which can hide a figure from the technique id wordings; "
                 "remove it") in r.stderr, r.stderr
+    finally:
+        shutil.rmtree(td)
+
+
+# (old, new, message): the STIX version the README states, on README.md, on the schema page
+# and in the repository tree on CONTRIBUTING.md, moved off the spec_version the objects of
+# the committed bundle carry. It was not read, so each passed.
+STIX_MUTATIONS = [
+    ("as a STIX 2.1 bundle", "as a STIX 2.0 bundle",
+     f'"STIX 2.0" does not match {STIX_BUNDLE} (STIX version: 2.1)'),
+    ("a STIX 2.1 rendering", "a STIX 2.11 rendering",
+     f'"STIX 2.11" does not match {STIX_BUNDLE} (STIX version: 2.1)'),
+    ("# STIX 2.1 bundle rendered", "# STIX 3 bundle rendered",
+     f'"STIX 3" does not match {STIX_BUNDLE} (STIX version: 2.1)'),
+]
+
+
+@pytest.mark.parametrize("old,new,message", STIX_MUTATIONS,
+                         ids=[n for _, n, _ in STIX_MUTATIONS])
+def test_a_stix_version_off_the_bundle_is_red(old, new, message):
+    td = scratch_tree()
+    try:
+        mutate_readme(td, old, new)
+        r = run_checker(td)
+        assert r.returncode == 1, f"checker passed with {new!r}:\n{r.stdout}"
+        assert f"{where_of(td, new)}: {message}" in r.stderr, r.stderr
+    finally:
+        shutil.rmtree(td)
+
+
+def set_bundle_spec_versions(root: Path, versions) -> None:
+    """Give the bundle's objects the spec_version values in `versions`, in turn."""
+    path = root / STIX_BUNDLE
+    data = json.loads(path.read_text(encoding="utf-8"))
+    for i, obj in enumerate(data["objects"]):
+        obj["spec_version"] = versions[i % len(versions)]
+    path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+
+
+def test_the_stix_version_is_read_from_the_bundle_objects():
+    td = scratch_tree()
+    try:
+        set_bundle_spec_versions(td, ["2.2"])
+        r = run_checker(td)
+        assert r.returncode == 1, r.stdout
+        assert (f'{where_of(td, "as a STIX 2.1 bundle")}: "STIX 2.1" does not match '
+                f"{STIX_BUNDLE} (STIX version: 2.2)") in r.stderr, r.stderr
+    finally:
+        shutil.rmtree(td)
+
+
+def test_a_missing_bundle_is_red():
+    td = scratch_tree()
+    try:
+        (td / STIX_BUNDLE).unlink()
+        r = run_checker(td)
+        assert r.returncode == 1, r.stdout
+        assert (f"{STIX_BUNDLE}: missing; the STIX version the README states is read from "
+                "its objects' spec_version") in r.stderr, r.stderr
+    finally:
+        shutil.rmtree(td)
+
+
+def test_a_bundle_whose_objects_carry_two_spec_versions_is_red():
+    td = scratch_tree()
+    try:
+        set_bundle_spec_versions(td, ["2.1", "2.2"])
+        r = run_checker(td)
+        assert r.returncode == 1, r.stdout
+        assert (f"{STIX_BUNDLE}: its objects carry 2 spec_version values (2.1, 2.2), and "
+                "the STIX version the README states is read from the one they share"
+                ) in r.stderr, r.stderr
+        assert "STIX version: " not in r.stderr, r.stderr
+    finally:
+        shutil.rmtree(td)
+
+
+def test_a_stix_version_line_carrying_an_invisible_character_is_red():
+    # The line holds "STIX 2.1" once U+00AD is removed, so the character fails the line.
+    td = scratch_tree()
+    try:
+        new = "as a ST\N{SOFT HYPHEN}IX 2.1 bundle"
+        named = "U+00AD SOFT HYPHEN, a format character"
+        mutate_readme(td, "as a STIX 2.1 bundle", new)
+        r = run_checker(td)
+        assert r.returncode == 1, r.stdout
+        assert (f"{where_of(td, new)}:{column_of(td, new, named)}: a line stating the STIX "
+                f"version carries {named}, which can hide a figure from the STIX version "
+                "wordings; remove it") in r.stderr, r.stderr
     finally:
         shutil.rmtree(td)
 
