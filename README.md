@@ -33,47 +33,7 @@ The tactics, in kill chain order:
 
 **61 techniques** across 9 tactics. **40 attack classes** grouping related techniques. **16 techniques with real-world evidence**. **42 techniques validated in controlled lab environments**. **3 techniques adapted from traditional environments** (marked as such).
 
-## Use cases
-
-### Your team ships an agent and security asks what can go wrong
-
-A team is about to ship an agent that reads documents, calls tools and keeps memory. Security asks for the threat list. The layer between the model and the user, where governance files, skills, MCP connections, memory and credentials in context live, is where agents differ, and a team without a list for that layer defends by guesswork.
-
-The matrix classifies attacks on that layer into 9 tactics and 61 techniques along a kill chain. Each technique carries an evidence tier, maps to a detection check and a defensive control, and 58 of the 61 carry a reproducible lab scenario.
-
-What you can do today: browse [threats.opena2a.org](https://threats.opena2a.org), or read `matrix.json` and validate it against its schema.
-
-```bash
-git clone https://github.com/opena2a-standards/agent-threat-matrix
-cd agent-threat-matrix
-python3 scripts/validate_matrix.py
-```
-
-Where it stops today: the live API at `https://api.oa2a.org/api/v1/threat-matrix` still labels the matrix 1.1 while this repository is at 1.2; the technique and tactic counts agree.
-
-### A web page tells your agent what to do
-
-An agent reads a page or a tool result. The page contains an instruction. The agent follows it, and an API key sitting in its context leaves with the next request. The person who delegated the task never sees the page.
-
-Both halves are catalogued: Indirect Prompt Injection (T-2002, initial access, observed in the wild) and Context Window Credential Leak (T-3006, credential harvest, validated in the lab). The ids are stable, so detection signatures (AIIS) and telemetry attributes can cite the same technique.
-
-What you can do today:
-
-```bash
-jq '.techniques[] | select(.id == "T-2002" or .id == "T-3006")' matrix.json
-```
-
-Where it stops today: 16 of the 61 techniques carry real-world evidence; 42 are validated in controlled lab environments and 3 are adapted from traditional environments, and each is marked as such.
-
-### A vendor says its scanner catches agent attacks
-
-A buyer hears that a tool "covers agent threats" and has no way to compare that claim with another vendor's, or to load it into the systems they already run.
-
-Vendors map their detections to technique ids, and the matrix ships as a STIX 2.1 bundle rendered from `matrix.json`, so the same ids load into a SIEM or threat-intelligence platform alongside ATT&CK and ATLAS.
-
-What you can do today: import `stix/agent-threat-matrix-bundle.json`, or regenerate it with `python3 scripts/generate_stix.py`.
-
-Why you can check this yourself: [`matrix.json`](matrix.json) and its schema in [`schema/`](schema/); [`scripts/validate_matrix.py`](scripts/validate_matrix.py); the per-technique justification in [`EVIDENCE_AUDIT.md`](EVIDENCE_AUDIT.md); the STIX bundle in [`stix/`](stix/); the rendered site at [threats.opena2a.org](https://threats.opena2a.org); and the live API at `https://api.oa2a.org/api/v1/threat-matrix`.
+The live API at `https://api.oa2a.org/api/v1/threat-matrix` still labels the matrix 1.1 while this repository is at 1.2; the technique and tactic counts agree.
 
 ## How to Use This Framework
 
@@ -99,15 +59,14 @@ When referencing the framework:
 
 ## Documentation
 
-- [Overview](docs/overview.md): the purpose of the matrix, and what it covers and leaves to MITRE ATLAS, the OWASP Top 10 for LLM and MITRE ATT&CK
+- [Overview](docs/overview.md): the matrix's purpose, and what it covers and leaves to MITRE ATLAS, the OWASP Top 10 for LLM and MITRE ATT&CK
 - [Attack classes](docs/attack-classes.md): every attack class with its description and techniques, rendered from `matrix.json`
 - [Cross-framework mapping](docs/cross-framework-mapping.md): what HackMyAgent, DVAA, OASB and the MITRE and OWASP mapping documents provide, and how `python3 scripts/check_readme_claims.py` checks their figures
 - [Attack paths](docs/attack-paths.md): complete kill chain traversals demonstrated in DVAA
-- [Evidence tiers](docs/evidence-tiers.md) and [EVIDENCE_AUDIT.md](EVIDENCE_AUDIT.md): the tier definitions, the evidence standard with the number of techniques in each tier, and the justification of every technique's tier
+- [Evidence tiers](docs/evidence-tiers.md) and [EVIDENCE_AUDIT.md](EVIDENCE_AUDIT.md): the tier definitions, the evidence standard with each tier's technique count, and every technique's tier justification
 - [Schema](docs/schema.md): what `python3 scripts/validate_matrix.py` checks in `matrix.json`, `technique-ids.json` and the STIX bundle
-- [Use cases: background](docs/use-cases.md): the catalogs that already cover networks and AI systems
-- [CONTRIBUTING.md](CONTRIBUTING.md): the repository structure, and how to propose a technique or an attack class
-- [CHANGELOG.md](CHANGELOG.md): changes to the matrix and its checks
+- [Use cases](docs/use-cases.md): the situations the matrix answers, the commands for each, and the catalogs that already cover networks and AI systems
+- [CONTRIBUTING.md](CONTRIBUTING.md) and [CHANGELOG.md](CHANGELOG.md): the repository structure, proposing techniques and attack classes, and changes to the matrix and its checks
 - Related projects: [HackMyAgent](https://github.com/opena2a-org/hackmyagent) (automated detection), [DVAA](https://github.com/opena2a-org/damn-vulnerable-ai-agent) (lab validation), [OASB](https://oasb.ai) (defensive controls) and [AI Agent Kill Chain](https://github.com/opena2a-org/ai-agent-kill-chain) (the kill chain stages)
 
 ## License
