@@ -43,6 +43,13 @@ plain scan, which must read generated lines as the checker does, so the sentence
 checker's patterns cannot drift apart with every test passing. The example README and the
 checker's description give of a no-break space after a tag name must be a form that only
 the second reading names, and the two must give the same form.
+
+The matrix version the README states under the title and in the framework citation is read
+against matrix.json, and a month and year on either line against the CHANGELOG.md heading
+that released that version. Neither was read, so a wrong version or month passed: each must
+now go red, and so must a month on a line stating a version no heading releases, and a line
+stating the version that carries a character which fails a line. The citation must state
+the version; the line under the title may leave it out.
 """
 
 import functools
@@ -64,7 +71,8 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
-FILES = ("matrix.json", "related-projects.json", "scripts/check_readme_claims.py")
+FILES = ("matrix.json", "related-projects.json", "CHANGELOG.md",
+         "scripts/check_readme_claims.py")
 # The attack-class tables moved from README.md to this page, which links up one level.
 CLASS_PAGE = "docs/attack-classes.md"
 BEGIN = "<!-- BEGIN GENERATED: attack-class-tables -->"
@@ -233,6 +241,131 @@ def test_a_claim_reworded_out_of_the_readme_is_red():
         r = run_checker(td)
         assert r.returncode == 1, r.stdout
         assert "README does not state observed of total" in r.stderr, r.stderr
+    finally:
+        shutil.rmtree(td)
+
+
+def set_matrix_version(root: Path, version: str) -> None:
+    path = root / "matrix.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data["version"] = version
+    path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+
+
+# (old, new, message): the matrix version under the title or in the framework citation, or
+# a month and year on one of those lines, moved off matrix.json or the CHANGELOG.md heading
+# that released the version. Neither was read, so each passed.
+VERSION_MUTATIONS = [
+    ("**Version 1.2**", "**Version 1.3**",
+     '"Version 1.3" does not match matrix.json (matrix version: 1.2)'),
+    ("Threat Matrix v1.2.", "Threat Matrix v1.1.",
+     '"Threat Matrix v1.1" does not match matrix.json (matrix version: 1.2)'),
+    ("**Version 1.2** | September 2026", "**Version 1.2** | October 2026",
+     '"October 2026" does not match CHANGELOG.md (version 1.2 released September 2026)'),
+    ('v1.2." September 2026.', 'v1.2." September 2025.',
+     '"September 2025" does not match CHANGELOG.md (version 1.2 released September 2026)'),
+]
+
+
+@pytest.mark.parametrize("old,new,message", VERSION_MUTATIONS,
+                         ids=[n for _, n, _ in VERSION_MUTATIONS])
+def test_a_wrong_version_or_release_month_is_red(old, new, message):
+    td = scratch_tree()
+    try:
+        mutate_readme(td, old, new)
+        r = run_checker(td)
+        assert r.returncode == 1, f"checker passed with {new!r}:\n{r.stdout}"
+        assert f"{where_of(td, new)}: {message}" in r.stderr, r.stderr
+    finally:
+        shutil.rmtree(td)
+
+
+def test_the_framework_citation_must_state_the_version():
+    td = scratch_tree()
+    try:
+        mutate_readme(td, "Threat Matrix v1.2.", "Threat Matrix, version 1.2.")
+        r = run_checker(td)
+        assert r.returncode == 1, r.stdout
+        assert "README does not state matrix version (1.2)" in r.stderr, r.stderr
+    finally:
+        shutil.rmtree(td)
+
+
+def test_the_line_under_the_title_may_leave_the_version_out():
+    td = scratch_tree()
+    try:
+        mutate_readme(td, "**Version 1.2** | September 2026 | ", "")
+        r = run_checker(td)
+        assert r.returncode == 0, r.stderr
+    finally:
+        shutil.rmtree(td)
+
+
+def test_a_release_month_is_red_when_the_changelog_does_not_release_the_version():
+    td = scratch_tree()
+    try:
+        set_matrix_version(td, "1.3")
+        mutate_readme(td, "**Version 1.2**", "**Version 1.3**")
+        mutate_readme(td, "Threat Matrix v1.2.", "Threat Matrix v1.3.")
+        r = run_checker(td)
+        assert r.returncode == 1, r.stdout
+        for line in ("**Version 1.3** | September 2026", 'v1.3." September 2026.'):
+            assert (f'{where_of(td, line)}: "September 2026" is read against the CHANGELOG.md '
+                    "release heading of version 1.3, and there is none") in r.stderr, r.stderr
+    finally:
+        shutil.rmtree(td)
+
+
+# (version, heading added to CHANGELOG.md, month and year the heading releases it in):
+# "## v1.3.0 (2026-12-01)" releases 1.3, and the shipped "## v1.1" heading writes its date
+# after a dash rather than in parentheses.
+RELEASES = [
+    ("1.3", "## v1.3.0 (2026-12-01)", "December 2026"),
+    ("1.1", None, "June 2026"),
+]
+
+
+@pytest.mark.parametrize("version,heading,released", RELEASES,
+                         ids=[v for v, _, _ in RELEASES])
+def test_the_release_month_is_read_from_the_changelog_heading_of_the_version(
+        version, heading, released):
+    td = scratch_tree()
+    try:
+        if heading:
+            changelog = td / "CHANGELOG.md"
+            text = changelog.read_text(encoding="utf-8")
+            assert text.count("## Unreleased\n") == 1
+            changelog.write_text(text.replace("## Unreleased\n", f"{heading}\n\n## Unreleased\n"),
+                                 encoding="utf-8")
+        set_matrix_version(td, version)
+        mutate_readme(td, "**Version 1.2**", f"**Version {version}**")
+        mutate_readme(td, "Threat Matrix v1.2.", f"Threat Matrix v{version}.")
+        r = run_checker(td)
+        assert r.returncode == 1, r.stdout
+        assert (f'"September 2026" does not match CHANGELOG.md (version {version} released '
+                f"{released})") in r.stderr, r.stderr
+        mutate_readme(td, f"**Version {version}** | September 2026",
+                      f"**Version {version}** | {released}")
+        mutate_readme(td, f'v{version}." September 2026.', f'v{version}." {released}.')
+        r = run_checker(td)
+        assert r.returncode == 0, r.stderr
+    finally:
+        shutil.rmtree(td)
+
+
+def test_a_version_line_carrying_an_invisible_character_is_red():
+    # "Ver" U+00AD "sion 1.3" is not read as stating the version, so the character fails
+    # the line instead of leaving a wrong version unchecked.
+    td = scratch_tree()
+    try:
+        new = "**Ver\N{SOFT HYPHEN}sion 1.3**"
+        named = "U+00AD SOFT HYPHEN, a format character"
+        mutate_readme(td, "**Version 1.2**", new)
+        r = run_checker(td)
+        assert r.returncode == 1, r.stdout
+        assert (f"{where_of(td, new)}:{column_of(td, new, named)}: a line stating the matrix "
+                f"version carries {named}, which can hide a figure from the version wordings; "
+                "remove it") in r.stderr, r.stderr
     finally:
         shutil.rmtree(td)
 

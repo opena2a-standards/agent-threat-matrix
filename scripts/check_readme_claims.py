@@ -97,6 +97,18 @@ one of the matrix.json counts once such characters are removed fails the same wa
 carries one. Each failure names the line, the column of the character's first occurrence
 on it, counted in characters from 1, and the character.
 
+The matrix version is read where the README states it as "Version N", as on the line under
+the title, or as "Threat Matrix vN", as in the framework citation, each in the letter case
+written here, where N is digits separated by dots, such as 1.2. Every occurrence must state
+the version in matrix.json as written there, and the README must state the second wording.
+On a line holding either wording, each English month name followed by a space and a
+four-digit year, such as "September 2026", must be the month and year that CHANGELOG.md gives the
+release of that version: the date on the first line of CHANGELOG.md that is "## v", that
+version, characters other than digits and a date written YYYY-MM-DD, where a version that
+differs only by trailing ".0" parts is the same version (v1.2.0 for 1.2). A line holding
+either wording once the characters above are removed fails when it carries one of them, as
+a line stating a count does. A version or month worded any other way is not read.
+
 Exit 0 when every claim matches the data, 1 otherwise. ``--help`` (or ``-h``) prints
 the usage and exits 0. Any other argument, such as a mistyped ``--fixx``, prints the
 usage and exits 2 without checking or writing anything. Help takes precedence over an
@@ -120,6 +132,7 @@ DESCRIPTION = "Assert every counted claim in README.md and its pages matches mat
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 MATRIX = ROOT / "matrix.json"
 RELATED = ROOT / "related-projects.json"
+CHANGELOG = ROOT / "CHANGELOG.md"
 
 # README.md and the pages that took its reference text, read as one text in this order.
 PAGES = (
@@ -158,6 +171,19 @@ RELATED_WORDINGS = (
     ("oasb", "controls", r"\b(\d+) controls\b"),
     ("oasb", "domains", r"\b(\d+) domains\b"),
 )
+
+# The wordings that state the matrix version, each with whether the README must state it:
+# the line under the title ("**Version 1.2**") and the framework citation.
+VERSION_WORDINGS = (
+    (r"\bVersion (\d+(?:\.\d+)*)", False),
+    (r"\bThreat Matrix v(\d+(?:\.\d+)*)", True),
+)
+MONTHS = ("January", "February", "March", "April", "May", "June", "July", "August",
+          "September", "October", "November", "December")
+MONTH_YEAR = re.compile(r"\b(" + "|".join(MONTHS) + r") (\d{4})\b")
+# A CHANGELOG.md release heading, "## v1.2.0 (2026-09-08)": its version, and the year and
+# month of the first date after it.
+RELEASE_HEADING = re.compile(r"(?m)^## v(\d+(?:\.\d+)*)(?!\d)[^\n\d]*(\d{4})-(\d{2})-\d{2}")
 
 # Letters (category Lo) that render as blank space. Each is a word character, so a DVAA
 # wording directly beside one is not read, and neither is a matrix.json count wording
@@ -541,8 +567,8 @@ def names(stripped, name, hiding=False):
 
 
 def hiding_kind(c):
-    """What `c` is when it fails a line that names DVAA or states a count, else None: a
-    character that can keep a wording from being read."""
+    """What `c` is when it fails a line that names DVAA, states a count or states the matrix
+    version, else None: a character that can keep a wording from being read."""
     category = unicodedata.category(c)
     if category == "Cf":
         return "a format character"
@@ -591,6 +617,20 @@ def empty(value):
 def percent(count, total):
     """`count` as a whole percentage of `total`, rounded half up."""
     return (200 * count + total) // (2 * total)
+
+
+def release_month(changelog, version):
+    """(month name, year) of the first release heading in `changelog` whose version is
+    `version`, a version that differs only by trailing ".0" parts being the same (v1.2.0
+    for 1.2); None when no heading releases it."""
+    def plain(v):
+        return re.sub(r"(?:\.0)+$", "", v)
+
+    for m in RELEASE_HEADING.finditer(changelog):
+        month = int(m.group(3))
+        if plain(m.group(1)) == plain(version) and 1 <= month <= 12:
+            return MONTHS[month - 1], m.group(2)
+    return None
 
 
 def main(argv):
@@ -856,6 +896,31 @@ def main(argv):
                 source=pinned)
         figures.append(f"{project}.{field}={value}")
 
+    # The matrix version where the README states it, and each month and year on a line
+    # stating it, which is when CHANGELOG.md says that version was released.
+    version = str(matrix.get("version"))
+    for pattern, stated in VERSION_WORDINGS:
+        require(pattern, [version], "matrix version", stated=stated)
+    released = None
+    if CHANGELOG.is_file():
+        released = release_month(CHANGELOG.read_text(encoding="utf-8"), version)
+    version_lines = set()
+    for number, (line, stripped, _) in enumerate(lines, 1):
+        if not any(re.search(pattern, stripped) for pattern, _ in VERSION_WORDINGS):
+            continue
+        version_lines.add(number)
+        for m in MONTH_YEAR.finditer(line):
+            if released is None:
+                failures.append(
+                    f"{pages.where(number)}: \"{m.group(0)}\" is read against the CHANGELOG.md "
+                    f"release heading of version {version}, and there is none"
+                )
+            elif m.groups() != released:
+                failures.append(
+                    f"{pages.where(number)}: \"{m.group(0)}\" does not match CHANGELOG.md "
+                    f"(version {version} released {' '.join(released)})"
+                )
+
     # A wording is not read when a character `hiding_kind` names stands inside it ("age"
     # U+00AD "nts", "22" U+200B " agents", "tac" U+00AD "tics"), or when a Hangul filler or
     # combining mark is glued to a DVAA wording (U+3164 "22 agents", "agents" U+034F), so
@@ -871,6 +936,8 @@ def main(argv):
             readers.append(("naming DVAA", "DVAA"))
         if any(re.search(pattern, stripped) for pattern in count_wordings):
             readers.append(("stating a matrix.json count", "count"))
+        if number in version_lines:
+            readers.append(("stating the matrix version", "version"))
         if not readers:
             continue
         where = " and ".join(phrase for phrase, _ in readers)
@@ -897,7 +964,8 @@ def main(argv):
         )
 
     if failures:
-        print("README claims do not match matrix.json and related-projects.json:\n",
+        print("README claims do not match matrix.json, related-projects.json and "
+              "CHANGELOG.md:\n",
               file=sys.stderr)
         for f in failures:
             print(f"  - {f}", file=sys.stderr)
