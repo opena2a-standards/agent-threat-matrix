@@ -23,15 +23,32 @@ Six properties:
 - G6 every relative link in GOVERNANCE.md resolves to a path in the tree, and a fragment on
      a link to a Markdown page names a heading on that page.
 
+A file a property reads that is not valid UTF-8 fails that property, in one line naming the
+file, the first byte that does not decode and the line it is on. GOVERNANCE.md is reported
+under G1 and then ends the run, as an absent page does; CONTRIBUTING.md and README.md under
+G4; .github/CODEOWNERS under G5; and a Markdown page that GOVERNANCE.md links with a
+fragment under G6, once however many such links it has.
+
 There is no ``--fix`` mode: the page is prose that people decide, not text a script may
 write. Exit 0 when all six hold, 1 otherwise, printing one line per violation. An optional
 argument names the repository root to check; the default is the parent of this script's
-directory.
+directory, and G1 names the root it examined. A root argument that names no directory, such
+as a path that does not exist, the path of a file or an empty argument, prints one line that
+names it and exits 1 without running a check. ``--help`` (or ``-h``) prints the usage and
+exits 0. An option the script does not know, such as ``--bogus``, or a second argument
+prints the usage and exits 2 without checking anything. Help takes precedence over an
+argument the script does not know: given together in either order, as in ``--bogus --help``,
+they print the usage and exit 0, again without checking anything.
 """
 
+import argparse
+import os
 import re
 import sys
 from pathlib import Path
+
+# The docstring's first line, held apart so --help still works under python3 -OO.
+DESCRIPTION = "Check that GOVERNANCE.md exists, links its homes, and names only paths that exist."
 
 ROOT = Path(__file__).resolve().parent.parent
 PAGE = "GOVERNANCE.md"
@@ -52,6 +69,17 @@ HEADING_RE = re.compile(r"^ {0,3}#{1,6}\s+(.*?)\s*#*\s*$")
 FENCE_RE = re.compile(r"^ {0,3}(`{3,}|~{3,})")
 EXTERNAL_RE = re.compile(r"^[a-z][a-z0-9+.-]*:", re.I)
 PAGE_LINK_RE = re.compile(r"\]\(GOVERNANCE\.md(?:#[^)]*)?\)")
+
+
+def read_utf8(path: Path):
+    """(text, None) when the bytes of `path` are valid UTF-8, else (None, reason), where
+    reason names the first byte that does not decode and the line it is on."""
+    data = path.read_bytes()
+    try:
+        return data.decode("utf-8"), None
+    except UnicodeDecodeError as exc:
+        lineno = data.count(b"\n", 0, exc.start) + 1
+        return None, f"is not valid UTF-8 (byte 0x{data[exc.start]:02x} on line {lineno})"
 
 
 def prose_lines(text: str):
@@ -153,18 +181,21 @@ def codeowners_patterns(text: str) -> list:
 
 def pattern_resolves(root: Path, pattern: str) -> bool:
     """True when a CODEOWNERS pattern names at least one path in the tree. A pattern that
-    starts with "/" is read from the root; one without "/" matches a name anywhere; a
-    pattern ending in "/" must be a directory; "*" and "?" are globbed."""
+    starts with "/" or holds a "/" before its end is read from the root; one with no other
+    "/" than a trailing one matches a name at any depth, as `*.js` matches every .js file
+    in GitHub's CODEOWNERS syntax; a pattern ending in "/" must be a directory; "*", "?"
+    and "[" are globbed."""
     anchored = pattern.startswith("/")
     body = pattern.lstrip("/")
     want_dir = body.endswith("/")
     body = body.rstrip("/")
     if not body:
         return True
-    if any(ch in body for ch in "*?["):
-        matches = list(root.glob(body))
-    elif anchored or "/" in body:
-        matches = [root / body] if (root / body).exists() else []
+    if anchored or "/" in body:
+        if any(ch in body for ch in "*?["):
+            matches = list(root.glob(body))
+        else:
+            matches = [root / body] if (root / body).exists() else []
     else:
         matches = list(root.rglob(body))
     matches = [m for m in matches if ".git" not in m.relative_to(root).parts]
@@ -178,10 +209,12 @@ def run_checks(root: Path):
     failures = []
     page = root / PAGE
 
-    # G1 -- the page exists.
+    # G1 -- the page exists and is valid UTF-8.
     if not page.is_file():
-        return [f"G1 {PAGE} does not exist at the repository root"], None
-    text = page.read_text(encoding="utf-8")
+        return [f"G1 {PAGE} does not exist at the repository root {root}"], None
+    text, problem = read_utf8(page)
+    if problem:
+        return [f"G1 {PAGE} {problem}; save it as UTF-8 so it can be checked"], None
 
     # G2 -- the page links both organization documents.
     for url in ORG_LINKS:
@@ -202,14 +235,21 @@ def run_checks(root: Path):
     # G4 -- CONTRIBUTING.md and README.md link the page.
     for rel in LINKING_PAGES:
         linking = root / rel
-        if not linking.is_file() or not PAGE_LINK_RE.search(linking.read_text(encoding="utf-8")):
+        linking_text, problem = read_utf8(linking) if linking.is_file() else ("", None)
+        if problem:
+            failures.append(f"G4 {rel} {problem}; save it as UTF-8 so its link to {PAGE} can be checked")
+        elif not PAGE_LINK_RE.search(linking_text):
             failures.append(f"G4 {rel} does not link {PAGE}")
 
     # G5 -- every CODEOWNERS pattern resolves, when the file is present.
     owners = root / CODEOWNERS
     owner_patterns = []
     if owners.is_file():
-        owner_patterns = codeowners_patterns(owners.read_text(encoding="utf-8"))
+        owners_text, problem = read_utf8(owners)
+        if problem:
+            failures.append(f"G5 {CODEOWNERS} {problem}; save it as UTF-8 so its patterns can be checked")
+        else:
+            owner_patterns = codeowners_patterns(owners_text)
         for lineno, pattern in owner_patterns:
             if not pattern_resolves(root, pattern):
                 failures.append(
@@ -218,13 +258,23 @@ def run_checks(root: Path):
 
     # G6 -- every relative link in the page resolves, fragment included.
     links = relative_links(text)
+    undecodable = set()
     for path, fragment in links:
         target = root / path if path else page
         if not target.exists():
             failures.append(f"G6 {PAGE} links {path}, which does not exist in the tree")
             continue
         if fragment and target.is_file() and target.suffix == ".md":
-            slugs = heading_slugs(target.read_text(encoding="utf-8"))
+            target_text, problem = read_utf8(target)
+            if problem:
+                if target not in undecodable:
+                    undecodable.add(target)
+                    failures.append(
+                        f"G6 {path or PAGE} {problem}; save it as UTF-8 so the fragments "
+                        f"{PAGE} links on it can be checked"
+                    )
+                continue
+            slugs = heading_slugs(target_text)
             base = re.sub(r"-\d+$", "", fragment)
             if fragment not in slugs and base not in slugs:
                 failures.append(
@@ -241,7 +291,25 @@ def run_checks(root: Path):
 
 
 def main(argv: list) -> int:
-    root = Path(argv[0]).resolve() if argv else ROOT
+    # An argument this script does not know ends the run with exit 2 before anything is
+    # read: an option such as --bogus must not be taken as the repository root. argparse
+    # acts on --help or -h where it stands and names the arguments it does not know only
+    # once it has read them all, so help beside such an argument prints the usage and exits
+    # 0; that run reads nothing either.
+    parser = argparse.ArgumentParser(description=DESCRIPTION, allow_abbrev=False)
+    parser.add_argument("root", nargs="?",
+                        help="the repository root to check; the default is the parent of "
+                             "this script's directory")
+    args = parser.parse_args(argv)
+
+    if args.root is None:
+        root = ROOT
+    elif os.path.isdir(args.root):
+        root = Path(args.root).resolve()
+    else:
+        # The argument is read as written, so "" is not taken as the working directory.
+        print(f"FAIL: the root argument {args.root!r} names no directory, so no check was run")
+        return 1
     failures, summary = run_checks(root)
     if failures:
         print(f"FAIL: {len(failures)} governance check(s) failed:")

@@ -7,6 +7,18 @@ named path that does not exist or a file named as a directory (G3), a linking pa
 the link (G4), a CODEOWNERS pattern that resolves to nothing (G5), and a relative link or a
 heading fragment that resolves to nothing (G6). A CODEOWNERS file whose patterns all resolve
 passes and is counted in the summary; an absent one is reported as absent and fails nothing.
+A CODEOWNERS glob with no "/" other than a trailing one matches at any depth, and one that
+starts with "/" matches at the root only.
+A file the checker reads that is not valid UTF-8 is reported, without a traceback, under
+each property that reads it: GOVERNANCE.md (G1), README.md and CONTRIBUTING.md (G4, and G6
+for CONTRIBUTING.md, which GOVERNANCE.md links with a fragment), CODEOWNERS (G5) and a page
+GOVERNANCE.md links with two fragments (G6, in one line).
+
+The arguments are read by a parser: --help and -h print the usage and exit 0, also beside an
+option the script does not know, and such an option, such as --bogus, or a second argument
+prints the usage and exits 2; neither run checks anything. A root argument that names no
+directory fails with one line that names it, and a root that is a directory is the tree
+checked, named by G1 when the page is missing there.
 """
 
 import importlib.util
@@ -43,8 +55,8 @@ def tree():
     shutil.rmtree(td)
 
 
-def run_checker(root: Path) -> subprocess.CompletedProcess:
-    return subprocess.run(["python3", str(root / "scripts" / "check_governance.py")],
+def run_checker(root: Path, *args: str) -> subprocess.CompletedProcess:
+    return subprocess.run(["python3", str(root / "scripts" / "check_governance.py"), *args],
                           capture_output=True, text=True, timeout=120)
 
 
@@ -141,6 +153,27 @@ def test_codeowners_whose_patterns_resolve_passes_and_is_counted(tree):
     assert f"the 4 patterns in {CHK.CODEOWNERS} each resolve to a path" in r.stdout, r.stdout
 
 
+def test_codeowners_glob_without_a_slash_matches_at_any_depth(tree):
+    # No .py or .yml file sits at the root; scripts/, tests/ and .github/ hold them.
+    assert not list(tree.glob("*.py")) and not list(tree.glob("*.yml"))
+    _write_codeowners(tree, ["*.py @example-owner", "*.yml @example-owner"])
+    r = run_checker(tree)
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert f"the 2 patterns in {CHK.CODEOWNERS} each resolve to a path" in r.stdout, r.stdout
+
+
+def test_codeowners_glob_read_from_the_root_stays_at_the_root(tree):
+    assert not list(tree.glob("*.py"))
+    _write_codeowners(tree, ["/*.py @example-owner", "*.does-not-exist @example-owner"])
+    r = run_checker(tree)
+    assert r.returncode == 1
+    failures = [l for l in r.stdout.splitlines() if l.strip().startswith("- G")]
+    assert failures == [
+        f"  - G5 {CHK.CODEOWNERS}:1: pattern '/*.py' resolves to no path in the tree",
+        f"  - G5 {CHK.CODEOWNERS}:2: pattern '*.does-not-exist' resolves to no path in the tree",
+    ], r.stdout
+
+
 def test_absent_codeowners_is_reported_as_absent(tree):
     owners = tree / CHK.CODEOWNERS
     if owners.exists():
@@ -167,6 +200,70 @@ def test_fragment_that_names_no_heading_is_reported(tree):
             "that page has that fragment") in r.stdout, r.stdout
 
 
+def failure_lines(r: subprocess.CompletedProcess) -> list:
+    """The failure lines of a run that ended without a traceback."""
+    assert "Traceback" not in r.stderr, r.stderr
+    return [l for l in r.stdout.splitlines() if l.strip().startswith("- G")]
+
+
+NOT_UTF8 = "is not valid UTF-8 (byte 0x{:02x} on line {}); save it as UTF-8 so"
+
+
+def test_page_that_is_not_utf8_is_reported(tree):
+    (tree / PAGE).write_bytes(b"\xff\xfe# Governance\n")
+    r = run_checker(tree)
+    assert r.returncode == 1, r.stdout + r.stderr
+    assert failure_lines(r) == [
+        f"  - G1 {PAGE} {NOT_UTF8.format(0xff, 1)} it can be checked"
+    ], r.stdout
+
+
+def test_readme_that_is_not_utf8_is_reported(tree):
+    path = tree / "README.md"
+    path.write_bytes(b"Caf\xe9\n" + path.read_bytes())
+    r = run_checker(tree)
+    assert r.returncode == 1, r.stdout + r.stderr
+    assert failure_lines(r) == [
+        f"  - G4 README.md {NOT_UTF8.format(0xe9, 1)} its link to {PAGE} can be checked"
+    ], r.stdout
+
+
+def test_contributing_that_is_not_utf8_is_reported_by_each_property_that_reads_it(tree):
+    assert "](CONTRIBUTING.md#change-control)" in (tree / PAGE).read_text(encoding="utf-8")
+    path = tree / "CONTRIBUTING.md"
+    path.write_bytes(b"Caf\xe9\n" + path.read_bytes())
+    r = run_checker(tree)
+    assert r.returncode == 1, r.stdout + r.stderr
+    assert failure_lines(r) == [
+        f"  - G4 CONTRIBUTING.md {NOT_UTF8.format(0xe9, 1)} its link to {PAGE} can be checked",
+        f"  - G6 CONTRIBUTING.md {NOT_UTF8.format(0xe9, 1)} the fragments {PAGE} links on it can be checked",
+    ], r.stdout
+
+
+def test_codeowners_that_is_not_utf8_is_reported(tree):
+    path = _write_codeowners(tree, RESOLVING_PATTERNS)
+    path.write_bytes(path.read_bytes() + b"/caf\xe9.json @example-owner\n")
+    r = run_checker(tree)
+    assert r.returncode == 1, r.stdout + r.stderr
+    assert failure_lines(r) == [
+        f"  - G5 {CHK.CODEOWNERS} {NOT_UTF8.format(0xe9, len(RESOLVING_PATTERNS) + 1)} its patterns can be checked"
+    ], r.stdout
+
+
+def test_linked_page_that_is_not_utf8_is_reported_once(tree):
+    rel = "docs/evidence-tiers.md"
+    assert (tree / PAGE).read_text(encoding="utf-8").count(f"]({rel}#") >= 2
+    path = tree / rel
+    data = path.read_bytes()
+    path.write_bytes(data + b"Caf\xe9\n")
+    lineno = data.count(b"\n") + 1
+    r = run_checker(tree)
+    assert r.returncode == 1, r.stdout + r.stderr
+    assert failure_lines(r) == [
+        f"  - G6 {rel} {NOT_UTF8.format(0xe9, lineno)} the fragments {PAGE} links on it can be checked"
+    ], r.stdout
+
+
 def test_page_passes_the_docs_prose_check():
     text = (ROOT / PAGE).read_text(encoding="utf-8")
     assert PROSE.check_text(PAGE, text) == []
@@ -184,3 +281,88 @@ def test_path_tokens_take_paths_and_leave_flags_and_words():
     assert list(CHK.path_tokens("matrix.json,")) == ["matrix.json"]
     assert list(CHK.path_tokens("status")) == []
     assert list(CHK.path_tokens("MAJOR.MINOR")) == []
+
+
+USAGE = "usage: check_governance.py [-h] [root]\n"
+
+
+@pytest.mark.parametrize("args", [
+    ["--help"],
+    ["-h"],
+    ["--bogus", "--help"],
+    ["--help", "--bogus"],
+    ["no-such-tree", "-h"],
+])
+def test_help_prints_the_usage_and_checks_nothing(args):
+    # The first argument used to be taken as the repository root, so "--help" was read as a
+    # path: the run reported G1 for a page that exists and exited 1. argparse acts on --help
+    # or -h where it stands and names an argument it does not know only once it has read
+    # them all, so help beside such an argument prints the usage and exits 0.
+    r = run_checker(ROOT, *args)
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert r.stdout.startswith(USAGE), r.stdout
+    # argparse wraps the description to the terminal width.
+    assert CHK.DESCRIPTION in " ".join(r.stdout.split()), r.stdout
+    assert "OK:" not in r.stdout and "FAIL" not in r.stdout, r.stdout
+    assert r.stderr == "", r.stderr
+
+
+@pytest.mark.parametrize("args,unknown", [
+    (["--bogus"], "--bogus"),
+    (["--he"], "--he"),
+    ([".", "extra"], "extra"),
+])
+def test_an_argument_the_script_does_not_know_exits_2_and_checks_nothing(args, unknown):
+    # "--bogus" used to be read as the repository root and reported as G1 with exit 1.
+    r = run_checker(ROOT, *args)
+    assert r.returncode == 2, r.stdout + r.stderr
+    assert r.stdout == "", r.stdout
+    assert r.stderr.startswith(USAGE), r.stderr
+    assert f"unrecognized arguments: {unknown}\n" in r.stderr, r.stderr
+
+
+@pytest.mark.parametrize("case", ["missing", "file", "empty"])
+def test_root_argument_that_names_no_directory_is_named(case):
+    # Such an argument used to be reported as the same G1 line, which named no path. An empty
+    # argument is read as written, not as the working directory.
+    with tempfile.TemporaryDirectory(prefix="atm-governance-") as td:
+        page = Path(td) / PAGE
+        page.write_text("# Governance\n", encoding="utf-8")
+        arg = {"missing": str(Path(td) / "no-such-tree"), "file": str(page), "empty": ""}[case]
+        r = run_checker(ROOT, arg)
+    assert r.returncode == 1, r.stdout + r.stderr
+    assert r.stdout == f"FAIL: the root argument {arg!r} names no directory, so no check was run\n", r.stdout
+    assert r.stderr == "", r.stderr
+
+
+def test_root_argument_is_the_tree_checked_and_g1_names_it(tree):
+    # The shipped tree holds the page, so a G1 failure here comes from the tree the argument
+    # names, and the line names that tree.
+    (tree / PAGE).unlink()
+    r = run_checker(ROOT, str(tree))
+    assert r.returncode == 1, r.stdout + r.stderr
+    assert r.stdout == ("FAIL: 1 governance check(s) failed:\n"
+                        f"  - G1 {PAGE} does not exist at the repository root {tree.resolve()}\n"), r.stdout
+
+
+def test_help_prints_the_usage_under_python_oo():
+    # -OO strips docstrings, so the help description cannot be read from __doc__.
+    r = subprocess.run(["python3", "-OO", str(CHECKER), "--help"],
+                       capture_output=True, text=True, timeout=120)
+    assert r.returncode == 0, r.stderr
+    assert CHK.DESCRIPTION in " ".join(r.stdout.split()), r.stdout
+
+
+def test_the_description_states_what_the_arguments_do():
+    doc = CHK.__doc__
+    assert CHK.DESCRIPTION == doc.splitlines()[0]
+    prose = " ".join(doc.split())
+    assert ("A root argument that names no directory, such as a path that does not exist, the "
+            "path of a file or an empty argument, prints one line that names it and exits 1 "
+            "without running a check.") in prose
+    assert "``--help`` (or ``-h``) prints the usage and exits 0." in prose
+    assert ("An option the script does not know, such as ``--bogus``, or a second argument "
+            "prints the usage and exits 2 without checking anything.") in prose
+    assert ("Help takes precedence over an argument the script does not know: given together "
+            "in either order, as in ``--bogus --help``, they print the usage and exit 0, again "
+            "without checking anything.") in prose
