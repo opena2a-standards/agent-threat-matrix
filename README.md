@@ -73,4 +73,4 @@ When referencing the framework:
 
 Apache-2.0. The framework is free to use, cite, and build upon.
 
-*Maintained by OpenA2A. Contributions welcome via pull request.*
+*Maintained by OpenA2A. [GOVERNANCE.md](GOVERNANCE.md) says who decides what enters the matrix and how it changes. Contributions welcome via pull request.*

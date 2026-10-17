@@ -27,6 +27,7 @@ agent-threat-matrix/
 ├── cross-references/         # MITRE ATT&CK, ATLAS, OWASP LLM mappings
 ├── docs/                     # Evidence tiers, schema and the reference pages the README links
 ├── CONTRIBUTING.md           # How to propose new techniques
+├── GOVERNANCE.md             # Who decides what enters the matrix, and how it changes
 ├── CHANGELOG.md
 └── LICENSE                   # Apache-2.0
 ```
@@ -192,10 +193,15 @@ technique, that technique is listed as authored in-house.
 OpenA2A retains final change control over the matrix. OpenA2A decides what enters the matrix,
 and a submission, however well evidenced, creates no entitlement to inclusion. Content that
 has been accepted may afterwards be edited, re-tiered (its evidence tier changed), re-placed
-(its canonical class or its (A)/(B) cross-reference placement changed), or removed entirely,
-as the evidence and the taxonomy evolve. Each such decision is recorded on the submission
-thread (the issue or pull request the content arrived in), so the contributor and any later
-reader can see what was decided and why.
+(its canonical class or its (A)/(B) cross-reference placement changed), or deprecated, as the
+evidence and the taxonomy evolve. A deprecated technique stays in the matrix, marked
+deprecated, and is never removed: its id is never deleted or reused. Each such decision is
+recorded on the submission thread (the issue or pull request the content arrived in), so the
+contributor and any later reader can see what was decided and why.
+
+Who the maintainers of record are, which paths are normative, how a change is proposed, how
+the version of `matrix.json` moves, how an evidence tier moves and how the scope is amended
+are in [GOVERNANCE.md](GOVERNANCE.md).
 
 ## Checking documentation prose
 
