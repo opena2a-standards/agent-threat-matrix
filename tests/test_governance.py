@@ -7,6 +7,8 @@ named path that does not exist or a file named as a directory (G3), a linking pa
 the link (G4), a CODEOWNERS pattern that resolves to nothing (G5), and a relative link or a
 heading fragment that resolves to nothing (G6). A CODEOWNERS file whose patterns all resolve
 passes and is counted in the summary; an absent one is reported as absent and fails nothing.
+A CODEOWNERS glob with no "/" other than a trailing one matches at any depth, and one that
+starts with "/" matches at the root only.
 """
 
 import importlib.util
@@ -139,6 +141,27 @@ def test_codeowners_whose_patterns_resolve_passes_and_is_counted(tree):
     r = run_checker(tree)
     assert r.returncode == 0, r.stdout + r.stderr
     assert f"the 4 patterns in {CHK.CODEOWNERS} each resolve to a path" in r.stdout, r.stdout
+
+
+def test_codeowners_glob_without_a_slash_matches_at_any_depth(tree):
+    # No .py or .yml file sits at the root; scripts/, tests/ and .github/ hold them.
+    assert not list(tree.glob("*.py")) and not list(tree.glob("*.yml"))
+    _write_codeowners(tree, ["*.py @example-owner", "*.yml @example-owner"])
+    r = run_checker(tree)
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert f"the 2 patterns in {CHK.CODEOWNERS} each resolve to a path" in r.stdout, r.stdout
+
+
+def test_codeowners_glob_read_from_the_root_stays_at_the_root(tree):
+    assert not list(tree.glob("*.py"))
+    _write_codeowners(tree, ["/*.py @example-owner", "*.does-not-exist @example-owner"])
+    r = run_checker(tree)
+    assert r.returncode == 1
+    failures = [l for l in r.stdout.splitlines() if l.strip().startswith("- G")]
+    assert failures == [
+        f"  - G5 {CHK.CODEOWNERS}:1: pattern '/*.py' resolves to no path in the tree",
+        f"  - G5 {CHK.CODEOWNERS}:2: pattern '*.does-not-exist' resolves to no path in the tree",
+    ], r.stdout
 
 
 def test_absent_codeowners_is_reported_as_absent(tree):

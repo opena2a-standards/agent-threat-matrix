@@ -153,18 +153,21 @@ def codeowners_patterns(text: str) -> list:
 
 def pattern_resolves(root: Path, pattern: str) -> bool:
     """True when a CODEOWNERS pattern names at least one path in the tree. A pattern that
-    starts with "/" is read from the root; one without "/" matches a name anywhere; a
-    pattern ending in "/" must be a directory; "*" and "?" are globbed."""
+    starts with "/" or holds a "/" before its end is read from the root; one with no other
+    "/" than a trailing one matches a name at any depth, as `*.js` matches every .js file
+    in GitHub's CODEOWNERS syntax; a pattern ending in "/" must be a directory; "*", "?"
+    and "[" are globbed."""
     anchored = pattern.startswith("/")
     body = pattern.lstrip("/")
     want_dir = body.endswith("/")
     body = body.rstrip("/")
     if not body:
         return True
-    if any(ch in body for ch in "*?["):
-        matches = list(root.glob(body))
-    elif anchored or "/" in body:
-        matches = [root / body] if (root / body).exists() else []
+    if anchored or "/" in body:
+        if any(ch in body for ch in "*?["):
+            matches = list(root.glob(body))
+        else:
+            matches = [root / body] if (root / body).exists() else []
     else:
         matches = list(root.rglob(body))
     matches = [m for m in matches if ".git" not in m.relative_to(root).parts]
