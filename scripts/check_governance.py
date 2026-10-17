@@ -25,9 +25,10 @@ Six properties:
 
 A file a property reads that is not valid UTF-8 fails that property, in one line naming the
 file, the first byte that does not decode and the line it is on. GOVERNANCE.md is reported
-under G1 and then ends the run, as an absent page does; CONTRIBUTING.md and README.md under
-G4; .github/CODEOWNERS under G5; and a Markdown page that GOVERNANCE.md links with a
-fragment under G6, once however many such links it has.
+under G1, in a line that also names the root examined, and then ends the run, as an absent
+page does; CONTRIBUTING.md and README.md under G4; .github/CODEOWNERS under G5; and a
+Markdown page that GOVERNANCE.md links with a fragment under G6, once however many such
+links it has.
 
 There is no ``--fix`` mode: the page is prose that people decide, not text a script may
 write. Exit 0 when all six hold, 1 otherwise, printing one line per violation. An optional
@@ -209,12 +210,12 @@ def run_checks(root: Path):
     failures = []
     page = root / PAGE
 
-    # G1 -- the page exists and is valid UTF-8.
+    # G1 -- the page exists and is valid UTF-8. Each G1 line names the root examined.
     if not page.is_file():
         return [f"G1 {PAGE} does not exist at the repository root {root}"], None
     text, problem = read_utf8(page)
     if problem:
-        return [f"G1 {PAGE} {problem}; save it as UTF-8 so it can be checked"], None
+        return [f"G1 {PAGE} at the repository root {root} {problem}; save it as UTF-8 so it can be checked"], None
 
     # G2 -- the page links both organization documents.
     for url in ORG_LINKS:
