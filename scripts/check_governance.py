@@ -23,6 +23,12 @@ Six properties:
 - G6 every relative link in GOVERNANCE.md resolves to a path in the tree, and a fragment on
      a link to a Markdown page names a heading on that page.
 
+A file a property reads that is not valid UTF-8 fails that property, in one line naming the
+file, the first byte that does not decode and the line it is on. GOVERNANCE.md is reported
+under G1 and then ends the run, as an absent page does; CONTRIBUTING.md and README.md under
+G4; .github/CODEOWNERS under G5; and a Markdown page that GOVERNANCE.md links with a
+fragment under G6, once however many such links it has.
+
 There is no ``--fix`` mode: the page is prose that people decide, not text a script may
 write. Exit 0 when all six hold, 1 otherwise, printing one line per violation. An optional
 argument names the repository root to check; the default is the parent of this script's
@@ -52,6 +58,17 @@ HEADING_RE = re.compile(r"^ {0,3}#{1,6}\s+(.*?)\s*#*\s*$")
 FENCE_RE = re.compile(r"^ {0,3}(`{3,}|~{3,})")
 EXTERNAL_RE = re.compile(r"^[a-z][a-z0-9+.-]*:", re.I)
 PAGE_LINK_RE = re.compile(r"\]\(GOVERNANCE\.md(?:#[^)]*)?\)")
+
+
+def read_utf8(path: Path):
+    """(text, None) when the bytes of `path` are valid UTF-8, else (None, reason), where
+    reason names the first byte that does not decode and the line it is on."""
+    data = path.read_bytes()
+    try:
+        return data.decode("utf-8"), None
+    except UnicodeDecodeError as exc:
+        lineno = data.count(b"\n", 0, exc.start) + 1
+        return None, f"is not valid UTF-8 (byte 0x{data[exc.start]:02x} on line {lineno})"
 
 
 def prose_lines(text: str):
@@ -181,10 +198,12 @@ def run_checks(root: Path):
     failures = []
     page = root / PAGE
 
-    # G1 -- the page exists.
+    # G1 -- the page exists and is valid UTF-8.
     if not page.is_file():
         return [f"G1 {PAGE} does not exist at the repository root"], None
-    text = page.read_text(encoding="utf-8")
+    text, problem = read_utf8(page)
+    if problem:
+        return [f"G1 {PAGE} {problem}; save it as UTF-8 so it can be checked"], None
 
     # G2 -- the page links both organization documents.
     for url in ORG_LINKS:
@@ -205,14 +224,21 @@ def run_checks(root: Path):
     # G4 -- CONTRIBUTING.md and README.md link the page.
     for rel in LINKING_PAGES:
         linking = root / rel
-        if not linking.is_file() or not PAGE_LINK_RE.search(linking.read_text(encoding="utf-8")):
+        linking_text, problem = read_utf8(linking) if linking.is_file() else ("", None)
+        if problem:
+            failures.append(f"G4 {rel} {problem}; save it as UTF-8 so its link to {PAGE} can be checked")
+        elif not PAGE_LINK_RE.search(linking_text):
             failures.append(f"G4 {rel} does not link {PAGE}")
 
     # G5 -- every CODEOWNERS pattern resolves, when the file is present.
     owners = root / CODEOWNERS
     owner_patterns = []
     if owners.is_file():
-        owner_patterns = codeowners_patterns(owners.read_text(encoding="utf-8"))
+        owners_text, problem = read_utf8(owners)
+        if problem:
+            failures.append(f"G5 {CODEOWNERS} {problem}; save it as UTF-8 so its patterns can be checked")
+        else:
+            owner_patterns = codeowners_patterns(owners_text)
         for lineno, pattern in owner_patterns:
             if not pattern_resolves(root, pattern):
                 failures.append(
@@ -221,13 +247,23 @@ def run_checks(root: Path):
 
     # G6 -- every relative link in the page resolves, fragment included.
     links = relative_links(text)
+    undecodable = set()
     for path, fragment in links:
         target = root / path if path else page
         if not target.exists():
             failures.append(f"G6 {PAGE} links {path}, which does not exist in the tree")
             continue
         if fragment and target.is_file() and target.suffix == ".md":
-            slugs = heading_slugs(target.read_text(encoding="utf-8"))
+            target_text, problem = read_utf8(target)
+            if problem:
+                if target not in undecodable:
+                    undecodable.add(target)
+                    failures.append(
+                        f"G6 {path or PAGE} {problem}; save it as UTF-8 so the fragments "
+                        f"{PAGE} links on it can be checked"
+                    )
+                continue
+            slugs = heading_slugs(target_text)
             base = re.sub(r"-\d+$", "", fragment)
             if fragment not in slugs and base not in slugs:
                 failures.append(

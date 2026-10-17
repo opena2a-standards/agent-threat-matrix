@@ -9,6 +9,10 @@ heading fragment that resolves to nothing (G6). A CODEOWNERS file whose patterns
 passes and is counted in the summary; an absent one is reported as absent and fails nothing.
 A CODEOWNERS glob with no "/" other than a trailing one matches at any depth, and one that
 starts with "/" matches at the root only.
+A file the checker reads that is not valid UTF-8 is reported, without a traceback, under
+each property that reads it: GOVERNANCE.md (G1), README.md and CONTRIBUTING.md (G4, and G6
+for CONTRIBUTING.md, which GOVERNANCE.md links with a fragment), CODEOWNERS (G5) and a page
+GOVERNANCE.md links with two fragments (G6, in one line).
 """
 
 import importlib.util
@@ -188,6 +192,70 @@ def test_fragment_that_names_no_heading_is_reported(tree):
     assert r.returncode == 1
     assert (f"G6 {PAGE} links docs/evidence-tiers.md#evidence-standards, and no heading on "
             "that page has that fragment") in r.stdout, r.stdout
+
+
+def failure_lines(r: subprocess.CompletedProcess) -> list:
+    """The failure lines of a run that ended without a traceback."""
+    assert "Traceback" not in r.stderr, r.stderr
+    return [l for l in r.stdout.splitlines() if l.strip().startswith("- G")]
+
+
+NOT_UTF8 = "is not valid UTF-8 (byte 0x{:02x} on line {}); save it as UTF-8 so"
+
+
+def test_page_that_is_not_utf8_is_reported(tree):
+    (tree / PAGE).write_bytes(b"\xff\xfe# Governance\n")
+    r = run_checker(tree)
+    assert r.returncode == 1, r.stdout + r.stderr
+    assert failure_lines(r) == [
+        f"  - G1 {PAGE} {NOT_UTF8.format(0xff, 1)} it can be checked"
+    ], r.stdout
+
+
+def test_readme_that_is_not_utf8_is_reported(tree):
+    path = tree / "README.md"
+    path.write_bytes(b"Caf\xe9\n" + path.read_bytes())
+    r = run_checker(tree)
+    assert r.returncode == 1, r.stdout + r.stderr
+    assert failure_lines(r) == [
+        f"  - G4 README.md {NOT_UTF8.format(0xe9, 1)} its link to {PAGE} can be checked"
+    ], r.stdout
+
+
+def test_contributing_that_is_not_utf8_is_reported_by_each_property_that_reads_it(tree):
+    assert "](CONTRIBUTING.md#change-control)" in (tree / PAGE).read_text(encoding="utf-8")
+    path = tree / "CONTRIBUTING.md"
+    path.write_bytes(b"Caf\xe9\n" + path.read_bytes())
+    r = run_checker(tree)
+    assert r.returncode == 1, r.stdout + r.stderr
+    assert failure_lines(r) == [
+        f"  - G4 CONTRIBUTING.md {NOT_UTF8.format(0xe9, 1)} its link to {PAGE} can be checked",
+        f"  - G6 CONTRIBUTING.md {NOT_UTF8.format(0xe9, 1)} the fragments {PAGE} links on it can be checked",
+    ], r.stdout
+
+
+def test_codeowners_that_is_not_utf8_is_reported(tree):
+    path = _write_codeowners(tree, RESOLVING_PATTERNS)
+    path.write_bytes(path.read_bytes() + b"/caf\xe9.json @example-owner\n")
+    r = run_checker(tree)
+    assert r.returncode == 1, r.stdout + r.stderr
+    assert failure_lines(r) == [
+        f"  - G5 {CHK.CODEOWNERS} {NOT_UTF8.format(0xe9, len(RESOLVING_PATTERNS) + 1)} its patterns can be checked"
+    ], r.stdout
+
+
+def test_linked_page_that_is_not_utf8_is_reported_once(tree):
+    rel = "docs/evidence-tiers.md"
+    assert (tree / PAGE).read_text(encoding="utf-8").count(f"]({rel}#") >= 2
+    path = tree / rel
+    data = path.read_bytes()
+    path.write_bytes(data + b"Caf\xe9\n")
+    lineno = data.count(b"\n") + 1
+    r = run_checker(tree)
+    assert r.returncode == 1, r.stdout + r.stderr
+    assert failure_lines(r) == [
+        f"  - G6 {rel} {NOT_UTF8.format(0xe9, lineno)} the fragments {PAGE} links on it can be checked"
+    ], r.stdout
 
 
 def test_page_passes_the_docs_prose_check():
