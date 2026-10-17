@@ -32,12 +32,23 @@ fragment under G6, once however many such links it has.
 There is no ``--fix`` mode: the page is prose that people decide, not text a script may
 write. Exit 0 when all six hold, 1 otherwise, printing one line per violation. An optional
 argument names the repository root to check; the default is the parent of this script's
-directory.
+directory, and G1 names the root it examined. A root argument that names no directory, such
+as a path that does not exist, the path of a file or an empty argument, prints one line that
+names it and exits 1 without running a check. ``--help`` (or ``-h``) prints the usage and
+exits 0. An option the script does not know, such as ``--bogus``, or a second argument
+prints the usage and exits 2 without checking anything. Help takes precedence over an
+argument the script does not know: given together in either order, as in ``--bogus --help``,
+they print the usage and exit 0, again without checking anything.
 """
 
+import argparse
+import os
 import re
 import sys
 from pathlib import Path
+
+# The docstring's first line, held apart so --help still works under python3 -OO.
+DESCRIPTION = "Check that GOVERNANCE.md exists, links its homes, and names only paths that exist."
 
 ROOT = Path(__file__).resolve().parent.parent
 PAGE = "GOVERNANCE.md"
@@ -200,7 +211,7 @@ def run_checks(root: Path):
 
     # G1 -- the page exists and is valid UTF-8.
     if not page.is_file():
-        return [f"G1 {PAGE} does not exist at the repository root"], None
+        return [f"G1 {PAGE} does not exist at the repository root {root}"], None
     text, problem = read_utf8(page)
     if problem:
         return [f"G1 {PAGE} {problem}; save it as UTF-8 so it can be checked"], None
@@ -280,7 +291,25 @@ def run_checks(root: Path):
 
 
 def main(argv: list) -> int:
-    root = Path(argv[0]).resolve() if argv else ROOT
+    # An argument this script does not know ends the run with exit 2 before anything is
+    # read: an option such as --bogus must not be taken as the repository root. argparse
+    # acts on --help or -h where it stands and names the arguments it does not know only
+    # once it has read them all, so help beside such an argument prints the usage and exits
+    # 0; that run reads nothing either.
+    parser = argparse.ArgumentParser(description=DESCRIPTION, allow_abbrev=False)
+    parser.add_argument("root", nargs="?",
+                        help="the repository root to check; the default is the parent of "
+                             "this script's directory")
+    args = parser.parse_args(argv)
+
+    if args.root is None:
+        root = ROOT
+    elif os.path.isdir(args.root):
+        root = Path(args.root).resolve()
+    else:
+        # The argument is read as written, so "" is not taken as the working directory.
+        print(f"FAIL: the root argument {args.root!r} names no directory, so no check was run")
+        return 1
     failures, summary = run_checks(root)
     if failures:
         print(f"FAIL: {len(failures)} governance check(s) failed:")

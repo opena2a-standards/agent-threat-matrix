@@ -13,6 +13,12 @@ A file the checker reads that is not valid UTF-8 is reported, without a tracebac
 each property that reads it: GOVERNANCE.md (G1), README.md and CONTRIBUTING.md (G4, and G6
 for CONTRIBUTING.md, which GOVERNANCE.md links with a fragment), CODEOWNERS (G5) and a page
 GOVERNANCE.md links with two fragments (G6, in one line).
+
+The arguments are read by a parser: --help and -h print the usage and exit 0, also beside an
+option the script does not know, and such an option, such as --bogus, or a second argument
+prints the usage and exits 2; neither run checks anything. A root argument that names no
+directory fails with one line that names it, and a root that is a directory is the tree
+checked, named by G1 when the page is missing there.
 """
 
 import importlib.util
@@ -49,8 +55,8 @@ def tree():
     shutil.rmtree(td)
 
 
-def run_checker(root: Path) -> subprocess.CompletedProcess:
-    return subprocess.run(["python3", str(root / "scripts" / "check_governance.py")],
+def run_checker(root: Path, *args: str) -> subprocess.CompletedProcess:
+    return subprocess.run(["python3", str(root / "scripts" / "check_governance.py"), *args],
                           capture_output=True, text=True, timeout=120)
 
 
@@ -275,3 +281,88 @@ def test_path_tokens_take_paths_and_leave_flags_and_words():
     assert list(CHK.path_tokens("matrix.json,")) == ["matrix.json"]
     assert list(CHK.path_tokens("status")) == []
     assert list(CHK.path_tokens("MAJOR.MINOR")) == []
+
+
+USAGE = "usage: check_governance.py [-h] [root]\n"
+
+
+@pytest.mark.parametrize("args", [
+    ["--help"],
+    ["-h"],
+    ["--bogus", "--help"],
+    ["--help", "--bogus"],
+    ["no-such-tree", "-h"],
+])
+def test_help_prints_the_usage_and_checks_nothing(args):
+    # The first argument used to be taken as the repository root, so "--help" was read as a
+    # path: the run reported G1 for a page that exists and exited 1. argparse acts on --help
+    # or -h where it stands and names an argument it does not know only once it has read
+    # them all, so help beside such an argument prints the usage and exits 0.
+    r = run_checker(ROOT, *args)
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert r.stdout.startswith(USAGE), r.stdout
+    # argparse wraps the description to the terminal width.
+    assert CHK.DESCRIPTION in " ".join(r.stdout.split()), r.stdout
+    assert "OK:" not in r.stdout and "FAIL" not in r.stdout, r.stdout
+    assert r.stderr == "", r.stderr
+
+
+@pytest.mark.parametrize("args,unknown", [
+    (["--bogus"], "--bogus"),
+    (["--he"], "--he"),
+    ([".", "extra"], "extra"),
+])
+def test_an_argument_the_script_does_not_know_exits_2_and_checks_nothing(args, unknown):
+    # "--bogus" used to be read as the repository root and reported as G1 with exit 1.
+    r = run_checker(ROOT, *args)
+    assert r.returncode == 2, r.stdout + r.stderr
+    assert r.stdout == "", r.stdout
+    assert r.stderr.startswith(USAGE), r.stderr
+    assert f"unrecognized arguments: {unknown}\n" in r.stderr, r.stderr
+
+
+@pytest.mark.parametrize("case", ["missing", "file", "empty"])
+def test_root_argument_that_names_no_directory_is_named(case):
+    # Such an argument used to be reported as the same G1 line, which named no path. An empty
+    # argument is read as written, not as the working directory.
+    with tempfile.TemporaryDirectory(prefix="atm-governance-") as td:
+        page = Path(td) / PAGE
+        page.write_text("# Governance\n", encoding="utf-8")
+        arg = {"missing": str(Path(td) / "no-such-tree"), "file": str(page), "empty": ""}[case]
+        r = run_checker(ROOT, arg)
+    assert r.returncode == 1, r.stdout + r.stderr
+    assert r.stdout == f"FAIL: the root argument {arg!r} names no directory, so no check was run\n", r.stdout
+    assert r.stderr == "", r.stderr
+
+
+def test_root_argument_is_the_tree_checked_and_g1_names_it(tree):
+    # The shipped tree holds the page, so a G1 failure here comes from the tree the argument
+    # names, and the line names that tree.
+    (tree / PAGE).unlink()
+    r = run_checker(ROOT, str(tree))
+    assert r.returncode == 1, r.stdout + r.stderr
+    assert r.stdout == ("FAIL: 1 governance check(s) failed:\n"
+                        f"  - G1 {PAGE} does not exist at the repository root {tree.resolve()}\n"), r.stdout
+
+
+def test_help_prints_the_usage_under_python_oo():
+    # -OO strips docstrings, so the help description cannot be read from __doc__.
+    r = subprocess.run(["python3", "-OO", str(CHECKER), "--help"],
+                       capture_output=True, text=True, timeout=120)
+    assert r.returncode == 0, r.stderr
+    assert CHK.DESCRIPTION in " ".join(r.stdout.split()), r.stdout
+
+
+def test_the_description_states_what_the_arguments_do():
+    doc = CHK.__doc__
+    assert CHK.DESCRIPTION == doc.splitlines()[0]
+    prose = " ".join(doc.split())
+    assert ("A root argument that names no directory, such as a path that does not exist, the "
+            "path of a file or an empty argument, prints one line that names it and exits 1 "
+            "without running a check.") in prose
+    assert "``--help`` (or ``-h``) prints the usage and exits 0." in prose
+    assert ("An option the script does not know, such as ``--bogus``, or a second argument "
+            "prints the usage and exits 2 without checking anything.") in prose
+    assert ("Help takes precedence over an argument the script does not know: given together "
+            "in either order, as in ``--bogus --help``, they print the usage and exit 0, again "
+            "without checking anything.") in prose
