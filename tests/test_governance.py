@@ -18,7 +18,7 @@ The arguments are read by a parser: --help and -h print the usage and exit 0, al
 option the script does not know, and such an option, such as --bogus, or a second argument
 prints the usage and exits 2; neither run checks anything. A root argument that names no
 directory fails with one line that names it, and a root that is a directory is the tree
-checked, named by G1 when the page is missing there.
+checked, named by G1 when the page there is missing or is not valid UTF-8.
 """
 
 import importlib.util
@@ -210,11 +210,12 @@ NOT_UTF8 = "is not valid UTF-8 (byte 0x{:02x} on line {}); save it as UTF-8 so"
 
 
 def test_page_that_is_not_utf8_is_reported(tree):
+    # With no root argument the root is the tree that holds the checker, and G1 names it.
     (tree / PAGE).write_bytes(b"\xff\xfe# Governance\n")
     r = run_checker(tree)
     assert r.returncode == 1, r.stdout + r.stderr
     assert failure_lines(r) == [
-        f"  - G1 {PAGE} {NOT_UTF8.format(0xff, 1)} it can be checked"
+        f"  - G1 {PAGE} at the repository root {tree.resolve()} {NOT_UTF8.format(0xff, 1)} it can be checked"
     ], r.stdout
 
 
@@ -343,6 +344,20 @@ def test_root_argument_is_the_tree_checked_and_g1_names_it(tree):
     assert r.returncode == 1, r.stdout + r.stderr
     assert r.stdout == ("FAIL: 1 governance check(s) failed:\n"
                         f"  - G1 {PAGE} does not exist at the repository root {tree.resolve()}\n"), r.stdout
+
+
+def test_root_argument_whose_page_is_not_utf8_is_named_by_g1():
+    # The G1 line for a page that is not valid UTF-8 named the page only, so it did not say
+    # which root held it; it names the root, as the G1 line for a missing page does.
+    with tempfile.TemporaryDirectory(prefix="atm-governance-") as td:
+        root = Path(td).resolve()
+        (root / PAGE).write_bytes(b"\xff\xfe# Governance\n")
+        r = run_checker(ROOT, str(root))
+    assert r.returncode == 1, r.stdout + r.stderr
+    assert r.stdout == ("FAIL: 1 governance check(s) failed:\n"
+                        f"  - G1 {PAGE} at the repository root {root} {NOT_UTF8.format(0xff, 1)} "
+                        "it can be checked\n"), r.stdout
+    assert r.stderr == "", r.stderr
 
 
 def test_help_prints_the_usage_under_python_oo():
