@@ -6,9 +6,10 @@ Standard library only, no network. Two passes:
 1. Shape. matrix.json is checked against schema/threat-matrix-v1.2.schema.json by
    the subset JSON Schema checker below. The subset is what that schema uses:
    ``type``, ``required``, ``properties``, ``additionalProperties``, ``items``,
-   ``enum``, ``const``, ``pattern`` and local ``$ref`` into ``$defs``. Any other
-   keyword in the schema is a fault in this checker's coverage and fails loudly
-   rather than being silently ignored.
+   ``enum``, ``const``, ``pattern``, ``minimum``, ``maximum`` and local ``$ref``
+   into ``$defs``. Any other keyword in the schema is a fault in this checker's
+   coverage and fails loudly rather than being silently ignored. A ``number`` is
+   finite: the NaN and Infinity that Python's json module reads are not JSON numbers.
 
 2. Semantics, one line per failure:
 
@@ -46,11 +47,14 @@ Standard library only, no network. Two passes:
         STIX object takes its ``modified`` date from it, so a stale ``updated``
         dates new content before it existed. Skipped where ROOT is not the top of
         a git work tree or ``HEAD`` carries no matrix.json
+   - S14 a technique whose ``wildPrevalence`` is above 0 has a ``wildSampleCount``
+        above 0: a prevalence with no samples behind it was not measured
 
 Exit 0 when everything holds, 1 otherwise.
 """
 
 import json
+import math
 import os
 import re
 import subprocess
@@ -79,7 +83,7 @@ GIT_LOCATION_VARS = ("GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR", "GIT_INDEX_FI
 
 SUPPORTED = {
     "type", "required", "properties", "additionalProperties", "items", "enum", "const",
-    "pattern", "$ref",
+    "pattern", "minimum", "maximum", "$ref",
     # annotation-only keywords: carried in the schema for readers, no validation effect
     "$schema", "$id", "title", "description", "$defs", "x-semantic",
 }
@@ -89,7 +93,7 @@ TYPE_CHECKS = {
     "array": lambda v: isinstance(v, list),
     "string": lambda v: isinstance(v, str),
     "integer": lambda v: isinstance(v, int) and not isinstance(v, bool),
-    "number": lambda v: isinstance(v, (int, float)) and not isinstance(v, bool),
+    "number": lambda v: isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v),
     "boolean": lambda v: isinstance(v, bool),
     "null": lambda v: v is None,
 }
@@ -133,6 +137,12 @@ class SchemaChecker:
         if "pattern" in schema and isinstance(value, str):
             if not re.search(schema["pattern"], value):
                 self.errors.append(f"{path}: {value!r} does not match {schema['pattern']}")
+
+        if TYPE_CHECKS["number"](value):
+            if "minimum" in schema and value < schema["minimum"]:
+                self.errors.append(f"{path}: {value!r} is below the minimum {schema['minimum']}")
+            if "maximum" in schema and value > schema["maximum"]:
+                self.errors.append(f"{path}: {value!r} is above the maximum {schema['maximum']}")
 
         if isinstance(value, dict):
             for key in schema.get("required", []):
@@ -288,6 +298,13 @@ def semantic_checks(matrix: dict, readiness: dict, technique_ids_file, errors: l
             errors.append(
                 f"S12 {tid}: evidenceTier is adapted (no lab reproduction) but dvaaValidation names "
                 f"{scenario!r}; set it to null, or reproduce the technique and re-tier it validated"
+            )
+
+        if t["wildPrevalence"] > 0 and t["wildSampleCount"] == 0:
+            errors.append(
+                f"S14 {tid}: wildPrevalence is {t['wildPrevalence']!r} but wildSampleCount is 0; a "
+                f"prevalence with no samples behind it was not measured, so read both from the "
+                f"registry with scripts/sync_wild_prevalence.py rather than editing them"
             )
 
         status = t.get("status", "active")
