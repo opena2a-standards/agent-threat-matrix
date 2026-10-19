@@ -146,7 +146,14 @@ argument the script does not know: given together in either order, as in
 checking or writing anything. A read of matrix.json that raises an OSError, a ValueError or
 a RecursionError (see ``read_matrix``) is reported in one line on standard error,
 ``matrix.json is missing or does not parse: <reason>``, and the run exits 1 without
-checking or writing anything.
+checking or writing anything. So is a matrix.json that parses but does not hold what this
+check needs from it (see ``SHAPE``), in the line
+``matrix.json parses but has the wrong shape: <reason>``: an object whose ``techniques``
+array holds objects with a string ``id`` and ``name`` and a ``tactic``, ``attackClass`` and
+``evidenceTier`` that are each absent, null or a string, whose ``tactics`` array holds
+objects with a string ``id`` and ``name`` and an ``order``, and whose ``attackClasses``, when
+present, is an array of objects with a string ``id``, ``category`` and ``description`` and
+``techniques`` that are absent, null or an array of strings.
 """
 
 import argparse
@@ -708,6 +715,90 @@ def read_matrix():
         return None, str(exc)
 
 
+# What ``wrong_shape`` asks of a key it reads from an object: present, with any value;
+# present, as a string; absent, null or a string; absent, null or an array of strings. Each
+# but the first is worded as the reason line words it.
+ANY, STRING = "any value", "a string"
+STRING_OR_NULL, STRINGS_OR_NULL = "a string or null", "an array of strings or null"
+
+# What this check needs from matrix.json, in the order ``wrong_shape`` checks it: each array,
+# whether the top level must hold it (an absent attackClasses is read as no classes), and the
+# keys of its objects, with what each must hold. An id is a string, as
+# scripts/check_canonical_classes.py asks, and so is a name, category or description, which
+# the check uses as text. A technique's tactic, attackClass and evidenceTier, which the check
+# groups techniques by, are each absent, null or a string, and a class's techniques, which it
+# sorts beside technique ids, are absent, null or an array of strings. ``order`` is only
+# compared and written as text, so it may hold any value, and so may the top-level
+# ``version``, which may also be absent; a key the check only tests for emptiness, as it does
+# ``hmaChecks``, is not listed.
+SHAPE = (
+    ("techniques", True, (("id", STRING), ("name", STRING), ("tactic", STRING_OR_NULL),
+                          ("attackClass", STRING_OR_NULL), ("evidenceTier", STRING_OR_NULL))),
+    ("tactics", True, (("id", STRING), ("name", STRING), ("order", ANY))),
+    ("attackClasses", False, (("id", STRING), ("category", STRING), ("description", STRING),
+                              ("techniques", STRINGS_OR_NULL))),
+)
+
+
+def json_type(value):
+    """The JSON type of a parsed value, with its article, as in "an array" or "null"."""
+    if value is None:
+        return "null"
+    if isinstance(value, bool):
+        return "a boolean"
+    if isinstance(value, (int, float)):
+        return "a number"
+    if isinstance(value, str):
+        return "a string"
+    if isinstance(value, list):
+        return "an array"
+    return "an object"
+
+
+def wrong_value(item, field, kind, where):
+    """None when the object ``item`` holds ``field`` as ``kind`` asks, or the reason it does
+    not; ``where`` names the object, as in "techniques[0]"."""
+    if field not in item:
+        return None if kind in (STRING_OR_NULL, STRINGS_OR_NULL) else f"{where} has no {field}"
+    value = item[field]
+    if kind == ANY or (value is None and kind != STRING):
+        return None
+    if kind == STRINGS_OR_NULL:
+        if not isinstance(value, list):
+            return f"{where}.{field} is {json_type(value)}, not {kind}"
+        for n, entry in enumerate(value):
+            if not isinstance(entry, str):
+                return f"{where}.{field}[{n}] is {json_type(entry)}, not a string"
+        return None
+    if not isinstance(value, str):
+        return f"{where}.{field} is {json_type(value)}, not {kind}"
+    return None
+
+
+def wrong_shape(matrix):
+    """None when the parsed matrix.json holds what ``SHAPE`` says this check needs from it,
+    or the reason it does not, naming the first place that fails in the words
+    scripts/check_canonical_classes.py uses, as in "techniques[0] has no id"."""
+    if not isinstance(matrix, dict):
+        return f"the top level is {json_type(matrix)}, not an object"
+    for key, required, fields in SHAPE:
+        if key not in matrix:
+            if required:
+                return f"the top level has no {key} key"
+            continue
+        items = matrix[key]
+        if not isinstance(items, list):
+            return f"{key} is {json_type(items)}, not an array"
+        for index, item in enumerate(items):
+            if not isinstance(item, dict):
+                return f"{key}[{index}] is {json_type(item)}, not an object"
+            for field, kind in fields:
+                cause = wrong_value(item, field, kind, f"{key}[{index}]")
+                if cause is not None:
+                    return cause
+    return None
+
+
 def main(argv):
     # An argument this script does not know ends the run with exit 2 before anything is
     # read or written: a mistyped --fix must not report the README as checked. argparse
@@ -723,6 +814,10 @@ def main(argv):
     matrix, cause = read_matrix()
     if cause is not None:
         print(f"matrix.json is missing or does not parse: {cause}", file=sys.stderr)
+        return 1
+    cause = wrong_shape(matrix)
+    if cause is not None:
+        print(f"matrix.json parses but has the wrong shape: {cause}", file=sys.stderr)
         return 1
     pages = Pages(ROOT)
 

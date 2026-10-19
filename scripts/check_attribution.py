@@ -28,7 +28,9 @@ where content came from, not text a script may invent. Exit 0 when all six hold,
 otherwise, printing one line per violation. A read of matrix.json that raises an OSError,
 a ValueError or a RecursionError (see ``read_matrix``) is reported in one line on standard
 error, ``FAIL: matrix.json is missing or does not parse: <reason>``, and the run exits 1
-without checking anything.
+without checking anything. So is a matrix.json that parses but is not an object whose
+``techniques`` array holds objects with a string ``id`` (see ``wrong_shape``), in the line
+``FAIL: matrix.json parses but has the wrong shape: <reason>``.
 """
 
 import json
@@ -83,6 +85,47 @@ def read_matrix(root: Path):
         return None, exc.strerror or str(exc)
     except (ValueError, RecursionError) as exc:
         return None, str(exc)
+
+
+def json_type(value) -> str:
+    """The JSON type of a parsed value, with its article, as in "an array" or "null"."""
+    if value is None:
+        return "null"
+    if isinstance(value, bool):
+        return "a boolean"
+    if isinstance(value, (int, float)):
+        return "a number"
+    if isinstance(value, str):
+        return "a string"
+    if isinstance(value, list):
+        return "an array"
+    return "an object"
+
+
+def wrong_shape(matrix):
+    """None when the parsed matrix.json is an object whose ``techniques`` array holds objects
+    with a string ``id``, the one value this check reads from it; otherwise the reason it is
+    not, naming the first place that fails, as scripts/check_canonical_classes.py words it.
+
+    The checks hold these ids in sets beside the ids ATTRIBUTION.md lists, and sort and print
+    them, so an id that is not a string can end the run with a traceback: an array is not
+    hashable, and a number does not sort beside a string.
+    """
+    if not isinstance(matrix, dict):
+        return f"the top level is {json_type(matrix)}, not an object"
+    if "techniques" not in matrix:
+        return "the top level has no techniques key"
+    techniques = matrix["techniques"]
+    if not isinstance(techniques, list):
+        return f"techniques is {json_type(techniques)}, not an array"
+    for index, technique in enumerate(techniques):
+        if not isinstance(technique, dict):
+            return f"techniques[{index}] is {json_type(technique)}, not an object"
+        if "id" not in technique:
+            return f"techniques[{index}] has no id"
+        if not isinstance(technique["id"], str):
+            return f"techniques[{index}].id is {json_type(technique['id'])}, not a string"
+    return None
 
 
 def load_matrix_ids(root: Path) -> set:
@@ -184,9 +227,13 @@ def run_checks(root: Path) -> list:
 
 
 def main(argv: list) -> int:
-    _matrix, cause = read_matrix(ROOT)
+    matrix, cause = read_matrix(ROOT)
     if cause is not None:
         print(f"FAIL: matrix.json is missing or does not parse: {cause}", file=sys.stderr)
+        return 1
+    cause = wrong_shape(matrix)
+    if cause is not None:
+        print(f"FAIL: matrix.json parses but has the wrong shape: {cause}", file=sys.stderr)
         return 1
     failures = run_checks(ROOT)
     if failures:

@@ -33,7 +33,10 @@ the C5 failure. Exit 0 when all eight hold, 1 otherwise, printing one line per v
 A read of matrix.json that raises an OSError, a ValueError or a RecursionError (see
 ``read_matrix``) is reported in one line on standard error,
 ``FAIL: matrix.json is missing or does not parse: <reason>``, and the run exits 1 without
-checking anything or, under ``--fix``, writing anything.
+checking anything or, under ``--fix``, writing anything. So is a matrix.json that parses but
+is not an object whose ``techniques`` and ``attackClasses`` arrays hold objects with a string
+``id`` (see ``wrong_shape``), in the line
+``FAIL: matrix.json parses but has the wrong shape: <reason>``.
 """
 
 import json
@@ -117,6 +120,50 @@ def read_matrix(root: Path):
         return None, exc.strerror or str(exc)
     except (ValueError, RecursionError) as exc:
         return None, str(exc)
+
+
+def json_type(value) -> str:
+    """The JSON type of a parsed value, with its article, as in "an array" or "null"."""
+    if value is None:
+        return "null"
+    if isinstance(value, bool):
+        return "a boolean"
+    if isinstance(value, (int, float)):
+        return "a number"
+    if isinstance(value, str):
+        return "a string"
+    if isinstance(value, list):
+        return "an array"
+    return "an object"
+
+
+def wrong_shape(matrix):
+    """None when the parsed matrix.json is an object whose ``techniques`` and
+    ``attackClasses`` arrays hold objects with a string ``id``, the values this check reads
+    from it besides ``version``, which may be absent or hold any value; otherwise the reason
+    it is not, naming the first place that fails, as scripts/check_canonical_classes.py
+    words it.
+
+    The checks hold these ids in sets beside the ids cross-references/ names, and sort and
+    print the technique ids, so an id that is not a string can end the run with a traceback:
+    an array is not hashable, and a number does not sort beside a string.
+    """
+    if not isinstance(matrix, dict):
+        return f"the top level is {json_type(matrix)}, not an object"
+    for key in ("techniques", "attackClasses"):
+        if key not in matrix:
+            return f"the top level has no {key} key"
+        items = matrix[key]
+        if not isinstance(items, list):
+            return f"{key} is {json_type(items)}, not an array"
+        for index, item in enumerate(items):
+            if not isinstance(item, dict):
+                return f"{key}[{index}] is {json_type(item)}, not an object"
+            if "id" not in item:
+                return f"{key}[{index}] has no id"
+            if not isinstance(item["id"], str):
+                return f"{key}[{index}].id is {json_type(item['id'])}, not a string"
+    return None
 
 
 def load_matrix(root: Path):
@@ -378,9 +425,13 @@ def fix_block(root: Path):
 
 def main(argv: list) -> int:
     fix = "--fix" in argv
-    _matrix, cause = read_matrix(ROOT)
+    matrix, cause = read_matrix(ROOT)
     if cause is not None:
         print(f"FAIL: matrix.json is missing or does not parse: {cause}", file=sys.stderr)
+        return 1
+    cause = wrong_shape(matrix)
+    if cause is not None:
+        print(f"FAIL: matrix.json parses but has the wrong shape: {cause}", file=sys.stderr)
         return 1
     if fix and end_before_begin((ROOT / "cross-references" / INDEX_NAME).read_text()):
         # An END marker before the BEGIN marker leaves no block to rewrite, so nothing is
