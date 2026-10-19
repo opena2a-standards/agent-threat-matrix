@@ -40,8 +40,8 @@ Mitigation section, and a missing Mitigation section have no single place to wri
 to, and a Mitigation section that holds a fenced code block may hold the rest of the page
 behind an unclosed fence, so ``--fix`` reports each of them and still exits 1.
 
-A read of matrix.json that raises an OSError or a ValueError (see ``read_matrix``) is
-reported in one line on standard error,
+A read of matrix.json that raises an OSError, a ValueError or a RecursionError (see
+``read_matrix``) is reported in one line on standard error,
 ``FAIL: matrix.json is missing or does not parse: <reason>``, and the run exits 1 without
 checking or writing a page, with ``--fix`` as without it.
 """
@@ -499,9 +499,10 @@ def read_matrix():
 
     The reasons are the ones scripts/validate_matrix.py gives for the same file: "no such
     file", "a directory, not a file", the system's reason for another OSError, its strerror,
-    as in "Permission denied", and the message of a ValueError, raised for a syntax error,
-    an integer longer than Python's int string conversion limit and bytes that are not
-    UTF-8, among others.
+    as in "Permission denied", the message of a ValueError, raised for a syntax error, an
+    integer longer than Python's int string conversion limit and bytes that are not UTF-8,
+    among others, and the message of the RecursionError, which is not a ValueError, that
+    json.loads raises for arrays or objects nested deeper than it parses.
     """
     try:
         return json.loads((ROOT / "matrix.json").read_text(encoding="utf-8")), None
@@ -511,7 +512,7 @@ def read_matrix():
         return None, "a directory, not a file"
     except OSError as exc:
         return None, exc.strerror or str(exc)
-    except ValueError as exc:
+    except (ValueError, RecursionError) as exc:
         return None, str(exc)
 
 

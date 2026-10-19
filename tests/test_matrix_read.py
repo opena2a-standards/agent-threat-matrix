@@ -3,12 +3,13 @@
 scripts/check_readme_claims.py, scripts/check_technique_pages.py,
 scripts/check_cross_references.py and scripts/check_attribution.py read matrix.json with no
 error handling, so a directory at that path or a file holding only "{" stopped each of them
-with a traceback ending in an IsADirectoryError or a json.JSONDecodeError. Each must print
-one line on standard error naming the file and the cause, with the reason
-scripts/validate_matrix.py gives for the same file, print nothing on standard output, write
-nothing and exit 1, with ``--fix`` as without it. scripts/check_readme_claims.py prints the
-line scripts/check_canonical_classes.py prints; the other three put "FAIL: " before it, as
-their other failure lines start.
+with a traceback ending in an IsADirectoryError or a json.JSONDecodeError, and arrays or
+objects nested deeper than the JSON parser reads stopped each with one ending in a
+RecursionError, which is not a ValueError. Each must print one line on standard error naming
+the file and the cause, with the reason scripts/validate_matrix.py gives for the same file,
+print nothing on standard output, write nothing and exit 1, with ``--fix`` as without it.
+scripts/check_readme_claims.py prints the line scripts/check_canonical_classes.py prints;
+the other three put "FAIL: " before it, as their other failure lines start.
 
 Each case runs the script from a scratch copy of the script and the files it reads, with
 matrix.json replaced, so the shipped tree is never written. With the shipped matrix.json the
@@ -82,8 +83,12 @@ def run(root: Path, script: str, *args: str) -> subprocess.CompletedProcess:
 
 
 def line_matches(got: str, want: str) -> bool:
-    """want in full, or, when it ends in "...", the start of got."""
-    return got.startswith(want[:-3]) if want.endswith("...") else got == want
+    """want in full, or, when it holds "...", a got that starts with the text before the
+    "..." and ends with the text after it."""
+    head, dots, tail = want.partition("...")
+    if not dots:
+        return got == want
+    return len(got) >= len(head) + len(tail) and got.startswith(head) and got.endswith(tail)
 
 
 def missing(path: Path):
@@ -111,6 +116,20 @@ def long_integer(path: Path):
     path.write_bytes(b'{"huge": ' + b"1" * 4301 + b"}")
 
 
+NESTING = 200000
+
+
+def nested_arrays(path: Path):
+    """Arrays nested NESTING levels deep: json.loads raises a RecursionError on them, which
+    is not a ValueError (tried on Python 3.12, 3.13 and 3.14)."""
+    path.write_bytes(b"[" * NESTING + b"]" * NESTING)
+
+
+def nested_objects(path: Path):
+    """Objects nested NESTING levels deep, each the value of "a" in the object around it."""
+    path.write_bytes(b'{"a": ' * NESTING + b"1" + b"}" * NESTING)
+
+
 # (name, what make(path) leaves at matrix.json, the reason the read line gives, marks)
 CASES = [
     ("missing", missing, "no such file", ()),
@@ -123,6 +142,12 @@ CASES = [
     ("4301-digit integer", long_integer,
      "Exceeds the limit (4300 digits) for integer string conversion: value has 4301 digits...",
      INT_LIMIT),
+    # The start of the reason differs between Python versions: "maximum recursion depth
+    # exceeded" on 3.12 and 3.13, "Stack overflow (used ... kB)" on 3.14.
+    ("arrays nested 200000 levels deep", nested_arrays,
+     "... while decoding a JSON array from a unicode string", ()),
+    ("objects nested 200000 levels deep", nested_objects,
+     "... while decoding a JSON object from a unicode string", ()),
 ]
 
 
