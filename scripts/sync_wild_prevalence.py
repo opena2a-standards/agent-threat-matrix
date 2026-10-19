@@ -21,8 +21,10 @@ Usage::
 
 Refused, with matrix.json left as it was: a response that cannot be fetched or does not
 parse, holds no technique list, lists an entry without a string id or one id twice, or
-lists none of the technique ids in matrix.json; a ``wildPrevalence`` that is not a number
-from 0 to 100; a ``wildSampleCount`` that is not a whole number of 0 or more; and a
+lists none of the technique ids in matrix.json; a ``wildPrevalence`` or ``wildSampleCount``
+that is an integer too large to convert to a 64-bit float, which JSON allows and
+scripts/validate_matrix.py reports as not a finite number; a ``wildPrevalence`` that is not
+a number from 0 to 100; a ``wildSampleCount`` that is not a whole number of 0 or more; and a
 ``wildPrevalence`` above 0 served with a ``wildSampleCount`` of 0.
 
 Exit 0 when matrix.json was written or already held the values, 1 when the response is
@@ -55,8 +57,24 @@ class Refused(Exception):
     """The response cannot be written into matrix.json; the message says why."""
 
 
+def too_large_for_float(value) -> bool:
+    """Whether value is an int too large to convert to a 64-bit float.
+
+    JSON allows an integer of any length, but math.isfinite converts an int to a float
+    first and raises OverflowError on such an int, so is_number asks this first.
+    """
+    if not isinstance(value, int) or isinstance(value, bool):
+        return False
+    try:
+        float(value)
+    except OverflowError:
+        return True
+    return False
+
+
 def is_number(value) -> bool:
-    return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
+    return (isinstance(value, (int, float)) and not isinstance(value, bool)
+            and not too_large_for_float(value) and math.isfinite(value))
 
 
 def served_values(payload) -> dict:
@@ -75,6 +93,10 @@ def served_values(payload) -> dict:
         samples = entry.get("wildSampleCount")
         prevalence = 0 if prevalence is None else prevalence
         samples = 0 if samples is None else samples
+        for name, value in (("wildPrevalence", prevalence), ("wildSampleCount", samples)):
+            if too_large_for_float(value):
+                raise Refused(f"{tid}: {name} is an integer of {len(str(abs(value)))} digits, too large "
+                              f"for a 64-bit float, so it is not a finite number")
         if not (is_number(prevalence) and 0 <= prevalence <= 100):
             raise Refused(f"{tid}: wildPrevalence {prevalence!r} is not a number from 0 to 100")
         if not (isinstance(samples, int) and not isinstance(samples, bool) and samples >= 0):

@@ -109,6 +109,14 @@ def _drop_source(m):
     del m["wildPrevalenceSource"]
 
 
+# 10 ** 400 has 401 digits: JSON allows an integer that long, and it is too large to convert
+# to a 64-bit float.
+HUGE = 10 ** 400
+TOO_LARGE = "an integer of 401 digits is too large for a 64-bit float, so it is not a finite number"
+# The largest finite 64-bit float, a whole number of 309 digits.
+LARGEST = int(sys.float_info.max)
+
+
 RED = [
     ("technique without wildPrevalence", _drop("wildPrevalence"),
      "matrix.techniques[0]: missing required property 'wildPrevalence'"),
@@ -128,6 +136,12 @@ RED = [
      "matrix.techniques[0].wildPrevalence: expected type number, got float"),
     ("prevalence Infinity", _set("wildPrevalence", float("inf")),
      "matrix.techniques[0].wildPrevalence: expected type number, got float"),
+    ("prevalence too large for a float", _set("wildPrevalence", HUGE),
+     f"matrix.techniques[0].wildPrevalence: {TOO_LARGE}"),
+    ("negative prevalence too large for a float", _set("wildPrevalence", -HUGE),
+     f"matrix.techniques[0].wildPrevalence: {TOO_LARGE}"),
+    ("sample count too large for a float", _set("wildSampleCount", HUGE),
+     f"matrix.techniques[0].wildSampleCount: {TOO_LARGE}"),
     ("fractional sample count", _set("wildSampleCount", 1.5),
      "matrix.techniques[0].wildSampleCount: expected type integer, got float"),
     ("negative sample count", _set("wildSampleCount", -1),
@@ -153,6 +167,19 @@ def test_validator_refuses(tree, fn, needle):
     assert needle in proc.stderr, proc.stderr
 
 
+def test_validator_reports_an_integer_too_large_for_a_float_as_one_finding(tree):
+    matrix = load(tree)
+    matrix["techniques"][0]["wildSampleCount"] = HUGE
+    dump(tree, matrix)
+    proc = run_validator(tree)
+    assert proc.returncode == 1, proc.stdout + proc.stderr
+    assert proc.stderr.splitlines() == [
+        "FAIL: matrix.json does not validate (2 finding(s)):",
+        f"  - matrix.techniques[0].wildSampleCount: {TOO_LARGE}",
+        "  - semantic checks skipped until the schema violations above are fixed",
+    ], proc.stderr
+
+
 def test_s14_prevalence_above_zero_with_no_samples_is_red(tree):
     matrix = load(tree)
     first = matrix["techniques"][0]
@@ -169,6 +196,7 @@ GREEN = [
     ("prevalence at the maximum", 100, 2566),
     ("fractional prevalence", 98.44, 7610),
     ("prevalence as a float zero", 0.0, 0),
+    ("sample count at the largest finite float", 100, LARGEST),
 ]
 
 
@@ -319,6 +347,31 @@ def test_sync_refuses_and_leaves_the_tree_as_it_was(tree, fn, needle):
     assert needle in proc.stderr, proc.stderr
     assert "matrix.json is unchanged" in proc.stderr, proc.stderr
     assert ((tree / "matrix.json").read_bytes(), (tree / STIX).read_bytes()) == before
+
+
+@pytest.mark.parametrize("key", ["wildPrevalence", "wildSampleCount"])
+def test_sync_refuses_an_integer_too_large_for_a_float_and_writes_nothing(tree, key):
+    payload = {"techniques": [{"id": "T-1001", "wildPrevalence": 5, "wildSampleCount": 5}]}
+    payload["techniques"][0][key] = HUGE
+    path = write_payload(tree, payload)
+    before = (tree / "matrix.json").read_bytes(), (tree / STIX).read_bytes()
+    proc = run_sync(tree, "--payload", str(path), "--read-date", today())
+    assert proc.returncode == 1, proc.stdout + proc.stderr
+    assert proc.stderr == (f"FAIL: T-1001: {key} is an integer of 401 digits, too large for a 64-bit "
+                           f"float, so it is not a finite number; matrix.json is unchanged\n"), proc.stderr
+    assert ((tree / "matrix.json").read_bytes(), (tree / STIX).read_bytes()) == before
+
+
+def test_sync_writes_the_largest_sample_count_a_float_holds_and_the_tree_validates(tree):
+    payload = served(load(tree))
+    entry = payload["techniques"][1]
+    entry["wildSampleCount"] = LARGEST
+    path = write_payload(tree, payload)
+    proc = run_sync(tree, "--payload", str(path), "--read-date", today())
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert technique(load(tree), entry["id"])["wildSampleCount"] == LARGEST
+    validated = run_validator(tree)
+    assert validated.returncode == 0, validated.stdout + validated.stderr
 
 
 def test_sync_refuses_a_response_that_does_not_parse(tree):
