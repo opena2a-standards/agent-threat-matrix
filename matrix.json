@@ -2,7 +2,7 @@
   "version": "1.2",
   "name": "AI Agent Threat Matrix",
   "created": "2026-03-24",
-  "updated": "2026-10-12",
+  "updated": "2026-10-19",
   "stixNamespace": "d43c7092-69ad-4822-b2cb-a48e459c4580",
   "tactics": [
     {
@@ -80,7 +80,9 @@
         "1.3",
         "1.4",
         "10.5"
-      ]
+      ],
+      "wildPrevalence": 0,
+      "wildSampleCount": 0
     },
     {
       "id": "T-1002",
@@ -95,7 +97,9 @@
       "dvaaValidation": "ToolBot tools/list",
       "oasbControls": [
         "10.5"
-      ]
+      ],
+      "wildPrevalence": 100,
+      "wildSampleCount": 2566
     },
     {
       "id": "T-1003",
@@ -113,7 +117,9 @@
         "1.2",
         "1.3",
         "1.4"
-      ]
+      ],
+      "wildPrevalence": 100,
+      "wildSampleCount": 11308
     },
     {
       "id": "T-1004",
@@ -131,7 +137,9 @@
         "1.2",
         "1.3",
         "1.4"
-      ]
+      ],
+      "wildPrevalence": 0,
+      "wildSampleCount": 0
     },
     {
       "id": "T-1005",
@@ -147,7 +155,9 @@
       "dvaaValidation": "ToolBot tool catalog",
       "oasbControls": [
         "10.5"
-      ]
+      ],
+      "wildPrevalence": 0,
+      "wildSampleCount": 0
     },
     {
       "id": "T-1006",
@@ -166,7 +176,9 @@
         "7.2",
         "7.3",
         "7.4"
-      ]
+      ],
+      "wildPrevalence": 0,
+      "wildSampleCount": 0
     },
     {
       "id": "T-1007",
@@ -181,7 +193,9 @@
       "dvaaValidation": "LongwindBot context overflow",
       "oasbControls": [
         "10.5"
-      ]
+      ],
+      "wildPrevalence": 0,
+      "wildSampleCount": 0
     },
     {
       "id": "T-2001",
@@ -203,7 +217,9 @@
         "3.3",
         "3.4",
         "3.5"
-      ]
+      ],
+      "wildPrevalence": 98.44,
+      "wildSampleCount": 7610
     },
     {
       "id": "T-2002",
@@ -226,7 +242,9 @@
         "3.3",
         "3.4",
         "3.5"
-      ]
+      ],
+      "wildPrevalence": 97.97,
+      "wildSampleCount": 7592
     },
     {
       "id": "T-2003",
@@ -245,7 +263,9 @@
         "3.3",
         "3.4",
         "3.5"
-      ]
+      ],
+      "wildPrevalence": 100,
+      "wildSampleCount": 3507
     },
     {
       "id": "T-2004",
@@ -265,7 +285,9 @@
         "3.3",
         "3.4",
         "3.5"
-      ]
+      ],
+      "wildPrevalence": 100,
+      "wildSampleCount": 2886
     },
     {
       "id": "T-2005",
@@ -286,7 +308,9 @@
         "3.3",
         "3.4",
         "3.5"
-      ]
+      ],
+      "wildPrevalence": 100,
+      "wildSampleCount": 2566
     },
     {
       "id": "T-2006",
@@ -309,7 +333,9 @@
         "3.3",
         "3.4",
         "3.5"
-      ]
+      ],
+      "wildPrevalence": 100,
+      "wildSampleCount": 11099
     },
     {
       "id": "T-2007",
@@ -328,7 +354,9 @@
         "3.3",
         "3.4",
         "3.5"
-      ]
+      ],
+      "wildPrevalence": 100,
+      "wildSampleCount": 5763
     },
     {
       "id": "T-2008",
@@ -347,7 +375,9 @@
         "3.3",
         "3.4",
         "3.5"
-      ]
+      ],
+      "wildPrevalence": 97.97,
+      "wildSampleCount": 7592
     },
     {
       "id": "T-3001",
@@ -369,7 +399,9 @@
         "5.3",
         "5.4",
         "5.5"
-      ]
+      ],
+      "wildPrevalence": 100,
+      "wildSampleCount": 3716
     },
     {
       "id": "T-3002",
@@ -391,7 +423,9 @@
         "5.3",
         "5.4",
         "5.5"
-      ]
+      ],
+      "wildPrevalence": 0,
+      "wildSampleCount": 0
     },
     {
       "id": "T-3003",
@@ -410,7 +444,9 @@
         "5.3",
         "5.4",
         "5.5"
-      ]
+      ],
+      "wildPrevalence": 0,
+      "wildSampleCount": 0
     },
     {
       "id": "T-3004",
@@ -434,7 +470,9 @@
         "5.3",
         "5.4",
         "5.5"
-      ]
+      ],
+      "wildPrevalence": 0,
+      "wildSampleCount": 0
     },
     {
       "id": "T-3005",
@@ -457,7 +495,9 @@
         "5.3",
         "5.4",
         "5.5"
-      ]
+      ],
+      "wildPrevalence": 0,
+      "wildSampleCount": 0
     },
     {
       "id": "T-3006",
@@ -477,7 +517,9 @@
         "5.3",
         "5.4",
         "5.5"
-      ]
+      ],
+      "wildPrevalence": 0,
+      "wildSampleCount": 0
     },
     {
       "id": "T-4001",
@@ -498,7 +540,9 @@
         "2.3",
         "2.4",
         "2.5"
-      ]
+      ],
+      "wildPrevalence": 100,
+      "wildSampleCount": 1988
     },
     {
       "id": "T-4002",
@@ -520,7 +564,9 @@
         "2.3",
         "2.4",
         "2.5"
-      ]
+      ],
+      "wildPrevalence": 100,
+      "wildSampleCount": 2877
     },
     {
       "id": "T-4003",
@@ -539,7 +585,9 @@
         "2.3",
         "2.4",
         "2.5"
-      ]
+      ],
+      "wildPrevalence": 0,
+      "wildSampleCount": 0
     },
     {
       "id": "T-4004",
@@ -561,7 +609,9 @@
         "2.3",
         "2.4",
         "2.5"
-      ]
+      ],
+      "wildPrevalence": 100,
+      "wildSampleCount": 1870
     },
     {
       "id": "T-4005",
@@ -580,7 +630,9 @@
         "2.3",
         "2.4",
         "2.5"
-      ]
+      ],
+      "wildPrevalence": 0,
+      "wildSampleCount": 0
     },
     {
       "id": "T-4006",
@@ -600,7 +652,9 @@
         "2.3",
         "2.4",
         "2.5"
-      ]
+      ],
+      "wildPrevalence": 100,
+      "wildSampleCount": 2886
     },
     {
       "id": "T-5001",
@@ -626,7 +680,9 @@
         "7.2",
         "7.3",
         "7.4"
-      ]
+      ],
+      "wildPrevalence": 0,
+      "wildSampleCount": 0
     },
     {
       "id": "T-5002",
@@ -650,7 +706,9 @@
         "7.2",
         "7.3",
         "7.4"
-      ]
+      ],
+      "wildPrevalence": 100,
+      "wildSampleCount": 1870
     },
     {
       "id": "T-5003",
@@ -675,7 +733,9 @@
         "7.2",
         "7.3",
         "7.4"
-      ]
+      ],
+      "wildPrevalence": 0,
+      "wildSampleCount": 0
     },
     {
       "id": "T-5004",
@@ -698,7 +758,9 @@
         "7.2",
         "7.3",
         "7.4"
-      ]
+      ],
+      "wildPrevalence": 0,
+      "wildSampleCount": 0
     },
     {
       "id": "T-5005",
@@ -722,7 +784,9 @@
         "7.2",
         "7.3",
         "7.4"
-      ]
+      ],
+      "wildPrevalence": 0,
+      "wildSampleCount": 0
     },
     {
       "id": "T-5006",
@@ -747,7 +811,9 @@
         "7.2",
         "7.3",
         "7.4"
-      ]
+      ],
+      "wildPrevalence": 0,
+      "wildSampleCount": 0
     },
     {
       "id": "T-6001",
@@ -770,7 +836,9 @@
         "8.2",
         "8.3",
         "8.4"
-      ]
+      ],
+      "wildPrevalence": 100,
+      "wildSampleCount": 2015
     },
     {
       "id": "T-6002",
@@ -793,7 +861,9 @@
         "8.2",
         "8.3",
         "8.4"
-      ]
+      ],
+      "wildPrevalence": 0,
+      "wildSampleCount": 0
     },
     {
       "id": "T-6003",
@@ -818,7 +888,9 @@
         "8.2",
         "8.3",
         "8.4"
-      ]
+      ],
+      "wildPrevalence": 0,
+      "wildSampleCount": 0
     },
     {
       "id": "T-6004",
@@ -841,7 +913,9 @@
         "8.2",
         "8.3",
         "8.4"
-      ]
+      ],
+      "wildPrevalence": 100,
+      "wildSampleCount": 2019
     },
     {
       "id": "T-6005",
@@ -865,7 +939,9 @@
         "8.2",
         "8.3",
         "8.4"
-      ]
+      ],
+      "wildPrevalence": 0,
+      "wildSampleCount": 0
     },
     {
       "id": "T-6006",
@@ -885,7 +961,9 @@
         "8.2",
         "8.3",
         "8.4"
-      ]
+      ],
+      "wildPrevalence": 0,
+      "wildSampleCount": 0
     },
     {
       "id": "T-7001",
@@ -906,7 +984,9 @@
         "4.2",
         "4.3",
         "4.4"
-      ]
+      ],
+      "wildPrevalence": 0,
+      "wildSampleCount": 0
     },
     {
       "id": "T-7002",
@@ -927,7 +1007,9 @@
         "4.2",
         "4.3",
         "4.4"
-      ]
+      ],
+      "wildPrevalence": 0,
+      "wildSampleCount": 0
     },
     {
       "id": "T-7003",
@@ -948,7 +1030,9 @@
         "4.2",
         "4.3",
         "4.4"
-      ]
+      ],
+      "wildPrevalence": 0,
+      "wildSampleCount": 0
     },
     {
       "id": "T-7004",
@@ -970,7 +1054,9 @@
         "4.2",
         "4.3",
         "4.4"
-      ]
+      ],
+      "wildPrevalence": 100,
+      "wildSampleCount": 3716
     },
     {
       "id": "T-7005",
@@ -992,7 +1078,9 @@
         "4.2",
         "4.3",
         "4.4"
-      ]
+      ],
+      "wildPrevalence": 0,
+      "wildSampleCount": 0
     },
     {
       "id": "T-7006",
@@ -1013,7 +1101,9 @@
         "4.2",
         "4.3",
         "4.4"
-      ]
+      ],
+      "wildPrevalence": 0,
+      "wildSampleCount": 0
     },
     {
       "id": "T-8001",
@@ -1031,7 +1121,9 @@
       "dvaaValidation": "ToolBot send_email",
       "oasbControls": [
         "4.3"
-      ]
+      ],
+      "wildPrevalence": 0,
+      "wildSampleCount": 0
     },
     {
       "id": "T-8002",
@@ -1050,7 +1142,9 @@
       "dvaaValidation": "ToolBot fetch_url POST",
       "oasbControls": [
         "4.3"
-      ]
+      ],
+      "wildPrevalence": 100,
+      "wildSampleCount": 3717
     },
     {
       "id": "T-8003",
@@ -1067,7 +1161,9 @@
       "dvaaValidation": null,
       "oasbControls": [
         "4.3"
-      ]
+      ],
+      "wildPrevalence": 0,
+      "wildSampleCount": 0
     },
     {
       "id": "T-8004",
@@ -1086,7 +1182,9 @@
       "dvaaValidation": "L3-06",
       "oasbControls": [
         "4.3"
-      ]
+      ],
+      "wildPrevalence": 100,
+      "wildSampleCount": 2089
     },
     {
       "id": "T-8005",
@@ -1104,7 +1202,9 @@
       "dvaaValidation": "All agents",
       "oasbControls": [
         "4.3"
-      ]
+      ],
+      "wildPrevalence": 0,
+      "wildSampleCount": 0
     },
     {
       "id": "T-8006",
@@ -1123,7 +1223,9 @@
       "dvaaValidation": "sandbox-telegram-allowed",
       "oasbControls": [
         "4.3"
-      ]
+      ],
+      "wildPrevalence": 0,
+      "wildSampleCount": 0
     },
     {
       "id": "T-9001",
@@ -1143,7 +1245,9 @@
         "4.1",
         "4.2",
         "10.5"
-      ]
+      ],
+      "wildPrevalence": 0,
+      "wildSampleCount": 0
     },
     {
       "id": "T-9002",
@@ -1162,7 +1266,9 @@
         "10.2",
         "10.3",
         "10.5"
-      ]
+      ],
+      "wildPrevalence": 100,
+      "wildSampleCount": 4077
     },
     {
       "id": "T-9003",
@@ -1183,7 +1289,9 @@
         "9.1",
         "9.4",
         "10.3"
-      ]
+      ],
+      "wildPrevalence": 0,
+      "wildSampleCount": 0
     },
     {
       "id": "T-9004",
@@ -1201,7 +1309,9 @@
         "7.2",
         "7.3",
         "10.2"
-      ]
+      ],
+      "wildPrevalence": 100,
+      "wildSampleCount": 1870
     },
     {
       "id": "T-9005",
@@ -1219,7 +1329,9 @@
         "4.4",
         "10.1",
         "10.2"
-      ]
+      ],
+      "wildPrevalence": 0,
+      "wildSampleCount": 0
     },
     {
       "id": "T-9006",
@@ -1246,7 +1358,9 @@
         "6.4",
         "6.5",
         "10.5"
-      ]
+      ],
+      "wildPrevalence": 100,
+      "wildSampleCount": 2018
     },
     {
       "id": "T-2009",
@@ -1272,7 +1386,9 @@
         "3.1",
         "3.2",
         "8.1"
-      ]
+      ],
+      "wildPrevalence": 0,
+      "wildSampleCount": 0
     },
     {
       "id": "T-4007",
@@ -1298,7 +1414,9 @@
         "2.2",
         "2.3",
         "6.2"
-      ]
+      ],
+      "wildPrevalence": 100,
+      "wildSampleCount": 4655
     },
     {
       "id": "T-6007",
@@ -1324,7 +1442,9 @@
         "8.1",
         "8.2",
         "4.3"
-      ]
+      ],
+      "wildPrevalence": 100,
+      "wildSampleCount": 2015
     },
     {
       "id": "T-7007",
@@ -1351,7 +1471,9 @@
         "3.2",
         "8.1",
         "8.2"
-      ]
+      ],
+      "wildPrevalence": 0,
+      "wildSampleCount": 0
     }
   ],
   "attackClasses": [
@@ -2219,5 +2341,9 @@
       ]
     }
   ],
-  "dataSources": []
+  "dataSources": [],
+  "wildPrevalenceSource": {
+    "url": "https://api.oa2a.org/api/v1/threat-matrix",
+    "read": "2026-10-19"
+  }
 }

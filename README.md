@@ -16,6 +16,7 @@ Open [`matrix.json`](matrix.json) first. It holds every tactic, technique, attac
 | `attackClass` | The technique's primary attack class, such as `RAG-POISON` |
 | `hmaChecks`, `oasbControls` | The HackMyAgent checks that detect it and the OASB controls that defend against it |
 | `dvaaValidation` | The DVAA challenge, scenario or agent that reproduces it in the lab, or `null` |
+| `wildPrevalence`, `wildSampleCount` | The wild prevalence the registry serves for the technique, a percentage from 0 to 100, and its sample count, both 0 where it serves none; the top-level `wildPrevalenceSource` gives the endpoint and the date they were read |
 
 The tactics, in kill chain order:
 

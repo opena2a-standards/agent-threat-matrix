@@ -2,9 +2,9 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://threats.opena2a.org/schema/threat-matrix-v1.2.schema.json",
   "title": "AI Agent Threat Matrix 1.2",
-  "description": "Shape of matrix.json. Technique ids are T-NNNN, or T-NNNN.NNN for a sub-technique; sub-techniques sit flat in techniques[] and carry parentId. The nine technique fields required by 1.1 are unchanged and still required. Every field added in 1.2 is optional. scripts/validate_matrix.py checks this schema with an in-repo subset checker and then the cross-field rules the schema cannot express (see the x-semantic notes).",
+  "description": "Shape of matrix.json. Technique ids are T-NNNN, or T-NNNN.NNN for a sub-technique; sub-techniques sit flat in techniques[] and carry parentId. The nine technique fields required by 1.1 are unchanged and still required. Every field added in 1.2 is optional. Added after the 1.2 release and required: wildPrevalence and wildSampleCount on every technique, and the top-level wildPrevalenceSource that says where and when they were read. scripts/validate_matrix.py checks this schema with an in-repo subset checker and then the cross-field rules the schema cannot express (see the x-semantic notes).",
   "type": "object",
-  "required": ["version", "name", "created", "updated", "stixNamespace", "tactics", "techniques", "attackClasses", "attackPaths", "dataSources"],
+  "required": ["version", "name", "created", "updated", "stixNamespace", "tactics", "techniques", "attackClasses", "attackPaths", "dataSources", "wildPrevalenceSource"],
   "additionalProperties": false,
   "properties": {
     "version": { "const": "1.2" },
@@ -23,7 +23,8 @@
       "description": "Registry of data sources a technique may cite in its dataSources array. May be empty.",
       "type": "array",
       "items": { "$ref": "#/$defs/dataSource" }
-    }
+    },
+    "wildPrevalenceSource": { "$ref": "#/$defs/wildPrevalenceSource" }
   },
   "$defs": {
     "date": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
@@ -49,7 +50,7 @@
     },
     "technique": {
       "type": "object",
-      "required": ["id", "name", "tactic", "description", "evidenceTier", "attackClass", "hmaChecks", "dvaaValidation", "oasbControls"],
+      "required": ["id", "name", "tactic", "description", "evidenceTier", "attackClass", "hmaChecks", "dvaaValidation", "oasbControls", "wildPrevalence", "wildSampleCount"],
       "additionalProperties": false,
       "properties": {
         "id": { "$ref": "#/$defs/techniqueId" },
@@ -71,6 +72,18 @@
           "x-semantic": "must be null when evidenceTier is adapted"
         },
         "oasbControls": { "type": "array", "items": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+$" } },
+        "wildPrevalence": {
+          "description": "The wildPrevalence the registry endpoint in wildPrevalenceSource served for this technique on the read date: a percentage from 0 to 100, and 0 where it served none. Written by scripts/sync_wild_prevalence.py, not by hand. Read it with wildSampleCount and the read date. It does not set or change evidenceTier.",
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "wildSampleCount": {
+          "description": "The wildSampleCount the same endpoint served with wildPrevalence: a whole number of samples, and 0 where it served none. 0 means the technique has no wild samples behind it.",
+          "type": "integer",
+          "minimum": 0,
+          "x-semantic": "must be above 0 wherever wildPrevalence is above 0"
+        },
         "parentId": {
           "$ref": "#/$defs/parentTechniqueId",
           "x-semantic": "required if and only if id is dotted; must be the id of a technique in techniques[] and equal the part of id before the dot"
@@ -129,6 +142,16 @@
         "reference": { "type": "string" },
         "date": { "$ref": "#/$defs/date" },
         "note": { "type": "string" }
+      }
+    },
+    "wildPrevalenceSource": {
+      "description": "Where and when the wildPrevalence and wildSampleCount of every technique were read. scripts/sync_wild_prevalence.py writes it with them.",
+      "type": "object",
+      "required": ["url", "read"],
+      "additionalProperties": false,
+      "properties": {
+        "url": { "type": "string", "pattern": "^https://", "description": "The registry endpoint the values were read from." },
+        "read": { "$ref": "#/$defs/date", "description": "The date the endpoint was read." }
       }
     },
     "dataSource": {
