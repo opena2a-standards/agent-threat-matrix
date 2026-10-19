@@ -168,6 +168,15 @@ def main():
     except FileNotFoundError:
         print(f"canonical-classes.json not found at {CANONICAL}", file=sys.stderr)
         return 1
+    except IsADirectoryError:
+        print(f"canonical-classes.json at {CANONICAL} is a directory, not a file", file=sys.stderr)
+        return 1
+    except OSError as exc:
+        # another failed read, such as a file the user may not read, with the system's
+        # reason, its strerror, as in "Permission denied"
+        print(f"canonical-classes.json at {CANONICAL} cannot be read: {exc.strerror or exc}",
+              file=sys.stderr)
+        return 1
     except ValueError as exc:
         # json.JSONDecodeError is one; so are the plain ValueError json.loads raises for an
         # integer longer than Python's int string conversion limit and the UnicodeDecodeError
