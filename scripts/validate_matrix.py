@@ -465,11 +465,18 @@ def read_json(path: Path):
 
     ValueError covers more than json.JSONDecodeError: json.loads raises a plain
     ValueError for an integer literal longer than Python's int string conversion limit.
+    A directory at the path is reported as "a directory, not a file". Another OSError,
+    such as a file where a directory on the path should be or a file the user may not
+    read, is reported with the system's reason, its strerror, as in "Not a directory".
     """
     try:
         return json.loads(path.read_text(encoding="utf-8")), None
     except FileNotFoundError:
         return None, "no such file"
+    except IsADirectoryError:
+        return None, "a directory, not a file"
+    except OSError as exc:
+        return None, exc.strerror or str(exc)
     except ValueError as exc:
         return None, str(exc)
 
