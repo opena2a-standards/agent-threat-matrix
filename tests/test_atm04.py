@@ -12,7 +12,8 @@ stamp that is not a 40-hex commit sha (V6), or with a canonical-classes.json tha
 parse (a syntax error, an integer of more than 4300 digits, bytes that are not UTF-8,
 arrays or objects nested 200000 levels deep) or cannot be read (no file, a directory, a
 file whose mode is 0, a symbolic link to itself), or with a matrix.json that is missing, a
-directory, unreadable or does not parse for one of those four causes, each of which it
+directory, unreadable or does not parse for one of those four causes, or that parses but
+is not an object whose techniques array holds objects with a string id, each of which it
 reports in one line, not a traceback; AC3 and AC4 pin the CHANGELOG states (a resolvable
 docstring pointer, no internal role name).
 """
@@ -592,4 +593,66 @@ AC2_MATRIX_CASES = [
 @pytest.mark.parametrize("case", [pytest.param(fn, id=name, marks=marks)
                                   for name, fn, marks in AC2_MATRIX_CASES])
 def test_ac2_matrix_read(case):
+    case()
+
+
+# --------------------------------------------------------------------------- matrix.json shape
+
+SHAPE_LINE = "matrix.json parses but has the wrong shape: "
+
+
+def _holding(raw: bytes):
+    """A make that writes raw at matrix.json."""
+    return lambda path: path.write_bytes(raw)
+
+
+def _shipped_matrix_without_the_id_of(index: int):
+    """A make that writes the shipped matrix.json with the id of techniques[index] removed."""
+    def make(path: Path):
+        matrix = json.loads((ROOT / "matrix.json").read_text(encoding="utf-8"))
+        del matrix["techniques"][index]["id"]
+        path.write_text(json.dumps(matrix, indent=2) + "\n", encoding="utf-8")
+    return make
+
+
+AC2_MATRIX_SHAPE_CASES = [
+    ("ATM-04.AC2 a matrix.json holding an array turns the checker red with the shape line, not a traceback",
+     _ac2_matrix_turns_the_checker_red(
+         _holding(b"[]"), SHAPE_LINE + "the top level is an array, not an object")),
+    ("ATM-04.AC2 a matrix.json holding null turns the checker red with the shape line, not a traceback",
+     _ac2_matrix_turns_the_checker_red(
+         _holding(b"null"), SHAPE_LINE + "the top level is null, not an object")),
+    ("ATM-04.AC2 a matrix.json with no techniques key turns the checker red with the shape line, "
+     "not a traceback",
+     _ac2_matrix_turns_the_checker_red(
+         _holding(b"{}"), SHAPE_LINE + "the top level has no techniques key")),
+    ("ATM-04.AC2 a techniques number turns the checker red with the shape line, not a traceback",
+     _ac2_matrix_turns_the_checker_red(
+         _holding(b'{"techniques": 5}'), SHAPE_LINE + "techniques is a number, not an array")),
+    ("ATM-04.AC2 a technique with no id turns the checker red with the shape line, not a traceback",
+     _ac2_matrix_turns_the_checker_red(
+         _holding(b'{"techniques": [{}]}'), SHAPE_LINE + "techniques[0] has no id")),
+    ("ATM-04.AC2 a technique that is a number turns the checker red with the shape line, "
+     "not a traceback",
+     _ac2_matrix_turns_the_checker_red(
+         _holding(b'{"techniques": [5]}'), SHAPE_LINE + "techniques[0] is a number, not an object")),
+    ("ATM-04.AC2 a technique id that is an array turns the checker red with the shape line, "
+     "not a traceback",
+     _ac2_matrix_turns_the_checker_red(
+         _holding(b'{"techniques": [{"id": ["T-1001"]}]}'),
+         SHAPE_LINE + "techniques[0].id is an array, not a string")),
+    ("ATM-04.AC2 a number id beside a string id turns the checker red with the shape line, "
+     "not a traceback",
+     _ac2_matrix_turns_the_checker_red(
+         _holding(b'{"techniques": [{"id": 5}, {"id": "T-0000"}]}'),
+         SHAPE_LINE + "techniques[0].id is a number, not a string")),
+    ("ATM-04.AC2 the shipped matrix.json with the id of techniques[3] removed turns the checker red "
+     "with the shape line naming that technique",
+     _ac2_matrix_turns_the_checker_red(
+         _shipped_matrix_without_the_id_of(3), SHAPE_LINE + "techniques[3] has no id")),
+]
+
+
+@pytest.mark.parametrize("case", [pytest.param(fn, id=name) for name, fn in AC2_MATRIX_SHAPE_CASES])
+def test_ac2_matrix_shape(case):
     case()
