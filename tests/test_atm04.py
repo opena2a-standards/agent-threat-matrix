@@ -9,12 +9,15 @@ the readme-claims job with an untampered verdict; AC2 proves the check GREEN on 
 shipped tree and RED on a scratch copy with one technique id dropped from a primary
 array, or with a matrixVersion stamp other than the matrix.json version or a matrixCommit
 stamp that is not a 40-hex commit sha (V6), or with a canonical-classes.json that does not
-parse (a syntax error, an integer of more than 4300 digits, bytes that are not UTF-8), which
-it reports in one line, not a traceback; AC3 and AC4 pin the CHANGELOG states (a resolvable
-docstring pointer, no internal role name).
+parse (a syntax error, an integer of more than 4300 digits, bytes that are not UTF-8) or
+cannot be read (no file, a directory, a file whose mode is 0, a symbolic link to itself),
+or with a matrix.json that is missing, a directory, unreadable or does not parse for one of
+those three causes, each of which it reports in one line, not a traceback; AC3 and AC4 pin
+the CHANGELOG states (a resolvable docstring pointer, no internal role name).
 """
 
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -412,4 +415,143 @@ AC2_PARSE_CASES = [
 @pytest.mark.parametrize("case", [pytest.param(fn, id=name, marks=marks)
                                   for name, fn, marks in AC2_PARSE_CASES])
 def test_ac2_parse(case):
+    case()
+
+
+# --------------------------------------------------------------------------- V1 read
+
+NOT_ROOT = pytest.mark.skipif(not hasattr(os, "geteuid") or os.geteuid() == 0,
+                              reason="root reads a file whatever its mode")
+
+
+def _scratch_tree_where(place) -> Path:
+    """A scratch copy of the tree where place(path) puts what stands at the path of
+    canonical-classes.json, if anything."""
+    td = Path(tempfile.mkdtemp(prefix="atm04-"))
+    (td / "scripts").mkdir()
+    shutil.copy(CHECKER, td / "scripts" / "check_canonical_classes.py")
+    shutil.copy(ROOT / "matrix.json", td / "matrix.json")
+    place(td / "canonical-classes.json")
+    return td
+
+
+def _unreadable(path: Path):
+    shutil.copy(ROOT / "canonical-classes.json", path)
+    path.chmod(0)
+
+
+def _ac2_read_turns_the_checker_red(place, line: str):
+    """line holds {path} where the checker prints the path it reads."""
+    def case():
+        scratch = _scratch_tree_where(place)
+        try:
+            proc = _run_checker(scratch)
+            assert proc.returncode == 1, proc.stdout + proc.stderr
+            assert "Traceback" not in proc.stderr, proc.stderr
+            assert proc.stdout == "", proc.stdout
+            path = scratch.resolve() / "canonical-classes.json"
+            assert proc.stderr.splitlines() == [line.format(path=path)], proc.stderr
+        finally:
+            shutil.rmtree(scratch)
+    return case
+
+
+AC2_READ_CASES = [
+    ("ATM-04.AC2 a missing canonical-classes.json turns the checker red with the not-found line",
+     _ac2_read_turns_the_checker_red(
+         lambda path: None, "canonical-classes.json not found at {path}"), ()),
+    ("ATM-04.AC2 a directory at canonical-classes.json turns the checker red with one line, "
+     "not a traceback",
+     _ac2_read_turns_the_checker_red(
+         Path.mkdir, "canonical-classes.json at {path} is a directory, not a file"), ()),
+    ("ATM-04.AC2 a canonical-classes.json of mode 0 turns the checker red with the reason the "
+     "system gives, not a traceback",
+     _ac2_read_turns_the_checker_red(
+         _unreadable, "canonical-classes.json at {path} cannot be read: Permission denied"),
+     NOT_ROOT),
+    ("ATM-04.AC2 a canonical-classes.json linked to itself turns the checker red with the reason "
+     "the system gives, not a traceback",
+     _ac2_read_turns_the_checker_red(
+         lambda path: path.symlink_to(path.name),
+         "canonical-classes.json at {path} cannot be read: Too many levels of symbolic links"), ()),
+]
+
+
+@pytest.mark.parametrize("case", [pytest.param(fn, id=name, marks=marks)
+                                  for name, fn, marks in AC2_READ_CASES])
+def test_ac2_read(case):
+    case()
+
+
+# --------------------------------------------------------------------------- matrix.json read
+
+NOT_AS_ROOT = pytest.mark.skipif(not hasattr(os, "geteuid") or os.geteuid() == 0,
+                                 reason="root reads a file whatever its mode")
+
+READ_LINE = "matrix.json is missing or does not parse: "
+
+
+def _scratch_tree_where_matrix(make) -> Path:
+    """A scratch copy of the tree in which make(path) puts what stands at matrix.json."""
+    td = Path(tempfile.mkdtemp(prefix="atm04-"))
+    (td / "scripts").mkdir()
+    shutil.copy(CHECKER, td / "scripts" / "check_canonical_classes.py")
+    shutil.copy(ROOT / "canonical-classes.json", td / "canonical-classes.json")
+    make(td / "matrix.json")
+    return td
+
+
+def _nothing(path: Path):
+    """Leave matrix.json missing."""
+
+
+def _unreadable_copy(path: Path):
+    shutil.copy(ROOT / "matrix.json", path)
+    path.chmod(0)
+
+
+def _ac2_matrix_turns_the_checker_red(make, line: str):
+    def case():
+        scratch = _scratch_tree_where_matrix(make)
+        try:
+            proc = _run_checker(scratch)
+            assert proc.returncode == 1, proc.stdout + proc.stderr
+            assert "Traceback" not in proc.stderr, proc.stderr
+            assert proc.stdout == "", proc.stdout
+            err = proc.stderr.splitlines()
+            assert len(err) == 1 and _line_matches(err[0], line), proc.stderr
+        finally:
+            shutil.rmtree(scratch)
+    return case
+
+
+AC2_MATRIX_CASES = [
+    ("ATM-04.AC2 a missing matrix.json turns the checker red with the read line, not a traceback",
+     _ac2_matrix_turns_the_checker_red(_nothing, READ_LINE + "no such file"), ()),
+    ("ATM-04.AC2 a directory at matrix.json turns the checker red with the read line, not a traceback",
+     _ac2_matrix_turns_the_checker_red(lambda path: path.mkdir(),
+                                       READ_LINE + "a directory, not a file"), ()),
+    ("ATM-04.AC2 a matrix.json of mode 0 turns the checker red with the read line, not a traceback",
+     _ac2_matrix_turns_the_checker_red(_unreadable_copy, READ_LINE + "Permission denied"),
+     NOT_AS_ROOT),
+    ("ATM-04.AC2 a matrix.json that is not UTF-8 turns the checker red with the read line, not a traceback",
+     _ac2_matrix_turns_the_checker_red(
+         lambda path: path.write_bytes(b"\xff\xfe" + (ROOT / "matrix.json").read_bytes()),
+         READ_LINE + "'utf-8' codec can't decode byte 0xff in position 0: invalid start byte"), ()),
+    ("ATM-04.AC2 a syntax error in matrix.json turns the checker red with the read line, not a traceback",
+     _ac2_matrix_turns_the_checker_red(
+         lambda path: path.write_bytes(b"{"),
+         READ_LINE + "Expecting property name enclosed in double quotes: line 1 column 2 (char 1)"),
+     ()),
+    ("ATM-04.AC2 a 4301-digit integer in matrix.json turns the checker red with the read line, not a traceback",
+     _ac2_matrix_turns_the_checker_red(
+         lambda path: path.write_bytes(b'{"huge": ' + b"1" * 4301 + b"}"),
+         READ_LINE + "Exceeds the limit (4300 digits) for integer string conversion: "
+         "value has 4301 digits..."), INT_LIMIT),
+]
+
+
+@pytest.mark.parametrize("case", [pytest.param(fn, id=name, marks=marks)
+                                  for name, fn, marks in AC2_MATRIX_CASES])
+def test_ac2_matrix_read(case):
     case()
