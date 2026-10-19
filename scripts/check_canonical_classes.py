@@ -19,7 +19,9 @@ Checks:
   40-hex sha of the commit whose matrix.json the mapping maps; an abbreviated sha is
   refused. No git is consulted, so only the shape of the sha is checked
 
-Exit 0 when the mapping holds, 1 otherwise, printing one line per violation.
+Exit 0 when the mapping holds, 1 otherwise, printing one line per violation. A read of
+matrix.json that raises an OSError or a ValueError (see ``read_matrix``) is reported in
+one line, ``matrix.json is missing or does not parse: <reason>``, and no check runs.
 """
 
 import json
@@ -162,6 +164,27 @@ def check_stamps(data, matrix_version, errors):
         errors.append(f"V6 matrixCommit {commit!r} is not a 40-hex commit sha")
 
 
+def read_matrix():
+    """(matrix.json parsed, None), or (None, the reason it could not be read or parsed).
+
+    The reasons are the ones scripts/validate_matrix.py gives for the same file: "no such
+    file", "a directory, not a file", the system's reason for another OSError, its strerror,
+    as in "Permission denied", and the message of a ValueError, raised for a syntax error,
+    an integer longer than Python's int string conversion limit and bytes that are not
+    UTF-8, among others.
+    """
+    try:
+        return json.loads(MATRIX.read_text(encoding="utf-8")), None
+    except FileNotFoundError:
+        return None, "no such file"
+    except IsADirectoryError:
+        return None, "a directory, not a file"
+    except OSError as exc:
+        return None, exc.strerror or str(exc)
+    except ValueError as exc:
+        return None, str(exc)
+
+
 def main():
     try:
         data = json.loads(CANONICAL.read_text(encoding="utf-8"))
@@ -184,7 +207,10 @@ def main():
         print(f"canonical-classes.json does not parse: {exc}", file=sys.stderr)
         return 1
 
-    matrix = json.loads(MATRIX.read_text(encoding="utf-8"))
+    matrix, cause = read_matrix()
+    if cause is not None:
+        print(f"matrix.json is missing or does not parse: {cause}", file=sys.stderr)
+        return 1
     matrix_ids = {t["id"] for t in matrix["techniques"]}
 
     errors = []
