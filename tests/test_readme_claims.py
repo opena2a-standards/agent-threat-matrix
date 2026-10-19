@@ -791,11 +791,12 @@ def test_a_wording_with_a_non_ascii_letter_is_not_read(old, new):
         shutil.rmtree(td)
 
 
-# Lines where a letter or digit outside ASCII is glued to a DVAA wording. re.ASCII also
-# narrows \b to ASCII word characters, so each of these used to be read as the wording
-# beside it ("é22 agents" as "22 agents") and fail on its number. A Unicode \b counts no
-# combining mark as a word character, so the cases with a combining mark were still read
-# under it: "é" written as "e" and U+0301 failed where the precomposed U+00E9 passed.
+# Lines where a letter, digit or combining mark outside ASCII is glued to a DVAA wording.
+# re.ASCII also narrows \b to ASCII word characters, so each of these used to be read as
+# the wording beside it ("é22 agents" as "22 agents") and fail on its number. A Unicode \b
+# counts no combining mark as a word character, so the cases with a combining mark were
+# still read under it: "é" written as "e" and U+0301 failed where the precomposed U+00E9
+# passed.
 GLUED_WORDINGS = [
     ("U+00E9 before the agent count",
      "(21 agents: 16 deliberately vulnerable", "(é22 agents: 16 deliberately vulnerable"),
@@ -830,6 +831,13 @@ GLUED_WORDINGS = [
     ("U+20DD (combining enclosing circle) on the s of agents",
      "(21 agents: 16 deliberately vulnerable",
      "(22 agents\N{COMBINING ENCLOSING CIRCLE}: 16 deliberately vulnerable"),
+    # A mark outside the Basic Multilingual Plane glues a wording as one inside it does.
+    ("U+1D165 (musical symbol combining stem, Mc) before the agent count",
+     "(21 agents: 16 deliberately vulnerable",
+     "(\N{MUSICAL SYMBOL COMBINING STEM}22 agents: 16 deliberately vulnerable"),
+    ("U+1D165 (musical symbol combining stem, Mc) on the s of agents",
+     "(21 agents: 16 deliberately vulnerable",
+     "(22 agents\N{MUSICAL SYMBOL COMBINING STEM}: 16 deliberately vulnerable"),
     # The wordings below are stated once in README, so each glued copy is added beside
     # the original rather than replacing it.
     ("U+00E9 before the deliberately vulnerable count",
@@ -855,7 +863,7 @@ GLUED_WORDINGS = [
 
 @pytest.mark.parametrize("old,new", [(o, n) for _, o, n in GLUED_WORDINGS],
                          ids=[name for name, _, _ in GLUED_WORDINGS])
-def test_a_wording_glued_to_a_non_ascii_letter_or_digit_is_not_read(old, new):
+def test_a_wording_glued_to_a_non_ascii_letter_digit_or_combining_mark_is_not_read(old, new):
     td = scratch_tree()
     try:
         mutate_readme(td, old, new)
@@ -1704,7 +1712,8 @@ def test_an_invisible_character_on_a_line_naming_neither_dvaa_nor_a_count_passes
 
 
 def test_a_wording_beside_punctuation_is_still_read():
-    # The Unicode word boundary still holds at the punctuation README puts around a figure.
+    # A wording is bounded by the absence of a Unicode word character or combining mark,
+    # and the punctuation README puts around a figure is neither, so it is still read.
     td = scratch_tree()
     try:
         mutate_readme(td, "(21 agents: 16 deliberately vulnerable",
