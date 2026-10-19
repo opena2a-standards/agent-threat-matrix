@@ -11,7 +11,9 @@ Standard library only, no network. Two passes:
    coverage and fails loudly rather than being silently ignored. A ``number`` is
    finite: the NaN and Infinity that Python's json module reads are not JSON numbers.
    An ``integer`` or ``number`` too large to convert to a 64-bit float, which JSON
-   allows, is reported as not a finite number.
+   allows, is reported as not a finite number. An integer longer than Python's int
+   string conversion limit (4300 digits by default) does not parse, and the FAIL line
+   says so with the parser's reason.
 
 2. Semantics, one line per failure:
 
@@ -274,7 +276,7 @@ def resolve_matrix_commit(commit: str, listed, errors: list) -> str:
         return "shape only: partial clone without matrix.json at that commit"
     try:
         indexed = sorted(t["id"] for t in json.loads(blob)["techniques"])
-    except (json.JSONDecodeError, KeyError, TypeError):
+    except (ValueError, KeyError, TypeError):
         errors.append(f"S11 technique-ids.json matrixCommit {commit}: matrix.json at that commit does not parse")
         return ""
     detail = id_difference(indexed, listed)
@@ -421,7 +423,7 @@ def committed_matrix():
         return None
     try:
         committed = json.loads(shown)
-    except json.JSONDecodeError:
+    except ValueError:
         return None
     return committed if isinstance(committed, dict) else None
 
@@ -458,22 +460,33 @@ def freshness_check(matrix: dict, committed, today: str, errors: list):
         )
 
 
-def load_json(path: Path):
+def read_json(path: Path):
+    """(data, None), or (None, the reason the file could not be read).
+
+    ValueError covers more than json.JSONDecodeError: json.loads raises a plain
+    ValueError for an integer literal longer than Python's int string conversion limit.
+    """
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except (FileNotFoundError, json.JSONDecodeError):
-        return None
+        return json.loads(path.read_text(encoding="utf-8")), None
+    except FileNotFoundError:
+        return None, "no such file"
+    except ValueError as exc:
+        return None, str(exc)
+
+
+def load_json(path: Path):
+    return read_json(path)[0]
 
 
 def main() -> int:
-    matrix = load_json(MATRIX)
-    schema = load_json(SCHEMA)
-    readiness = load_json(READINESS)
-    if matrix is None or schema is None or readiness is None:
-        for path, data in ((MATRIX, matrix), (SCHEMA, schema), (READINESS, readiness)):
+    loaded = {path: read_json(path) for path in (MATRIX, SCHEMA, READINESS)}
+    if any(data is None for data, _ in loaded.values()):
+        for path, (data, cause) in loaded.items():
             if data is None:
-                print(f"FAIL: {path.relative_to(ROOT)} is missing or does not parse", file=sys.stderr)
+                print(f"FAIL: {path.relative_to(ROOT)} is missing or does not parse: {cause}",
+                      file=sys.stderr)
         return 1
+    matrix, schema, readiness = (loaded[path][0] for path in (MATRIX, SCHEMA, READINESS))
 
     checker = SchemaChecker(schema)
     try:

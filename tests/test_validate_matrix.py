@@ -9,6 +9,7 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 from datetime import date
 from pathlib import Path
@@ -144,6 +145,44 @@ def test_schema_reports_an_integer_too_large_for_a_float_in_a_string_field_once(
     _red(proc, "matrix.created: expected type string, got int")
     assert "Traceback" not in proc.stderr, proc.stderr
     assert proc.stderr.count("matrix.created:") == 1, proc.stderr
+
+
+def write_long_sample_count(root: Path, digits: int) -> None:
+    """Set techniques[0].wildSampleCount to a digits-long integer by editing the text:
+    json.dumps refuses an int past Python's int string conversion limit."""
+    text = (root / "matrix.json").read_text()
+    key = '"wildSampleCount": '
+    start = text.index(key) + len(key)
+    end = start
+    while text[end].isdigit():
+        end += 1
+    (root / "matrix.json").write_text(text[:start] + "1" * digits + text[end:])
+
+
+def test_integer_at_the_int_conversion_limit_is_reported_as_too_large():
+    proc = mutate(lambda root: write_long_sample_count(root, 4300))
+    _red(proc, "matrix.techniques[0].wildSampleCount: an integer of 4300 digits is too large "
+               "for a 64-bit float, so it is not a finite number")
+    assert "Traceback" not in proc.stderr, proc.stderr
+
+
+INT_LIMIT = pytest.mark.skipif(
+    getattr(sys, "get_int_max_str_digits", lambda: 0)() != 4300,
+    reason="needs Python's default int string conversion limit of 4300 digits")
+
+
+@INT_LIMIT
+@pytest.mark.parametrize("digits", [4301, 5000])
+def test_integer_past_the_int_conversion_limit_is_a_fail_line_not_a_traceback(digits):
+    proc = mutate(lambda root: write_long_sample_count(root, digits))
+    _red(proc, "FAIL: matrix.json is missing or does not parse: Exceeds the limit (4300 digits) "
+               f"for integer string conversion: value has {digits} digits")
+    assert "Traceback" not in proc.stderr, proc.stderr
+
+
+def test_missing_matrix_names_the_cause():
+    _red(mutate(lambda root: (root / "matrix.json").unlink()),
+         "FAIL: matrix.json is missing or does not parse: no such file")
 
 
 def test_data_source_must_resolve_in_the_registry():
@@ -505,6 +544,34 @@ def test_matrix_commit_indexing_a_different_matrix_is_refused():
     _red(run_on(root),
          f"S11 technique-ids.json matrixCommit {sha} indexes a matrix.json whose ids "
          f"differ from the list: extra ['T-7007']")
+
+
+@INT_LIMIT
+def test_matrix_commit_whose_matrix_has_an_integer_past_the_conversion_limit_is_refused():
+    def stamp(root):
+        shipped = (root / "matrix.json").read_bytes()
+        write_long_sample_count(root, 4301)
+        older = commit_all(root, "matrix with a 4301-digit sample count")
+        (root / "matrix.json").write_bytes(shipped)
+        commit_all(root, "shipped matrix")
+        return older
+    root = history_tree(stamp)
+    sha = load(root, "technique-ids.json")["matrixCommit"]
+    proc = run_on(root)
+    _red(proc, f"S11 technique-ids.json matrixCommit {sha}: matrix.json at that commit does not parse")
+    assert "Traceback" not in proc.stderr, proc.stderr
+
+
+@INT_LIMIT
+def test_head_matrix_with_an_integer_past_the_conversion_limit_skips_s13():
+    root = history_tree()
+    shipped = (root / "matrix.json").read_bytes()
+    write_long_sample_count(root, 4301)
+    commit_all(root, "matrix with a 4301-digit sample count")
+    (root / "matrix.json").write_bytes(shipped)
+    proc = run_on(root)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert "Traceback" not in proc.stderr, proc.stderr
 
 
 def test_matrix_commit_naming_a_tree_is_refused():
