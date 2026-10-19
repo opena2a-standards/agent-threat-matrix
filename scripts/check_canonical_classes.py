@@ -168,7 +168,10 @@ def main():
     except FileNotFoundError:
         print(f"canonical-classes.json not found at {CANONICAL}", file=sys.stderr)
         return 1
-    except json.JSONDecodeError as exc:
+    except ValueError as exc:
+        # json.JSONDecodeError is one; so are the plain ValueError json.loads raises for an
+        # integer longer than Python's int string conversion limit and the UnicodeDecodeError
+        # read_text raises for bytes that are not UTF-8
         print(f"canonical-classes.json does not parse: {exc}", file=sys.stderr)
         return 1
 

@@ -8,14 +8,17 @@ The checker under test is scripts/check_canonical_classes.py. AC1 pins its CI wi
 the readme-claims job with an untampered verdict; AC2 proves the check GREEN on the
 shipped tree and RED on a scratch copy with one technique id dropped from a primary
 array, or with a matrixVersion stamp other than the matrix.json version or a matrixCommit
-stamp that is not a 40-hex commit sha (V6); AC3 and AC4 pin the CHANGELOG states (a resolvable docstring pointer, no
-internal role name).
+stamp that is not a 40-hex commit sha (V6), or with a canonical-classes.json that does not
+parse (a syntax error, an integer of more than 4300 digits, bytes that are not UTF-8), which
+it reports in one line, not a traceback; AC3 and AC4 pin the CHANGELOG states (a resolvable
+docstring pointer, no internal role name).
 """
 
 import json
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 
@@ -329,4 +332,84 @@ AC2_STAMP_CASES = [
 
 @pytest.mark.parametrize("case", [pytest.param(fn, id=name) for name, fn in AC2_STAMP_CASES])
 def test_ac2_stamps(case):
+    case()
+
+
+# --------------------------------------------------------------------------- V1 parse
+
+INT_LIMIT = pytest.mark.skipif(
+    getattr(sys, "get_int_max_str_digits", lambda: 0)() != 4300,
+    reason="needs Python's default int string conversion limit of 4300 digits")
+
+
+def _scratch_tree_holding(raw: bytes) -> Path:
+    """A scratch copy of the tree whose canonical-classes.json holds raw."""
+    td = Path(tempfile.mkdtemp(prefix="atm04-"))
+    (td / "scripts").mkdir()
+    shutil.copy(CHECKER, td / "scripts" / "check_canonical_classes.py")
+    shutil.copy(ROOT / "matrix.json", td / "matrix.json")
+    (td / "canonical-classes.json").write_bytes(raw)
+    return td
+
+
+def _with_long_integer(digits: int) -> bytes:
+    """The shipped canonical-classes.json with a top-level key "huge" set to a digits-long
+    integer by editing the text: json.dumps refuses an int past Python's int string
+    conversion limit."""
+    text = (ROOT / "canonical-classes.json").read_text(encoding="utf-8")
+    assert text.startswith("{")
+    return ('{"huge": ' + "1" * digits + "," + text[1:]).encode("utf-8")
+
+
+def _line_matches(got: str, want: str) -> bool:
+    """want in full, or, when it ends in "...", the start of got."""
+    return got.startswith(want[:-3]) if want.endswith("...") else got == want
+
+
+def _ac2_file_turns_the_checker_red(make, *lines: str):
+    def case():
+        scratch = _scratch_tree_holding(make())
+        try:
+            proc = _run_checker(scratch)
+            assert proc.returncode == 1, proc.stdout + proc.stderr
+            assert "Traceback" not in proc.stderr, proc.stderr
+            assert proc.stdout == "", proc.stdout
+            err = proc.stderr.splitlines()
+            assert len(err) == len(lines) and all(map(_line_matches, err, lines)), proc.stderr
+        finally:
+            shutil.rmtree(scratch)
+    return case
+
+
+AC2_PARSE_CASES = [
+    ("ATM-04.AC2 a syntax error turns the checker red with the parse line",
+     _ac2_file_turns_the_checker_red(
+         lambda: b"{",
+         "canonical-classes.json does not parse: Expecting property name enclosed in double "
+         "quotes: line 1 column 2 (char 1)"), ()),
+    ("ATM-04.AC2 a 4301-digit integer turns the checker red with the parse line, not a traceback",
+     _ac2_file_turns_the_checker_red(
+         lambda: _with_long_integer(4301),
+         "canonical-classes.json does not parse: Exceeds the limit (4300 digits) for integer "
+         "string conversion: value has 4301 digits..."), INT_LIMIT),
+    ("ATM-04.AC2 a 5000-digit integer turns the checker red with the parse line, not a traceback",
+     _ac2_file_turns_the_checker_red(
+         lambda: _with_long_integer(5000),
+         "canonical-classes.json does not parse: Exceeds the limit (4300 digits) for integer "
+         "string conversion: value has 5000 digits..."), INT_LIMIT),
+    ("ATM-04.AC2 a 4300-digit integer parses and turns the checker red with the V1 line",
+     _ac2_file_turns_the_checker_red(
+         lambda: _with_long_integer(4300),
+         "V1 unexpected top-level key: huge", "canonical-classes.json: 1 violation(s)"), ()),
+    ("ATM-04.AC2 bytes that are not UTF-8 turn the checker red with the parse line, not a traceback",
+     _ac2_file_turns_the_checker_red(
+         lambda: b"\xff\xfe" + (ROOT / "canonical-classes.json").read_bytes(),
+         "canonical-classes.json does not parse: 'utf-8' codec can't decode byte 0xff in "
+         "position 0: invalid start byte"), ()),
+]
+
+
+@pytest.mark.parametrize("case", [pytest.param(fn, id=name, marks=marks)
+                                  for name, fn, marks in AC2_PARSE_CASES])
+def test_ac2_parse(case):
     case()

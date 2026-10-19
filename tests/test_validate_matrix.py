@@ -185,6 +185,52 @@ def test_missing_matrix_names_the_cause():
          "FAIL: matrix.json is missing or does not parse: no such file")
 
 
+def replace_with_directory(rel: str):
+    def fn(root):
+        (root / rel).unlink()
+        (root / rel).mkdir()
+    return fn
+
+
+@pytest.mark.parametrize("rel", ["matrix.json", "schema/threat-matrix-v1.2.schema.json",
+                                 "schema/consumer-readiness.json"])
+def test_directory_at_an_input_path_is_one_fail_line_not_a_traceback(rel):
+    proc = mutate(replace_with_directory(rel))
+    assert proc.returncode == 1, proc.stdout + proc.stderr
+    assert proc.stdout == "", proc.stdout
+    assert proc.stderr.splitlines() == [
+        f"FAIL: {rel} is missing or does not parse: a directory, not a file"], proc.stderr
+
+
+def test_directory_at_technique_ids_is_the_s8_finding_not_a_traceback():
+    proc = mutate(replace_with_directory("technique-ids.json"))
+    assert proc.returncode == 1, proc.stdout + proc.stderr
+    assert proc.stderr.splitlines() == [
+        "FAIL: matrix.json does not validate (1 finding(s)):",
+        "  - S8 technique-ids.json is missing or does not parse"], proc.stderr
+
+
+def test_file_where_the_schema_directory_should_be_names_the_system_reason():
+    def fn(root):
+        shutil.rmtree(root / "schema")
+        (root / "schema").write_text("not a directory\n")
+    proc = mutate(fn)
+    assert proc.returncode == 1, proc.stdout + proc.stderr
+    assert proc.stderr.splitlines() == [
+        "FAIL: schema/threat-matrix-v1.2.schema.json is missing or does not parse: Not a directory",
+        "FAIL: schema/consumer-readiness.json is missing or does not parse: Not a directory",
+    ], proc.stderr
+
+
+@pytest.mark.skipif(not hasattr(os, "geteuid") or os.geteuid() == 0,
+                    reason="root reads a file whatever its mode")
+def test_unreadable_matrix_names_the_system_reason():
+    proc = mutate(lambda root: (root / "matrix.json").chmod(0))
+    assert proc.returncode == 1, proc.stdout + proc.stderr
+    assert proc.stderr.splitlines() == [
+        "FAIL: matrix.json is missing or does not parse: Permission denied"], proc.stderr
+
+
 def test_data_source_must_resolve_in_the_registry():
     def fn(root):
         m = load(root, "matrix.json")
