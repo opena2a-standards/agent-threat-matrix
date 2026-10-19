@@ -9,11 +9,12 @@ the readme-claims job with an untampered verdict; AC2 proves the check GREEN on 
 shipped tree and RED on a scratch copy with one technique id dropped from a primary
 array, or with a matrixVersion stamp other than the matrix.json version or a matrixCommit
 stamp that is not a 40-hex commit sha (V6), or with a canonical-classes.json that does not
-parse (a syntax error, an integer of more than 4300 digits, bytes that are not UTF-8) or
-cannot be read (no file, a directory, a file whose mode is 0, a symbolic link to itself),
-or with a matrix.json that is missing, a directory, unreadable or does not parse for one of
-those three causes, each of which it reports in one line, not a traceback; AC3 and AC4 pin
-the CHANGELOG states (a resolvable docstring pointer, no internal role name).
+parse (a syntax error, an integer of more than 4300 digits, bytes that are not UTF-8,
+arrays or objects nested 200000 levels deep) or cannot be read (no file, a directory, a
+file whose mode is 0, a symbolic link to itself), or with a matrix.json that is missing, a
+directory, unreadable or does not parse for one of those four causes, each of which it
+reports in one line, not a traceback; AC3 and AC4 pin the CHANGELOG states (a resolvable
+docstring pointer, no internal role name).
 """
 
 import json
@@ -364,9 +365,24 @@ def _with_long_integer(digits: int) -> bytes:
     return ('{"huge": ' + "1" * digits + "," + text[1:]).encode("utf-8")
 
 
+NESTING = 200000
+
+
+def _nested(kind: str) -> bytes:
+    """A JSON array or object nested NESTING levels deep: json.loads raises a RecursionError
+    on it, which is not a ValueError (tried on Python 3.12, 3.13 and 3.14)."""
+    if kind == "array":
+        return b"[" * NESTING + b"]" * NESTING
+    return b'{"a": ' * NESTING + b"1" + b"}" * NESTING
+
+
 def _line_matches(got: str, want: str) -> bool:
-    """want in full, or, when it ends in "...", the start of got."""
-    return got.startswith(want[:-3]) if want.endswith("...") else got == want
+    """want in full, or, when it holds "...", a got that starts with the text before the
+    "..." and ends with the text after it."""
+    head, dots, tail = want.partition("...")
+    if not dots:
+        return got == want
+    return len(got) >= len(head) + len(tail) and got.startswith(head) and got.endswith(tail)
 
 
 def _ac2_file_turns_the_checker_red(make, *lines: str):
@@ -409,6 +425,18 @@ AC2_PARSE_CASES = [
          lambda: b"\xff\xfe" + (ROOT / "canonical-classes.json").read_bytes(),
          "canonical-classes.json does not parse: 'utf-8' codec can't decode byte 0xff in "
          "position 0: invalid start byte"), ()),
+    ("ATM-04.AC2 arrays nested 200000 levels deep turn the checker red with the parse line, "
+     "not a traceback",
+     _ac2_file_turns_the_checker_red(
+         lambda: _nested("array"),
+         "canonical-classes.json does not parse: ... while decoding a JSON array from a "
+         "unicode string"), ()),
+    ("ATM-04.AC2 objects nested 200000 levels deep turn the checker red with the parse line, "
+     "not a traceback",
+     _ac2_file_turns_the_checker_red(
+         lambda: _nested("object"),
+         "canonical-classes.json does not parse: ... while decoding a JSON object from a "
+         "unicode string"), ()),
 ]
 
 
@@ -548,6 +576,16 @@ AC2_MATRIX_CASES = [
          lambda path: path.write_bytes(b'{"huge": ' + b"1" * 4301 + b"}"),
          READ_LINE + "Exceeds the limit (4300 digits) for integer string conversion: "
          "value has 4301 digits..."), INT_LIMIT),
+    ("ATM-04.AC2 arrays nested 200000 levels deep in matrix.json turn the checker red with the "
+     "read line, not a traceback",
+     _ac2_matrix_turns_the_checker_red(
+         lambda path: path.write_bytes(_nested("array")),
+         READ_LINE + "... while decoding a JSON array from a unicode string"), ()),
+    ("ATM-04.AC2 objects nested 200000 levels deep in matrix.json turn the checker red with the "
+     "read line, not a traceback",
+     _ac2_matrix_turns_the_checker_red(
+         lambda path: path.write_bytes(_nested("object")),
+         READ_LINE + "... while decoding a JSON object from a unicode string"), ()),
 ]
 
 

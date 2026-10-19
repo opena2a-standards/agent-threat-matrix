@@ -231,6 +231,38 @@ def test_unreadable_matrix_names_the_system_reason():
         "FAIL: matrix.json is missing or does not parse: Permission denied"], proc.stderr
 
 
+NESTING = 200000
+
+
+def nested(kind: str) -> str:
+    """A JSON array or object nested NESTING levels deep: json.loads raises a RecursionError
+    on it, which is not a ValueError (tried on Python 3.12, 3.13 and 3.14)."""
+    if kind == "array":
+        return "[" * NESTING + "]" * NESTING
+    return '{"a": ' * NESTING + "1" + "}" * NESTING
+
+
+@pytest.mark.parametrize("kind", ["array", "object"])
+@pytest.mark.parametrize("rel", ["matrix.json", "schema/threat-matrix-v1.2.schema.json",
+                                 "schema/consumer-readiness.json"])
+def test_input_nested_too_deep_to_parse_is_one_fail_line_not_a_traceback(rel, kind):
+    proc = mutate(lambda root: (root / rel).write_text(nested(kind)))
+    assert proc.returncode == 1, proc.stdout + proc.stderr
+    assert proc.stdout == "", proc.stdout
+    lines = proc.stderr.splitlines()
+    assert len(lines) == 1, proc.stderr
+    assert lines[0].startswith(f"FAIL: {rel} is missing or does not parse: "), proc.stderr
+    assert lines[0].endswith(f" while decoding a JSON {kind} from a unicode string"), proc.stderr
+
+
+def test_technique_ids_nested_too_deep_to_parse_is_the_s8_finding_not_a_traceback():
+    proc = mutate(lambda root: (root / "technique-ids.json").write_text(nested("array")))
+    assert proc.returncode == 1, proc.stdout + proc.stderr
+    assert proc.stderr.splitlines() == [
+        "FAIL: matrix.json does not validate (1 finding(s)):",
+        "  - S8 technique-ids.json is missing or does not parse"], proc.stderr
+
+
 def test_data_source_must_resolve_in_the_registry():
     def fn(root):
         m = load(root, "matrix.json")
@@ -614,6 +646,32 @@ def test_head_matrix_with_an_integer_past_the_conversion_limit_skips_s13():
     shipped = (root / "matrix.json").read_bytes()
     write_long_sample_count(root, 4301)
     commit_all(root, "matrix with a 4301-digit sample count")
+    (root / "matrix.json").write_bytes(shipped)
+    proc = run_on(root)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert "Traceback" not in proc.stderr, proc.stderr
+
+
+def test_matrix_commit_whose_matrix_is_nested_too_deep_to_parse_is_refused():
+    def stamp(root):
+        shipped = (root / "matrix.json").read_bytes()
+        (root / "matrix.json").write_text(nested("array"))
+        older = commit_all(root, "matrix nested 200000 arrays deep")
+        (root / "matrix.json").write_bytes(shipped)
+        commit_all(root, "shipped matrix")
+        return older
+    root = history_tree(stamp)
+    sha = load(root, "technique-ids.json")["matrixCommit"]
+    proc = run_on(root)
+    _red(proc, f"S11 technique-ids.json matrixCommit {sha}: matrix.json at that commit does not parse")
+    assert "Traceback" not in proc.stderr, proc.stderr
+
+
+def test_head_matrix_nested_too_deep_to_parse_skips_s13():
+    root = history_tree()
+    shipped = (root / "matrix.json").read_bytes()
+    (root / "matrix.json").write_text(nested("array"))
+    commit_all(root, "matrix nested 200000 arrays deep")
     (root / "matrix.json").write_bytes(shipped)
     proc = run_on(root)
     assert proc.returncode == 0, proc.stdout + proc.stderr

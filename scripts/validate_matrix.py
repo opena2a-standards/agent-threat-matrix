@@ -13,7 +13,8 @@ Standard library only, no network. Two passes:
    An ``integer`` or ``number`` too large to convert to a 64-bit float, which JSON
    allows, is reported as not a finite number. An integer longer than Python's int
    string conversion limit (4300 digits by default) does not parse, and the FAIL line
-   says so with the parser's reason.
+   says so with the parser's reason. The same holds for arrays or objects nested deeper
+   than the parser allows.
 
 2. Semantics, one line per failure:
 
@@ -276,7 +277,7 @@ def resolve_matrix_commit(commit: str, listed, errors: list) -> str:
         return "shape only: partial clone without matrix.json at that commit"
     try:
         indexed = sorted(t["id"] for t in json.loads(blob)["techniques"])
-    except (ValueError, KeyError, TypeError):
+    except (ValueError, RecursionError, KeyError, TypeError):
         errors.append(f"S11 technique-ids.json matrixCommit {commit}: matrix.json at that commit does not parse")
         return ""
     detail = id_difference(indexed, listed)
@@ -423,7 +424,7 @@ def committed_matrix():
         return None
     try:
         committed = json.loads(shown)
-    except ValueError:
+    except (ValueError, RecursionError):
         return None
     return committed if isinstance(committed, dict) else None
 
@@ -465,6 +466,8 @@ def read_json(path: Path):
 
     ValueError covers more than json.JSONDecodeError: json.loads raises a plain
     ValueError for an integer literal longer than Python's int string conversion limit.
+    For arrays or objects nested deeper than it parses, json.loads raises a RecursionError,
+    which is not a ValueError, and its message is the reason.
     A directory at the path is reported as "a directory, not a file". Another OSError,
     such as a file where a directory on the path should be or a file the user may not
     read, is reported with the system's reason, its strerror, as in "Not a directory".
@@ -477,7 +480,7 @@ def read_json(path: Path):
         return None, "a directory, not a file"
     except OSError as exc:
         return None, exc.strerror or str(exc)
-    except ValueError as exc:
+    except (ValueError, RecursionError) as exc:
         return None, str(exc)
 
 
