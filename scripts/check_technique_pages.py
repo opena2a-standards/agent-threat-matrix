@@ -39,6 +39,11 @@ technique page is left alone. Any other missing technique-page line, a repeated 
 Mitigation section, and a missing Mitigation section have no single place to write the data
 to, and a Mitigation section that holds a fenced code block may hold the rest of the page
 behind an unclosed fence, so ``--fix`` reports each of them and still exits 1.
+
+A read of matrix.json that raises an OSError or a ValueError (see ``read_matrix``) is
+reported in one line on standard error,
+``FAIL: matrix.json is missing or does not parse: <reason>``, and the run exits 1 without
+checking or writing a page, with ``--fix`` as without it.
 """
 
 from __future__ import annotations  # "X | None" annotations also load on Python 3.9
@@ -489,10 +494,33 @@ def report(heading: str, failures: list[str]) -> None:
         print(f"  - {failure}")
 
 
+def read_matrix():
+    """(matrix.json parsed, None), or (None, the reason it could not be read or parsed).
+
+    The reasons are the ones scripts/validate_matrix.py gives for the same file: "no such
+    file", "a directory, not a file", the system's reason for another OSError, its strerror,
+    as in "Permission denied", and the message of a ValueError, raised for a syntax error,
+    an integer longer than Python's int string conversion limit and bytes that are not
+    UTF-8, among others.
+    """
+    try:
+        return json.loads((ROOT / "matrix.json").read_text(encoding="utf-8")), None
+    except FileNotFoundError:
+        return None, "no such file"
+    except IsADirectoryError:
+        return None, "a directory, not a file"
+    except OSError as exc:
+        return None, exc.strerror or str(exc)
+    except ValueError as exc:
+        return None, str(exc)
+
+
 def main(argv: list[str]) -> int:
     fix = "--fix" in argv
-    with open(ROOT / "matrix.json") as f:
-        matrix = json.load(f)
+    matrix, cause = read_matrix()
+    if cause is not None:
+        print(f"FAIL: matrix.json is missing or does not parse: {cause}", file=sys.stderr)
+        return 1
 
     failures = check_pages(matrix, fix)
     if failures and not fix:
