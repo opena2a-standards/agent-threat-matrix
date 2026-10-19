@@ -10,6 +10,8 @@ Standard library only, no network. Two passes:
    into ``$defs``. Any other keyword in the schema is a fault in this checker's
    coverage and fails loudly rather than being silently ignored. A ``number`` is
    finite: the NaN and Infinity that Python's json module reads are not JSON numbers.
+   An ``integer`` or ``number`` too large to convert to a 64-bit float, which JSON
+   allows, is reported as not a finite number.
 
 2. Semantics, one line per failure:
 
@@ -88,12 +90,30 @@ SUPPORTED = {
     "$schema", "$id", "title", "description", "$defs", "x-semantic",
 }
 
+
+def too_large_for_float(value) -> bool:
+    """Whether value is an int too large to convert to a 64-bit float.
+
+    JSON allows an integer of any length, but math.isfinite converts an int to a float
+    first and raises OverflowError on such an int. TYPE_CHECKS asks this first, so the
+    int fails the ``integer`` and ``number`` checks instead of ending the run.
+    """
+    if not isinstance(value, int) or isinstance(value, bool):
+        return False
+    try:
+        float(value)
+    except OverflowError:
+        return True
+    return False
+
+
 TYPE_CHECKS = {
     "object": lambda v: isinstance(v, dict),
     "array": lambda v: isinstance(v, list),
     "string": lambda v: isinstance(v, str),
-    "integer": lambda v: isinstance(v, int) and not isinstance(v, bool),
-    "number": lambda v: isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v),
+    "integer": lambda v: isinstance(v, int) and not isinstance(v, bool) and not too_large_for_float(v),
+    "number": lambda v: (isinstance(v, (int, float)) and not isinstance(v, bool)
+                         and not too_large_for_float(v) and math.isfinite(v)),
     "boolean": lambda v: isinstance(v, bool),
     "null": lambda v: v is None,
 }
@@ -131,7 +151,11 @@ class SchemaChecker:
         if "type" in schema:
             types = schema["type"] if isinstance(schema["type"], list) else [schema["type"]]
             if not any(TYPE_CHECKS[t](value) for t in types):
-                self.errors.append(f"{path}: expected type {schema['type']}, got {type(value).__name__}")
+                if too_large_for_float(value) and {"integer", "number"} & set(types):
+                    self.errors.append(f"{path}: an integer of {len(str(abs(value)))} digits is too large "
+                                       f"for a 64-bit float, so it is not a finite number")
+                else:
+                    self.errors.append(f"{path}: expected type {schema['type']}, got {type(value).__name__}")
                 return
 
         if "pattern" in schema and isinstance(value, str):

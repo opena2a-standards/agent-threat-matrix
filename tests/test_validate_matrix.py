@@ -124,6 +124,28 @@ def test_schema_rejects_a_bad_attack_mapping_id():
     _red(mutate(fn), "matrix.techniques[0].attackMapping[0].id: 'T-1595' does not match")
 
 
+def test_schema_reports_an_integer_too_large_for_a_float_in_an_integer_field_without_bounds():
+    def fn(root):
+        m = load(root, "matrix.json")
+        m["tactics"][0]["order"] = 10 ** 400  # 401 digits
+        dump(root, "matrix.json", m)
+    proc = mutate(fn)
+    _red(proc, "matrix.tactics[0].order: an integer of 401 digits is too large for a 64-bit float, "
+               "so it is not a finite number")
+    assert "Traceback" not in proc.stderr, proc.stderr
+
+
+def test_schema_reports_an_integer_too_large_for_a_float_in_a_string_field_once():
+    def fn(root):
+        m = load(root, "matrix.json")
+        m["created"] = 10 ** 400
+        dump(root, "matrix.json", m)
+    proc = mutate(fn)
+    _red(proc, "matrix.created: expected type string, got int")
+    assert "Traceback" not in proc.stderr, proc.stderr
+    assert proc.stderr.count("matrix.created:") == 1, proc.stderr
+
+
 def test_data_source_must_resolve_in_the_registry():
     def fn(root):
         m = load(root, "matrix.json")
