@@ -143,6 +143,9 @@ the usage and exits 0. Any other argument, such as a mistyped ``--fixx``, prints
 usage and exits 2 without checking or writing anything. Help takes precedence over an
 argument the script does not know: given together in either order, as in
 ``--fixx --help`` or ``-h --bogus``, they print the usage and exit 0, again without
+checking or writing anything. A read of matrix.json that raises an OSError, a ValueError or
+a RecursionError (see ``read_matrix``) is reported in one line on standard error,
+``matrix.json is missing or does not parse: <reason>``, and the run exits 1 without
 checking or writing anything.
 """
 
@@ -683,6 +686,28 @@ def release_month(changelog, version):
     return None
 
 
+def read_matrix():
+    """(matrix.json parsed, None), or (None, the reason it could not be read or parsed).
+
+    The reasons are the ones scripts/validate_matrix.py gives for the same file: "no such
+    file", "a directory, not a file", the system's reason for another OSError, its strerror,
+    as in "Permission denied", the message of a ValueError, raised for a syntax error, an
+    integer longer than Python's int string conversion limit and bytes that are not UTF-8,
+    among others, and the message of the RecursionError, which is not a ValueError, that
+    json.loads raises for arrays or objects nested deeper than it parses.
+    """
+    try:
+        return json.loads(MATRIX.read_text(encoding="utf-8")), None
+    except FileNotFoundError:
+        return None, "no such file"
+    except IsADirectoryError:
+        return None, "a directory, not a file"
+    except OSError as exc:
+        return None, exc.strerror or str(exc)
+    except (ValueError, RecursionError) as exc:
+        return None, str(exc)
+
+
 def main(argv):
     # An argument this script does not know ends the run with exit 2 before anything is
     # read or written: a mistyped --fix must not report the README as checked. argparse
@@ -695,7 +720,10 @@ def main(argv):
                              "that holds them")
     args = parser.parse_args(argv)
 
-    matrix = json.loads(MATRIX.read_text(encoding="utf-8"))
+    matrix, cause = read_matrix()
+    if cause is not None:
+        print(f"matrix.json is missing or does not parse: {cause}", file=sys.stderr)
+        return 1
     pages = Pages(ROOT)
 
     if args.fix:

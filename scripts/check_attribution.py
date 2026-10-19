@@ -25,7 +25,10 @@ Six properties:
 
 There is no ``--fix`` mode: both placements and every credit string are facts about
 where content came from, not text a script may invent. Exit 0 when all six hold, 1
-otherwise, printing one line per violation.
+otherwise, printing one line per violation. A read of matrix.json that raises an OSError,
+a ValueError or a RecursionError (see ``read_matrix``) is reported in one line on standard
+error, ``FAIL: matrix.json is missing or does not parse: <reason>``, and the run exits 1
+without checking anything.
 """
 
 import json
@@ -58,6 +61,28 @@ DECLINED_MARKER = "(credit declined)"
 
 # The section of CONTRIBUTING.md the failure text points a contributor at.
 CREDIT_SECTION = 'CONTRIBUTING.md, "Contributor credit"'
+
+
+def read_matrix(root: Path):
+    """(matrix.json parsed, None), or (None, the reason it could not be read or parsed).
+
+    The reasons are the ones scripts/validate_matrix.py gives for the same file: "no such
+    file", "a directory, not a file", the system's reason for another OSError, its strerror,
+    as in "Permission denied", the message of a ValueError, raised for a syntax error, an
+    integer longer than Python's int string conversion limit and bytes that are not UTF-8,
+    among others, and the message of the RecursionError, which is not a ValueError, that
+    json.loads raises for arrays or objects nested deeper than it parses.
+    """
+    try:
+        return json.loads((root / "matrix.json").read_text(encoding="utf-8")), None
+    except FileNotFoundError:
+        return None, "no such file"
+    except IsADirectoryError:
+        return None, "a directory, not a file"
+    except OSError as exc:
+        return None, exc.strerror or str(exc)
+    except (ValueError, RecursionError) as exc:
+        return None, str(exc)
 
 
 def load_matrix_ids(root: Path) -> set:
@@ -159,6 +184,10 @@ def run_checks(root: Path) -> list:
 
 
 def main(argv: list) -> int:
+    _matrix, cause = read_matrix(ROOT)
+    if cause is not None:
+        print(f"FAIL: matrix.json is missing or does not parse: {cause}", file=sys.stderr)
+        return 1
     failures = run_checks(ROOT)
     if failures:
         print(f"FAIL: {len(failures)} attribution check(s) failed:")

@@ -20,8 +20,11 @@ Checks:
   refused. No git is consulted, so only the shape of the sha is checked
 
 Exit 0 when the mapping holds, 1 otherwise, printing one line per violation. A read of
-matrix.json that raises an OSError or a ValueError (see ``read_matrix``) is reported in
-one line, ``matrix.json is missing or does not parse: <reason>``, and no check runs.
+matrix.json that raises an OSError, a ValueError or a RecursionError (see ``read_matrix``)
+is reported in one line, ``matrix.json is missing or does not parse: <reason>``, and no
+check runs. So is a matrix.json that parses but is not an object whose ``techniques``
+array holds objects with a string ``id`` (see ``technique_ids``), in the line
+``matrix.json parses but has the wrong shape: <reason>``.
 """
 
 import json
@@ -169,9 +172,10 @@ def read_matrix():
 
     The reasons are the ones scripts/validate_matrix.py gives for the same file: "no such
     file", "a directory, not a file", the system's reason for another OSError, its strerror,
-    as in "Permission denied", and the message of a ValueError, raised for a syntax error,
-    an integer longer than Python's int string conversion limit and bytes that are not
-    UTF-8, among others.
+    as in "Permission denied", the message of a ValueError, raised for a syntax error, an
+    integer longer than Python's int string conversion limit and bytes that are not UTF-8,
+    among others, and the message of the RecursionError, which is not a ValueError, that
+    json.loads raises for arrays or objects nested deeper than it parses.
     """
     try:
         return json.loads(MATRIX.read_text(encoding="utf-8")), None
@@ -181,8 +185,52 @@ def read_matrix():
         return None, "a directory, not a file"
     except OSError as exc:
         return None, exc.strerror or str(exc)
-    except ValueError as exc:
+    except (ValueError, RecursionError) as exc:
         return None, str(exc)
+
+
+def json_type(value):
+    """The JSON type of a parsed value, with its article, as in "an array" or "null"."""
+    if value is None:
+        return "null"
+    if isinstance(value, bool):
+        return "a boolean"
+    if isinstance(value, (int, float)):
+        return "a number"
+    if isinstance(value, str):
+        return "a string"
+    if isinstance(value, list):
+        return "an array"
+    return "an object"
+
+
+def technique_ids(matrix):
+    """(the set of technique ids in the parsed matrix.json, None), or (None, the reason it is
+    not an object whose ``techniques`` array holds objects with a string ``id``, naming the
+    first place that fails).
+
+    The checks compare, sort and print these ids beside the string ids of
+    canonical-classes.json, so an id that is not a string can end the run with a traceback:
+    an array is not hashable, and a number does not sort beside a string.
+    """
+    if not isinstance(matrix, dict):
+        return None, f"the top level is {json_type(matrix)}, not an object"
+    if "techniques" not in matrix:
+        return None, "the top level has no techniques key"
+    techniques = matrix["techniques"]
+    if not isinstance(techniques, list):
+        return None, f"techniques is {json_type(techniques)}, not an array"
+    ids = set()
+    for index, technique in enumerate(techniques):
+        if not isinstance(technique, dict):
+            return None, f"techniques[{index}] is {json_type(technique)}, not an object"
+        if "id" not in technique:
+            return None, f"techniques[{index}] has no id"
+        tid = technique["id"]
+        if not isinstance(tid, str):
+            return None, f"techniques[{index}].id is {json_type(tid)}, not a string"
+        ids.add(tid)
+    return ids, None
 
 
 def main():
@@ -200,10 +248,11 @@ def main():
         print(f"canonical-classes.json at {CANONICAL} cannot be read: {exc.strerror or exc}",
               file=sys.stderr)
         return 1
-    except ValueError as exc:
+    except (ValueError, RecursionError) as exc:
         # json.JSONDecodeError is one; so are the plain ValueError json.loads raises for an
         # integer longer than Python's int string conversion limit and the UnicodeDecodeError
-        # read_text raises for bytes that are not UTF-8
+        # read_text raises for bytes that are not UTF-8. For arrays or objects nested deeper
+        # than it parses, json.loads raises a RecursionError, which is not a ValueError
         print(f"canonical-classes.json does not parse: {exc}", file=sys.stderr)
         return 1
 
@@ -211,7 +260,10 @@ def main():
     if cause is not None:
         print(f"matrix.json is missing or does not parse: {cause}", file=sys.stderr)
         return 1
-    matrix_ids = {t["id"] for t in matrix["techniques"]}
+    matrix_ids, cause = technique_ids(matrix)
+    if cause is not None:
+        print(f"matrix.json parses but has the wrong shape: {cause}", file=sys.stderr)
+        return 1
 
     errors = []
     mapping = check_shape(data, errors)

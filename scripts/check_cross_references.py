@@ -30,6 +30,10 @@ table. Every other line is left alone; there is no other rewrite, because C3 and
 editorial placements, not text a script may invent. With the BEGIN or END marker
 missing, or END before BEGIN, ``--fix`` writes nothing and prints "NOT FIXED" ahead of
 the C5 failure. Exit 0 when all eight hold, 1 otherwise, printing one line per violation.
+A read of matrix.json that raises an OSError, a ValueError or a RecursionError (see
+``read_matrix``) is reported in one line on standard error,
+``FAIL: matrix.json is missing or does not parse: <reason>``, and the run exits 1 without
+checking anything or, under ``--fix``, writing anything.
 """
 
 import json
@@ -91,6 +95,28 @@ ATLAS_TECH_ID_RE = re.compile(r"\bAML\.T\d{4}")
 
 # The section of CONTRIBUTING.md the C3/C4 failure text points a contributor at.
 PLACEMENT_SECTION = 'CONTRIBUTING.md, "Placing a new technique"'
+
+
+def read_matrix(root: Path):
+    """(matrix.json parsed, None), or (None, the reason it could not be read or parsed).
+
+    The reasons are the ones scripts/validate_matrix.py gives for the same file: "no such
+    file", "a directory, not a file", the system's reason for another OSError, its strerror,
+    as in "Permission denied", the message of a ValueError, raised for a syntax error, an
+    integer longer than Python's int string conversion limit and bytes that are not UTF-8,
+    among others, and the message of the RecursionError, which is not a ValueError, that
+    json.loads raises for arrays or objects nested deeper than it parses.
+    """
+    try:
+        return json.loads((root / "matrix.json").read_text(encoding="utf-8")), None
+    except FileNotFoundError:
+        return None, "no such file"
+    except IsADirectoryError:
+        return None, "a directory, not a file"
+    except OSError as exc:
+        return None, exc.strerror or str(exc)
+    except (ValueError, RecursionError) as exc:
+        return None, str(exc)
 
 
 def load_matrix(root: Path):
@@ -352,6 +378,10 @@ def fix_block(root: Path):
 
 def main(argv: list) -> int:
     fix = "--fix" in argv
+    _matrix, cause = read_matrix(ROOT)
+    if cause is not None:
+        print(f"FAIL: matrix.json is missing or does not parse: {cause}", file=sys.stderr)
+        return 1
     if fix and end_before_begin((ROOT / "cross-references" / INDEX_NAME).read_text()):
         # An END marker before the BEGIN marker leaves no block to rewrite, so nothing is
         # written and the block is not reported current; the C5 failure below ends the run
