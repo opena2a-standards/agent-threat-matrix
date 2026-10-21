@@ -84,7 +84,8 @@ line is also read with only a space, a tab or / ending a tag name. Where a chara
 than an ASCII letter, digit, hyphen, white space, / or > follows a tag name, such as \\ or
 <, the line is also read as a browser reads a tag in an HTML block, with a name that is an
 ASCII letter followed by any characters other than white space, / and >, so "DV<x\\>AA"
-and "D<D\\\\</b>VAA" name DVAA. The line names DVAA when any reading does. On the way, as CommonMark reads them, the character a \\ escapes and
+and "D<D\\\\</b>VAA" name DVAA. The line names DVAA when any reading does. On the way, as
+CommonMark reads them, the character a \\ escapes and
 the text of a code span are kept as text, which no later step reads as markup, HTML, a
 link span or a character reference, and the \\ and the backticks around the code span are
 removed. A \\ escapes the ASCII punctuation character directly after it and stays before
@@ -368,7 +369,10 @@ class HtmlBlockHtml:
     as where it starts and where its name ends, and only a "<" between the two is passed
     over, so one instance gives what the pattern gives however many times it reads a line:
     a later reading of the line, which starts again from its first character, looks for
-    each tag before that one."""
+    each tag before that one. Whether a tag finds a ">" turns on the line alone, so this
+    holds also for readings that pass over different parts of the line, as the reading that
+    removes a link label passes over the label and the reading that removes none does not:
+    `names` reads a line with one instance in both."""
 
     def __init__(self):
         self.text, self.start, self.name_end = None, -1, -1
@@ -928,7 +932,11 @@ def names(stripped, name, hiding=False, spans=True, labels=None):
     DVAA. Each name form removes a "]" directly followed by a
     link label that is blank or in `labels`, the labels the page holding the line defines,
     with that label; where a "]" stands directly before a "[", the line is also read with no
-    label removed, as it is with `labels` None. `defined_labels` also counts a text that
+    label removed, as it is with `labels` None, in each of those readings, one
+    `HtmlBlockHtml` serving both label readings: on a page that defines DV,
+    "[x][DV](url)A<y\\>A <q\\" names DVAA only read with no label removed and as a browser
+    reads "<y\\>" in an HTML block, after the reading that removes DV has held "<q\\", a tag
+    that finds no ">". `defined_labels` also counts a text that
     only looks like a definition, so "[x][DV](url)AA", which shows "[x]DVAA" unless the page
     defines DV, names DVAA by the reading that removes no label even with DV in `labels`,
     while "[DV][dvaa]AA" names DVAA only with dvaa in `labels`. The name form reads no code
@@ -954,6 +962,9 @@ def names(stripped, name, hiding=False, spans=True, labels=None):
     if OTHER_SPACE_AFTER_TAG_NAME.search(stripped):
         readings.append(SPACE_OR_TAB_HTML)
     if OTHER_CHARACTER_IN_TAG_NAME.search(stripped):
+        # One instance reads the line with each removal below and its `detached` form: it
+        # gives what HTML_BLOCK_HTML gives in every reading, whichever "<" a reading passes
+        # over.
         readings.append(HtmlBlockHtml())
     # Only a "]" directly before a "[" can be removed with a label, so a line without one
     # reads alike either way.

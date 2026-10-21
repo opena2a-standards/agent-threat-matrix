@@ -1496,6 +1496,59 @@ def test_a_definition_on_another_page_defines_no_label_on_this_one():
         shutil.rmtree(td)
 
 
+# A line where a "]" stands directly before a "[" and a tag name is followed by "\", set as
+# its own paragraph after README's licence line on a page that defines the label DV:
+# "[x][DV](url)A<y\>A <q\" names DVAA only read with no label removed and as a browser
+# reads "<y\>" in an HTML block, as a tag named "y\". `names` reads the line with one
+# HtmlBlockHtml with the label DV removed and then with none, and the first reading leaves
+# it holding "<q\", a tag that finds no ">", which comes after "<y\>": holding it must not
+# keep the reading with no label removed from removing "<y\>", or the line would pass with
+# two wrong figures.
+LABEL_AND_TAG_LINE = "[x][DV](url)A<y\\>A <q\\"
+
+
+def test_a_tag_a_browser_reads_leaves_the_name_read_in_each_label_reading():
+    td = scratch_tree()
+    try:
+        line = f"{LABEL_AND_TAG_LINE} {FIGURES}"
+        mutate_readme(td, LICENCE, f"{LICENCE}\n\n{line}\n")
+        readme = td / "README.md"
+        readme.write_text(readme.read_text(encoding="utf-8")
+                          + "\n[DV]: https://example.org\n", encoding="utf-8")
+        number = where_of(td, line)
+        r = run_checker(td)
+        assert r.returncode == 1, r.stdout
+        for failure in (
+            f"{number}: \"99 agents\" does not match related-projects.json "
+            "(DVAA agents: 21)",
+            f"{number}: \"77 vulnerability categories\" does not match "
+            "related-projects.json (DVAA vulnerability categories: 12)",
+        ):
+            assert failure in r.stderr, r.stderr
+    finally:
+        shutil.rmtree(td)
+
+
+def test_one_html_block_reading_reads_a_line_alike_in_each_label_reading():
+    checker = load_checker()
+    labels = frozenset({"dv"})
+    assert checker.names(LABEL_AND_TAG_LINE, "DVAA", labels=labels)
+    for raw_html in (checker.RAW_HTML, checker.SPACE_OR_TAB_HTML):
+        for removal in (labels, None):
+            form = checker.name_form(LABEL_AND_TAG_LINE, raw_html, labels=removal)
+            assert not checker.holds(form, "DVAA"), (form, removal)
+    assert not checker.holds(checker.name_form(LABEL_AND_TAG_LINE, checker.HtmlBlockHtml(),
+                                               labels=labels), "DVAA")
+    # In the order `names` takes them, and again, one instance reads the line in each label
+    # reading as a new one does.
+    reading = checker.HtmlBlockHtml()
+    for removal, form in ((labels, "x(url)AA <q\\"), (None, "xDVAA <q\\"),
+                          (labels, "x(url)AA <q\\"), (None, "xDVAA <q\\")):
+        assert checker.name_form(LABEL_AND_TAG_LINE, reading, labels=removal) == form
+        assert checker.name_form(LABEL_AND_TAG_LINE, checker.HtmlBlockHtml(),
+                                 labels=removal) == form
+
+
 # Names the check does not read as DVAA: a reference to "*" or "&" shows that character
 # rather than marking up text, a letter with an accent is not confusable with A, NFKC
 # leaves U+00C1 composed, a comment that no line closes shows as text and runs to the end
@@ -1909,7 +1962,8 @@ def stated_first_step(line, any_space=True, spans=True, labels=None, html_block=
     """(pairs, open): `line` after the first step README states, each character with
     whether it is kept as text, and whether the lines after it read no code span. A "]"
     directly followed by a link label that is blank or in `labels` goes with the label,
-    which is not read further; with `labels` None no label goes."""
+    which is not read further; with `labels` None no label goes. HTML is removed as
+    `stated_html_end` reads it with `any_space` and `html_block`."""
     out, i, reading, unmatched = [], 0, spans, False
     while i < len(line):
         c = line[i]
@@ -2004,7 +2058,9 @@ def test_the_stated_steps_read_every_generated_line_as_the_checker_does():
     # with only a space, a tab or "/" ending a tag name; on any other line the two ways
     # remove the same HTML. A line where a tag name is followed by another character, such
     # as "\" or "<", is also read the HTML block way, with a tag name running to white
-    # space, "/" or ">"; on any other line that way reads the line as the first does.
+    # space, "/" or ">"; on any other line that way reads the line as the first does. A line
+    # holding "][" is also read with the labels in STATED_LABELS removed, the first way and,
+    # where it applies, the HTML block way.
     checker = load_checker()
     rng = random.Random(80)
     for _ in range(STATED_LINES):
@@ -2022,6 +2078,11 @@ def test_the_stated_steps_read_every_generated_line_as_the_checker_does():
         if "][" in line:
             assert (checker.name_form(line, labels=STATED_LABELS)
                     == stated_name_form(checker, line, labels=STATED_LABELS)), ascii(line)
+            if checker.OTHER_CHARACTER_IN_TAG_NAME.search(line):
+                stated = stated_name_form(checker, line, labels=STATED_LABELS,
+                                          html_block=True)
+                assert (checker.name_form(line, checker.HtmlBlockHtml(), labels=STATED_LABELS)
+                        == stated), ascii(line)
 
 
 # Labels the generated lines are read with, as the check compares them, and the pieces of
@@ -2042,7 +2103,9 @@ def test_the_stated_label_rule_reads_every_generated_line_as_the_checker_does():
     # them, such as a label ending at an escaped "]" or a definition opened by an escaped
     # "[", would leave the cases above passing. A removed label is passed over with the "]"
     # that closes it, so with labels removed code spans stop being read on no line where
-    # they go on being read with none removed, the reading span_lines takes.
+    # they go on being read with none removed, the reading span_lines takes. A line where a
+    # tag name is followed by another character, such as "\" or "[", is read the HTML block
+    # way too, with one HtmlBlockHtml in each label reading in turn, as `names` reads it.
     checker = load_checker()
     rng = random.Random(152)
     for _ in range(LABEL_LINES_GENERATED):
@@ -2055,6 +2118,11 @@ def test_the_stated_label_rule_reads_every_generated_line_as_the_checker_does():
                     == stated_first_step(line, labels=labels)[1]), ascii(line)
         assert (not checker.step_one(line, labels=STATED_LABELS)[1]
                 or checker.step_one(line)[1]), ascii(line)
+        if checker.OTHER_CHARACTER_IN_TAG_NAME.search(line):
+            reading = checker.HtmlBlockHtml()
+            for labels in (STATED_LABELS, None, STATED_LABELS):
+                stated = stated_name_form(checker, line, labels=labels, html_block=True)
+                assert checker.name_form(line, reading, labels=labels) == stated, ascii(line)
 
 
 def test_nfkc_gives_what_unicodedata_normalize_gives():
