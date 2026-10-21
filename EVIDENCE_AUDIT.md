@@ -104,7 +104,7 @@ These three tier names are the ones that ship: `evidenceTier` in `matrix.json` t
 |----|-----------|--------------|---------------|
 | T-6001 | Memory Injection | VALIDATED | DVAA L2-04 (MemoryBot persistent injection). |
 | T-6002 | Self-Replicating Memory Entry | VALIDATED | DVAA L3-03. Memory entry that re-injects itself when recalled. |
-| T-6003 | Configuration Modification | OBSERVED | OpenClaw gateway configs modifiable without auth (~75K exposed). NemoClaw config files world-readable. |
+| T-6003 | Configuration Modification | OBSERVED | OpenClaw gateway configs modifiable without auth. SecurityScorecard STRIKE counted 40,214 internet-exposed OpenClaw instances, 23,505 of them showing active control panel interfaces ([9 February 2026](https://securityscorecard.com/blog/beyond-the-hype-moltbots-real-risk-is-exposed-infrastructure-not-ai-superintelligence/)). NemoClaw config files world-readable. |
 | T-6004 | Skill/Plugin Backdoor | VALIDATED | DVAA skill-backdoor-install scenario. |
 | T-6005 | Scheduled Task Injection | OBSERVED | OpenClaw heartbeat mechanism confirmed (RQ-OC-001 investigation: local fs only, not remote, but persistence mechanism exists). NemoClaw H-007. |
 | T-6006 | Tool Registration Persistence | VALIDATED | DVAA L2-08 (PluginBot malicious tool registration). |
