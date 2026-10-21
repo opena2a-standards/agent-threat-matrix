@@ -64,7 +64,8 @@ Everything else is editorial: the prose of `README.md`, the pages under `docs/` 
 the two named above, the prose of the technique pages, `CONTRIBUTING.md`, `CHANGELOG.md`,
 `ATTRIBUTION.md`, whose own rule is the "Contributor credit" section of CONTRIBUTING.md,
 and `related-projects.json`, the figures about related projects that the README check
-reads.
+reads and the OASB-1 control titles that `scripts/check_technique_pages.py` writes into
+the Mitigation section of each technique page.
 
 A change to normative content is a normative change in the organization's sense and takes
 the route below. An editorial change is a pull request directly.

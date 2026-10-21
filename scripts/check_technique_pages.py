@@ -21,11 +21,15 @@ a table of the tactic's techniques in matrix.json order), so each must equal its
 rendering from matrix.json. Their tables kept the same four superseded classes.
 
 The ``## Mitigation`` section of a technique page is data too: it lists the OASB controls
-in ``oasbControls``, and says "No documented mitigations yet." only for a technique that
-maps none. Every page said that while every technique mapped to one or more controls. The
-section runs from its heading to the next ``## `` heading outside fenced code blocks. A
-technique page also carries no ``**Severity:**`` line: matrix.json has no severity field,
-and every page printed the label with an empty value.
+in ``oasbControls``, one line each with the control's OASB-1 title, as in
+``- OASB 1.1: Agent Cryptographic Identity``, and says "No documented mitigations yet." only
+for a technique that maps none. Every page said that while every technique mapped to one or
+more controls, and then listed each control by its bare id. The titles are pinned in
+related-projects.json under ``oasb.controlTitles``, with the OASB-1 release they were read
+from; a technique that maps a control with no title there fails. The section runs from its
+heading to the next ``## `` heading outside fenced code blocks. A technique page also
+carries no ``**Severity:**`` line: matrix.json has no severity field, and every page
+printed the label with an empty value.
 
 A page whose technique is ``adapted`` in matrix.json states its evidence gap in words, in
 one ``- **Evidence Gap:**`` line, and no other page carries that line. The three adapted
@@ -37,11 +41,12 @@ the data, to drop a Severity line or an Evidence Gap line the data does not back
 a missing Evidence Gap line directly under the Evidence Tier line. Every other line of a
 technique page is left alone. Any other missing technique-page line, a repeated line or
 Mitigation section, and a missing Mitigation section have no single place to write the data
-to, and a Mitigation section that holds a fenced code block may hold the rest of the page
-behind an unclosed fence, so ``--fix`` reports each of them and still exits 1.
+to, a Mitigation section that holds a fenced code block may hold the rest of the page
+behind an unclosed fence, and a control with no title has no line to write, so ``--fix``
+reports each of them and still exits 1.
 
 A read of matrix.json that raises an OSError, a ValueError or a RecursionError (see
-``read_matrix``) is reported in one line on standard error,
+``read_json``) is reported in one line on standard error,
 ``FAIL: matrix.json is missing or does not parse: <reason>``, and the run exits 1 without
 checking or writing a page, with ``--fix`` as without it. So is a matrix.json that parses but
 does not hold what this check needs from it (see ``SHAPE``), in the line
@@ -50,7 +55,11 @@ does not hold what this check needs from it (see ``SHAPE``), in the line
 ``attackClass`` and an ``evidenceTier``, a ``description`` that is absent, null or a string,
 and ``hmaChecks`` and ``oasbControls`` that are each absent, null or an array of strings, and
 whose ``tactics`` array holds objects with a string ``id``, a ``name``, an ``order`` and a
-string ``description``.
+string ``description``. related-projects.json is then read the same way, in the lines
+``FAIL: related-projects.json is missing or does not parse: <reason>`` and
+``FAIL: related-projects.json parses but has the wrong shape: <reason>``: it must be an
+object whose ``oasb`` object holds a ``controlTitles`` object with a string for each
+control id (see ``wrong_titles_shape``).
 """
 
 from __future__ import annotations  # "X | None" annotations also load on Python 3.9
@@ -62,6 +71,8 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+# Where the OASB-1 control titles are pinned, under oasb.controlTitles.
+RELATED = "related-projects.json"
 NO_PROCEDURES = "No documented procedures yet."
 NO_MITIGATION = "No documented mitigations yet."
 OASB_URL = "https://oasb.ai"
@@ -309,8 +320,9 @@ def find_lines(regex: re.Pattern, text: str) -> list[re.Match]:
     return [m for m in regex.finditer(text) if not fenced(m.start())]
 
 
-def check_technique_page(technique: dict, text: str) -> tuple[list[str], str]:
-    """Return the page's disagreements with the data and the page with them rewritten."""
+def check_technique_page(technique: dict, text: str, titles: dict) -> tuple[list[str], str]:
+    """Return the page's disagreements with the data and the page with them rewritten.
+    ``titles`` holds the OASB-1 title of each control id."""
     tid = technique["id"]
     failures = []
     updated = text
@@ -346,7 +358,7 @@ def check_technique_page(technique: dict, text: str) -> tuple[list[str], str]:
 
     gap_failures, updated = check_evidence_gap(technique, updated)
     failures.extend(gap_failures)
-    mitigation_failures, updated = check_mitigation(technique, updated)
+    mitigation_failures, updated = check_mitigation(technique, updated, titles)
     failures.extend(mitigation_failures)
     return failures, updated
 
@@ -380,33 +392,44 @@ def check_evidence_gap(technique: dict, text: str) -> tuple[list[str], str]:
             f"says '{ADAPTED_GAP}'"], text
 
 
-def expected_mitigation(technique: dict) -> str:
-    """The Mitigation section body: one line per OASB control matrix.json maps."""
+def expected_mitigation(technique: dict, titles: dict) -> str:
+    """The Mitigation section body: one line per OASB control matrix.json maps, with the
+    control's title from ``titles``, which must hold every one of them."""
     controls = technique.get("oasbControls") or []
     if not controls:
         return NO_MITIGATION
     lines = [f"Apply the [OASB-1]({OASB_URL}) controls that matrix.json maps to this technique:", ""]
-    lines += [f"- OASB {control}" for control in controls]
+    lines += [f"- OASB {control}: {titles[control]}" for control in controls]
     return "\n".join(lines)
 
 
-def check_mitigation(technique: dict, text: str) -> tuple[list[str], str]:
-    """Return the Mitigation section's disagreement with the data and the page with the
-    section rewritten. A section that holds a fenced code block is not rewritten."""
+def check_mitigation(technique: dict, text: str, titles: dict) -> tuple[list[str], str]:
+    """Return the Mitigation section's disagreements with the data and the page with the
+    section rewritten. A section that holds a fenced code block is not rewritten, and
+    neither is the section of a technique that maps a control ``titles`` does not hold."""
     tid = technique["id"]
+    controls = technique.get("oasbControls") or []
+    untitled = [control for control in controls if control not in titles]
+    failures = []
+    if untitled:
+        noun = "control" if len(untitled) == 1 else "controls"
+        failures.append(f"{tid}: matrix.json maps OASB {noun} {', '.join(untitled)}, which "
+                        f"{RELATED} gives no title under oasb.controlTitles")
     headings = find_lines(MITIGATION_RE, text)
     if len(headings) > 1:
-        return [f"{tid}: page has {len(headings)} '## Mitigation' sections"], text
+        return failures + [f"{tid}: page has {len(headings)} '## Mitigation' sections"], text
     if not headings:
-        return [f"{tid}: page has no '## Mitigation' section"], text
+        return failures + [f"{tid}: page has no '## Mitigation' section"], text
+    if untitled:
+        return failures, text
     start = headings[0].end("line")
     following = [m.start() for m in find_lines(SECTION_RE, text) if m.start() > start]
     end = following[0] if following else len(text)
-    want = expected_mitigation(technique)
+    want = expected_mitigation(technique, titles)
     if text[start:end].strip("\n") == want:
         return [], text
-    controls = ", ".join(technique.get("oasbControls") or []) or "none"
-    failures = [f"{tid}: Mitigation section does not list the OASB controls matrix.json maps ({controls})"]
+    failures.append(f"{tid}: Mitigation section does not list the OASB controls matrix.json maps "
+                    f"({', '.join(controls) or 'none'}) with their titles in {RELATED}")
     if any(start <= fence_start < end for fence_start, _ in fenced_spans(text)):
         return failures, text
     trailer = "\n\n" if end < len(text) else "\n"
@@ -467,8 +490,9 @@ def check_tactic_page(rel: str, have: str, want: str) -> list[str]:
     return failures
 
 
-def check_pages(matrix: dict, fix: bool) -> list[str]:
-    """Return every page disagreement; with ``fix``, rewrite what the data can render."""
+def check_pages(matrix: dict, titles: dict, fix: bool) -> list[str]:
+    """Return every page disagreement; with ``fix``, rewrite what the data can render.
+    ``titles`` holds the OASB-1 title of each control id."""
     failures = []
     for technique in matrix["techniques"]:
         page = ROOT / "techniques" / f"{technique['id']}.md"
@@ -476,7 +500,7 @@ def check_pages(matrix: dict, fix: bool) -> list[str]:
             failures.append(f"{technique['id']}: no page at techniques/{technique['id']}.md")
             continue
         text = page.read_text(encoding="utf-8")
-        page_failures, updated = check_technique_page(technique, text)
+        page_failures, updated = check_technique_page(technique, text, titles)
         failures.extend(page_failures)
         if fix and updated != text:
             page.write_text(updated, encoding="utf-8")
@@ -496,15 +520,16 @@ def check_pages(matrix: dict, fix: bool) -> list[str]:
 
 def report(heading: str, failures: list[str]) -> None:
     print(f"{heading} {len(failures)} technique- or tactic-page line(s) or section(s) that disagree "
-          "with matrix.json:")
+          f"with matrix.json or {RELATED}:")
     for failure in failures:
         print(f"  - {failure}")
 
 
-def read_matrix():
-    """(matrix.json parsed, None), or (None, the reason it could not be read or parsed).
+def read_json(name: str):
+    """(the file ``name`` at the repository root parsed, None), or (None, the reason it could
+    not be read or parsed).
 
-    The reasons are the ones scripts/validate_matrix.py gives for the same file: "no such
+    The reasons are the ones scripts/validate_matrix.py gives for matrix.json: "no such
     file", "a directory, not a file", the system's reason for another OSError, its strerror,
     as in "Permission denied", the message of a ValueError, raised for a syntax error, an
     integer longer than Python's int string conversion limit and bytes that are not UTF-8,
@@ -512,7 +537,7 @@ def read_matrix():
     json.loads raises for arrays or objects nested deeper than it parses.
     """
     try:
-        return json.loads((ROOT / "matrix.json").read_text(encoding="utf-8")), None
+        return json.loads((ROOT / name).read_text(encoding="utf-8")), None
     except FileNotFoundError:
         return None, "no such file"
     except IsADirectoryError:
@@ -599,9 +624,31 @@ def wrong_shape(matrix: object) -> str | None:
     return None
 
 
+def wrong_titles_shape(related: object) -> str | None:
+    """None when the parsed related-projects.json holds the OASB-1 control titles this check
+    writes, an ``oasb`` object whose ``controlTitles`` object gives a string for each control
+    id, or the reason it does not, worded as ``wrong_shape`` words its reasons."""
+    if not isinstance(related, dict):
+        return f"the top level is {json_type(related)}, not an object"
+    if "oasb" not in related:
+        return "the top level has no oasb key"
+    oasb = related["oasb"]
+    if not isinstance(oasb, dict):
+        return f"oasb is {json_type(oasb)}, not an object"
+    if "controlTitles" not in oasb:
+        return "oasb has no controlTitles"
+    titles = oasb["controlTitles"]
+    if not isinstance(titles, dict):
+        return f"oasb.controlTitles is {json_type(titles)}, not an object"
+    for control, title in titles.items():
+        if not isinstance(title, str):
+            return f"oasb.controlTitles[{json.dumps(control)}] is {json_type(title)}, not a string"
+    return None
+
+
 def main(argv: list[str]) -> int:
     fix = "--fix" in argv
-    matrix, cause = read_matrix()
+    matrix, cause = read_json("matrix.json")
     if cause is not None:
         print(f"FAIL: matrix.json is missing or does not parse: {cause}", file=sys.stderr)
         return 1
@@ -609,14 +656,23 @@ def main(argv: list[str]) -> int:
     if cause is not None:
         print(f"FAIL: matrix.json parses but has the wrong shape: {cause}", file=sys.stderr)
         return 1
+    related, cause = read_json(RELATED)
+    if cause is not None:
+        print(f"FAIL: {RELATED} is missing or does not parse: {cause}", file=sys.stderr)
+        return 1
+    cause = wrong_titles_shape(related)
+    if cause is not None:
+        print(f"FAIL: {RELATED} parses but has the wrong shape: {cause}", file=sys.stderr)
+        return 1
+    titles = related["oasb"]["controlTitles"]
 
-    failures = check_pages(matrix, fix)
+    failures = check_pages(matrix, titles, fix)
     if failures and not fix:
         report("FAIL: found", failures)
         return 1
     if failures:
         # A missing or repeated line has no single place to write the data to; it stays.
-        remaining = check_pages(matrix, fix=False)
+        remaining = check_pages(matrix, titles, fix=False)
         fixed = [f for f in failures if f not in remaining]
         if fixed:
             report("FIXED: rewrote", fixed)
@@ -625,8 +681,9 @@ def main(argv: list[str]) -> int:
             return 1
 
     print(f"OK: {len(matrix['techniques'])} technique pages and {len(matrix['tactics'])} tactic "
-          "pages agree with matrix.json on every data line and Mitigation section, every adapted "
-          "page states its evidence gap, and no technique page carries a Severity line")
+          "pages agree with matrix.json on every data line and Mitigation section, every control "
+          f"a Mitigation section lists carries its title from {RELATED}, every adapted page "
+          "states its evidence gap, and no technique page carries a Severity line")
     return 0
 
 
