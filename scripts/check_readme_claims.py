@@ -80,8 +80,11 @@ follows, and each tag from < or </ and a name, which is an ASCII letter followed
 ASCII letters, digits and hyphens, to a > right after the name or, after / or a character
 Unicode lists as white space (such as U+00A0 NO-BREAK SPACE), to the first > after that
 if no < comes first. Where white space other than a space or tab follows a tag name, the
-line is also read with only a space, a tab or / ending a tag name, and names DVAA when
-either reading does. On the way, as CommonMark reads them, the character a \\ escapes and
+line is also read with only a space, a tab or / ending a tag name. Where a character other
+than an ASCII letter, digit, hyphen, white space, / or > follows a tag name, such as \\ or
+<, the line is also read as a browser reads a tag in an HTML block, with a name that is an
+ASCII letter followed by any characters other than white space, / and >, so "DV<x\\>AA"
+and "D<D\\\\</b>VAA" name DVAA. The line names DVAA when any reading does. On the way, as CommonMark reads them, the character a \\ escapes and
 the text of a code span are kept as text, which no later step reads as markup, HTML, a
 link span or a character reference, and the \\ and the backticks around the code span are
 removed. A \\ escapes the ASCII punctuation character directly after it and stays before
@@ -326,6 +329,48 @@ SPACE_OR_TAB_HTML = re.compile(
 # SPACE: only on a line that holds one do RAW_HTML and SPACE_OR_TAB_HTML remove different
 # text.
 OTHER_SPACE_AFTER_TAG_NAME = re.compile(r"</?[A-Za-z][A-Za-z0-9-]*[^\S \t]")
+
+# RAW_HTML with a tag name of an ASCII letter followed by any characters other than white
+# space, "/" and ">", as a browser reads a tag in an HTML block: "<x\>" is a tag named "x\",
+# and "<D\\</b>" a tag named "d\\<" with an attribute "b", so "DV<x\>AA" and "D<D\\</b>VAA"
+# between "<div>" and "</div>" show "DVAA".
+HTML_BLOCK_HTML = re.compile(
+    RAW_HTML.pattern.replace(r"[A-Za-z0-9-]*(?:[\s/]", r"[^\s/>]*(?:[\s/]"))
+
+# A tag name followed by a character other than an ASCII letter, digit, hyphen, white space,
+# "/" or ">", such as "\" or "<": only on a line that holds one do RAW_HTML and
+# HTML_BLOCK_HTML remove different text.
+OTHER_CHARACTER_IN_TAG_NAME = re.compile(r"</?[A-Za-z][A-Za-z0-9-]*[^A-Za-z0-9\s/>-]")
+
+# The tag name HTML_BLOCK_HTML reads from its first letter.
+HTML_BLOCK_TAG_NAME = re.compile(r"[^\s/>]*")
+
+
+class HtmlBlockHtml:
+    """The HTML `HTML_BLOCK_HTML` matches, with `match` as a compiled pattern has it, read
+    over a line in linear time. A tag name there can hold "<", so a tag that finds no ">"
+    can take its name past another "<"; a tag from a "<" and an ASCII letter inside that
+    name has the rest of that name as its own and finds no ">" either, so it is not looked
+    for again. A "</" ends that name at its "/" and is looked for. The last such tag is held
+    as where it starts and where its name ends, and only a "<" between the two is passed
+    over, so one instance gives what the pattern gives however many times it reads a line:
+    a later reading of the line, which starts again from its first character, looks for
+    each tag before that one."""
+
+    def __init__(self):
+        self.text, self.start, self.name_end = None, -1, -1
+
+    def match(self, text, pos):
+        letter = pos + 2 if text.startswith("</", pos) else pos + 1
+        is_tag = letter < len(text) and text[letter] in string.ascii_letters
+        if (letter == pos + 1 and is_tag and text is self.text
+                and self.start < pos < self.name_end):
+            return None
+        found = HTML_BLOCK_HTML.match(text, pos)
+        if is_tag and not found:
+            self.text, self.start = text, pos
+            self.name_end = HTML_BLOCK_TAG_NAME.match(text, letter + 1).end()
+        return found
 
 # A "]" followed by "(" with the text after it to the first ")" if no further "(" comes
 # first, or a "]" followed by "[" with the text after it to the first "]" if no further "["
@@ -766,7 +811,10 @@ def names(stripped, name, hiding=False, spans=True):
     """Whether a line that is `stripped` once the characters `hiding_kind` names are
     removed names `name`: it `holds` `name` as it stands or in its `name_form`, read with
     `RAW_HTML` and, where a tag name is followed by white space other than a space or
-    tab, with `SPACE_OR_TAB_HTML` too. The name form reads no code span with `spans` false,
+    tab, with `SPACE_OR_TAB_HTML` too, and where a tag name is followed by a character
+    other than an ASCII letter, digit, hyphen, white space, "/" or ">", as a browser reads a
+    tag in an HTML block too, with `HtmlBlockHtml`: "DV<x\\>AA" and "D<D\\\\</b>VAA" name
+    DVAA. The name form reads no code span with `spans` false,
     as `span_lines` gives for a line after one that can leave a code span, HTML or a link
     span open, nor with `hiding` true. Where a name form holds `name` only with combining
     marks directly after it that NFKC joins to its last letter, or only once its letters
@@ -788,6 +836,8 @@ def names(stripped, name, hiding=False, spans=True):
     readings = [RAW_HTML]
     if OTHER_SPACE_AFTER_TAG_NAME.search(stripped):
         readings.append(SPACE_OR_TAB_HTML)
+    if OTHER_CHARACTER_IN_TAG_NAME.search(stripped):
+        readings.append(HtmlBlockHtml())
     for raw_html in readings:
         form = name_form(stripped, raw_html, spans)
         if found(form):

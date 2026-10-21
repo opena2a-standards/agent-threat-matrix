@@ -1217,6 +1217,103 @@ def test_a_name_written_with_markup_a_reference_or_a_confusable_letter_leaves_th
         shutil.rmtree(td)
 
 
+# DVAA written in an HTML block, between "<div>" and "</div>", where a browser reads a tag
+# name to white space, "/" or ">": "<x\>" is a tag named "x\" and "<D\\</b>" a tag named
+# "d\\<" with an attribute "b", so each line shows "DVAA (99 agents, ...)". Both were read
+# as text, as a tag name of ASCII letters, digits and hyphens ends at neither "\" nor "<",
+# and the check found no DVAA on the line and exited 0.
+LICENSE_LINE = "Apache-2.0. The framework is free to use, cite, and build upon.\n"
+HTML_BLOCK_NAMES = [
+    ("plain name", "DVAA"),
+    ("tag with a backslash in its name", "DV<x\\>AA"),
+    ("tag with a backslash and a < in its name", "D<D\\\\</b>VAA"),
+]
+
+
+@pytest.mark.parametrize("written", [w for _, w in HTML_BLOCK_NAMES],
+                         ids=[case for case, _ in HTML_BLOCK_NAMES])
+def test_a_name_in_an_html_block_hidden_by_a_tag_a_browser_reads_leaves_the_line_read(
+        written):
+    td = scratch_tree()
+    try:
+        figures = f"{written} (99 agents, 77 vulnerability categories)"
+        mutate_readme(td, LICENSE_LINE, f"{LICENSE_LINE}\n<div>\n{figures}\n</div>\n")
+        line = where_of(td, figures)
+        r = run_checker(td)
+        assert r.returncode == 1, r.stdout
+        for failure in (
+            f"{line}: \"99 agents\" does not match related-projects.json "
+            "(DVAA agents: 21)",
+            f"{line}: \"77 vulnerability categories\" does not match "
+            "related-projects.json (DVAA vulnerability categories: 12)",
+        ):
+            assert failure in r.stderr, r.stderr
+    finally:
+        shutil.rmtree(td)
+
+
+def test_a_tag_name_a_browser_reads_is_removed_only_in_the_html_block_reading():
+    checker = load_checker()
+    for written in ("DV<x\\>AA", "D<D\\\\</b>VAA"):
+        assert checker.OTHER_CHARACTER_IN_TAG_NAME.search(written)
+        assert not checker.holds(checker.name_form(written), "DVAA"), written
+        assert checker.name_form(written, checker.HtmlBlockHtml()) == "DVAA", written
+        assert checker.names(written, "DVAA"), written
+    assert checker.name_form("DV<a</b>AA", checker.HtmlBlockHtml()) == "DVAA"
+    assert checker.name_form("DV<a<</b>AA", checker.HtmlBlockHtml()) == "DVAA"
+    # HtmlBlockHtml does not look again for a tag inside the name of one that found no
+    # ">", and gives what the pattern gives from every "<": a "</" at the end of that name
+    # starts a name of its own.
+    rng = random.Random(153)
+    pieces = [*"<</\\>ab /-\t\"'`*", "\N{NO-BREAK SPACE}", "<!--", "-->", "DV", "AA"]
+    for _ in range(50_000):
+        line = "".join(rng.choice(pieces) for _ in range(rng.randint(1, 16)))
+        assert (checker.step_one(line, checker.HtmlBlockHtml())
+                == checker.step_one(line, checker.HTML_BLOCK_HTML)), ascii(line)
+    # Where every tag name ends at white space, "/", ">" or the end of the line, the
+    # reading is not added.
+    assert not checker.OTHER_CHARACTER_IN_TAG_NAME.search("DV<b>AA <i x='1'> <br/> <a")
+
+
+def test_one_html_block_reading_reads_a_line_alike_each_time():
+    # One HtmlBlockHtml gives what HTML_BLOCK_HTML gives however many times it reads a line,
+    # so the readings `names` makes of one line can share an instance. In
+    # "DV<y\>AA <q\" the tag "<q\" finds no ">", and a later reading of the line, which
+    # starts again from its first character, still removes "<y\>" before it: a "<" is
+    # passed over only inside the name of the last tag that found no ">", not anywhere
+    # before the end of that name.
+    checker = load_checker()
+    line = "DV<y\\>AA <q\\"
+    reading = checker.HtmlBlockHtml()
+    for _ in range(3):
+        assert checker.name_form(line, reading) == "DVAA <q\\"
+    # One instance reads lines picked from a set, each one to three times in a row, so a
+    # reading often follows another of the same line, as well as readings of other lines.
+    rng = random.Random(1531)
+    pieces = [*"<</\\>ab /-\t\"'`*", "\N{NO-BREAK SPACE}", "<!--", "-->", "DV", "AA"]
+    lines = ["".join(rng.choice(pieces) for _ in range(rng.randint(1, 16)))
+             for _ in range(500)]
+    reading = checker.HtmlBlockHtml()
+    for _ in range(50_000):
+        line = rng.choice(lines)
+        expected = checker.step_one(line, checker.HTML_BLOCK_HTML)
+        for _ in range(rng.randint(1, 3)):
+            assert checker.step_one(line, reading) == expected, ascii(line)
+
+
+@pytest.mark.parametrize("line", ["DV" + "<a" * 50_000, "DV" + "<a\\" * 40_000 + "AA",
+                                  "DV" + "<a</" * 30_000 + "AA"])
+def test_the_html_block_reading_reads_a_long_line_in_linear_time(line):
+    # A tag name in that reading can hold "<", so a tag that finds no ">" takes its name
+    # past every "<" after it; looked for again from each "<" on a line of "<a", every
+    # look would scan to the end of the line, in time quadratic in its length.
+    checker = load_checker()
+    start = time.perf_counter()
+    checker.names(line, "DVAA")
+    seconds = time.perf_counter() - start
+    assert seconds < 3, f"{seconds:.2f} s"
+
+
 # The DVAA row of the related-projects table rewritten with "DVAA" in markup beside a
 # backtick and two wrong figures: the backtick stands in a link destination, in a link
 # title, in each of two table cells, in an autolink, or in an HTML attribute that holds
@@ -1487,11 +1584,13 @@ def ascii_letter_at(text, i):
     return i < len(text) and text[i] in string.ascii_letters
 
 
-def stated_html_end(line, i, any_space=True):
+def stated_html_end(line, i, any_space=True, html_block=False):
     """Where the HTML that README states starts at the "<" at line[i] ends, or None. With
     `any_space` false, as in the second reading README states where white space other than
     a space or tab follows a tag name, only a space, a tab or "/" lets a tag run on past
-    its name to a ">"."""
+    its name to a ">". With `html_block` true, as in the reading README states where
+    another character follows a tag name, the name after its first letter runs on over any
+    character other than white space, "/" and ">"."""
     for opening, close in (("<!--", "-->"), ("<?", "?>"), ("<![CDATA[", "]]>")):
         if line.startswith(opening, i):
             end = line.find(close, i + len(opening))
@@ -1502,7 +1601,9 @@ def stated_html_end(line, i, any_space=True):
     j = i + 2 if line.startswith("</", i) else i + 1
     if not ascii_letter_at(line, j):
         return None
-    while j < len(line) and line[j] in TAG_NAME:
+    j += 1
+    while j < len(line) and (not (line[j].isspace() or line[j] in "/>") if html_block
+                             else line[j] in TAG_NAME):
         j += 1
     if j < len(line) and line[j] == ">":
         return j + 1
@@ -1529,14 +1630,14 @@ def stated_reference_end(text, i):
     return end + 1 if 0 < len(number) <= most and all(c in digits for c in number) else None
 
 
-def stated_name_form(checker, line, any_space=True):
+def stated_name_form(checker, line, any_space=True, html_block=False):
     """`line` read by the three steps README states, as a plain scan rather than with the
-    checker's patterns, and with `any_space` false as in the second reading. A reference is
-    decoded by html.unescape, as in the checker, and a decoded character that fails a line
-    is dropped."""
+    checker's patterns, with `any_space` false as in the second reading and with
+    `html_block` true as in the HTML block reading. A reference is decoded by html.unescape,
+    as in the checker, and a decoded character that fails a line is dropped."""
     # First, going along the line, its HTML is removed wherever it stands, the character a
     # backslash escapes and the text of each code span are kept as text, each pair marked.
-    pairs = stated_first_step(line, any_space)[0]
+    pairs = stated_first_step(line, any_space, html_block=html_block)[0]
     # Second, going along what remains, each "]" followed by "(" or "[" goes with the text
     # after it to the first ")" or "]" if no further "(" or "[" comes first, then each "!"
     # directly before a "[", and then the Markdown characters, none of them kept as text.
@@ -1606,7 +1707,7 @@ def stated_run_end(line, i):
     return i
 
 
-def stated_first_step(line, any_space=True, spans=True):
+def stated_first_step(line, any_space=True, spans=True, html_block=False):
     """(pairs, open): `line` after the first step README states, each character with
     whether it is kept as text, and whether the lines after it read no code span."""
     out, i, reading, unmatched = [], 0, spans, False
@@ -1615,7 +1716,7 @@ def stated_first_step(line, any_space=True, spans=True):
         if c == "<":
             if reading and stated_stops_at_lt(line, i):
                 reading = False
-            end = stated_html_end(line, i, any_space)
+            end = stated_html_end(line, i, any_space, html_block)
             if end is not None:
                 i = end
                 continue
@@ -1694,7 +1795,9 @@ def test_the_stated_steps_read_every_generated_line_as_the_checker_does():
     # leave every test passing. Any line the two read differently names the step. A line
     # with white space other than a space or tab is also read the second way README states,
     # with only a space, a tab or "/" ending a tag name; on any other line the two ways
-    # remove the same HTML.
+    # remove the same HTML. A line where a tag name is followed by another character, such
+    # as "\" or "<", is also read the HTML block way, with a tag name running to white
+    # space, "/" or ">"; on any other line that way reads the line as the first does.
     checker = load_checker()
     rng = random.Random(80)
     for _ in range(STATED_LINES):
@@ -1704,6 +1807,11 @@ def test_the_stated_steps_read_every_generated_line_as_the_checker_does():
         if any(c.isspace() and c not in " \t" for c in line):
             assert (checker.name_form(line, checker.SPACE_OR_TAB_HTML)
                     == stated_name_form(checker, line, any_space=False)), ascii(line)
+        block = stated_name_form(checker, line, html_block=True)
+        if checker.OTHER_CHARACTER_IN_TAG_NAME.search(line):
+            assert checker.name_form(line, checker.HtmlBlockHtml()) == block, ascii(line)
+        else:
+            assert block == stated_name_form(checker, line), ascii(line)
 
 
 def test_nfkc_gives_what_unicodedata_normalize_gives():
