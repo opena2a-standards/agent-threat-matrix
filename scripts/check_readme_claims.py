@@ -84,7 +84,8 @@ line is also read with only a space, a tab or / ending a tag name. Where a chara
 than an ASCII letter, digit, hyphen, white space, / or > follows a tag name, such as \\ or
 <, the line is also read as a browser reads a tag in an HTML block, with a name that is an
 ASCII letter followed by any characters other than white space, / and >, so "DV<x\\>AA"
-and "D<D\\\\</b>VAA" name DVAA. The line names DVAA when any reading does. On the way, as CommonMark reads them, the character a \\ escapes and
+and "D<D\\\\</b>VAA" name DVAA. The line names DVAA when any reading does. On the way, as
+CommonMark reads them, the character a \\ escapes and
 the text of a code span are kept as text, which no later step reads as markup, HTML, a
 link span or a character reference, and the \\ and the backticks around the code span are
 removed. A \\ escapes the ASCII punctuation character directly after it and stays before
@@ -104,14 +105,27 @@ line with no close; any other < followed by an ASCII character other than a spac
 when no > follows it or a backtick, ' or " stands between it and the first > after it;
 and a ] followed by ( or [ when no ) or ] follows it with no further ( or [ first, or
 when a backtick, ', ", \\ or < stands between them. No code span is read on a line that
-carries one of the characters above, nor on the lines after a line on which code spans
-are not read or stop being read, or that holds a run of backticks that no run closes, up
-to a blank line (empty or of spaces and tabs only): a code span, HTML or link span still
-open at the end of that line could close on one of them. Second, going along what
-remains, each ] followed by ( is removed with the text after it to the first ) if no
-further ( comes first, and each ] followed by [ with the text after it to the first ] if
-no further [ comes first, whether or not they make a link, then each ! directly before a
-[, and then the Markdown characters * _ ~ ` [ ]. Third, its character references are
+carries one of the characters above, nor on the lines after a line on which, read with no
+link label removed as below, code spans are not read or stop being read, or that holds a
+run of backticks that no run closes, up to a blank line (empty or of spaces and tabs
+only): a code span, HTML or link span still open at the end of that line could close on
+one of them. Going along the line, where a ] that no \\ escapes and that stands in no code
+span or HTML is directly followed by a link label, the [ and the text after it to the
+first ] that no \\ escapes, with no [ that no \\ escapes before that ], as CommonMark bounds
+a label though of any length, the ] is removed with the label when the label is blank,
+empty or of white space only, or one that the page holding the line defines, and no HTML,
+escape or code span starts inside the label; otherwise the ] stays, and the [ and what
+follows it are read on. A page defines a label where, once such characters are removed, it
+holds a [ that no \\ escapes followed by that label and ]:, two labels being the same when
+they are after Unicode case folding, with white space at either end removed and each run
+of white space inside read as one space. Where a ] is so directly followed by a [, the
+line is also read with no label removed, and it names DVAA when any of its readings does.
+So "[x][DV](url)AA", which CommonMark shows as "[x]DVAA" where the page does not define the
+label DV, names DVAA, while "[DV][dvaa]AA" names DVAA only where the page defines the label
+dvaa. Second, going along what remains, each ] followed by ( is removed with the text after
+it to the first ) if no further ( comes first, whether or not they make a link, then each
+! directly before a [, and then the Markdown characters * _ ~ ` [ ]. Third, its character
+references are
 decoded, each to the characters it stands for less any such character, so "&#8203;"
 (U+200B) leaves nothing, and it is
 brought to NFKC with each character Unicode lists as confusable with A, D or V read as
@@ -355,7 +369,10 @@ class HtmlBlockHtml:
     as where it starts and where its name ends, and only a "<" between the two is passed
     over, so one instance gives what the pattern gives however many times it reads a line:
     a later reading of the line, which starts again from its first character, looks for
-    each tag before that one."""
+    each tag before that one. Whether a tag finds a ">" turns on the line alone, so this
+    holds also for readings that pass over different parts of the line, as the reading that
+    removes a link label passes over the label and the reading that removes none does not:
+    `names` reads a line with one instance in both."""
 
     def __init__(self):
         self.text, self.start, self.name_end = None, -1, -1
@@ -373,9 +390,15 @@ class HtmlBlockHtml:
         return found
 
 # A "]" followed by "(" with the text after it to the first ")" if no further "(" comes
-# first, or a "]" followed by "[" with the text after it to the first "]" if no further "["
-# comes first, whether or not they make a link: "[DV](url)AA" shows "DVAA".
-LINK_TARGET = re.compile(r"\]\([^()]*\)|\]\[[^\[\]]*\]")
+# first, which the second step removes whether or not they make a link: "[DV](url)AA" shows
+# "DVAA".
+PAREN_SPAN = re.compile(r"\]\([^()]*\)")
+
+# PAREN_SPAN, or a "]" followed by "[" with the text after it to the first "]" if no further
+# "[" comes first: where a "]" followed by "(" or "[" starts neither, or the one it starts
+# holds a character in LINK_UNSURE, the first step stops reading code spans. Whether a "]"
+# followed by "[" is removed with the label after it is read apart from this (`label_end`).
+LINK_TARGET = re.compile(PAREN_SPAN.pattern + r"|\]\[[^\[\]]*\]")
 
 # A "!" directly before a "[", removed so that an image reads as its alternative text:
 # "DV![](x.png)AA" names DVAA, while "DV!AA" does not.
@@ -618,7 +641,8 @@ def span_lines(lines):
     only spaces and tabs as written. A code span, HTML or link span still open at the end of
     such a line could close on a later line of its paragraph. A line that carries a
     character `hiding_kind` names reads no code span, which `names` sees to, and so leaves
-    the lines after it with none read too."""
+    the lines after it with none read too. Each line is read with no link label removed,
+    which leaves code spans unread wherever removing the labels the page defines would."""
     reads, open_ = [], False
     for line, stripped, hidden in lines:
         if not line.strip(" \t"):
@@ -627,6 +651,19 @@ def span_lines(lines):
         if not open_:
             open_ = step_one(stripped, spans=not hidden)[1]
     return reads
+
+
+def page_labels(pages, lines):
+    """For each README line, as `classified` returns it, the link labels that the page
+    holding it defines (`defined_labels`), read from that page's lines with the characters
+    `hiding_kind` names removed: a link reference definition holds on its own page only, as
+    each page is a document of its own."""
+    labels = []
+    starts = [first - 1 for first in pages.first_lines] + [len(lines)]
+    for start, end in zip(starts, starts[1:]):
+        defined = defined_labels("\n".join(stripped for _, stripped, _ in lines[start:end]))
+        labels.extend([defined] * (end - start))
+    return labels or [frozenset()] * len(lines)
 
 
 def decoded(reference):
@@ -669,7 +706,66 @@ def unclosed(found):
     return False
 
 
-def step_one(stripped, raw_html=RAW_HTML, spans=True):
+def label_end(text, start):
+    """The offset just past the link label that opens with the "[" at text[start], or None
+    where none does. As CommonMark bounds a link label, it runs to the first "]" that no
+    backslash escapes, with no "[" that no backslash escapes before that "]"; a backslash
+    escapes the ASCII punctuation character directly after it. CommonMark's limit of 999
+    characters is not applied. No code span, HTML or character reference is read inside
+    it."""
+    if text[start:start + 1] != "[":
+        return None
+    i = start + 1
+    while i < len(text):
+        c = text[i]
+        if c == "\\" and text[i + 1:i + 2] in PUNCTUATION:
+            i += 2
+        elif c == "[":
+            return None
+        elif c == "]":
+            return i + 1
+        else:
+            i += 1
+    return None
+
+
+def label_key(label):
+    """Link label `label`, the text between its brackets, as two labels are compared: after
+    Unicode case folding, with white space at either end removed and each run of white space
+    inside read as one space, as CommonMark compares them. A blank label, empty or of white
+    space only, gives "". `BREAK` is dropped, so a label reads alike in the line `detached`
+    gives."""
+    return " ".join(label.replace(BREAK, "").casefold().split())
+
+
+def defined_labels(text):
+    """The link labels page `text` defines, each as `label_key` gives it: each label, as
+    `label_end` reads one, that a "[" no backslash escapes opens and ":" directly follows,
+    such as "dvaa" in "[DVAA]: https://example.org". A blank label defines nothing. A
+    definition-like text that CommonMark does not read as one, such as one in a fenced code
+    block, is counted too, which `names` allows for by also reading each line with no label
+    removed. Each "[" scans only up to the first "[" or "]" after it that no backslash
+    escapes, and a label found is passed over whole, so a page is read in linear time."""
+    keys = set()
+    i = 0
+    while i < len(text):
+        c = text[i]
+        if c == "\\" and text[i + 1:i + 2] in PUNCTUATION:
+            i += 2
+            continue
+        if c == "[":
+            end = label_end(text, i)
+            if end is not None:
+                key = label_key(text[i + 1:end - 1])
+                if key and text[end:end + 1] == ":":
+                    keys.add(key)
+                i = end
+                continue
+        i += 1
+    return frozenset(keys)
+
+
+def step_one(stripped, raw_html=RAW_HTML, spans=True, labels=None):
     """(text, open): `stripped` after the first step the module description states. Its HTML
     is removed as `raw_html` matches it, `RAW_HTML` unless another is given; the character
     each backslash escapes and the text of each code span are kept as text, written in the
@@ -677,13 +773,22 @@ def step_one(stripped, raw_html=RAW_HTML, spans=True):
     backtick in no code span is left for the second step to remove. Code spans are read
     until the first place where a backtick after it could be read another way, the places
     the module description lists, which `RAW_HTML` decides whichever HTML `raw_html`
-    removes; with `spans` false none is read. `open` is whether the lines after this one,
-    up to a blank line, read no code span: whether code spans were not read here or stopped
-    being read, or a run of backticks here found no closing run.
+    removes; with `spans` false none is read. A "]" directly followed by a link label, as
+    `label_end` reads one, is removed with the label, which is not read further, where the
+    label is blank or its `label_key` is in `labels`, the labels the page holding the line
+    defines; with `labels` None no label is removed. `open` is whether the lines after this
+    one, up to a blank line, read no code span: whether code spans were not read here or
+    stopped being read, or a run of backticks here found no closing run. A removed label is
+    passed over, so neither the "]" that closes it nor a backtick, "<" or backslash in it
+    stops code spans being read, while the "]" before a label holding one of the last three
+    has already stopped them: `open` is never true with `labels` where it is false with
+    `labels` None, the reading `span_lines` takes.
 
     Each closing run is looked up in the runs of its length, in order, past the ones already
-    passed, and a "<" that starts no HTML looks for the first ">" after it once for all the
-    "<" before that ">": a line is read in linear time."""
+    passed, a "<" that starts no HTML looks for the first ">" after it once for all the "<"
+    before that ">", and a link label is scanned only up to the first "[" or "]" after its
+    "[" that no backslash escapes, where the next one can start: a line is read in linear
+    time."""
     runs = {}
     for run in BACKTICKS.finditer(stripped):
         runs.setdefault(len(run.group()), []).append(run.start())
@@ -742,29 +847,39 @@ def step_one(stripped, raw_html=RAW_HTML, spans=True):
             out.append(stripped[i:end])
             i = end
             continue
-        elif c == "]" and reading and stripped[i + 1:i + 2] in ("(", "["):
-            link = LINK_TARGET.match(stripped, i)
-            if not link or any(u in LINK_UNSURE for u in link.group()):
-                reading = False
+        elif c == "]" and stripped[i + 1:i + 2] in ("(", "["):
+            if reading:
+                link = LINK_TARGET.match(stripped, i)
+                if not link or any(u in LINK_UNSURE for u in link.group()):
+                    reading = False
+            end = None if labels is None else label_end(stripped, i + 1)
+            if end is not None:
+                key = label_key(stripped[i + 2:end - 1])
+                if not key or key in labels:
+                    i = end
+                    continue
         out.append(c)
         i += 1
     return "".join(out), not reading or unmatched
 
 
-def name_form(stripped, raw_html=RAW_HTML, spans=True):
+def name_form(stripped, raw_html=RAW_HTML, spans=True, labels=None):
     """`stripped` as a name in it reads, by the three steps the module description states:
     `step_one`, which removes the raw HTML `raw_html` matches, `RAW_HTML` unless another is
-    given, and keeps as text the character each backslash escapes and the text of each code
-    span, read unless `spans` is false; then each "](...)" and "][...]" span `LINK_TARGET`
-    matches removed, whether or not it makes a link, then each "!" `IMAGE` matches, and the
+    given, keeps as text the character each backslash escapes and the text of each code
+    span, read unless `spans` is false, and removes each "]" directly followed by a link
+    label that is blank or in `labels`, the labels the page holding the line defines, with
+    that label, and none with `labels` None; then each "](...)" span `PAREN_SPAN` matches
+    removed, whether or not it makes a link, then each "!" `IMAGE` matches, and the
     Markdown characters in `MARKUP`; then the character references decoded, less the
     characters `hiding_kind` names, and the text brought to NFKC, which brings back what the
     first step kept as text, with each character in `CONFUSABLES` read as the letters it
-    resembles. The HTML is removed before the link spans, as HTML can start inside a link
-    destination or title and end after the ")" that closes them, and the markup before the
-    references are decoded, as a reference to "*" shows a star."""
-    text = step_one(stripped, raw_html, spans)[0]
-    text = IMAGE.sub("", LINK_TARGET.sub("", text)).translate(MARKUP)
+    resembles. The HTML is removed before the "](...)" spans, as HTML can start inside a link
+    destination or title and end after the ")" that closes them, while a link label is read
+    as written, as CommonMark reads one; and the markup is removed before the references are
+    decoded, as a reference to "*" shows a star."""
+    text = step_one(stripped, raw_html, spans, labels)[0]
+    text = IMAGE.sub("", PAREN_SPAN.sub("", text)).translate(MARKUP)
     text = REFERENCE.sub(decoded, text)
     return nfkc(text).translate(CONFUSABLES)
 
@@ -807,26 +922,36 @@ def detached(stripped):
     return "".join(out)
 
 
-def names(stripped, name, hiding=False, spans=True):
+def names(stripped, name, hiding=False, spans=True, labels=None):
     """Whether a line that is `stripped` once the characters `hiding_kind` names are
     removed names `name`: it `holds` `name` as it stands or in its `name_form`, read with
     `RAW_HTML` and, where a tag name is followed by white space other than a space or
     tab, with `SPACE_OR_TAB_HTML` too, and where a tag name is followed by a character
     other than an ASCII letter, digit, hyphen, white space, "/" or ">", as a browser reads a
     tag in an HTML block too, with `HtmlBlockHtml`: "DV<x\\>AA" and "D<D\\\\</b>VAA" name
-    DVAA. The name form reads no code span with `spans` false,
-    as `span_lines` gives for a line after one that can leave a code span, HTML or a link
-    span open, nor with `hiding` true. Where a name form holds `name` only with combining
-    marks directly after it that NFKC joins to its last letter, or only once its letters
-    are decomposed, the name form of the line `detached` is read too, so a mark counts only
-    where it is written as itself directly after a letter or another mark: "DVAA" U+0301
-    does not name DVAA, while "DV**AA**" U+0301 and "DV**AA&#x301;**" do, and "DVAA"
-    U+0332, which NFKC leaves apart from the A, names DVAA. "DV" U+200B "AA", "DV&#8203;AA",
-    "**DV**AA", "DV<!-- -->AA", "DVA" U+0410 and the fullwidth letters each name DVAA;
-    "DVAA" U+0301 does not. On a line that carried such a character, `hiding` true, a
-    combining mark after `name` does not keep the line from naming it: removing the
-    character can put a mark directly after the name, so "DVAA" U+200B U+0301 names
-    DVAA."""
+    DVAA. Each name form removes a "]" directly followed by a
+    link label that is blank or in `labels`, the labels the page holding the line defines,
+    with that label; where a "]" stands directly before a "[", the line is also read with no
+    label removed, as it is with `labels` None, in each of those readings, one
+    `HtmlBlockHtml` serving both label readings: on a page that defines DV,
+    "[x][DV](url)A<y\\>A <q\\" names DVAA only read with no label removed and as a browser
+    reads "<y\\>" in an HTML block, after the reading that removes DV has held "<q\\", a tag
+    that finds no ">". `defined_labels` also counts a text that
+    only looks like a definition, so "[x][DV](url)AA", which shows "[x]DVAA" unless the page
+    defines DV, names DVAA by the reading that removes no label even with DV in `labels`,
+    while "[DV][dvaa]AA" names DVAA only with dvaa in `labels`. The name form reads no code
+    span with `spans` false, as `span_lines` gives for a line after one that can leave a
+    code span, HTML or a link span open, nor with `hiding` true. Where a name form holds
+    `name` only with combining marks directly after it that NFKC joins to its last letter,
+    or only once its letters are decomposed, the name form of the line `detached` is read
+    too, so a mark counts only where it is written as itself directly after a letter or
+    another mark: "DVAA" U+0301 does not name DVAA, while "DV**AA**" U+0301 and
+    "DV**AA&#x301;**" do, and "DVAA" U+0332, which NFKC leaves apart from the A, names DVAA.
+    "DV" U+200B "AA", "DV&#8203;AA", "**DV**AA", "DV<!-- -->AA", "DVA" U+0410 and the
+    fullwidth letters each name DVAA; "DVAA" U+0301 does not. On a line that carried such a
+    character, `hiding` true, a combining mark after `name` does not keep the line from
+    naming it: removing the character can put a mark directly after the name, so "DVAA"
+    U+200B U+0301 names DVAA."""
     def found(text):
         return name in text if hiding else holds(text, name)
 
@@ -837,14 +962,22 @@ def names(stripped, name, hiding=False, spans=True):
     if OTHER_SPACE_AFTER_TAG_NAME.search(stripped):
         readings.append(SPACE_OR_TAB_HTML)
     if OTHER_CHARACTER_IN_TAG_NAME.search(stripped):
+        # One instance reads the line with each removal below and its `detached` form: it
+        # gives what HTML_BLOCK_HTML gives in every reading, whichever "<" a reading passes
+        # over.
         readings.append(HtmlBlockHtml())
+    # Only a "]" directly before a "[" can be removed with a label, so a line without one
+    # reads alike either way.
+    removals = [None] if labels is None or "][" not in stripped else [labels, None]
     for raw_html in readings:
-        form = name_form(stripped, raw_html, spans)
-        if found(form):
-            return True
-        decomposed = unicodedata.normalize("NFKD", form).translate(CONFUSABLES)
-        if name in decomposed and found(name_form(detached(stripped), raw_html, spans)):
-            return True
+        for removal in removals:
+            form = name_form(stripped, raw_html, spans, removal)
+            if found(form):
+                return True
+            decomposed = unicodedata.normalize("NFKD", form).translate(CONFUSABLES)
+            if name in decomposed and found(
+                    name_form(detached(stripped), raw_html, spans, removal)):
+                return True
     return False
 
 
@@ -1237,8 +1370,9 @@ def main(argv):
     # line also give the line with such characters removed, which decides whether it names
     # DVAA.
     lines = [classified(line) for line in readme.split("\n")]
-    naming = [names(stripped, "DVAA", bool(hidden), spans)
-              for (_, stripped, hidden), spans in zip(lines, span_lines(lines))]
+    naming = [names(stripped, "DVAA", bool(hidden), spans, labels)
+              for (_, stripped, hidden), spans, labels
+              in zip(lines, span_lines(lines), page_labels(pages, lines))]
     dvaa_lines = lines_naming(lines, naming)
     pinned = "related-projects.json"
     # Every DVAA wording is read in any letter case: DVAA itself writes "Attack Categories".
