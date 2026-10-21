@@ -44,6 +44,16 @@ checker's patterns cannot drift apart with every test passing. The example READM
 checker's description give of a no-break space after a tag name must be a form that only
 the second reading names, and the two must give the same form.
 
+A "]" directly followed by a link label the page does not define makes no reference link:
+CommonMark shows the "]" and reads the "[" after it on, so "[x][DV](y)AA" shows "[x]DVAA".
+The check removed every "][...]" span whether or not it made a link, read "x(y)AA", and the
+line passed with two wrong figures, as did "[x][\\[DV](y)AA"; each must now go red, as
+"[DV](y)AA" did. A label the page defines, in any letter case and spacing, and a blank one
+are removed with the "]" before them, also after a label the page does not define on the
+same line. The line is also read with no label removed, so a definition-like line in a
+fenced code block, which CommonMark does not read as a definition, leaves the figures read,
+and a definition on another page defines nothing on this one.
+
 The matrix version the README states under the title and in the framework citation is read
 against matrix.json, and a month and year on either line against the CHANGELOG.md heading
 that released that version. Neither was read, so a wrong version or month passed: each must
@@ -1419,6 +1429,73 @@ def test_a_blank_line_ends_what_the_line_before_left_open():
         shutil.rmtree(td)
 
 
+# Lines that show "DVAA" with two wrong figures where a "]" stands directly before a "[",
+# each set as its own paragraph after README's licence line, with the text the case gives
+# added at the end of README.md. Where README.md defines no label DV, "[x]" in
+# "[x][DV](y)AA" makes no link and CommonMark shows "[x]DVAA", DV linking to y; removing
+# "][DV]" whether or not it made a link read "x(y)AA", and the first and third lines passed
+# with exit 0, while the second, the same name with no "[x]", failed on both figures. A
+# label the page defines, in another letter case too, and a blank label go with the "]"
+# before them, also after a label the page does not define on the same line; and as a
+# definition-like line in a fenced code block counts as a definition, the line is also read
+# with no label removed.
+DEFINITION = "[d]: https://example.org"
+LABEL_LINES = [
+    ("label the page does not define", "[x][DV](y)AA", ""),
+    ("link span with no label before it", "[DV](y)AA", ""),
+    ("escaped bracket in a label the page does not define", "[x][\\[DV](y)AA", ""),
+    ("label the page defines", "[DV][d]AA", DEFINITION),
+    ("label the page defines in another letter case", "[DV][ D ]AA", DEFINITION),
+    ("blank label", "[DV][ ]AA", ""),
+    ("escaped bracket in a label the page defines", "[DV][d\\]]AA",
+     "[d\\]]: https://example.org"),
+    ("label the page defines after one it does not", "[q][DV](y)[A][d]A", DEFINITION),
+    ("definition-like line in a fenced code block", "[x][DV](y)AA",
+     "```\n[DV]: https://example.org\n```"),
+]
+
+
+@pytest.mark.parametrize("written,defined", [(w, d) for _, w, d in LABEL_LINES],
+                         ids=[case for case, _, _ in LABEL_LINES])
+def test_a_link_label_leaves_the_name_dvaa_read_as_commonmark_shows_it(written, defined):
+    td = scratch_tree()
+    try:
+        line = f"{written} {FIGURES}"
+        mutate_readme(td, LICENCE, f"{LICENCE}\n\n{line}\n")
+        if defined:
+            readme = td / "README.md"
+            readme.write_text(readme.read_text(encoding="utf-8") + f"\n{defined}\n",
+                              encoding="utf-8")
+        number = where_of(td, line)
+        r = run_checker(td)
+        assert r.returncode == 1, r.stdout
+        for failure in (
+            f"{number}: \"99 agents\" does not match related-projects.json "
+            "(DVAA agents: 21)",
+            f"{number}: \"77 vulnerability categories\" does not match "
+            "related-projects.json (DVAA vulnerability categories: 12)",
+        ):
+            assert failure in r.stderr, r.stderr
+    finally:
+        shutil.rmtree(td)
+
+
+def test_a_definition_on_another_page_defines_no_label_on_this_one():
+    # docs/overview.md defines d and README.md does not, so CommonMark shows "[DV][d]AA" on
+    # README.md as written, which does not name DVAA, and its figures are not read; removing
+    # every "][...]" span read "DVAA" there.
+    td = scratch_tree()
+    try:
+        mutate_readme(td, LICENCE, f"{LICENCE}\n\n[DV][d]AA {FIGURES}\n")
+        overview = td / "docs" / "overview.md"
+        overview.write_text(overview.read_text(encoding="utf-8") + f"\n{DEFINITION}\n",
+                            encoding="utf-8")
+        r = run_checker(td)
+        assert r.returncode == 0, r.stderr
+    finally:
+        shutil.rmtree(td)
+
+
 # Names the check does not read as DVAA: a reference to "*" or "&" shows that character
 # rather than marking up text, a letter with an accent is not confusable with A, NFKC
 # leaves U+00C1 composed, a comment that no line closes shows as text and runs to the end
@@ -1522,10 +1599,11 @@ def test_a_character_fails_a_line_that_names_dvaa_only_by_the_steps(written):
 # What a line reads as, where each case turns on one part of the three steps README
 # states: the HTML is removed before the link spans, each kind of HTML is removed, closed
 # or running to the end of the line, a tag ends after a quoted attribute, U+00A0 or "/",
-# the "][...]" span goes as the "](...)" span does whether or not a link is made, a "!"
-# goes where it stands before a "[" once the link spans are removed and stays elsewhere,
-# "_" is removed, a reference that fails a line leaves nothing, a reference to "*" shows
-# it, and NFKC composes a mark with the letter before it.
+# the "](...)" span goes whether or not a link is made, a "!" goes where it stands before
+# a "[" once the link spans are removed and stays elsewhere, "_" is removed, a reference
+# that fails a line leaves nothing, a reference to "*" shows it, and NFKC composes a mark
+# with the letter before it. LABEL_FORMS below holds the cases where a "]" stands directly
+# before a "[".
 NAME_FORMS = [
     ("HTML before the link spans", '[DV](url "<!-- ) -->")AA', "DVAA"),
     ("tag with a quoted attribute", 'DV<span title="x">AA', "DVAA"),
@@ -1540,7 +1618,6 @@ NAME_FORMS = [
     ("declaration no close follows", "DV<!X AA", "DV"),
     ("tag whose quote does not close", '<b x=")AA>', ""),
     ("closing tag with text after its name", '</b ")AA>', ""),
-    ("reference label", "[DV][dvaa]AA", "DVAA"),
     ("link span that makes no link", "[x](see **DV**AA)", "x"),
     ("image", "DV![](x.png)AA", "DVAA"),
     ("exclamation mark before a link span", "DV!](x)[A]A", "DVAA"),
@@ -1575,6 +1652,77 @@ def test_each_step_reads_a_line_as_stated(text, form):
     checker = load_checker()
     assert checker.name_form(text) == form
     assert stated_name_form(checker, text) == form
+
+
+# What a line reads as where a "]" stands directly before a "[", read with the labels the
+# page defines, each written as the check compares it, or with None, the reading that
+# removes no label. The label after the "]" goes with it where the page defines it, in any
+# letter case and spacing, Unicode case folding U+1E9E LATIN CAPITAL LETTER SHARP S to "ss",
+# or where it is blank, and is read as written, with no escape, code span or HTML read
+# inside it; it ends at the first "]" no backslash escapes and is no label where an
+# unescaped "[" comes first. Otherwise the "]" stays and the "[" after it is read on, so a
+# link span it opens is removed, as in
+# "[x][DV](y)AA", which CommonMark shows as "[x]DVAA" where the page does not define DV.
+# Removing every "][...]" span read that line as "x(y)AA".
+LABEL_FORMS = [
+    ("label the page defines", "[DV][dvaa]AA", {"dvaa"}, "DVAA"),
+    ("label the page does not define", "[DV][dvaa]AA", set(), "DVdvaaAA"),
+    ("no label removed", "[DV][dvaa]AA", None, "DVdvaaAA"),
+    ("label in another letter case with a space at each end", "[DV][ DvAA ]AA", {"dvaa"},
+     "DVAA"),
+    ("label with a run of white space inside", "[DV][d \t v]AA", {"d v"}, "DVAA"),
+    ("label that case folds to the one defined", "[DV][\N{LATIN CAPITAL LETTER SHARP S}]AA",
+     {"ss"}, "DVAA"),
+    ("blank label", "[DV][ ]AA", set(), "DVAA"),
+    ("blank label with no label removed", "[DV][ ]AA", None, "DV AA"),
+    ("link span after a label the page does not define", "[x][DV](y)AA", set(), "xDVAA"),
+    ("escaped bracket in a label the page does not define", "[x][\\[DV](y)AA", set(),
+     "x[DVAA"),
+    ("escaped bracket in a label the page defines", "[DV][a\\]b]AA", {"a\\]b"}, "DVAA"),
+    ("code span in a label the page defines", "[DV][`x`]AA", {"`x`"}, "DVAA"),
+    ("tag in a label the page defines", "[DV][a<b>]AA", {"a<b>"}, "DVAA"),
+    ("tag in a label the page does not define", "[DV][a<b>]AA", set(), "DVaAA"),
+    ("unescaped bracket in a label", "[DV][a[d]AA", {"a[d"}, "DVadAA"),
+    ("label the page defines after one it does not", "[q][DV](y)[A][d]A", {"d"}, "qDVAA"),
+    ("label longer than the 999 characters CommonMark allows", f"[DV][{'d' * 1000}]AA",
+     {"d" * 1000}, "DVAA"),
+]
+
+
+@pytest.mark.parametrize("text,labels,form", [(t, l, f) for _, t, l, f in LABEL_FORMS],
+                         ids=[case for case, _, _, _ in LABEL_FORMS])
+def test_a_link_label_reads_as_stated(text, labels, form):
+    checker = load_checker()
+    defined = None if labels is None else frozenset(labels)
+    assert checker.name_form(text, labels=defined) == form
+    assert stated_name_form(checker, text, labels=defined) == form
+
+
+# What a page defines: each label, read as a link label is, that a "[" no backslash escapes
+# opens and ":" directly follows, wherever it stands, also across a line break or in a
+# fenced code block, where CommonMark reads no definition; a blank label defines nothing.
+DEFINITIONS = [
+    ("definition", "[DVAA]: https://example.org", {"dvaa"}),
+    ("indented definition with a title", '   [ D  v ]: <https://example.org> "t"', {"d v"}),
+    ("escaped bracket in the label", "[a\\]b]: x", {"a\\]b"}),
+    ("label across a line break", "[a\nb]: x", {"a b"}),
+    ("definition-like line in a fenced code block", "```\n[DV]: x\n```", {"dv"}),
+    ("escaped opening bracket", "\\[DV]: x", set()),
+    ("escaped backslash before the opening bracket", "\\\\[DV]: x", {"dv"}),
+    ("unescaped bracket in the label", "[a[DV]: x", {"dv"}),
+    ("blank label", "[ ]: x", set()),
+    ("label followed by a space", "[DV] : x", set()),
+    ("reference link and link span", "[x][DV] and [DV](y)", set()),
+    ("label longer than the 999 characters CommonMark allows", f"[{'d' * 1000}]: x",
+     {"d" * 1000}),
+]
+
+
+@pytest.mark.parametrize("text,labels", [(t, l) for _, t, l in DEFINITIONS],
+                         ids=[case for case, _, _ in DEFINITIONS])
+def test_a_page_defines_the_labels_stated(text, labels):
+    assert load_checker().defined_labels(text) == frozenset(labels)
+    assert stated_defined_labels(text) == labels
 
 
 TAG_NAME = string.ascii_letters + string.digits + "-"
@@ -1630,29 +1778,79 @@ def stated_reference_end(text, i):
     return end + 1 if 0 < len(number) <= most and all(c in digits for c in number) else None
 
 
-def stated_name_form(checker, line, any_space=True, html_block=False):
+def stated_label_end(text, start):
+    """Where the link label README states opens at the "[" at text[start] ends, past its "]",
+    or None: it runs to the first "]" that no backslash escapes, with no "[" that no
+    backslash escapes before it, a backslash escaping the ASCII punctuation character after
+    it."""
+    escaped = False
+    for k in range(start + 1, len(text)):
+        if escaped:
+            escaped = False
+        elif text[k] == "\\":
+            escaped = text[k + 1:k + 2] != "" and text[k + 1] in string.punctuation
+        elif text[k] == "[":
+            return None
+        elif text[k] == "]":
+            return k + 1
+    return None
+
+
+def stated_label_key(label):
+    """Link label `label` as README states two labels are compared: after Unicode case
+    folding, with white space at either end removed and each run of white space inside read
+    as one space."""
+    words, word = [], ""
+    for c in label.casefold():
+        if c.isspace():
+            if word:
+                words.append(word)
+            word = ""
+        else:
+            word += c
+    if word:
+        words.append(word)
+    return " ".join(words)
+
+
+def stated_defined_labels(text):
+    """The labels page `text` defines as README states: each label that a "[" no backslash
+    escapes, one with an even run of backslashes before it, opens and ":" follows."""
+    keys = set()
+    for start, c in enumerate(text):
+        run = 0
+        while c == "[" and run < start and text[start - 1 - run] == "\\":
+            run += 1
+        end = stated_label_end(text, start) if c == "[" and not run % 2 else None
+        if end is not None and text[end:end + 1] == ":" and stated_label_key(
+                text[start + 1:end - 1]):
+            keys.add(stated_label_key(text[start + 1:end - 1]))
+    return keys
+
+
+def stated_name_form(checker, line, any_space=True, labels=None, html_block=False):
     """`line` read by the three steps README states, as a plain scan rather than with the
-    checker's patterns, with `any_space` false as in the second reading and with
+    checker's patterns, with `any_space` false as in the second reading, with `labels` the
+    labels the page defines, or None for the reading that removes no label, and with
     `html_block` true as in the HTML block reading. A reference is decoded by html.unescape,
     as in the checker, and a decoded character that fails a line is dropped."""
     # First, going along the line, its HTML is removed wherever it stands, the character a
-    # backslash escapes and the text of each code span are kept as text, each pair marked.
-    pairs = stated_first_step(line, any_space, html_block=html_block)[0]
-    # Second, going along what remains, each "]" followed by "(" or "[" goes with the text
-    # after it to the first ")" or "]" if no further "(" or "[" comes first, then each "!"
-    # directly before a "[", and then the Markdown characters, none of them kept as text.
+    # backslash escapes and the text of each code span are kept as text, each pair marked,
+    # and a "]" goes with the link label after it where the label is blank or defined.
+    pairs = stated_first_step(line, any_space, labels=labels, html_block=html_block)[0]
+    # Second, going along what remains, each "]" followed by "(" goes with the text after it
+    # to the first ")" if no further "(" comes first, then each "!" directly before a "[",
+    # and then the Markdown characters, none of them kept as text.
     def plain(k, chars):
         return k < len(pairs) and not pairs[k][1] and pairs[k][0] in chars
 
     kept, i = [], 0
     while i < len(pairs):
-        if plain(i, "]") and plain(i + 1, "(["):
-            opening = pairs[i + 1][0]
-            close = ")" if opening == "(" else "]"
+        if plain(i, "]") and plain(i + 1, "("):
             j = i + 2
-            while j < len(pairs) and not plain(j, opening + close):
+            while j < len(pairs) and not plain(j, "()"):
                 j += 1
-            if j < len(pairs) and pairs[j][0] == close:
+            if j < len(pairs) and pairs[j][0] == ")":
                 i = j + 1
                 continue
         kept.append(pairs[i])
@@ -1707,9 +1905,11 @@ def stated_run_end(line, i):
     return i
 
 
-def stated_first_step(line, any_space=True, spans=True, html_block=False):
+def stated_first_step(line, any_space=True, spans=True, labels=None, html_block=False):
     """(pairs, open): `line` after the first step README states, each character with
-    whether it is kept as text, and whether the lines after it read no code span."""
+    whether it is kept as text, and whether the lines after it read no code span. A "]"
+    directly followed by a link label that is blank or in `labels` goes with the label,
+    which is not read further; with `labels` None no label goes."""
     out, i, reading, unmatched = [], 0, spans, False
     while i < len(line):
         c = line[i]
@@ -1750,14 +1950,21 @@ def stated_first_step(line, any_space=True, spans=True, html_block=False):
             out.extend((c, False) for _ in range(run))
             i += run
             continue
-        elif c == "]" and reading and line[i + 1:i + 2] in ("(", "["):
-            close = ")" if line[i + 1] == "(" else "]"
-            j = i + 2
-            while j < len(line) and line[j] not in (line[i + 1], close):
-                j += 1
-            if j == len(line) or line[j] != close or any(
-                    u in line[i + 2:j] for u in "`'\"\\<"):
-                reading = False
+        elif c == "]" and line[i + 1:i + 2] in ("(", "["):
+            if reading:
+                close = ")" if line[i + 1] == "(" else "]"
+                j = i + 2
+                while j < len(line) and line[j] not in (line[i + 1], close):
+                    j += 1
+                if j == len(line) or line[j] != close or any(
+                        u in line[i + 2:j] for u in "`'\"\\<"):
+                    reading = False
+            if labels is not None and line[i + 1] == "[":
+                end = stated_label_end(line, i + 1)
+                if end is not None and (not stated_label_key(line[i + 2:end - 1])
+                                        or stated_label_key(line[i + 2:end - 1]) in labels):
+                    i = end
+                    continue
         out.append((c, False))
         i += 1
     return out, not reading or unmatched
@@ -1812,6 +2019,42 @@ def test_the_stated_steps_read_every_generated_line_as_the_checker_does():
             assert checker.name_form(line, checker.HtmlBlockHtml()) == block, ascii(line)
         else:
             assert block == stated_name_form(checker, line), ascii(line)
+        if "][" in line:
+            assert (checker.name_form(line, labels=STATED_LABELS)
+                    == stated_name_form(checker, line, labels=STATED_LABELS)), ascii(line)
+
+
+# Labels the generated lines are read with, as the check compares them, and the pieces of
+# the lines and pages that the label rule reads: brackets, a backslash before each, the
+# letters of those labels in either letter case, U+1E9E, which case folds to "ss", white
+# space, a colon, and the characters that decide where code spans and HTML end.
+STATED_LABELS = frozenset({"x", "dv", "a", "d v", "ss", "\\]"})
+LABEL_PIECES = [
+    *"[]()DVAadxs:` <>'\t\\", "\\[", "\\]", "\\\\", "][", "]:", "<b>",
+    "\N{LATIN CAPITAL LETTER SHARP S}", "\N{NO-BREAK SPACE}",
+]
+LABEL_LINES_GENERATED = 100_000
+
+
+def test_the_stated_label_rule_reads_every_generated_line_as_the_checker_does():
+    # The label rule is stated in words in README and the script's description, and the
+    # checker reads labels and definitions with its own scans; a clause that drifted from
+    # them, such as a label ending at an escaped "]" or a definition opened by an escaped
+    # "[", would leave the cases above passing. A removed label is passed over with the "]"
+    # that closes it, so with labels removed code spans stop being read on no line where
+    # they go on being read with none removed, the reading span_lines takes.
+    checker = load_checker()
+    rng = random.Random(152)
+    for _ in range(LABEL_LINES_GENERATED):
+        line = "".join(rng.choice(LABEL_PIECES) for _ in range(rng.randint(1, 16)))
+        assert checker.defined_labels(line) == stated_defined_labels(line), ascii(line)
+        for labels in (None, STATED_LABELS):
+            assert (checker.name_form(line, labels=labels)
+                    == stated_name_form(checker, line, labels=labels)), ascii(line)
+            assert (checker.step_one(line, labels=labels)[1]
+                    == stated_first_step(line, labels=labels)[1]), ascii(line)
+        assert (not checker.step_one(line, labels=STATED_LABELS)[1]
+                or checker.step_one(line)[1]), ascii(line)
 
 
 def test_nfkc_gives_what_unicodedata_normalize_gives():
@@ -1893,6 +2136,33 @@ def test_names_reads_a_long_run_of_combining_marks_after_the_name_in_linear_time
     assert seconds < 3, f"{seconds:.2f} s"
 
 
+LABEL_RUNS = 100_000
+LONG_LABEL_TEXTS = [
+    # A "[" and then escaped brackets only: no "[" that no backslash escapes follows the
+    # first, so one scan reads to the end and no other starts.
+    ("a page of escaped brackets", lambda checker: checker.defined_labels(
+        "[" + "\\[" * LABEL_RUNS), frozenset()),
+    # A label after each "]", every other one defined: each is scanned up to its own "]".
+    ("a line of labels", lambda checker: checker.name_form(
+        "[DV" + "][x][y" * LABEL_RUNS + "]AA", labels=frozenset({"x"})),
+     "DV" + "y" * LABEL_RUNS + "AA"),
+]
+
+
+@pytest.mark.parametrize("read,result", [(r, v) for _, r, v in LONG_LABEL_TEXTS],
+                         ids=[case for case, _, _ in LONG_LABEL_TEXTS])
+def test_link_labels_and_definitions_are_read_in_linear_time(read, result):
+    # A label is scanned only up to the first "[" or "]" after its "[" that no backslash
+    # escapes, and a page only from each "[" that none escapes, so the page of 200,001
+    # characters and the line of 600,006 here are each read in under a second.
+    checker = load_checker()
+    start = time.perf_counter()
+    got = read(checker)
+    seconds = time.perf_counter() - start
+    assert got == result
+    assert seconds < 1, f"{seconds:.2f} s"
+
+
 def test_a_mark_after_markup_or_written_as_a_reference_is_put_apart():
     checker = load_checker()
     assert checker.name_form("DV![](x.png)AA") == "DVAA"
@@ -1906,6 +2176,17 @@ def test_a_mark_after_markup_or_written_as_a_reference_is_put_apart():
         assert checker.detached(attached) == attached
     # No ASCII character is a combining mark, so none after the name needs a lookup.
     assert not any(checker.is_mark(code) for code in range(128))
+
+
+def test_a_label_reads_alike_in_the_line_detached_gives():
+    # NFKC joins the mark after "**AA**" to the A, so the line names DVAA only once detached
+    # puts that mark apart; it puts apart the mark after "-" inside the label too, and the
+    # label must still be the one the page defines for "][-" U+0301 "]" to be removed.
+    checker = load_checker()
+    line = "[DV][-\N{COMBINING ACUTE ACCENT}]**AA**\N{COMBINING ACUTE ACCENT}"
+    assert checker.BREAK in checker.detached(line).split("]")[1]
+    assert checker.names(line, "DVAA", labels=frozenset({"-\N{COMBINING ACUTE ACCENT}"}))
+    assert not checker.names(line, "DVAA", labels=frozenset())
 
 
 def test_the_no_break_space_example_is_a_form_only_the_second_reading_names():
