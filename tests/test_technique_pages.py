@@ -7,8 +7,9 @@ page's technique table, is then changed in one place: the checker must go red na
 page and the line, and ``--fix`` must restore the shipped text. The checker used to compare
 only the Attack Class and OASB Controls lines, so a class move in the data left the HMA
 Checks line, the References class link and the tactic tables on the old values while CI
-stayed green. The Mitigation section, rendered from ``oasbControls``, the absent Severity
-line and the Evidence Gap line every adapted page carries are checked the same way.
+stayed green. The Mitigation section, rendered from ``oasbControls`` with the OASB-1 control
+titles pinned in related-projects.json, the absent Severity line and the Evidence Gap line
+every adapted page carries are checked the same way.
 """
 
 import importlib.util
@@ -41,6 +42,7 @@ def scratch_tree() -> Path:
     (td / "scripts").mkdir()
     shutil.copy(ROOT / SCRIPT, td / SCRIPT)
     shutil.copy(ROOT / "matrix.json", td / "matrix.json")
+    shutil.copy(ROOT / "related-projects.json", td / "related-projects.json")
     shutil.copytree(ROOT / "techniques", td / "techniques")
     shutil.copytree(ROOT / "tactics", td / "tactics")
     return td
@@ -497,6 +499,32 @@ def test_tactic_row_follows_a_class_move_in_the_data(tree):
 NO_MITIGATION = "No documented mitigations yet."
 MITIGATION_SECTION_RE = re.compile(r"^## Mitigation\n(.*?)(?=^## |\Z)", re.M | re.S)
 TECHNIQUES = json.loads((ROOT / "matrix.json").read_text(encoding="utf-8"))["techniques"]
+# The OASB-1 control titles pinned in related-projects.json. Before they were pinned, every
+# section listed each control by its bare id, as "- OASB 1.1", and the checker passed it.
+RELATED = json.loads((ROOT / "related-projects.json").read_text(encoding="utf-8"))
+TITLES = RELATED["oasb"]["controlTitles"]
+CONTROL_LINE_RE = re.compile(r"^- OASB (.*)$", re.M)
+
+
+def titled(*controls: str) -> list[str]:
+    """What CONTROL_LINE_RE reads from the lines that list these controls with their titles."""
+    return [f"{control}: {TITLES[control]}" for control in controls]
+
+
+def edit_related(root: Path, change) -> None:
+    """Apply change to the parsed related-projects.json under root and write it back."""
+    path = root / "related-projects.json"
+    related = json.loads(path.read_text(encoding="utf-8"))
+    change(related)
+    path.write_text(json.dumps(related, indent=2) + "\n", encoding="utf-8")
+
+
+def test_the_titles_cover_the_pinned_oasb_controls_and_every_mapped_one():
+    # The titles were read from the release the controls and domains figures were read from.
+    assert len(TITLES) == RELATED["oasb"]["controls"]
+    assert len({control.split(".")[0] for control in TITLES}) == RELATED["oasb"]["domains"]
+    assert all(isinstance(title, str) and title.strip() for title in TITLES.values())
+    assert {c for t in TECHNIQUES for c in t["oasbControls"]} <= set(TITLES)
 
 
 def test_no_shipped_page_says_no_mitigation_is_documented():
@@ -512,11 +540,146 @@ def test_no_shipped_page_prints_a_severity_line():
 
 
 @pytest.mark.parametrize("technique", TECHNIQUES, ids=[t["id"] for t in TECHNIQUES])
-def test_mitigation_section_names_every_mapped_control_in_order(technique):
+def test_mitigation_section_names_every_mapped_control_in_order_with_its_title(technique):
     text = (ROOT / "techniques" / f"{technique['id']}.md").read_text(encoding="utf-8")
     found = MITIGATION_SECTION_RE.search(text)
     assert found, "page has a Mitigation section"
-    assert re.findall(r"^- OASB (\S+)$", found.group(1), re.M) == technique["oasbControls"]
+    assert CONTROL_LINE_RE.findall(found.group(1)) == titled(*technique["oasbControls"])
+
+
+# A line the pages carried before the titles, and two near misses of the titled line.
+UNTITLED_LINES = ["- OASB 1.1", "- OASB 1.1: Agent Identity",
+                  f"- OASB 1.1 {TITLES['1.1']}"]
+
+
+@pytest.mark.parametrize("stale", UNTITLED_LINES)
+def test_a_control_listed_without_its_title_is_red_and_fixed(tree, stale):
+    page = tree / "techniques" / "T-1001.md"
+    before = page.read_text(encoding="utf-8")
+    mutate(page, f"- OASB 1.1: {TITLES['1.1']}\n", stale + "\n")
+
+    result = run_checker(tree)
+    assert result.returncode == 1, result.stdout
+    assert ("T-1001: Mitigation section does not list the OASB controls matrix.json maps "
+            "(1.1, 1.2, 1.3, 1.4, 10.5) with their titles in related-projects.json") in result.stdout
+
+    assert run_checker(tree, "--fix").returncode == 0
+    assert page.read_text(encoding="utf-8") == before
+    assert run_checker(tree).returncode == 0
+
+
+def test_mitigation_follows_a_title_change_in_related_projects_json(tree):
+    edit_related(tree, lambda r: r["oasb"]["controlTitles"].update({"7.1": "Agent Authentication"}))
+    users = [t["id"] for t in TECHNIQUES if "7.1" in t["oasbControls"]]
+    assert users
+
+    result = run_checker(tree)
+    assert result.returncode == 1
+    assert result.stdout.count("Mitigation section does not list") == len(users), result.stdout
+    for tid in users:
+        assert f"  - {tid}: Mitigation section does not list the OASB controls" in result.stdout
+
+    assert run_checker(tree, "--fix").returncode == 0
+    for tid in users:
+        text = (tree / "techniques" / f"{tid}.md").read_text(encoding="utf-8")
+        section = MITIGATION_SECTION_RE.search(text).group(1)
+        assert "7.1: Agent Authentication" in CONTROL_LINE_RE.findall(section)
+    assert run_checker(tree).returncode == 0
+
+
+def test_a_mapped_control_with_no_title_is_red_and_left_alone(tree):
+    edit_related(tree, lambda r: r["oasb"]["controlTitles"].pop("10.5"))
+    page = tree / "techniques" / "T-1001.md"
+    before = page.read_text(encoding="utf-8")
+
+    result = run_checker(tree)
+    assert result.returncode == 1
+    assert ("T-1001: matrix.json maps OASB control 10.5, which related-projects.json gives no "
+            "title under oasb.controlTitles") in result.stdout
+
+    fixed = run_checker(tree, "--fix")
+    assert fixed.returncode == 1, "--fix has no title to write, so it stays red"
+    assert "FAIL: could not rewrite" in fixed.stdout
+    assert page.read_text(encoding="utf-8") == before
+
+
+def test_controls_with_no_title_are_named_beside_a_missing_section(tree):
+    # The OASB 11.1 to 11.4 the pages once cited do not exist in the shipped OASB-1 set.
+    matrix_path = tree / "matrix.json"
+    matrix = json.loads(matrix_path.read_text(encoding="utf-8"))
+    technique = next(t for t in matrix["techniques"] if t["id"] == "T-1006")
+    technique["oasbControls"] = ["7.1", "11.1", "11.2"]
+    matrix_path.write_text(json.dumps(matrix, indent=2), encoding="utf-8")
+    page = tree / "techniques" / "T-1006.md"
+    page.write_text(MITIGATION_SECTION_RE.sub("", page.read_text(encoding="utf-8"), count=1),
+                    encoding="utf-8")
+
+    result = run_checker(tree)
+    assert result.returncode == 1
+    assert ("T-1006: matrix.json maps OASB controls 11.1, 11.2, which related-projects.json "
+            "gives no title under oasb.controlTitles") in result.stdout
+    assert "T-1006: page has no '## Mitigation' section" in result.stdout
+
+
+def _set_oasb(value):
+    return lambda r: r.update({"oasb": value})
+
+
+def _set_titles(value):
+    return lambda r: r["oasb"].update({"controlTitles": value})
+
+
+def _set_title(control, value):
+    return lambda r: r["oasb"]["controlTitles"].update({control: value})
+
+
+def _write(raw: bytes):
+    return lambda path: path.write_bytes(raw)
+
+
+# (name, what make(path) leaves at related-projects.json, the one line the check prints)
+RELATED_CASES = [
+    ("missing", lambda path: path.unlink(),
+     "FAIL: related-projects.json is missing or does not parse: no such file"),
+    ("syntax error", _write(b"{"),
+     "FAIL: related-projects.json is missing or does not parse: Expecting property name "
+     "enclosed in double quotes: line 1 column 2 (char 1)"),
+    ("an array", _write(b"[]\n"),
+     "FAIL: related-projects.json parses but has the wrong shape: the top level is an array, "
+     "not an object"),
+    ("no oasb key", lambda path: edit_related(path.parent, lambda r: r.pop("oasb")),
+     "FAIL: related-projects.json parses but has the wrong shape: the top level has no oasb key"),
+    ("oasb a string", lambda path: edit_related(path.parent, _set_oasb("OASB-1")),
+     "FAIL: related-projects.json parses but has the wrong shape: oasb is a string, not an object"),
+    ("no controlTitles",
+     lambda path: edit_related(path.parent, lambda r: r["oasb"].pop("controlTitles")),
+     "FAIL: related-projects.json parses but has the wrong shape: oasb has no controlTitles"),
+    ("controlTitles an array", lambda path: edit_related(path.parent, _set_titles([])),
+     "FAIL: related-projects.json parses but has the wrong shape: oasb.controlTitles is an "
+     "array, not an object"),
+    ("a title that is a number", lambda path: edit_related(path.parent, _set_title("1.1", 1)),
+     'FAIL: related-projects.json parses but has the wrong shape: oasb.controlTitles["1.1"] is '
+     "a number, not a string"),
+    ("a title that is null", lambda path: edit_related(path.parent, _set_title("10.5", None)),
+     'FAIL: related-projects.json parses but has the wrong shape: oasb.controlTitles["10.5"] is '
+     "null, not a string"),
+]
+
+
+@pytest.mark.parametrize("args", [(), ("--fix",)], ids=["check", "fix"])
+@pytest.mark.parametrize("make, line", [case[1:] for case in RELATED_CASES],
+                         ids=[case[0] for case in RELATED_CASES])
+def test_a_related_projects_json_the_check_cannot_use_is_reported_in_one_line(tree, make, line, args):
+    # A stale page that --fix would rewrite, to show that nothing is written.
+    mutate(tree / "techniques" / "T-1001.md", f"- OASB 1.1: {TITLES['1.1']}\n", "- OASB 1.1\n")
+    pages = {p: p.read_bytes() for p in sorted(tree.rglob("*.md"))}
+    make(tree / "related-projects.json")
+
+    result = run_checker(tree, *args)
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert result.stdout == ""
+    assert result.stderr.splitlines() == [line]
+    assert {p: p.read_bytes() for p in sorted(tree.rglob("*.md"))} == pages
 
 
 def test_placeholder_mitigation_is_red_and_fixed(tree):
@@ -550,7 +713,7 @@ def test_mitigation_follows_a_control_change_in_the_data(tree):
 
     assert run_checker(tree, "--fix").returncode == 0
     section = MITIGATION_SECTION_RE.search((tree / "techniques" / "T-1006.md").read_text(encoding="utf-8"))
-    assert re.findall(r"^- OASB (\S+)$", section.group(1), re.M) == ["7.1"]
+    assert CONTROL_LINE_RE.findall(section.group(1)) == titled("7.1")
 
 
 def test_severity_line_is_red_and_dropped(tree):
@@ -602,7 +765,8 @@ def test_mitigation_section_holding_a_fence_is_red_and_left_alone(tree):
 
 def test_heading_inside_a_fenced_block_does_not_end_the_mitigation_section(tree):
     page = tree / "techniques" / "T-1001.md"
-    mutate(page, "- OASB 10.5\n", "- OASB 10.5\n\n```markdown\n## Evidence\n```\n")
+    line = f"- OASB 10.5: {TITLES['10.5']}\n"
+    mutate(page, line, line + "\n```markdown\n## Evidence\n```\n")
 
     result = run_checker(tree)
     assert result.returncode == 1
@@ -610,9 +774,10 @@ def test_heading_inside_a_fenced_block_does_not_end_the_mitigation_section(tree)
 
 
 def test_rendered_section_for_a_technique_without_controls_keeps_the_placeholder():
-    assert CHK.expected_mitigation({"oasbControls": []}) == NO_MITIGATION
-    rendered = CHK.expected_mitigation({"oasbControls": ["1.1", "10.5"]})
-    assert re.findall(r"^- OASB (\S+)$", rendered, re.M) == ["1.1", "10.5"]
+    assert CHK.expected_mitigation({"oasbControls": []}, TITLES) == NO_MITIGATION
+    rendered = CHK.expected_mitigation({"oasbControls": ["1.1", "10.5"]}, TITLES)
+    assert CONTROL_LINE_RE.findall(rendered) == ["1.1: Agent Cryptographic Identity",
+                                                 "10.5: Recovery and Rollback"]
     assert NO_MITIGATION not in rendered
 
 

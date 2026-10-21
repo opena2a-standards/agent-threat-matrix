@@ -62,7 +62,7 @@ SCRIPTS = [
      ("related-projects.json", "CHANGELOG.md", "stix/agent-threat-matrix-bundle.json",
       *readme_pages()),
      "", True),
-    ("check_technique_pages.py", ("techniques", "tactics"), "FAIL: ", True),
+    ("check_technique_pages.py", ("techniques", "tactics", "related-projects.json"), "FAIL: ", True),
     ("check_cross_references.py", ("cross-references",), "FAIL: ", True),
     ("check_attribution.py", ("ATTRIBUTION.md",), "FAIL: ", False),
 ]
