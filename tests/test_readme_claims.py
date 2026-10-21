@@ -1118,8 +1118,11 @@ WRITTEN_NAMES = [
     ("HTML comment in a link title", f'[DV]{DVAA_URL[:-1]} "<!-- ) -->")AA'),
     ("link text", f"[DV]{DVAA_URL}AA"),
     ("emphasis with underscores", f"[_DV_]{DVAA_URL}AA"),
-    # No backslash escape is read: the backslash is removed with the Markdown characters.
-    ("backslash before an asterisk", f"[DV\\*AA]{DVAA_URL}"),
+    # A code span shows its text less one space at each end, and an escaped parenthesis
+    # does not end a link destination. Read with the backticks and the backslash removed
+    # wherever they stood, the first read "DV AA" and the second "DVx)AA".
+    ("code span with a space at each end", f"[` DV `AA]{DVAA_URL}"),
+    ("escaped parenthesis in the link destination", f"[DV]({DVAA_URL[1:-1]}\\)x)AA"),
     # The "!" of an image is removed, so the name reads "DVAA"; it was kept, and the name
     # read "DV!AA".
     ("image with no alternative text", f"[DV![](x.png)AA]{DVAA_URL}"),
@@ -1217,8 +1220,12 @@ def test_a_name_written_with_markup_a_reference_or_a_confusable_letter_leaves_th
 # The DVAA row of the related-projects table rewritten with "DVAA" in markup beside a
 # backtick and two wrong figures: the backtick stands in a link destination, in a link
 # title, in each of two table cells, in an autolink, or in an HTML attribute that holds
-# "<", and the line ends with another backtick. No code span is read, so each backtick is
-# removed with the Markdown characters and the line goes red on both figures.
+# "<", and the line ends with another backtick. None of these makes a code span of the
+# text between the two backticks, and the check reads none: code spans stop being read at
+# a link span holding a backtick or quote, at a code span whose text holds a "|", which
+# ends a cell in a table row, and at a "<" with a backtick or quote before the first ">"
+# after it. Each backtick is then removed with the Markdown characters and the line goes
+# red on both figures.
 DVAA_ROW = f"| {DVAA_LINK} |"
 BACKTICK_LINES = [
     ("backtick in a link destination",
@@ -1258,17 +1265,85 @@ def test_a_backtick_beside_the_name_dvaa_leaves_the_line_read(line):
         shutil.rmtree(td)
 
 
+# Lines that show "DVAA" with two wrong figures where a backtick could open a code span
+# that hides the name, each set as its own paragraph after README's licence line; the
+# line with the figures is read. Code spans stop being read at a "<" with a quote before
+# the first ">" after it, at a link span that holds a backtick, quote or backslash or
+# meets a further "(" first, and at a code span whose text holds "<" or "&", which a
+# browser reads in an HTML block; and none is read after a line that leaves a backtick,
+# a comment or a link destination open. Read as a code span, the text between two of
+# these backticks would hold "**DV**AA" or "D<b></b>VAA" as written, and the line would
+# not name DVAA.
+FIGURES = "(99 agents, 77 vulnerability categories)"
+LICENCE = "Apache-2.0. The framework is free to use, cite, and build upon."
+PARAGRAPH_LINES = [
+    ("quote in a tag", [f"<span title='>`'> **DV**AA {FIGURES} `x`"]),
+    ("backtick in a link destination", [f"[x](`) **DV**AA {FIGURES} `x`"]),
+    ("parenthesis pair in a link destination", [f"[x](a(b)`) **DV**AA {FIGURES} `x`"]),
+    ("escaped parenthesis in a link destination", [f"[x](a\\)`) **DV**AA {FIGURES} `x`"]),
+    ("link title holding a parenthesis", [f'[x](a ")`") **DV**AA {FIGURES} `x`']),
+    ("backtick in a reference label", [f"[x][a`] **DV**AA {FIGURES} `x`"]),
+    ("< in a code span in an HTML block", ["<div>", f"` D<b></b>VAA {FIGURES} `", "</div>"]),
+    ("& in a code span in an HTML block", ["<div>", f"` D&#86;AA {FIGURES} `", "</div>"]),
+    ("backtick open on the line before", ["a `", f"` **DV**AA {FIGURES} `x`"]),
+    ("comment open on the line before", ["a <!--", f"` --> **DV**AA {FIGURES} `x`"]),
+    ("link destination open on the line before", ["[x](", f"`) **DV**AA {FIGURES} `x`"]),
+]
+
+
+@pytest.mark.parametrize("lines", [lines for _, lines in PARAGRAPH_LINES],
+                         ids=[case for case, _ in PARAGRAPH_LINES])
+def test_a_backtick_that_could_hide_the_name_dvaa_leaves_the_line_read(lines):
+    td = scratch_tree()
+    try:
+        mutate_readme(td, LICENCE, LICENCE + "\n\n" + "\n".join(lines) + "\n\n")
+        number = where_of(td, next(line for line in lines if FIGURES in line))
+        r = run_checker(td)
+        assert r.returncode == 1, r.stdout
+        for failure in (
+            f"{number}: \"99 agents\" does not match related-projects.json "
+            "(DVAA agents: 21)",
+            f"{number}: \"77 vulnerability categories\" does not match "
+            "related-projects.json (DVAA vulnerability categories: 12)",
+        ):
+            assert failure in r.stderr, r.stderr
+    finally:
+        shutil.rmtree(td)
+
+
+def test_a_blank_line_ends_what_the_line_before_left_open():
+    # Its own paragraph, the line holds one code span with "**DV**AA" as written.
+    td = scratch_tree()
+    try:
+        mutate_readme(td, LICENCE, f"{LICENCE}\n\na `\n\n` **DV**AA {FIGURES} `x`\n\n")
+        r = run_checker(td)
+        assert r.returncode == 0, r.stderr
+    finally:
+        shutil.rmtree(td)
+
+
 # Names the check does not read as DVAA: a reference to "*" or "&" shows that character
 # rather than marking up text, a letter with an accent is not confusable with A, NFKC
 # leaves U+00C1 composed, a comment that no line closes shows as text and runs to the end
 # of the line, a character read as letters that do not stand together in "DVAA" shows them
 # in another order, "DVAA" directly followed by a combining mark that NFKC joins to the last
 # A shows another letter, also where the mark is joined past one NFKC leaves apart, and a
-# "!" that does not stand before a "[" stays. Such a line does not name DVAA, so its
-# figures are not read.
+# "!" that does not stand before a "[" stays. A character a backslash escapes shows as
+# itself, as does a backslash before a letter, and a code span shows its text as written.
+# Such a line does not name DVAA, so its figures are not read. Read with the backticks and
+# backslashes removed wherever they stood, each name from "backslash before an asterisk"
+# to "backslash before an image" was read as DVAA.
 OTHER_NAMES = [
     ("reference to an asterisk", "[DV&#42;AA]"),
     ("reference to an ampersand", "[DV&amp;AA]"),
+    ("backslash before an asterisk", "[DV\\*AA]"),
+    ("code span holding an asterisk", "[`DV*AA`]"),
+    ("code span holding strong emphasis", "[`DV**AA**`]"),
+    ("backslash before a backtick", "[DV\\`AA]"),
+    ("backslash before a letter", "[D\\VAA]"),
+    ("backslash before a tag", "[DV\\<b>AA]"),
+    ("backslash before a character reference", "[DV\\&#65;A]"),
+    ("backslash before an image", "[DV\\![](x.png)AA]"),
     ("hyphen", "[DV-AA]"),
     ("U+00C1 LATIN CAPITAL LETTER A WITH ACUTE", "[DV\N{LATIN CAPITAL LETTER A WITH ACUTE}A]"),
     ("U+00C1 LATIN CAPITAL LETTER A WITH ACUTE for the last A",
@@ -1376,6 +1451,22 @@ NAME_FORMS = [
     ("underscores", "_DV_AA", "DVAA"),
     ("reference to U+200B", "DV&#8203;AA", "DVAA"),
     ("reference to an asterisk", "DV&#42;AA", "DV*AA"),
+    ("backslash before an asterisk", "DV\\*AA", "DV*AA"),
+    ("backslash before a letter", "D\\VAA", "D\\VAA"),
+    ("backslash before a tag", "DV\\<b>AA", "DV<b>AA"),
+    ("backslash before a reference", "DV\\&#65;A", "DV&#65;A"),
+    ("escaped backtick", "\\`DV`AA`", "`DVAA"),
+    ("code span", "`DV*AA`", "DV*AA"),
+    ("code span with a space at each end", "` DV `AA", "DVAA"),
+    ("code span closed by a run as long", "``DV`AA``", "DV`AA"),
+    ("run of backticks no run closes", "`DV``AA", "DVAA"),
+    ("code span holding a |", "`DV|*AA`", "DV|AA"),
+    ("code span holding a <", "`<b>`DV*AA", "DVAA"),
+    ("code span after a tag", "<b>`DV*AA`", "DV*AA"),
+    ("code span after a tag holding a quote", "<b title='x'>`DV*AA`", "DVAA"),
+    ("code span after an autolink", "<https://x.org>`DV*AA`", "<https://x.org>DV*AA"),
+    ("code span after a link span holding a backtick", "[x](`)`DV*AA`", "xDVAA"),
+    ("code span after a link span", "[x](y)`DV*AA`", "xDV*AA"),
     ("combining mark after the last A", "DVAA\N{COMBINING ACUTE ACCENT}",
      "DVA\N{LATIN CAPITAL LETTER A WITH ACUTE}"),
 ]
@@ -1443,59 +1534,144 @@ def stated_name_form(checker, line, any_space=True):
     checker's patterns, and with `any_space` false as in the second reading. A reference is
     decoded by html.unescape, as in the checker, and a decoded character that fails a line
     is dropped."""
-    # First, going along the line, its HTML is removed wherever it stands.
-    kept, i = [], 0
-    while i < len(line):
-        end = stated_html_end(line, i, any_space) if line[i] == "<" else None
-        if end is None:
-            kept.append(line[i])
-            i += 1
-        else:
-            i = end
-    text = "".join(kept)
+    # First, going along the line, its HTML is removed wherever it stands, the character a
+    # backslash escapes and the text of each code span are kept as text, each pair marked.
+    pairs = stated_first_step(line, any_space)[0]
     # Second, going along what remains, each "]" followed by "(" or "[" goes with the text
     # after it to the first ")" or "]" if no further "(" or "[" comes first, then each "!"
-    # directly before a "[", and then the Markdown characters.
+    # directly before a "[", and then the Markdown characters, none of them kept as text.
+    def plain(k, chars):
+        return k < len(pairs) and not pairs[k][1] and pairs[k][0] in chars
+
     kept, i = [], 0
-    while i < len(text):
-        if text[i] == "]" and text[i + 1:i + 2] in ("(", "["):
-            opening = text[i + 1]
+    while i < len(pairs):
+        if plain(i, "]") and plain(i + 1, "(["):
+            opening = pairs[i + 1][0]
             close = ")" if opening == "(" else "]"
             j = i + 2
-            while j < len(text) and text[j] not in (opening, close):
+            while j < len(pairs) and not plain(j, opening + close):
                 j += 1
-            if j < len(text) and text[j] == close:
+            if j < len(pairs) and pairs[j][0] == close:
                 i = j + 1
                 continue
-        kept.append(text[i])
+        kept.append(pairs[i])
         i += 1
-    kept = [c for k, c in enumerate(kept) if c != "!" or kept[k + 1:k + 2] != ["["]]
-    text = "".join(c for c in kept if c not in "*_~`\\[]")
-    # Third, its character references are decoded, less the characters that fail a line,
-    # and it is brought to NFKC with each confusable character read as its letters.
-    kept, i = [], 0
-    while i < len(text):
-        end = stated_reference_end(text, i) if text[i] == "&" else None
-        if end is None:
-            kept.append(text[i])
-            i += 1
-        else:
-            kept.extend(c for c in html.unescape(text[i:end]) if not checker.hiding_kind(c))
-            i = end
-    return unicodedata.normalize("NFKC", "".join(kept)).translate(CONFUSABLE_LETTERS)
+    kept = [p for k, p in enumerate(kept)
+            if p != ("!", False) or kept[k + 1:k + 2] != [("[", False)]]
+    kept = [p for p in kept if p[1] or p[0] not in "*_~`[]"]
+    # Third, its character references, of characters not kept as text, are decoded, less
+    # the characters that fail a line, and it is brought to NFKC with each confusable
+    # character read as its letters.
+    text, i = [], 0
+    while i < len(kept):
+        if kept[i] == ("&", False):
+            j = i
+            while j < len(kept) and not kept[j][1]:
+                j += 1
+            run = "".join(c for c, _ in kept[i:j])
+            end = stated_reference_end(run, 0)
+            if end is not None:
+                text.extend(c for c in html.unescape(run[:end]) if not checker.hiding_kind(c))
+                i += end
+                continue
+        text.append(kept[i][0])
+        i += 1
+    return unicodedata.normalize("NFKC", "".join(text)).translate(CONFUSABLE_LETTERS)
 
 
-# The generated lines are made of characters the first two steps act on and, for two
+def stated_closed(line, i):
+    """Whether a close follows the opening of the comment, processing instruction, CDATA
+    section or declaration at line[i]; a tag always ends at its ">"."""
+    for opening, close in (("<!--", "-->"), ("<?", "?>"), ("<![CDATA[", "]]>")):
+        if line.startswith(opening, i):
+            return line.find(close, i + len(opening)) >= 0
+    return line.find(">", i + 3) >= 0 if line.startswith("<!", i) else True
+
+
+def stated_stops_at_lt(line, i):
+    """Whether code spans stop being read at the "<" at line[i], as README states."""
+    end = stated_html_end(line, i)
+    if end is not None:
+        return not stated_closed(line, i) or any(c in "`'\"" for c in line[i:end])
+    if line[i + 1:i + 2] in ("", " ", "\t") or not line[i + 1].isascii():
+        return False
+    close = line.find(">", i + 1)
+    return close < 0 or any(c in "`'\"" for c in line[i + 1:close])
+
+
+def stated_run_end(line, i):
+    """Where the run of backticks starting at line[i] ends."""
+    while i < len(line) and line[i] == "`":
+        i += 1
+    return i
+
+
+def stated_first_step(line, any_space=True, spans=True):
+    """(pairs, open): `line` after the first step README states, each character with
+    whether it is kept as text, and whether the lines after it read no code span."""
+    out, i, reading, unmatched = [], 0, spans, False
+    while i < len(line):
+        c = line[i]
+        if c == "<":
+            if reading and stated_stops_at_lt(line, i):
+                reading = False
+            end = stated_html_end(line, i, any_space)
+            if end is not None:
+                i = end
+                continue
+        elif c == "\\" and line[i + 1:i + 2] != "" and line[i + 1] in string.punctuation:
+            out.append((line[i + 1], True))
+            i += 2
+            continue
+        elif c == "`":
+            run = stated_run_end(line, i) - i
+            if reading:
+                close, j = None, i + run
+                while j < len(line):
+                    if line[j] != "`":
+                        j += 1
+                    elif stated_run_end(line, j) - j == run:
+                        close = j
+                        break
+                    else:
+                        j = stated_run_end(line, j)
+                if close is None:
+                    unmatched = True
+                elif any(s in line[i + run:close] for s in "|<&"):
+                    reading = False
+                else:
+                    text = line[i + run:close]
+                    if text.startswith(" ") and text.endswith(" ") and text.strip(" "):
+                        text = text[1:-1]
+                    out.extend((t, True) for t in text)
+                    i = close + run
+                    continue
+            out.extend((c, False) for _ in range(run))
+            i += run
+            continue
+        elif c == "]" and reading and line[i + 1:i + 2] in ("(", "["):
+            close = ")" if line[i + 1] == "(" else "]"
+            j = i + 2
+            while j < len(line) and line[j] not in (line[i + 1], close):
+                j += 1
+            if j == len(line) or line[j] != close or any(
+                    u in line[i + 2:j] for u in "`'\"\\<"):
+                reading = False
+        out.append((c, False))
+        i += 1
+    return out, not reading or unmatched
+
+
+# The generated lines are made of characters the first two steps act on, among them the
+# backtick, the backslash, "|" and "'" that decide where code spans are read, and, for two
 # pieces in five, of longer pieces: the openings and closes of HTML, character references,
 # white space other than a space, and characters NFKC or the confusables read as A, D or V
-# or leave beside them. With these, each pattern alternative and each step, changed or
-# taken out of order, reads at least 30 of the 200,000 lines differently, with three
-# exceptions a case above also pins: removing each "!" before the link spans rather than
-# after them reads 2 lines differently ("exclamation mark before a link span"), and in
-# the second reading letting only a space and "/" end a tag name reads 13 differently
-# ("tab after a tag name in the second reading") and letting only a space and a tab end
-# it reads 22 differently ("slash after a tag name in the second reading").
-MARKUP_CHARACTERS = "[]()DVAx \"*_~`\\<>"
+# or leave beside them. Cases above pin orders of steps on their own: removing each "!"
+# before the link spans rather than after them ("exclamation mark before a link span"),
+# and in the second reading letting only a space and "/" end a tag name ("tab after a tag
+# name in the second reading") or only a space and a tab ("slash after a tag name in the
+# second reading").
+MARKUP_CHARACTERS = "[]()DVAx \"*_~`\\<>|'"
 PIECES = [
     *"/-!?=1&#;\t", "<x", "</A", "<!--", "-->", "<?", "?>", "<![CDATA[", "]]>", "<!",
     "&#68;", "&#x41;", "&#8203;", "&DD;", "&amp;", "&ast;", "&lowbar;",
@@ -1524,6 +1700,7 @@ def test_the_stated_steps_read_every_generated_line_as_the_checker_does():
     for _ in range(STATED_LINES):
         line = generated_line(rng)
         assert checker.name_form(line) == stated_name_form(checker, line), ascii(line)
+        assert checker.step_one(line)[1] == stated_first_step(line)[1], ascii(line)
         if any(c.isspace() and c not in " \t" for c in line):
             assert (checker.name_form(line, checker.SPACE_OR_TAB_HTML)
                     == stated_name_form(checker, line, any_space=False)), ascii(line)

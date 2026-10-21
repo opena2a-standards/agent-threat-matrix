@@ -81,12 +81,36 @@ ASCII letters, digits and hyphens, to a > right after the name or, after / or a 
 Unicode lists as white space (such as U+00A0 NO-BREAK SPACE), to the first > after that
 if no < comes first. Where white space other than a space or tab follows a tag name, the
 line is also read with only a space, a tab or / ending a tag name, and names DVAA when
-either reading does. Second, going along what remains, each ] followed by ( is removed
-with the text after it to the first ) if no further ( comes first, and each ] followed by
-[ with the text after it to the first ] if no further [ comes first, whether or not they
-make a link, then each ! directly before a [, and then the Markdown characters
-* _ ~ ` \\ [ ]. Third, its character references are decoded, each to the characters it
-stands for less any such character, so "&#8203;" (U+200B) leaves nothing, and it is
+either reading does. On the way, as CommonMark reads them, the character a \\ escapes and
+the text of a code span are kept as text, which no later step reads as markup, HTML, a
+link span or a character reference, and the \\ and the backticks around the code span are
+removed. A \\ escapes the ASCII punctuation character directly after it and stays before
+any other character. A run of backticks, or where a \\ escapes a backtick the run that
+starts after it, opens a code span that the next run of as many backticks on the line
+closes, and the text between them loses one space at each end when it starts and ends
+with a space and holds another character. No HTML starts inside a code span or at an
+escaped <, and no escape or code span starts inside HTML. So "DV\\*AA" and "`DV*AA`" read
+"DV*AA" and do not name DVAA, as "DV&#42;AA" does not, while "` DV `AA" names DVAA. Going
+along the line, no code span is read from the first of these places on, where a backtick
+after it could be read another way, and each backtick from there is removed with the
+Markdown characters in the second step: a code span whose text holds a |, which starts
+another cell in a table row, or a < or &, which a browser reads in an HTML block as the
+start of a tag or a character reference; a < at which HTML starts, read with any white
+space ending a tag name, that holds a backtick, ' or ", or that runs to the end of the
+line with no close; any other < followed by an ASCII character other than a space or tab,
+when no > follows it or a backtick, ' or " stands between it and the first > after it;
+and a ] followed by ( or [ when no ) or ] follows it with no further ( or [ first, or
+when a backtick, ', ", \\ or < stands between them. No code span is read on a line that
+carries one of the characters above, nor on the lines after a line on which code spans
+are not read or stop being read, or that holds a run of backticks that no run closes, up
+to a blank line (empty or of spaces and tabs only): a code span, HTML or link span still
+open at the end of that line could close on one of them. Second, going along what
+remains, each ] followed by ( is removed with the text after it to the first ) if no
+further ( comes first, and each ] followed by [ with the text after it to the first ] if
+no further [ comes first, whether or not they make a link, then each ! directly before a
+[, and then the Markdown characters * _ ~ ` [ ]. Third, its character references are
+decoded, each to the characters it stands for less any such character, so "&#8203;"
+(U+200B) leaves nothing, and it is
 brought to NFKC with each character Unicode lists as confusable with A, D or V read as
 that letter (U+0410 CYRILLIC CAPITAL LETTER A reads as A). So the name written as
 "DV&#8203;AA", "**DV**AA", "DV<!-- -->AA", "<b>DV</b>AA", "[DV](url)AA",
@@ -162,6 +186,7 @@ import html
 import json
 import pathlib
 import re
+import string
 import sys
 import unicodedata
 
@@ -312,8 +337,40 @@ LINK_TARGET = re.compile(r"\]\([^()]*\)|\]\[[^\[\]]*\]")
 IMAGE = re.compile(r"!(?=\[)")
 
 # Markdown characters that mark up text without showing: emphasis, strikethrough, code
-# span, escape and link text delimiters.
-MARKUP = str.maketrans("", "", "*_~`\\[]")
+# span and link text delimiters. A backslash is not one: the first step removes each that
+# escapes a character, and any other shows.
+MARKUP = str.maketrans("", "", "*_~`[]")
+
+# The ASCII punctuation characters, which a backslash escapes.
+PUNCTUATION = frozenset(string.punctuation)
+
+# Each printable ASCII character other than the space mapped to its fullwidth form, U+FF01
+# to U+FF5E. The first step writes what it keeps as text in these forms, which no later
+# step reads as markup, HTML, a link span or a character reference, and NFKC in the third
+# step brings each back to the ASCII character.
+AS_TEXT = {code: code + 0xFEE0 for code in range(0x21, 0x7F)}
+
+# A run of backticks.
+BACKTICKS = re.compile(r"`+")
+
+# The characters that stop code spans being read where they stand in the text of a code
+# span: a "|" starts another cell in a table row, and in an HTML block a browser reads a
+# "<" as the start of a tag and a "&" as the start of a character reference.
+SPAN_UNSURE = frozenset("|<&")
+
+# The characters that stop code spans being read where they stand in HTML, or between a
+# "<" that starts none and the first ">" after it: a backtick there could open a code span
+# or stand inside HTML, and a quote could hold a ">" that does not end a tag.
+HTML_UNSURE = frozenset("`'\"")
+
+# The characters that stop code spans being read where they stand between a "](" and the
+# first ")" after it, or a "][" and the first "]": a link title, an escaped parenthesis
+# or a destination in "<" and ">" can run past that ")".
+LINK_UNSURE = frozenset("`'\"\\<")
+
+# The kinds of HTML that run to the end of the line when no close follows, each as its
+# opening and close; the declaration comes last, as "<!" opens the others too.
+HTML_CLOSES = (("<!--", "-->"), ("<?", "?>"), ("<![CDATA[", "]]>"), ("<!", ">"))
 
 # A control character, which no line read for the name holds, put before a combining mark
 # written after something other than a letter or another mark, and before a character
@@ -509,6 +566,24 @@ def lines_naming(lines, naming):
     return "\n".join(line if named else "" for (line, _, _), named in zip(lines, naming))
 
 
+def span_lines(lines):
+    """For each README line, as `classified` returns it, whether code spans are read on it:
+    not on the lines after one on which code spans are not read or stop being read, or that
+    holds a run of backticks no run closes, up to a blank line, one that is empty or holds
+    only spaces and tabs as written. A code span, HTML or link span still open at the end of
+    such a line could close on a later line of its paragraph. A line that carries a
+    character `hiding_kind` names reads no code span, which `names` sees to, and so leaves
+    the lines after it with none read too."""
+    reads, open_ = [], False
+    for line, stripped, hidden in lines:
+        if not line.strip(" \t"):
+            open_ = False
+        reads.append(not open_)
+        if not open_:
+            open_ = step_one(stripped, spans=not hidden)[1]
+    return reads
+
+
 def decoded(reference):
     """A character reference match as the characters it stands for, less those `hiding_kind`
     names: "&#8203;" stands for U+200B, which shows nothing."""
@@ -539,17 +614,111 @@ def nfkc(text):
     return unicodedata.normalize("NFKC", "".join(ordered))
 
 
-def name_form(stripped, raw_html=RAW_HTML):
+def unclosed(found):
+    """Whether `found`, HTML `RAW_HTML` matches, is a comment, processing instruction, CDATA
+    section or declaration that runs to the end of the line because no close follows its
+    opening. "<!-->" ends in "-->", but no close follows its opening "<!--"."""
+    for opening, close in HTML_CLOSES:
+        if found.startswith(opening):
+            return not (found.endswith(close) and len(found) >= len(opening) + len(close))
+    return False
+
+
+def step_one(stripped, raw_html=RAW_HTML, spans=True):
+    """(text, open): `stripped` after the first step the module description states. Its HTML
+    is removed as `raw_html` matches it, `RAW_HTML` unless another is given; the character
+    each backslash escapes and the text of each code span are kept as text, written in the
+    `AS_TEXT` forms, and the backslash and the backticks around the code span removed; a
+    backtick in no code span is left for the second step to remove. Code spans are read
+    until the first place where a backtick after it could be read another way, the places
+    the module description lists, which `RAW_HTML` decides whichever HTML `raw_html`
+    removes; with `spans` false none is read. `open` is whether the lines after this one,
+    up to a blank line, read no code span: whether code spans were not read here or stopped
+    being read, or a run of backticks here found no closing run.
+
+    Each closing run is looked up in the runs of its length, in order, past the ones already
+    passed, and a "<" that starts no HTML looks for the first ">" after it once for all the
+    "<" before that ">": a line is read in linear time."""
+    runs = {}
+    for run in BACKTICKS.finditer(stripped):
+        runs.setdefault(len(run.group()), []).append(run.start())
+    passed = dict.fromkeys(runs, 0)
+    out = []
+    reading, unmatched = spans, False
+    # The first ">" after the last "<" that starts no HTML, when no character in
+    # HTML_UNSURE stands before it; a later "<" before it needs no new look.
+    clear_to = -1
+    i, n = 0, len(stripped)
+    while i < n:
+        c = stripped[i]
+        if c == "<":
+            if reading:
+                found = RAW_HTML.match(stripped, i)
+                if found:
+                    reading = not (unclosed(found.group())
+                                   or any(h in HTML_UNSURE for h in found.group()))
+                elif stripped[i + 1:i + 2] not in ("", " ", "\t") and stripped[i + 1].isascii():
+                    if clear_to < i:
+                        end = stripped.find(">", i + 1)
+                        if end < 0 or any(h in HTML_UNSURE for h in stripped[i + 1:end]):
+                            reading = False
+                        clear_to = end
+            found = raw_html.match(stripped, i)
+            if found:
+                i = found.end()
+                continue
+        elif c == "\\" and stripped[i + 1:i + 2] in PUNCTUATION:
+            out.append(stripped[i + 1].translate(AS_TEXT))
+            i += 2
+            continue
+        elif c == "`":
+            end = i + 1
+            while end < n and stripped[end] == "`":
+                end += 1
+            if reading:
+                starts = runs.get(end - i, [])
+                k = passed.get(end - i, 0)
+                while k < len(starts) and starts[k] < end:
+                    k += 1
+                if starts:
+                    passed[end - i] = k
+                if k == len(starts):
+                    unmatched = True
+                else:
+                    text = stripped[end:starts[k]]
+                    if any(s in SPAN_UNSURE for s in text):
+                        reading = False
+                    else:
+                        if text[:1] == text[-1:] == " " and text.strip(" "):
+                            text = text[1:-1]
+                        out.append(text.translate(AS_TEXT))
+                        i = starts[k] + end - i
+                        continue
+            out.append(stripped[i:end])
+            i = end
+            continue
+        elif c == "]" and reading and stripped[i + 1:i + 2] in ("(", "["):
+            link = LINK_TARGET.match(stripped, i)
+            if not link or any(u in LINK_UNSURE for u in link.group()):
+                reading = False
+        out.append(c)
+        i += 1
+    return "".join(out), not reading or unmatched
+
+
+def name_form(stripped, raw_html=RAW_HTML, spans=True):
     """`stripped` as a name in it reads, by the three steps the module description states:
-    the raw HTML `raw_html` matches removed, `RAW_HTML` unless another is given; each
-    "](...)" and "][...]" span `LINK_TARGET` matches removed, whether or not it makes a
-    link, then each "!" `IMAGE` matches, and the Markdown characters in `MARKUP`; then the
-    character references decoded, less the characters `hiding_kind` names, and the text
-    brought to NFKC with each character in `CONFUSABLES` read as the letters it resembles.
-    The HTML is removed before the link spans, as HTML can start inside a link destination
-    or title and end after the ")" that closes them, and the markup before the references
-    are decoded, as a reference to "*" shows a star."""
-    text = raw_html.sub("", stripped)
+    `step_one`, which removes the raw HTML `raw_html` matches, `RAW_HTML` unless another is
+    given, and keeps as text the character each backslash escapes and the text of each code
+    span, read unless `spans` is false; then each "](...)" and "][...]" span `LINK_TARGET`
+    matches removed, whether or not it makes a link, then each "!" `IMAGE` matches, and the
+    Markdown characters in `MARKUP`; then the character references decoded, less the
+    characters `hiding_kind` names, and the text brought to NFKC, which brings back what the
+    first step kept as text, with each character in `CONFUSABLES` read as the letters it
+    resembles. The HTML is removed before the link spans, as HTML can start inside a link
+    destination or title and end after the ")" that closes them, and the markup before the
+    references are decoded, as a reference to "*" shows a star."""
+    text = step_one(stripped, raw_html, spans)[0]
     text = IMAGE.sub("", LINK_TARGET.sub("", text)).translate(MARKUP)
     text = REFERENCE.sub(decoded, text)
     return nfkc(text).translate(CONFUSABLES)
@@ -593,11 +762,13 @@ def detached(stripped):
     return "".join(out)
 
 
-def names(stripped, name, hiding=False):
+def names(stripped, name, hiding=False, spans=True):
     """Whether a line that is `stripped` once the characters `hiding_kind` names are
     removed names `name`: it `holds` `name` as it stands or in its `name_form`, read with
     `RAW_HTML` and, where a tag name is followed by white space other than a space or
-    tab, with `SPACE_OR_TAB_HTML` too. Where a name form holds `name` only with combining
+    tab, with `SPACE_OR_TAB_HTML` too. The name form reads no code span with `spans` false,
+    as `span_lines` gives for a line after one that can leave a code span, HTML or a link
+    span open, nor with `hiding` true. Where a name form holds `name` only with combining
     marks directly after it that NFKC joins to its last letter, or only once its letters
     are decomposed, the name form of the line `detached` is read too, so a mark counts only
     where it is written as itself directly after a letter or another mark: "DVAA" U+0301
@@ -613,15 +784,16 @@ def names(stripped, name, hiding=False):
 
     if found(stripped):
         return True
+    spans = spans and not hiding
     readings = [RAW_HTML]
     if OTHER_SPACE_AFTER_TAG_NAME.search(stripped):
         readings.append(SPACE_OR_TAB_HTML)
     for raw_html in readings:
-        form = name_form(stripped, raw_html)
+        form = name_form(stripped, raw_html, spans)
         if found(form):
             return True
         decomposed = unicodedata.normalize("NFKD", form).translate(CONFUSABLES)
-        if name in decomposed and found(name_form(detached(stripped), raw_html)):
+        if name in decomposed and found(name_form(detached(stripped), raw_html, spans)):
             return True
     return False
 
@@ -1015,7 +1187,8 @@ def main(argv):
     # line also give the line with such characters removed, which decides whether it names
     # DVAA.
     lines = [classified(line) for line in readme.split("\n")]
-    naming = [names(stripped, "DVAA", bool(hidden)) for _, stripped, hidden in lines]
+    naming = [names(stripped, "DVAA", bool(hidden), spans)
+              for (_, stripped, hidden), spans in zip(lines, span_lines(lines))]
     dvaa_lines = lines_naming(lines, naming)
     pinned = "related-projects.json"
     # Every DVAA wording is read in any letter case: DVAA itself writes "Attack Categories".
