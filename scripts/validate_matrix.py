@@ -80,6 +80,10 @@ Standard library only, no network. Two passes:
         validator does not read the clone the pins were taken from:
         ``python3 scripts/pin_evidence_sources.py --dvaa <clone> --check`` compares
         them with it
+   - S18 a ``dataSources`` mapping of a technique whose ``tool`` is ``hackmyagent``
+        and whose ``kind`` is ``check`` names one of the technique's ``hmaChecks``,
+        so the technique page's Data Sources line shows no check its HMA Checks
+        line leaves out
 
 Exit 0 when everything holds, 1 otherwise.
 """
@@ -471,6 +475,12 @@ def semantic_checks(matrix: dict, readiness: dict, technique_ids_file, pages: di
                     f"S4 {tid}: dataSources source {source!r} names tool {tool!r}, which its readBy "
                     f"does not cite ({', '.join(sorted(readers[source]))}); cite where {tool!r} reads "
                     f"the data, or name a tool that does"
+                )
+            if tool == "hackmyagent" and mapping["kind"] == "check" and mapping["ref"] not in t["hmaChecks"]:
+                errors.append(
+                    f"S18 {tid}: dataSources source {source!r} names hackmyagent check "
+                    f"{mapping['ref']!r}, which hmaChecks does not list; add the check to hmaChecks, "
+                    f"or name a check that hmaChecks lists"
                 )
 
         scenario = t.get("dvaaValidation")

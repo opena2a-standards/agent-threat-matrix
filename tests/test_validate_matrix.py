@@ -281,11 +281,15 @@ def mapping(source: str = "honeypot", tool: str = "example-tool") -> dict:
     return {"source": source, "tool": tool, "kind": "sensorField", "ref": "request.path"}
 
 
+SHIPPED_SOURCES = load(ROOT, "matrix.json")["dataSources"]
+
+
 def with_data_sources(registry: list, technique_sources: list):
-    """Return a mutation that sets the registry and the first technique's mappings."""
+    """Return a mutation that puts the entries ahead of the shipped registry, so the first of
+    them is dataSources[0], and sets the first technique's mappings."""
     def fn(root):
         m = load(root, "matrix.json")
-        m["dataSources"] = registry
+        m["dataSources"] = registry + m["dataSources"]
         m["techniques"][0]["dataSources"] = technique_sources
         dump(root, "matrix.json", m)
         regenerate_stix(root)
@@ -300,7 +304,7 @@ def test_data_source_must_resolve_in_the_registry():
 def test_data_source_resolves_when_registered():
     proc = mutate(with_data_sources([data_source()], [mapping()]))
     assert proc.returncode == 0, proc.stdout + proc.stderr
-    assert "1 data sources" in proc.stdout
+    assert f"{len(SHIPPED_SOURCES) + 1} data sources" in proc.stdout
 
 
 def test_data_source_without_a_reader_citation_is_refused():
@@ -345,6 +349,45 @@ def test_technique_mapping_names_a_tool_that_the_source_reader_citations_cite():
     _red(mutate(with_data_sources([data_source()], [mapping(tool="other-tool")])),
          "S4 T-1001: dataSources source 'honeypot' names tool 'other-tool', which its readBy "
          "does not cite (example-tool)")
+
+
+def hma_source() -> dict:
+    """A registry entry whose readBy cites hackmyagent, with illustrative citation values."""
+    return dict(data_source(), readBy=[reader("hackmyagent")])
+
+
+def hma_mapping(ref: str, kind: str = "check") -> dict:
+    return {"source": "honeypot", "tool": "hackmyagent", "kind": kind, "ref": ref}
+
+
+def test_a_hackmyagent_check_that_hma_checks_does_not_list_is_refused():
+    # T-1001 lists WEBEXPOSE-001, WEBEXPOSE-002 and MCP-011; PROMPT-001 is another technique's.
+    _red(mutate(with_data_sources([hma_source()], [hma_mapping("PROMPT-001")])),
+         "S18 T-1001: dataSources source 'honeypot' names hackmyagent check 'PROMPT-001', which "
+         "hmaChecks does not list; add the check to hmaChecks, or name a check that hmaChecks lists")
+
+
+def test_a_hackmyagent_check_that_hma_checks_lists_is_accepted():
+    proc = mutate(with_data_sources([hma_source()], [hma_mapping("WEBEXPOSE-001")]))
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+
+
+def test_the_hma_checks_rule_reads_only_hackmyagent_checks():
+    entry = dict(data_source(), readBy=[reader("hackmyagent"), reader()])
+    uses = [hma_mapping("PROMPT-001", kind="signature"),
+            {"source": "honeypot", "tool": "example-tool", "kind": "check", "ref": "PROMPT-001"}]
+    proc = mutate(with_data_sources([entry], uses))
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+
+
+def test_every_shipped_technique_carries_data_sources_and_its_hackmyagent_checks_are_listed():
+    techniques = load(ROOT, "matrix.json")["techniques"]
+    assert all("dataSources" in t for t in techniques)
+    assert any(t["dataSources"] for t in techniques), "no technique maps a data source"
+    for t in techniques:
+        for use in t["dataSources"]:
+            if use["tool"] == "hackmyagent" and use["kind"] == "check":
+                assert use["ref"] in t["hmaChecks"], (t["id"], use)
 
 
 def test_deprecated_requires_replaced_by():

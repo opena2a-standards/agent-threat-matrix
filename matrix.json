@@ -2,7 +2,7 @@
   "version": "1.2",
   "name": "AI Agent Threat Matrix",
   "created": "2026-03-24",
-  "updated": "2026-10-21",
+  "updated": "2026-10-22",
   "stixNamespace": "d43c7092-69ad-4822-b2cb-a48e459c4580",
   "tactics": [
     {
@@ -81,6 +81,26 @@
         "1.4",
         "10.5"
       ],
+      "dataSources": [
+        {
+          "source": "web-served-directory-listing",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "WEBEXPOSE-001"
+        },
+        {
+          "source": "web-served-directory-listing",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "WEBEXPOSE-002"
+        },
+        {
+          "source": "mcp-discovery-document",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "MCP-011"
+        }
+      ],
       "wildPrevalence": 0,
       "wildSampleCount": 0,
       "attackMapping": [
@@ -111,6 +131,14 @@
       "dvaaValidation": "ToolBot tools/list",
       "oasbControls": [
         "10.5"
+      ],
+      "dataSources": [
+        {
+          "source": "mcp-discovery-document",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "MCP-011"
+        }
       ],
       "wildPrevalence": 100,
       "wildSampleCount": 2566,
@@ -152,6 +180,14 @@
         "1.3",
         "1.4"
       ],
+      "dataSources": [
+        {
+          "source": "web-served-directory-listing",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "WEBEXPOSE-001"
+        }
+      ],
       "wildPrevalence": 100,
       "wildSampleCount": 11308,
       "atlasMapping": [
@@ -192,6 +228,14 @@
         "1.3",
         "1.4"
       ],
+      "dataSources": [
+        {
+          "source": "web-served-directory-listing",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "WEBEXPOSE-001"
+        }
+      ],
       "wildPrevalence": 0,
       "wildSampleCount": 0,
       "atlasMapping": [
@@ -224,6 +268,20 @@
       "oasbControls": [
         "10.5"
       ],
+      "dataSources": [
+        {
+          "source": "mcp-discovery-document",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "MCP-011"
+        },
+        {
+          "source": "mcp-server-configuration",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "MCP-001"
+        }
+      ],
       "wildPrevalence": 0,
       "wildSampleCount": 0,
       "atlasMapping": [
@@ -252,6 +310,20 @@
         "7.3",
         "7.4"
       ],
+      "dataSources": [
+        {
+          "source": "a2a-agent-card",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "A2A-001"
+        },
+        {
+          "source": "application-source-code",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "A2A-002"
+        }
+      ],
       "wildPrevalence": 0,
       "wildSampleCount": 0,
       "evidence": [
@@ -276,6 +348,14 @@
       "oasbControls": [
         "10.5"
       ],
+      "dataSources": [
+        {
+          "source": "web-served-directory-listing",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "WEBEXPOSE-001"
+        }
+      ],
       "wildPrevalence": 0,
       "wildSampleCount": 0
     },
@@ -299,6 +379,32 @@
         "3.3",
         "3.4",
         "3.5"
+      ],
+      "dataSources": [
+        {
+          "source": "agent-instruction-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "PROMPT-001"
+        },
+        {
+          "source": "agent-instruction-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "PROMPT-002"
+        },
+        {
+          "source": "agent-instruction-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "PROMPT-003"
+        },
+        {
+          "source": "agent-instruction-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "PROMPT-004"
+        }
       ],
       "wildPrevalence": 98.44,
       "wildSampleCount": 7610,
@@ -347,6 +453,38 @@
         "3.4",
         "3.5"
       ],
+      "dataSources": [
+        {
+          "source": "agent-instruction-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "PROMPT-001"
+        },
+        {
+          "source": "retrieval-configuration",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "RAG-001"
+        },
+        {
+          "source": "application-source-code",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "RAG-002"
+        },
+        {
+          "source": "retrieval-configuration",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "RAG-003"
+        },
+        {
+          "source": "retrieval-configuration",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "RAG-004"
+        }
+      ],
       "wildPrevalence": 97.97,
       "wildSampleCount": 7592,
       "attackMapping": [
@@ -389,6 +527,14 @@
         "3.3",
         "3.4",
         "3.5"
+      ],
+      "dataSources": [
+        {
+          "source": "agent-instruction-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "PROMPT-001"
+        }
       ],
       "wildPrevalence": 100,
       "wildSampleCount": 3507,
@@ -434,6 +580,20 @@
         "3.4",
         "3.5"
       ],
+      "dataSources": [
+        {
+          "source": "agent-instruction-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "PROMPT-001"
+        },
+        {
+          "source": "agent-instruction-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "PROMPT-002"
+        }
+      ],
       "wildPrevalence": 100,
       "wildSampleCount": 2886,
       "atlasMapping": [
@@ -471,6 +631,26 @@
         "3.3",
         "3.4",
         "3.5"
+      ],
+      "dataSources": [
+        {
+          "source": "skill-definition-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "SKILL-001"
+        },
+        {
+          "source": "skill-definition-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "SKILL-004"
+        },
+        {
+          "source": "skill-definition-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "SKILL-005"
+        }
       ],
       "wildPrevalence": 100,
       "wildSampleCount": 2566,
@@ -511,6 +691,38 @@
         "3.3",
         "3.4",
         "3.5"
+      ],
+      "dataSources": [
+        {
+          "source": "application-source-code",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "UNICODE-STEGO-001"
+        },
+        {
+          "source": "application-source-code",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "UNICODE-STEGO-002"
+        },
+        {
+          "source": "application-source-code",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "UNICODE-STEGO-003"
+        },
+        {
+          "source": "application-source-code",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "UNICODE-STEGO-004"
+        },
+        {
+          "source": "application-source-code",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "UNICODE-STEGO-005"
+        }
       ],
       "wildPrevalence": 100,
       "wildSampleCount": 11099,
@@ -555,6 +767,14 @@
         "3.4",
         "3.5"
       ],
+      "dataSources": [
+        {
+          "source": "agent-instruction-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "PROMPT-001"
+        }
+      ],
       "wildPrevalence": 100,
       "wildSampleCount": 5763,
       "atlasMapping": [
@@ -590,6 +810,20 @@
         "3.3",
         "3.4",
         "3.5"
+      ],
+      "dataSources": [
+        {
+          "source": "application-source-code",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "SOUL-OVERRIDE-001"
+        },
+        {
+          "source": "skill-definition-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "SOUL-OVERRIDE-001"
+        }
       ],
       "wildPrevalence": 97.97,
       "wildSampleCount": 7592,
@@ -637,6 +871,50 @@
         "5.4",
         "5.5"
       ],
+      "dataSources": [
+        {
+          "source": "configuration-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "CRED-001"
+        },
+        {
+          "source": "environment-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "CRED-001"
+        },
+        {
+          "source": "mcp-server-configuration",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "CRED-001"
+        },
+        {
+          "source": "agent-instruction-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "CRED-001"
+        },
+        {
+          "source": "private-key-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "CRED-002"
+        },
+        {
+          "source": "package-manifest",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "CRED-003"
+        },
+        {
+          "source": "configuration-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "CRED-004"
+        }
+      ],
       "wildPrevalence": 100,
       "wildSampleCount": 3716,
       "attackMapping": [
@@ -683,6 +961,50 @@
         "5.4",
         "5.5"
       ],
+      "dataSources": [
+        {
+          "source": "environment-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "ENV-001"
+        },
+        {
+          "source": "configuration-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "ENV-001"
+        },
+        {
+          "source": "environment-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "ENV-002"
+        },
+        {
+          "source": "configuration-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "ENV-002"
+        },
+        {
+          "source": "environment-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "ENV-003"
+        },
+        {
+          "source": "configuration-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "ENV-003"
+        },
+        {
+          "source": "package-manifest",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "ENV-004"
+        }
+      ],
       "wildPrevalence": 0,
       "wildSampleCount": 0,
       "attackMapping": [
@@ -718,6 +1040,32 @@
         "5.4",
         "5.5"
       ],
+      "dataSources": [
+        {
+          "source": "configuration-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "CRED-001"
+        },
+        {
+          "source": "environment-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "CRED-001"
+        },
+        {
+          "source": "mcp-server-configuration",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "CRED-001"
+        },
+        {
+          "source": "agent-instruction-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "CRED-001"
+        }
+      ],
       "wildPrevalence": 0,
       "wildSampleCount": 0,
       "atlasMapping": [
@@ -750,6 +1098,44 @@
         "5.3",
         "5.4",
         "5.5"
+      ],
+      "dataSources": [
+        {
+          "source": "agent-memory-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "MEM-001"
+        },
+        {
+          "source": "configuration-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "MEM-002"
+        },
+        {
+          "source": "configuration-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "MEM-003"
+        },
+        {
+          "source": "multi-agent-configuration",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "MEM-004"
+        },
+        {
+          "source": "application-source-code",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "MEM-005"
+        },
+        {
+          "source": "application-source-code",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "MEM-006"
+        }
       ],
       "wildPrevalence": 0,
       "wildSampleCount": 0,
@@ -790,6 +1176,74 @@
         "5.4",
         "5.5"
       ],
+      "dataSources": [
+        {
+          "source": "configuration-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "CRED-001"
+        },
+        {
+          "source": "environment-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "CRED-001"
+        },
+        {
+          "source": "mcp-server-configuration",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "CRED-001"
+        },
+        {
+          "source": "agent-instruction-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "CRED-001"
+        },
+        {
+          "source": "environment-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "ENV-001"
+        },
+        {
+          "source": "configuration-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "ENV-001"
+        },
+        {
+          "source": "environment-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "ENV-002"
+        },
+        {
+          "source": "configuration-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "ENV-002"
+        },
+        {
+          "source": "environment-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "ENV-003"
+        },
+        {
+          "source": "configuration-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "ENV-003"
+        },
+        {
+          "source": "package-manifest",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "ENV-004"
+        }
+      ],
       "wildPrevalence": 0,
       "wildSampleCount": 0,
       "attackMapping": [
@@ -826,6 +1280,44 @@
         "5.4",
         "5.5"
       ],
+      "dataSources": [
+        {
+          "source": "configuration-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "CRED-001"
+        },
+        {
+          "source": "environment-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "CRED-001"
+        },
+        {
+          "source": "mcp-server-configuration",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "CRED-001"
+        },
+        {
+          "source": "agent-instruction-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "CRED-001"
+        },
+        {
+          "source": "agent-instruction-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "AGENT-CRED-001"
+        },
+        {
+          "source": "application-source-code",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "AGENT-CRED-001"
+        }
+      ],
       "wildPrevalence": 0,
       "wildSampleCount": 0,
       "atlasMapping": [
@@ -855,6 +1347,26 @@
         "2.3",
         "2.4",
         "2.5"
+      ],
+      "dataSources": [
+        {
+          "source": "file-permission-metadata",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "PERM-001"
+        },
+        {
+          "source": "file-permission-metadata",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "PERM-002"
+        },
+        {
+          "source": "file-permission-metadata",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "PERM-003"
+        }
       ],
       "wildPrevalence": 100,
       "wildSampleCount": 1988,
@@ -895,6 +1407,32 @@
         "2.4",
         "2.5"
       ],
+      "dataSources": [
+        {
+          "source": "package-manifest",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "AUTH-001"
+        },
+        {
+          "source": "package-manifest",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "AUTH-002"
+        },
+        {
+          "source": "application-source-code",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "AUTH-003"
+        },
+        {
+          "source": "package-manifest",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "AUTH-004"
+        }
+      ],
       "wildPrevalence": 100,
       "wildSampleCount": 2877,
       "atlasMapping": [
@@ -930,6 +1468,14 @@
         "2.3",
         "2.4",
         "2.5"
+      ],
+      "dataSources": [
+        {
+          "source": "file-permission-metadata",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "PERM-001"
+        }
       ],
       "wildPrevalence": 0,
       "wildSampleCount": 0,
@@ -969,6 +1515,32 @@
         "2.4",
         "2.5"
       ],
+      "dataSources": [
+        {
+          "source": "package-manifest",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "AUTH-001"
+        },
+        {
+          "source": "package-manifest",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "AUTH-002"
+        },
+        {
+          "source": "application-source-code",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "AUTH-003"
+        },
+        {
+          "source": "package-manifest",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "AUTH-004"
+        }
+      ],
       "wildPrevalence": 100,
       "wildSampleCount": 1870,
       "evidence": [
@@ -997,6 +1569,14 @@
         "2.3",
         "2.4",
         "2.5"
+      ],
+      "dataSources": [
+        {
+          "source": "application-source-code",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "UNICODE-STEGO-001"
+        }
       ],
       "wildPrevalence": 0,
       "wildSampleCount": 0,
@@ -1033,6 +1613,20 @@
         "2.3",
         "2.4",
         "2.5"
+      ],
+      "dataSources": [
+        {
+          "source": "agent-instruction-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "PROMPT-001"
+        },
+        {
+          "source": "agent-instruction-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "PROMPT-002"
+        }
       ],
       "wildPrevalence": 100,
       "wildSampleCount": 2886,
@@ -1077,6 +1671,32 @@
         "7.3",
         "7.4"
       ],
+      "dataSources": [
+        {
+          "source": "mcp-server-configuration",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "NET-001"
+        },
+        {
+          "source": "mcp-server-configuration",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "NET-002"
+        },
+        {
+          "source": "application-source-code",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "NET-003"
+        },
+        {
+          "source": "mcp-server-configuration",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "MCP-001"
+        }
+      ],
       "wildPrevalence": 0,
       "wildSampleCount": 0,
       "atlasMapping": [
@@ -1109,6 +1729,20 @@
         "7.2",
         "7.3",
         "7.4"
+      ],
+      "dataSources": [
+        {
+          "source": "a2a-agent-card",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "A2A-001"
+        },
+        {
+          "source": "application-source-code",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "A2A-002"
+        }
       ],
       "wildPrevalence": 100,
       "wildSampleCount": 1870,
@@ -1144,6 +1778,26 @@
         "7.2",
         "7.3",
         "7.4"
+      ],
+      "dataSources": [
+        {
+          "source": "mcp-server-configuration",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "MCP-001"
+        },
+        {
+          "source": "mcp-server-configuration",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "MCP-002"
+        },
+        {
+          "source": "mcp-server-configuration",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "MCP-003"
+        }
       ],
       "wildPrevalence": 0,
       "wildSampleCount": 0,
@@ -1184,6 +1838,32 @@
         "7.3",
         "7.4"
       ],
+      "dataSources": [
+        {
+          "source": "configuration-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "CRED-001"
+        },
+        {
+          "source": "environment-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "CRED-001"
+        },
+        {
+          "source": "mcp-server-configuration",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "CRED-001"
+        },
+        {
+          "source": "agent-instruction-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "CRED-001"
+        }
+      ],
       "wildPrevalence": 0,
       "wildSampleCount": 0,
       "attackMapping": [
@@ -1223,6 +1903,20 @@
         "7.2",
         "7.3",
         "7.4"
+      ],
+      "dataSources": [
+        {
+          "source": "mcp-server-configuration",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "MCP-001"
+        },
+        {
+          "source": "mcp-discovery-document",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "MCP-011"
+        }
       ],
       "wildPrevalence": 0,
       "wildSampleCount": 0,
@@ -1265,6 +1959,26 @@
         "7.3",
         "7.4"
       ],
+      "dataSources": [
+        {
+          "source": "mcp-server-configuration",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "NET-001"
+        },
+        {
+          "source": "mcp-server-configuration",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "NET-002"
+        },
+        {
+          "source": "application-source-code",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "NET-003"
+        }
+      ],
       "wildPrevalence": 0,
       "wildSampleCount": 0,
       "attackMapping": [
@@ -1303,6 +2017,44 @@
         "8.2",
         "8.3",
         "8.4"
+      ],
+      "dataSources": [
+        {
+          "source": "agent-memory-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "MEM-001"
+        },
+        {
+          "source": "configuration-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "MEM-002"
+        },
+        {
+          "source": "configuration-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "MEM-003"
+        },
+        {
+          "source": "multi-agent-configuration",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "MEM-004"
+        },
+        {
+          "source": "application-source-code",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "MEM-005"
+        },
+        {
+          "source": "application-source-code",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "MEM-006"
+        }
       ],
       "wildPrevalence": 100,
       "wildSampleCount": 2015,
@@ -1344,6 +2096,44 @@
         "8.3",
         "8.4"
       ],
+      "dataSources": [
+        {
+          "source": "agent-memory-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "MEM-001"
+        },
+        {
+          "source": "configuration-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "MEM-002"
+        },
+        {
+          "source": "configuration-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "MEM-003"
+        },
+        {
+          "source": "multi-agent-configuration",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "MEM-004"
+        },
+        {
+          "source": "application-source-code",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "MEM-005"
+        },
+        {
+          "source": "application-source-code",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "MEM-006"
+        }
+      ],
       "wildPrevalence": 0,
       "wildSampleCount": 0,
       "atlasMapping": [
@@ -1383,6 +2173,56 @@
         "8.3",
         "8.4"
       ],
+      "dataSources": [
+        {
+          "source": "agent-gateway-configuration",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "GATEWAY-001"
+        },
+        {
+          "source": "agent-gateway-configuration",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "GATEWAY-002"
+        },
+        {
+          "source": "agent-gateway-configuration",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "GATEWAY-003"
+        },
+        {
+          "source": "agent-gateway-configuration",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "GATEWAY-004"
+        },
+        {
+          "source": "agent-gateway-configuration",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "GATEWAY-005"
+        },
+        {
+          "source": "agent-gateway-configuration",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "GATEWAY-006"
+        },
+        {
+          "source": "agent-gateway-configuration",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "GATEWAY-007"
+        },
+        {
+          "source": "agent-gateway-configuration",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "GATEWAY-008"
+        }
+      ],
       "wildPrevalence": 0,
       "wildSampleCount": 0,
       "atlasMapping": [
@@ -1414,6 +2254,44 @@
         "8.2",
         "8.3",
         "8.4"
+      ],
+      "dataSources": [
+        {
+          "source": "skill-definition-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "SKILL-001"
+        },
+        {
+          "source": "skill-definition-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "SKILL-002"
+        },
+        {
+          "source": "skill-definition-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "SKILL-003"
+        },
+        {
+          "source": "skill-definition-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "SKILL-004"
+        },
+        {
+          "source": "skill-definition-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "SKILL-005"
+        },
+        {
+          "source": "skill-definition-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "SKILL-006"
+        }
       ],
       "wildPrevalence": 100,
       "wildSampleCount": 2019,
@@ -1463,6 +2341,50 @@
         "8.3",
         "8.4"
       ],
+      "dataSources": [
+        {
+          "source": "heartbeat-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "HEARTBEAT-001"
+        },
+        {
+          "source": "heartbeat-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "HEARTBEAT-002"
+        },
+        {
+          "source": "heartbeat-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "HEARTBEAT-003"
+        },
+        {
+          "source": "heartbeat-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "HEARTBEAT-004"
+        },
+        {
+          "source": "heartbeat-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "HEARTBEAT-005"
+        },
+        {
+          "source": "heartbeat-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "HEARTBEAT-006"
+        },
+        {
+          "source": "skill-definition-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "HEARTBEAT-007"
+        }
+      ],
       "wildPrevalence": 0,
       "wildSampleCount": 0,
       "attackMapping": [
@@ -1491,6 +2413,26 @@
         "8.2",
         "8.3",
         "8.4"
+      ],
+      "dataSources": [
+        {
+          "source": "skill-definition-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "SKILL-001"
+        },
+        {
+          "source": "skill-definition-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "SKILL-002"
+        },
+        {
+          "source": "skill-definition-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "SKILL-003"
+        }
       ],
       "wildPrevalence": 0,
       "wildSampleCount": 0,
@@ -1521,6 +2463,38 @@
         "4.2",
         "4.3",
         "4.4"
+      ],
+      "dataSources": [
+        {
+          "source": "package-manifest",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "IO-001"
+        },
+        {
+          "source": "application-source-code",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "IO-001"
+        },
+        {
+          "source": "package-manifest",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "IO-002"
+        },
+        {
+          "source": "package-manifest",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "IO-003"
+        },
+        {
+          "source": "application-source-code",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "IO-004"
+        }
       ],
       "wildPrevalence": 0,
       "wildSampleCount": 0,
@@ -1559,6 +2533,38 @@
         "4.3",
         "4.4"
       ],
+      "dataSources": [
+        {
+          "source": "package-manifest",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "IO-001"
+        },
+        {
+          "source": "application-source-code",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "IO-001"
+        },
+        {
+          "source": "application-source-code",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "INJ-001"
+        },
+        {
+          "source": "application-source-code",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "INJ-002"
+        },
+        {
+          "source": "application-source-code",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "INJ-003"
+        }
+      ],
       "wildPrevalence": 0,
       "wildSampleCount": 0,
       "attackMapping": [
@@ -1595,6 +2601,38 @@
         "4.2",
         "4.3",
         "4.4"
+      ],
+      "dataSources": [
+        {
+          "source": "package-manifest",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "IO-001"
+        },
+        {
+          "source": "application-source-code",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "IO-001"
+        },
+        {
+          "source": "package-manifest",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "IO-002"
+        },
+        {
+          "source": "package-manifest",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "IO-003"
+        },
+        {
+          "source": "application-source-code",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "IO-004"
+        }
       ],
       "wildPrevalence": 0,
       "wildSampleCount": 0,
@@ -1633,6 +2671,38 @@
         "4.2",
         "4.3",
         "4.4"
+      ],
+      "dataSources": [
+        {
+          "source": "agent-memory-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "MEM-001"
+        },
+        {
+          "source": "configuration-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "MEM-002"
+        },
+        {
+          "source": "configuration-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "MEM-003"
+        },
+        {
+          "source": "multi-agent-configuration",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "MEM-004"
+        },
+        {
+          "source": "application-source-code",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "MEM-005"
+        }
       ],
       "wildPrevalence": 100,
       "wildSampleCount": 3716,
@@ -1673,6 +2743,62 @@
         "4.3",
         "4.4"
       ],
+      "dataSources": [
+        {
+          "source": "package-manifest",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "IO-001"
+        },
+        {
+          "source": "application-source-code",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "IO-001"
+        },
+        {
+          "source": "environment-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "ENV-001"
+        },
+        {
+          "source": "configuration-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "ENV-001"
+        },
+        {
+          "source": "environment-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "ENV-002"
+        },
+        {
+          "source": "configuration-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "ENV-002"
+        },
+        {
+          "source": "environment-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "ENV-003"
+        },
+        {
+          "source": "configuration-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "ENV-003"
+        },
+        {
+          "source": "package-manifest",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "ENV-004"
+        }
+      ],
       "wildPrevalence": 0,
       "wildSampleCount": 0,
       "attackMapping": [
@@ -1710,6 +2836,32 @@
         "4.3",
         "4.4"
       ],
+      "dataSources": [
+        {
+          "source": "retrieval-configuration",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "RAG-001"
+        },
+        {
+          "source": "application-source-code",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "RAG-002"
+        },
+        {
+          "source": "retrieval-configuration",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "RAG-003"
+        },
+        {
+          "source": "retrieval-configuration",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "RAG-004"
+        }
+      ],
       "wildPrevalence": 0,
       "wildSampleCount": 0,
       "atlasMapping": [
@@ -1741,6 +2893,32 @@
       "dvaaValidation": "ToolBot send_email",
       "oasbControls": [
         "4.3"
+      ],
+      "dataSources": [
+        {
+          "source": "container-definition",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "SANDBOX-001"
+        },
+        {
+          "source": "container-definition",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "SANDBOX-002"
+        },
+        {
+          "source": "container-definition",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "SANDBOX-003"
+        },
+        {
+          "source": "container-definition",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "SANDBOX-004"
+        }
       ],
       "wildPrevalence": 0,
       "wildSampleCount": 0,
@@ -1776,6 +2954,38 @@
       "dvaaValidation": "ToolBot fetch_url POST",
       "oasbControls": [
         "4.3"
+      ],
+      "dataSources": [
+        {
+          "source": "mcp-server-configuration",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "NET-001"
+        },
+        {
+          "source": "container-definition",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "SANDBOX-001"
+        },
+        {
+          "source": "container-definition",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "SANDBOX-002"
+        },
+        {
+          "source": "container-definition",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "SANDBOX-003"
+        },
+        {
+          "source": "container-definition",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "SANDBOX-004"
+        }
       ],
       "wildPrevalence": 100,
       "wildSampleCount": 3717,
@@ -1818,6 +3028,26 @@
       "oasbControls": [
         "4.3"
       ],
+      "dataSources": [
+        {
+          "source": "mcp-server-configuration",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "NET-001"
+        },
+        {
+          "source": "mcp-server-configuration",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "NET-002"
+        },
+        {
+          "source": "application-source-code",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "NET-003"
+        }
+      ],
       "wildPrevalence": 0,
       "wildSampleCount": 0,
       "attackMapping": [
@@ -1852,6 +3082,38 @@
       "dvaaValidation": "L3-06",
       "oasbControls": [
         "4.3"
+      ],
+      "dataSources": [
+        {
+          "source": "mcp-server-configuration",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "NET-001"
+        },
+        {
+          "source": "container-definition",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "SANDBOX-001"
+        },
+        {
+          "source": "container-definition",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "SANDBOX-002"
+        },
+        {
+          "source": "container-definition",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "SANDBOX-003"
+        },
+        {
+          "source": "container-definition",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "SANDBOX-004"
+        }
       ],
       "wildPrevalence": 100,
       "wildSampleCount": 2089,
@@ -1895,6 +3157,32 @@
       "oasbControls": [
         "4.3"
       ],
+      "dataSources": [
+        {
+          "source": "container-definition",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "SANDBOX-001"
+        },
+        {
+          "source": "container-definition",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "SANDBOX-002"
+        },
+        {
+          "source": "container-definition",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "SANDBOX-003"
+        },
+        {
+          "source": "container-definition",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "SANDBOX-004"
+        }
+      ],
       "wildPrevalence": 0,
       "wildSampleCount": 0,
       "atlasMapping": [
@@ -1922,6 +3210,38 @@
       "dvaaValidation": "sandbox-telegram-allowed",
       "oasbControls": [
         "4.3"
+      ],
+      "dataSources": [
+        {
+          "source": "container-definition",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "SANDBOX-001"
+        },
+        {
+          "source": "container-definition",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "SANDBOX-002"
+        },
+        {
+          "source": "container-definition",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "SANDBOX-003"
+        },
+        {
+          "source": "container-definition",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "SANDBOX-004"
+        },
+        {
+          "source": "mcp-server-configuration",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "NET-001"
+        }
       ],
       "wildPrevalence": 0,
       "wildSampleCount": 0,
@@ -1959,6 +3279,20 @@
         "4.2",
         "10.5"
       ],
+      "dataSources": [
+        {
+          "source": "skill-definition-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "SUPPLY-001"
+        },
+        {
+          "source": "application-source-code",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "INTEGRITY-001"
+        }
+      ],
       "wildPrevalence": 0,
       "wildSampleCount": 0,
       "attackMapping": [
@@ -1993,6 +3327,14 @@
         "10.2",
         "10.3",
         "10.5"
+      ],
+      "dataSources": [
+        {
+          "source": "skill-definition-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "SUPPLY-001"
+        }
       ],
       "wildPrevalence": 100,
       "wildSampleCount": 4077,
@@ -2039,6 +3381,20 @@
         "9.4",
         "10.3"
       ],
+      "dataSources": [
+        {
+          "source": "skill-definition-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "SUPPLY-001"
+        },
+        {
+          "source": "heartbeat-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "HEARTBEAT-001"
+        }
+      ],
       "wildPrevalence": 0,
       "wildSampleCount": 0,
       "attackMapping": [
@@ -2073,6 +3429,14 @@
         "7.3",
         "10.2"
       ],
+      "dataSources": [
+        {
+          "source": "skill-definition-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "SUPPLY-001"
+        }
+      ],
       "wildPrevalence": 100,
       "wildSampleCount": 1870,
       "evidence": [
@@ -2100,6 +3464,14 @@
         "4.4",
         "10.1",
         "10.2"
+      ],
+      "dataSources": [
+        {
+          "source": "skill-definition-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "SUPPLY-001"
+        }
       ],
       "wildPrevalence": 0,
       "wildSampleCount": 0,
@@ -2136,6 +3508,56 @@
         "6.4",
         "6.5",
         "10.5"
+      ],
+      "dataSources": [
+        {
+          "source": "skill-definition-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "SUPPLY-001"
+        },
+        {
+          "source": "skill-definition-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "SUPPLY-002"
+        },
+        {
+          "source": "skill-definition-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "SUPPLY-003"
+        },
+        {
+          "source": "skill-definition-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "SUPPLY-004"
+        },
+        {
+          "source": "package-manifest",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "DEP-001"
+        },
+        {
+          "source": "package-manifest",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "DEP-002"
+        },
+        {
+          "source": "package-manifest",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "DEP-003"
+        },
+        {
+          "source": "package-manifest",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "DEP-004"
+        }
       ],
       "wildPrevalence": 100,
       "wildSampleCount": 2018,
@@ -2187,6 +3609,7 @@
         "3.2",
         "8.1"
       ],
+      "dataSources": [],
       "wildPrevalence": 0,
       "wildSampleCount": 0
     },
@@ -2215,6 +3638,7 @@
         "2.3",
         "6.2"
       ],
+      "dataSources": [],
       "wildPrevalence": 100,
       "wildSampleCount": 4655,
       "attackMapping": [
@@ -2265,6 +3689,7 @@
         "8.2",
         "4.3"
       ],
+      "dataSources": [],
       "wildPrevalence": 100,
       "wildSampleCount": 2015,
       "atlasMapping": [
@@ -2313,6 +3738,296 @@
         "3.2",
         "8.1",
         "8.2"
+      ],
+      "dataSources": [
+        {
+          "source": "agent-instruction-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "LIFECYCLE-001"
+        },
+        {
+          "source": "tool-description-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "LIFECYCLE-001"
+        },
+        {
+          "source": "mcp-server-configuration",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "LIFECYCLE-001"
+        },
+        {
+          "source": "agent-memory-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "LIFECYCLE-001"
+        },
+        {
+          "source": "configuration-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "LIFECYCLE-001"
+        },
+        {
+          "source": "application-source-code",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "LIFECYCLE-001"
+        },
+        {
+          "source": "agent-instruction-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "LIFECYCLE-002"
+        },
+        {
+          "source": "tool-description-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "LIFECYCLE-002"
+        },
+        {
+          "source": "mcp-server-configuration",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "LIFECYCLE-002"
+        },
+        {
+          "source": "agent-memory-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "LIFECYCLE-002"
+        },
+        {
+          "source": "configuration-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "LIFECYCLE-002"
+        },
+        {
+          "source": "application-source-code",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "LIFECYCLE-002"
+        },
+        {
+          "source": "tool-description-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "LIFECYCLE-003"
+        },
+        {
+          "source": "mcp-server-configuration",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "LIFECYCLE-003"
+        },
+        {
+          "source": "agent-memory-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "LIFECYCLE-003"
+        },
+        {
+          "source": "configuration-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "LIFECYCLE-003"
+        },
+        {
+          "source": "agent-instruction-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "LIFECYCLE-004"
+        },
+        {
+          "source": "tool-description-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "LIFECYCLE-004"
+        },
+        {
+          "source": "mcp-server-configuration",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "LIFECYCLE-004"
+        },
+        {
+          "source": "agent-memory-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "LIFECYCLE-004"
+        },
+        {
+          "source": "configuration-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "LIFECYCLE-004"
+        },
+        {
+          "source": "application-source-code",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "LIFECYCLE-004"
+        },
+        {
+          "source": "tool-description-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "LIFECYCLE-005"
+        },
+        {
+          "source": "mcp-server-configuration",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "LIFECYCLE-005"
+        },
+        {
+          "source": "agent-memory-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "LIFECYCLE-005"
+        },
+        {
+          "source": "configuration-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "LIFECYCLE-005"
+        },
+        {
+          "source": "agent-instruction-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "LIFECYCLE-006"
+        },
+        {
+          "source": "tool-description-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "LIFECYCLE-006"
+        },
+        {
+          "source": "mcp-server-configuration",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "LIFECYCLE-006"
+        },
+        {
+          "source": "agent-memory-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "LIFECYCLE-006"
+        },
+        {
+          "source": "configuration-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "LIFECYCLE-006"
+        },
+        {
+          "source": "agent-instruction-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "LIFECYCLE-007"
+        },
+        {
+          "source": "tool-description-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "LIFECYCLE-007"
+        },
+        {
+          "source": "mcp-server-configuration",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "LIFECYCLE-007"
+        },
+        {
+          "source": "agent-memory-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "LIFECYCLE-007"
+        },
+        {
+          "source": "configuration-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "LIFECYCLE-007"
+        },
+        {
+          "source": "application-source-code",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "LIFECYCLE-007"
+        },
+        {
+          "source": "agent-instruction-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "LIFECYCLE-008"
+        },
+        {
+          "source": "application-source-code",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "LIFECYCLE-008"
+        },
+        {
+          "source": "agent-instruction-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "LIFECYCLE-009"
+        },
+        {
+          "source": "application-source-code",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "LIFECYCLE-009"
+        },
+        {
+          "source": "configuration-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "LIFECYCLE-009"
+        },
+        {
+          "source": "agent-instruction-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "LIFECYCLE-010"
+        },
+        {
+          "source": "tool-description-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "LIFECYCLE-010"
+        },
+        {
+          "source": "mcp-server-configuration",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "LIFECYCLE-010"
+        },
+        {
+          "source": "agent-memory-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "LIFECYCLE-010"
+        },
+        {
+          "source": "configuration-file",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "LIFECYCLE-010"
+        },
+        {
+          "source": "application-source-code",
+          "tool": "hackmyagent",
+          "kind": "check",
+          "ref": "LIFECYCLE-010"
+        }
       ],
       "wildPrevalence": 0,
       "wildSampleCount": 0
@@ -3183,7 +4898,274 @@
       ]
     }
   ],
-  "dataSources": [],
+  "dataSources": [
+    {
+      "id": "agent-instruction-file",
+      "name": "Agent instruction file",
+      "description": "The instruction and persona files an agent loads into its system prompt, such as CLAUDE.md, SOUL.md and system-prompt.md.",
+      "readBy": [
+        {
+          "tool": "hackmyagent",
+          "repository": "opena2a-org/hackmyagent",
+          "commit": "62c06a80624383208e586a39b59090f39e147c1c",
+          "path": "src/hardening/scanner.ts",
+          "line": 18920
+        }
+      ]
+    },
+    {
+      "id": "skill-definition-file",
+      "name": "Skill definition file",
+      "description": "The skill files an agent loads, named SKILL.md or ending in .skill.md.",
+      "readBy": [
+        {
+          "tool": "hackmyagent",
+          "repository": "opena2a-org/hackmyagent",
+          "commit": "62c06a80624383208e586a39b59090f39e147c1c",
+          "path": "src/hardening/scanner.ts",
+          "line": 12376
+        }
+      ]
+    },
+    {
+      "id": "heartbeat-file",
+      "name": "Heartbeat task file",
+      "description": "The heartbeat files that hold the tasks an agent runs on a schedule, named HEARTBEAT.md or ending in .heartbeat.md.",
+      "readBy": [
+        {
+          "tool": "hackmyagent",
+          "repository": "opena2a-org/hackmyagent",
+          "commit": "62c06a80624383208e586a39b59090f39e147c1c",
+          "path": "src/hardening/scanner.ts",
+          "line": 13421
+        }
+      ]
+    },
+    {
+      "id": "mcp-server-configuration",
+      "name": "MCP server configuration",
+      "description": "The MCP configuration at the project root, mcp.json or .mcp.json, which names each server's command, arguments and environment.",
+      "readBy": [
+        {
+          "tool": "hackmyagent",
+          "repository": "opena2a-org/hackmyagent",
+          "commit": "62c06a80624383208e586a39b59090f39e147c1c",
+          "path": "src/hardening/scanner.ts",
+          "line": 883
+        }
+      ]
+    },
+    {
+      "id": "tool-description-file",
+      "name": "Tool description file",
+      "description": "Files that describe the tools an agent can call and that it can load into its prompt, such as tools.json, tool-descriptions.json and capabilities.json.",
+      "readBy": [
+        {
+          "tool": "hackmyagent",
+          "repository": "opena2a-org/hackmyagent",
+          "commit": "62c06a80624383208e586a39b59090f39e147c1c",
+          "path": "src/lifecycle/assembly-scanner.ts",
+          "line": 234
+        }
+      ]
+    },
+    {
+      "id": "mcp-discovery-document",
+      "name": "MCP discovery document",
+      "description": "The MCP discovery file a deployment serves at .well-known/mcp or .well-known/mcp.json.",
+      "readBy": [
+        {
+          "tool": "hackmyagent",
+          "repository": "opena2a-org/hackmyagent",
+          "commit": "62c06a80624383208e586a39b59090f39e147c1c",
+          "path": "src/hardening/scanner.ts",
+          "line": 17575
+        }
+      ]
+    },
+    {
+      "id": "a2a-agent-card",
+      "name": "A2A agent card",
+      "description": "The A2A agent card a deployment serves at .well-known/agent.json.",
+      "readBy": [
+        {
+          "tool": "hackmyagent",
+          "repository": "opena2a-org/hackmyagent",
+          "commit": "62c06a80624383208e586a39b59090f39e147c1c",
+          "path": "src/hardening/scanner.ts",
+          "line": 17487
+        }
+      ]
+    },
+    {
+      "id": "agent-gateway-configuration",
+      "name": "Agent gateway configuration",
+      "description": "The gateway configuration of an OpenClaw agent, such as openclaw.json or .openclaw/config.json.",
+      "readBy": [
+        {
+          "tool": "hackmyagent",
+          "repository": "opena2a-org/hackmyagent",
+          "commit": "62c06a80624383208e586a39b59090f39e147c1c",
+          "path": "src/hardening/scanner.ts",
+          "line": 13666
+        }
+      ]
+    },
+    {
+      "id": "environment-file",
+      "name": "Environment file",
+      "description": "The environment files at the project root, such as .env and .env.local.",
+      "readBy": [
+        {
+          "tool": "hackmyagent",
+          "repository": "opena2a-org/hackmyagent",
+          "commit": "62c06a80624383208e586a39b59090f39e147c1c",
+          "path": "src/hardening/scanner.ts",
+          "line": 9179
+        }
+      ]
+    },
+    {
+      "id": "configuration-file",
+      "name": "Configuration file",
+      "description": "Application and agent configuration files, such as config.json, config.yaml and settings.json.",
+      "readBy": [
+        {
+          "tool": "hackmyagent",
+          "repository": "opena2a-org/hackmyagent",
+          "commit": "62c06a80624383208e586a39b59090f39e147c1c",
+          "path": "src/hardening/scanner.ts",
+          "line": 9033
+        }
+      ]
+    },
+    {
+      "id": "multi-agent-configuration",
+      "name": "Multi-agent configuration",
+      "description": "Files that define the agents of a multi-agent system and how they delegate, such as agents.json and orchestrator.json.",
+      "readBy": [
+        {
+          "tool": "hackmyagent",
+          "repository": "opena2a-org/hackmyagent",
+          "commit": "62c06a80624383208e586a39b59090f39e147c1c",
+          "path": "src/hardening/scanner.ts",
+          "line": 15169
+        }
+      ]
+    },
+    {
+      "id": "retrieval-configuration",
+      "name": "Retrieval configuration",
+      "description": "The configuration of a retrieval pipeline or vector store, such as rag.json, retrieval.json and vector-store.json.",
+      "readBy": [
+        {
+          "tool": "hackmyagent",
+          "repository": "opena2a-org/hackmyagent",
+          "commit": "62c06a80624383208e586a39b59090f39e147c1c",
+          "path": "src/hardening/scanner.ts",
+          "line": 15251
+        }
+      ]
+    },
+    {
+      "id": "agent-memory-file",
+      "name": "Agent memory file",
+      "description": "Files in which an agent keeps memory and conversation history between sessions, such as memory.json, context.json and conversation-history.json.",
+      "readBy": [
+        {
+          "tool": "hackmyagent",
+          "repository": "opena2a-org/hackmyagent",
+          "commit": "62c06a80624383208e586a39b59090f39e147c1c",
+          "path": "src/hardening/scanner.ts",
+          "line": 15084
+        }
+      ]
+    },
+    {
+      "id": "application-source-code",
+      "name": "Application source code",
+      "description": "The source files of the agent application, such as TypeScript, JavaScript and Python files.",
+      "readBy": [
+        {
+          "tool": "hackmyagent",
+          "repository": "opena2a-org/hackmyagent",
+          "commit": "62c06a80624383208e586a39b59090f39e147c1c",
+          "path": "src/hardening/scanner.ts",
+          "line": 15316
+        }
+      ]
+    },
+    {
+      "id": "package-manifest",
+      "name": "Package manifest",
+      "description": "The package manifest, package.json, and the lockfile beside it, such as package-lock.json.",
+      "readBy": [
+        {
+          "tool": "hackmyagent",
+          "repository": "opena2a-org/hackmyagent",
+          "commit": "62c06a80624383208e586a39b59090f39e147c1c",
+          "path": "src/hardening/scanner.ts",
+          "line": 9528
+        }
+      ]
+    },
+    {
+      "id": "container-definition",
+      "name": "Container definition",
+      "description": "The Dockerfile and Docker Compose file that define the container an agent runs in.",
+      "readBy": [
+        {
+          "tool": "hackmyagent",
+          "repository": "opena2a-org/hackmyagent",
+          "commit": "62c06a80624383208e586a39b59090f39e147c1c",
+          "path": "src/hardening/scanner.ts",
+          "line": 11838
+        }
+      ]
+    },
+    {
+      "id": "file-permission-metadata",
+      "name": "File permission metadata",
+      "description": "The permission bits of credential and configuration files, such as .env and secrets.json.",
+      "readBy": [
+        {
+          "tool": "hackmyagent",
+          "repository": "opena2a-org/hackmyagent",
+          "commit": "62c06a80624383208e586a39b59090f39e147c1c",
+          "path": "src/hardening/scanner.ts",
+          "line": 7489
+        }
+      ]
+    },
+    {
+      "id": "web-served-directory-listing",
+      "name": "Web-served directory listing",
+      "description": "The files present in the directories a web server serves, such as public, static and dist.",
+      "readBy": [
+        {
+          "tool": "hackmyagent",
+          "repository": "opena2a-org/hackmyagent",
+          "commit": "62c06a80624383208e586a39b59090f39e147c1c",
+          "path": "src/hardening/scanner.ts",
+          "line": 18278
+        }
+      ]
+    },
+    {
+      "id": "private-key-file",
+      "name": "Private key file",
+      "description": "Private key files in the project tree, such as files ending in .key or .pem.",
+      "readBy": [
+        {
+          "tool": "hackmyagent",
+          "repository": "opena2a-org/hackmyagent",
+          "commit": "62c06a80624383208e586a39b59090f39e147c1c",
+          "path": "src/hardening/scanner.ts",
+          "line": 8525
+        }
+      ]
+    }
+  ],
   "wildPrevalenceSource": {
     "url": "https://api.oa2a.org/api/v1/threat-matrix",
     "read": "2026-10-19"

@@ -56,6 +56,14 @@ of the page outside fenced code blocks starts ``- Evidence: ``, so a page whose 
 carries no entry has none. The section linked only the technique's attack class and tactic
 pages while the STIX bundle already carried the entries of 26 techniques.
 
+docs/data-sources.md carries nothing but data as well, so it must equal its full rendering
+from matrix.json: one table row per vocabulary entry, in matrix.json order, with its name, its
+id, its description and a link to the line each ``readBy`` citation names at its pinned
+commit, then one row per technique that maps no data source, in matrix.json order, with the
+HMA checks it lists. A ``|`` in a name or description is written ``\\|`` so it stays inside its
+cell. The list of unmapped techniques is committed there and cannot fall behind the data.
+``--fix`` writes the page from the data when it is missing or differs.
+
 Run with ``--fix`` to rewrite those lines, the Mitigation section and the tactic pages from
 the data, to drop a Severity line, an Evidence Gap line or a Data Sources line the data does
 not back, to add a missing Evidence Gap line directly under the Evidence Tier line, to write
@@ -83,7 +91,9 @@ does not hold what this check needs from it (see ``SHAPE``), in the line
 with a string ``type``, ``reference`` and ``date`` and a ``note`` that is absent, null or a
 string, whose ``tactics`` array holds objects with a string ``id``, a ``name``, an ``order``
 and a string ``description``, and whose ``dataSources`` array holds objects with a string
-``id`` and ``name``. related-projects.json is then read the same way, in the lines
+``id``, ``name`` and ``description`` and a ``readBy`` array of objects, each with a ``tool``,
+``repository``, ``commit``, ``path`` and ``line``. related-projects.json is then read the same
+way, in the lines
 ``FAIL: related-projects.json is missing or does not parse: <reason>`` and
 ``FAIL: related-projects.json parses but has the wrong shape: <reason>``: it must be an
 object whose ``oasb`` object holds a ``controlTitles`` object with a string for each
@@ -101,6 +111,19 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 # Where the OASB-1 control titles are pinned, under oasb.controlTitles.
 RELATED = "related-projects.json"
+# The page rendered from the dataSources vocabulary and the techniques that map none.
+DATA_SOURCES_PAGE = "docs/data-sources.md"
+DATA_SOURCES_INTRO = (
+    "The data source vocabulary is the top-level `dataSources` in [matrix.json](../matrix.json): "
+    "telemetry a defender can collect to see a technique. Each entry's `readBy` cites the code "
+    "of a tool or sensor that reads the data, at a pinned commit, and "
+    "`scripts/validate_matrix.py` refuses an entry with no citation. A technique's "
+    "`dataSources` names each source with the check, signature or sensor field that uses it "
+    "for that technique, and the technique's page shows the source by its name. This page is "
+    "rendered from matrix.json: `python3 scripts/check_technique_pages.py` fails when it "
+    "differs, and `--fix` rewrites it.")
+UNMAPPED_INTRO = ("These techniques map no data source in matrix.json, each listed with the HMA "
+                  "checks matrix.json gives it.")
 NO_PROCEDURES = "No documented procedures yet."
 NO_MITIGATION = "No documented mitigations yet."
 OASB_URL = "https://oasb.ai"
@@ -629,7 +652,45 @@ def render_tactic_page(tactic: dict, techniques: list[dict]) -> str:
     return "\n".join(lines) + "\n"
 
 
-def check_tactic_page(rel: str, have: str, want: str) -> list[str]:
+def cell(value: object) -> str:
+    """``value`` as the text of a Markdown table cell, each ``|`` in it escaped."""
+    return str(value).replace("|", "\\|")
+
+
+def reading_code(reader: dict) -> str:
+    """A ``readBy`` citation as a link to the line it names at its pinned commit."""
+    return (f"[{reader['tool']} {reader['path']}:{reader['line']}]"
+            f"(https://github.com/{reader['repository']}/blob/{reader['commit']}/"
+            f"{reader['path']}#L{reader['line']})")
+
+
+def render_data_sources_page(matrix: dict) -> str:
+    """docs/data-sources.md: the vocabulary with the code each entry cites, and the techniques
+    that map no data source with the HMA checks each lists."""
+    lines = ["# Data sources", "", DATA_SOURCES_INTRO, "", "## Vocabulary", ""]
+    if matrix["dataSources"]:
+        lines += ["| Data source | Id | Description | Read by |",
+                  "|-------------|----|-------------|---------|"]
+        for source in matrix["dataSources"]:
+            readers = ", ".join(reading_code(reader) for reader in source["readBy"])
+            lines.append(f"| {cell(source['name'])} | `{source['id']}` "
+                         f"| {cell(source['description'])} | {readers} |")
+    else:
+        lines.append("The vocabulary holds no data source.")
+    lines += ["", "## Unmapped techniques", ""]
+    unmapped = [t for t in matrix["techniques"] if not t.get("dataSources")]
+    if unmapped:
+        lines += [UNMAPPED_INTRO, "", "| ID | Name | HMA Checks |", "|----|------|------------|"]
+        for t in unmapped:
+            checks = ", ".join(t.get("hmaChecks") or []) or "none"
+            lines.append(f"| [{t['id']}](../techniques/{t['id']}.md) | {cell(t['name'])} "
+                         f"| {checks} |")
+    else:
+        lines.append("Every technique maps a data source.")
+    return "\n".join(lines) + "\n"
+
+
+def check_rendered_page(rel: str, have: str, want: str) -> list[str]:
     have_lines, want_lines = have.splitlines(), want.splitlines()
     failures = []
     for i in range(max(len(have_lines), len(want_lines))):
@@ -671,15 +732,25 @@ def check_pages(matrix: dict, titles: dict, fix: bool) -> list[str]:
         if not page.exists():
             failures.append(f"{rel}: no page")
         else:
-            failures.extend(check_tactic_page(rel, page.read_text(encoding="utf-8"), want))
+            failures.extend(check_rendered_page(rel, page.read_text(encoding="utf-8"), want))
         if fix and (not page.exists() or page.read_text(encoding="utf-8") != want):
             page.write_text(want, encoding="utf-8")
+
+    page = ROOT / DATA_SOURCES_PAGE
+    want = render_data_sources_page(matrix)
+    if not page.exists():
+        failures.append(f"{DATA_SOURCES_PAGE}: no page")
+    else:
+        failures.extend(check_rendered_page(DATA_SOURCES_PAGE, page.read_text(encoding="utf-8"), want))
+    if fix and (not page.exists() or page.read_text(encoding="utf-8") != want):
+        page.parent.mkdir(parents=True, exist_ok=True)
+        page.write_text(want, encoding="utf-8")
     return failures
 
 
 def report(heading: str, failures: list[str]) -> None:
-    print(f"{heading} {len(failures)} technique- or tactic-page line(s) or section(s) that disagree "
-          f"with matrix.json or {RELATED}:")
+    print(f"{heading} {len(failures)} line(s) or section(s) of the technique pages, the tactic "
+          f"pages or {DATA_SOURCES_PAGE} that disagree with matrix.json or {RELATED}:")
     for failure in failures:
         print(f"  - {failure}")
 
@@ -709,17 +780,21 @@ def read_json(name: str):
 
 # What ``wrong_shape`` asks of a key it reads from an object: present, with any value;
 # present, as a string; absent, null or a string; absent, null or an array of strings;
-# absent, null or an array of objects each holding a string at every key of MAPPING_KEYS.
+# absent, null or an array of objects each holding a string at every key of MAPPING_KEYS;
+# present, as an array of objects each holding every key of READER_KEYS, with any value.
 # Each but the first is worded as the reason line words it.
 ANY, STRING = "any value", "a string"
 STRING_OR_NULL, STRINGS_OR_NULL = "a string or null", "an array of strings or null"
 MAPPINGS_OR_NULL = "an array of objects or null"
 ENTRIES_OR_NULL = "an array of evidence entries or null"
+CITATIONS = "an array of objects"
 OPTIONAL = (STRING_OR_NULL, STRINGS_OR_NULL, MAPPINGS_OR_NULL, ENTRIES_OR_NULL)
 # The keys of a technique's dataSources mapping, each joined into the Data Sources line.
 MAPPING_KEYS = ("source", "tool", "kind", "ref")
 # The keys of an evidence entry, each written into its Evidence line, and what each must hold.
 ENTRY_SHAPE = (("type", STRING), ("reference", STRING), ("date", STRING), ("note", STRING_OR_NULL))
+# The keys of a readBy citation, each written into the link docs/data-sources.md shows for it.
+READER_KEYS = ("tool", "repository", "commit", "path", "line")
 
 # What this check needs from matrix.json, in the order ``wrong_shape`` checks it: each array
 # and the keys of its objects, with what each must hold. An id is a string, as
@@ -732,7 +807,8 @@ SHAPE = (
                     ("oasbControls", STRINGS_OR_NULL), ("evidenceTier", ANY),
                     ("dataSources", MAPPINGS_OR_NULL), ("evidence", ENTRIES_OR_NULL))),
     ("tactics", (("id", STRING), ("name", ANY), ("order", ANY), ("description", STRING))),
-    ("dataSources", (("id", STRING), ("name", STRING))),
+    ("dataSources", (("id", STRING), ("name", STRING), ("description", STRING),
+                     ("readBy", CITATIONS))),
 )
 
 
@@ -757,7 +833,17 @@ def wrong_value(item: dict, field: str, kind: str, where: str) -> str | None:
     if field not in item:
         return None if kind in OPTIONAL else f"{where} has no {field}"
     value = item[field]
-    if kind == ANY or (value is None and kind != STRING):
+    if kind == ANY or (value is None and kind not in (STRING, CITATIONS)):
+        return None
+    if kind == CITATIONS:
+        if not isinstance(value, list):
+            return f"{where}.{field} is {json_type(value)}, not {kind}"
+        for n, entry in enumerate(value):
+            if not isinstance(entry, dict):
+                return f"{where}.{field}[{n}] is {json_type(entry)}, not an object"
+            for key in READER_KEYS:
+                if key not in entry:
+                    return f"{where}.{field}[{n}] has no {key}"
         return None
     if kind == MAPPINGS_OR_NULL:
         if not isinstance(value, list):
@@ -878,9 +964,11 @@ def main(argv: list[str]) -> int:
           f"sections list the {entries} evidence {'entry' if entries == 1 else 'entries'} "
           f"matrix.json carries, every control a Mitigation section lists carries its title from "
           f"{RELATED}, every adapted page states its evidence gap, no technique page carries a "
-          "Severity line, and "
+          "Severity line, "
           f"{mapped} of {len(matrix['techniques'])} technique pages carry a Data Sources line, "
-          "naming each source by its vocabulary name")
+          f"naming each source by its vocabulary name, and {DATA_SOURCES_PAGE} lists the "
+          f"{len(matrix['dataSources'])} vocabulary entries and the "
+          f"{len(matrix['techniques']) - mapped} techniques that map none")
     return 0
 
 
