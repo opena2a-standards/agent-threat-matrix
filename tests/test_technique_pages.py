@@ -1168,3 +1168,76 @@ def test_evidence_lines_with_two_tactic_links_to_go_under_are_left_alone(tree):
 
     assert run_checker(tree, "--fix").returncode == 1
     assert page.read_text(encoding="utf-8") == stale
+
+
+# The check compared only the text of the Data Sources line, never its position. Each case
+# puts the line directly after one shipped T-1001 line: the last References line, the HMA
+# Checks line (so it sits directly above the OASB Controls line) and the last control the
+# Mitigation section lists.
+MISPLACED_AFTER = [
+    ("below-references", "- Tactic: [reconnaissance](../tactics/reconnaissance.md)\n"),
+    ("above-controls", "- **HMA Checks:** WEBEXPOSE-001, WEBEXPOSE-002, MCP-011\n"),
+    ("in-mitigation", "- OASB 10.5: Recovery and Rollback\n"),
+]
+MISPLACED = "T-1001: Data Sources line is not directly under the OASB Controls line"
+
+
+def with_data_sources_line(page: str, line: str) -> str:
+    """The page with ``line`` directly under its OASB Controls line, where --fix writes it."""
+    return page.replace(T1001_CONTROLS + "\n", T1001_CONTROLS + "\n" + line + "\n")
+
+
+@pytest.mark.parametrize("after", [after for _, after in MISPLACED_AFTER],
+                         ids=[name for name, _ in MISPLACED_AFTER])
+def test_a_data_sources_line_away_from_the_oasb_controls_line_is_red_and_moved(tree, after):
+    map_data_sources(tree, EXAMPLE_MAPPINGS, [EXAMPLE_SOURCE])
+    page = tree / "techniques" / "T-1001.md"
+    shipped = page.read_text(encoding="utf-8")
+    mutate(page, after, after + EXAMPLE_LINE + "\n")
+
+    result = run_checker(tree)
+    assert result.returncode == 1, result.stdout
+    assert MISPLACED in result.stdout
+
+    fixed = run_checker(tree, "--fix")
+    assert fixed.returncode == 0, fixed.stdout
+    assert page.read_text(encoding="utf-8") == with_data_sources_line(shipped, EXAMPLE_LINE)
+    assert run_checker(tree).returncode == 0
+
+
+def test_a_stale_data_sources_line_away_from_the_oasb_controls_line_is_rewritten_under_it(tree):
+    map_data_sources(tree, EXAMPLE_MAPPINGS, [EXAMPLE_SOURCE])
+    page = tree / "techniques" / "T-1001.md"
+    shipped = page.read_text(encoding="utf-8")
+    by_id = EXAMPLE_LINE.replace("Example request log", "example-log")
+    page.write_text(shipped + by_id + "\n", encoding="utf-8")
+
+    result = run_checker(tree)
+    assert result.returncode == 1, result.stdout
+    assert f"T-1001: Data Sources line is '{by_id}', matrix.json says '{EXAMPLE_LINE}'" in result.stdout
+    assert MISPLACED in result.stdout
+
+    assert run_checker(tree, "--fix").returncode == 0
+    assert page.read_text(encoding="utf-8") == with_data_sources_line(shipped, EXAMPLE_LINE)
+
+
+@pytest.mark.parametrize("controls,failure", [
+    ("", "T-1001: page has no 'OASB Controls' line"),
+    (T1001_CONTROLS + "\n" + T1001_CONTROLS + "\n", "T-1001: page has 2 'OASB Controls' lines"),
+], ids=["no-controls-line", "two-controls-lines"])
+def test_a_data_sources_line_stays_put_on_a_page_without_one_oasb_controls_line(tree, controls,
+                                                                                 failure):
+    # Only the text of the line is checked there, so a stale one is rewritten where it is.
+    map_data_sources(tree, EXAMPLE_MAPPINGS, [EXAMPLE_SOURCE])
+    page = tree / "techniques" / "T-1001.md"
+    mutate(page, T1001_CONTROLS + "\n", controls)
+    before = page.read_text(encoding="utf-8")
+    by_id = EXAMPLE_LINE.replace("Example request log", "example-log")
+    page.write_text(before + by_id + "\n", encoding="utf-8")
+
+    result = run_checker(tree, "--fix")
+    assert result.returncode == 1, result.stdout
+    assert failure in result.stdout
+    assert f"T-1001: Data Sources line is '{by_id}', matrix.json says '{EXAMPLE_LINE}'" in result.stdout
+    assert MISPLACED not in result.stdout, "with no single OASB Controls line there is no place to move it to"
+    assert page.read_text(encoding="utf-8") == before + EXAMPLE_LINE + "\n"
