@@ -1255,8 +1255,13 @@ def test_a_name_written_with_markup_a_reference_or_a_confusable_letter_leaves_th
 # "x" U+00A0 "<y", so each line shows "DVAA (99 agents, ...)". Each was read as text, as a
 # tag name of ASCII letters, digits and hyphens ends at "\" and "<", and one that runs to
 # white space ends at U+00A0 and U+3000 IDEOGRAPHIC SPACE, and the check found no DVAA on
-# the line and exited 0. U+00A0 and U+3000 are written as escapes, as saved raw they read
-# as the space beside them.
+# the line and exited 0. A browser also reads a "<" after a tag name and white space as part
+# of an attribute name or unquoted value, so "<a <b>" is a tag named "a" with an attribute
+# "<b", and "<a <b" U+00A0 "D<x\>" a tag named "a" with an attribute "<b" U+00A0 "d<x\":
+# the check ended a tag at the first ">" only where no "<" came first, removed only "<b>"
+# and "<b" U+00A0 "D<x\>" from the last two lines, read "DV<a AA" and "D<a VAA" and exited
+# 0. U+00A0 and U+3000 are written as escapes, as saved raw they read as the space beside
+# them.
 LICENSE_LINE = "Apache-2.0. The framework is free to use, cite, and build upon.\n"
 HTML_BLOCK_NAMES = [
     ("plain name", "DVAA"),
@@ -1264,6 +1269,9 @@ HTML_BLOCK_NAMES = [
     ("tag with a backslash and a < in its name", "D<D\\\\</b>VAA"),
     ("tag with U+00A0 and a < in its name", "DV<x\N{NO-BREAK SPACE}<y>AA"),
     ("tag with U+3000 and a < in its name", "DV<x\N{IDEOGRAPHIC SPACE}<y>AA"),
+    ("tag with a < after its name and a space", "DV<a <b>AA"),
+    ("tag with a < after its name and a space, then U+00A0 and a tag name with a <",
+     "D<a <b\N{NO-BREAK SPACE}D<x\\>VAA"),
 ]
 
 
@@ -1445,7 +1453,8 @@ def test_a_reference_with_more_digits_than_u10ffff_has_stands_for_u_fffd():
 # DVAA set as its own paragraph after README's licence line, with a style, script or
 # template element holding text inside the name, the last a style element whose start tag
 # holds "<" in a quoted attribute value, which only the reading that passes over quoted
-# values reads as a tag. A browser shows no text of such an element, so each line shows
+# values and the HTML block reading read as a tag. A browser shows no text of such an
+# element, so each line shows
 # "DVAA (99 agents, 77 vulnerability categories)", while the check removed the two tags,
 # kept the text between them, read "DVxAA", found no DVAA and exited 0.
 ELEMENT_NAMES = [
@@ -1488,19 +1497,35 @@ def test_a_tag_name_a_browser_reads_is_removed_only_in_the_html_block_reading():
         assert checker.names(written, "DVAA"), written
     assert checker.name_form("DV<a</b>AA", checker.HtmlBlockHtml()) == "DVAA"
     assert checker.name_form("DV<a<</b>AA", checker.HtmlBlockHtml()) == "DVAA"
-    # HtmlBlockHtml does not look again for a tag inside the name of one that found no
-    # ">", and gives what the pattern gives from every "<": a "</" at the end of that name
-    # starts a name of its own.
+    # A "<" after a tag name and a space, a tab or "/" does not end the tag in an HTML
+    # block, where a browser reads it as part of an attribute name or value.
+    for written in ("DV<a <b>AA", "D<a <b\N{NO-BREAK SPACE}D<x\\>VAA", "DV<a\t<b>AA",
+                    "DV<a/<b>AA", "DV</a x<b>AA"):
+        assert checker.LESS_THAN_AFTER_TAG_NAME.search(written), ascii(written)
+        assert not checker.holds(checker.name_form(written), "DVAA"), ascii(written)
+        assert checker.name_form(written, checker.HtmlBlockHtml()) == "DVAA", ascii(written)
+        assert checker.names(written, "DVAA"), ascii(written)
+    assert not checker.OTHER_CHARACTER_IN_TAG_NAME.search("DV<a <b>AA")
+    # HtmlBlockHtml does not look for a tag after the last ">" of a line, where none finds
+    # a ">", and gives what the pattern gives from every "<".
     rng = random.Random(153)
     pieces = [*"<</\\>ab /-\t\"'`*", "\N{NO-BREAK SPACE}", "<!--", "-->", "DV", "AA"]
     for _ in range(50_000):
         line = "".join(rng.choice(pieces) for _ in range(rng.randint(1, 16)))
         assert (checker.step_one(line, checker.HtmlBlockHtml())
                 == checker.step_one(line, checker.HTML_BLOCK_HTML)), ascii(line)
-    # Where every tag name ends at a tab, a space, "/", ">" or the end of the line, the
-    # reading is not added; white space other than a tab or space does not end a tag name
-    # in an HTML block, so a tag name followed by it adds the reading.
-    assert not checker.OTHER_CHARACTER_IN_TAG_NAME.search("DV<b>AA <i x='1'> <br/> <a\t<p")
+        # On a line the HTML block way is not read on, it would remove what RAW_HTML does.
+        if not block_read(checker, line):
+            assert (checker.step_one(line, checker.HTML_BLOCK_HTML)
+                    == checker.step_one(line)), ascii(line)
+    # Where every tag name ends at a tab, a space, "/", ">" or the end of the line, and no
+    # "<" follows a tab, a space or "/" after one before any ">", the reading is not added;
+    # white space other than a tab or space does not end a tag name in an HTML block, so a
+    # tag name followed by it adds the reading, and so does "<a" followed by a tab and "<p".
+    for line, added in (("DV<b>AA <i x='1'> <br/> <a\t>p <a", False),
+                        ("DV<b>AA <i x='1'> <br/> <a\t<p", True)):
+        assert not checker.OTHER_CHARACTER_IN_TAG_NAME.search(line), ascii(line)
+        assert bool(checker.LESS_THAN_AFTER_TAG_NAME.search(line)) == added, ascii(line)
     for space in ("\N{NO-BREAK SPACE}", "\N{IDEOGRAPHIC SPACE}", "\N{EM SPACE}"):
         assert checker.OTHER_CHARACTER_IN_TAG_NAME.search(f"DV<b{space}x>AA"), ascii(space)
         assert checker.HTML_BLOCK_TAG_NAME.match(f"b{space}x>").end() == 3, ascii(space)
@@ -1510,9 +1535,8 @@ def test_one_html_block_reading_reads_a_line_alike_each_time():
     # One HtmlBlockHtml gives what HTML_BLOCK_HTML gives however many times it reads a line,
     # so the readings `names` makes of one line can share an instance. In
     # "DV<y\>AA <q\" the tag "<q\" finds no ">", and a later reading of the line, which
-    # starts again from its first character, still removes "<y\>" before it: a "<" is
-    # passed over only inside the name of the last tag that found no ">", not anywhere
-    # before the end of that name.
+    # starts again from its first character, still removes "<y\>" before it: a tag is
+    # passed over only after the last ">" of the line.
     checker = load_checker()
     line = "DV<y\\>AA <q\\"
     reading = checker.HtmlBlockHtml()
@@ -1534,11 +1558,14 @@ def test_one_html_block_reading_reads_a_line_alike_each_time():
 
 @pytest.mark.parametrize("line", ["DV" + "<a" * 50_000, "DV" + "<a\\" * 40_000 + "AA",
                                   "DV" + "<a</" * 30_000 + "AA",
-                                  "DV" + "<a\N{NO-BREAK SPACE}" * 40_000 + "AA"])
+                                  "DV" + "<a\N{NO-BREAK SPACE}" * 40_000 + "AA",
+                                  "DV" + "<a " * 40_000 + "AA",
+                                  "DV" + "<a <b" * 30_000 + "AA"])
 def test_the_html_block_reading_reads_a_long_line_in_linear_time(line):
-    # A tag name in that reading can hold "<", so a tag that finds no ">" takes its name
-    # past every "<" after it; looked for again from each "<" on a line of "<a", every
-    # look would scan to the end of the line, in time quadratic in its length.
+    # A tag in that reading runs past any "<" in its name and attributes, so a tag that
+    # finds no ">" runs past every "<" after it; looked for again from each "<" on a line of
+    # "<a" or "<a ", every look would scan to the end of the line, in time quadratic in its
+    # length.
     checker = load_checker()
     start = time.perf_counter()
     checker.names(line, "DVAA")
@@ -1695,10 +1722,14 @@ def test_a_quoted_value_is_passed_over_only_in_the_quoted_value_reading():
     checker = load_checker()
     for _, written in QUOTED_VALUE_NAMES:
         assert checker.QUOTE_AFTER_TAG_NAME.search(written)
-        for other in (checker.RAW_HTML, checker.SPACE_OR_TAB_HTML, checker.HtmlBlockHtml()):
+        for other in (checker.RAW_HTML, checker.SPACE_OR_TAB_HTML):
             assert not checker.holds(checker.name_form(written, other), "DVAA"), written
         assert checker.name_form(written, checker.QUOTED_HTML) == "DVAA", written
         assert checker.names(written, "DVAA"), written
+    # The HTML block reading ends a tag at the first ">" after it, also in a quoted value,
+    # and reads a "<" after the tag name and a space as part of the tag, quoted or not.
+    assert checker.name_form("DV<b title='>'>AA", checker.HtmlBlockHtml()) == "DV'>AA"
+    assert checker.name_form('DV<b x="<">AA', checker.HtmlBlockHtml()) == "DVAA"
     # Where no tag name is followed by "/" or white space and then by a quote before any "<"
     # or ">", the reading is not added.
     assert not checker.QUOTE_AFTER_TAG_NAME.search("DV<b>AA <i x=1> '<' \"<\" <b\"x\"> <a")
@@ -2257,16 +2288,22 @@ def test_the_element_rule_ends_a_tag_name_where_the_html_block_reading_does():
 
 
 # A start tag whose quoted attribute value holds "<" is a tag only in the reading that
-# passes over quoted values, and there it opens a style element as in the other readings:
-# 'DV<style title="<">x</style>AA' names DVAA only read that way with the text of the
-# element removed, as a browser reads the value whole and shows no text of the element.
+# passes over quoted values and in the HTML block reading, which reads a "<" after a tag
+# name and a space as part of the tag, and there it opens a style element as in the other
+# readings: 'DV<style title="<">x</style>AA' names DVAA only read one of those ways with
+# the text of the element removed, as a browser reads the value whole and shows no text of
+# the element.
 def test_a_start_tag_read_past_a_quoted_value_opens_an_element():
     checker = load_checker()
     line = 'DV<style title="<">x</style>AA'
     assert checker.QUOTE_AFTER_TAG_NAME.search(line)
+    assert checker.LESS_THAN_AFTER_TAG_NAME.search(line)
     assert checker.name_form(line, checker.QUOTED_HTML, hide_elements=True) == "DVAA"
     assert stated_name_form(checker, line, quoted=True, hide_elements=True) == "DVAA"
     assert checker.name_form(line, checker.QUOTED_HTML) == "DVxAA"
+    assert checker.name_form(line, checker.HtmlBlockHtml(), hide_elements=True) == "DVAA"
+    assert stated_name_form(checker, line, html_block=True, hide_elements=True) == "DVAA"
+    assert checker.name_form(line, checker.HtmlBlockHtml()) == "DVxAA"
     assert not checker.holds(checker.name_form(line, hide_elements=True), "DVAA")
     assert checker.names(line, "DVAA")
 
@@ -2283,13 +2320,24 @@ def ascii_letter_at(text, i):
     return i < len(text) and text[i] in string.ascii_letters
 
 
+def block_read(checker, line):
+    """Whether `names` also reads `line` the HTML block way: where a tag name is followed by
+    a character other than an ASCII letter, digit, hyphen, tab, line feed, form feed, space,
+    "/" or ">", or by a tab, line feed, form feed, space or "/" and then by a "<" before any
+    ">"."""
+    return bool(checker.OTHER_CHARACTER_IN_TAG_NAME.search(line)
+                or checker.LESS_THAN_AFTER_TAG_NAME.search(line))
+
+
 def stated_html_end(line, i, any_space=True, html_block=False, quoted=False):
     """Where the HTML that README states starts at the "<" at line[i] ends, or None. With
     `any_space` false, as in the second reading README states where white space other than
     a space or tab follows a tag name, only a space, a tab or "/" lets a tag run on past
     its name to a ">". With `html_block` true, as in the reading README states where
-    another character follows a tag name, the name after its first letter runs on over any
-    character other than a tab, line feed, form feed, space, "/" and ">". With `quoted`
+    another character follows a tag name, or a "<" follows a tab, line feed, form feed,
+    space or "/" after one, the name after its first letter runs on over any character
+    other than a tab, line feed, form feed, space, "/" and ">", and after the name and one
+    of the first five the tag runs on past any "<" to the first ">". With `quoted`
     true, as in the reading README states where a quote follows "/" or white space after a
     tag name, each quote after that "/" or white space is passed over with the text up to
     the next such quote, where one follows on the line."""
@@ -2313,8 +2361,10 @@ def stated_html_end(line, i, any_space=True, html_block=False, quoted=False):
                                               else line[j] in " \t")):
         k = j + 1
         while k < len(line):
-            if line[k] in "<>":
-                return k + 1 if line[k] == ">" else None
+            if line[k] == ">":
+                return k + 1
+            if line[k] == "<" and not html_block:
+                return None
             close = line.find(line[k], k + 1) if quoted and line[k] in "\"'" else -1
             k = close + 1 if close >= 0 else k + 1
     return None
@@ -2642,9 +2692,10 @@ def test_the_stated_steps_read_every_generated_line_as_the_checker_does():
     # with white space other than a space or tab is also read the second way README states,
     # with only a space, a tab or "/" ending a tag name; on any other line the two ways
     # remove the same HTML. A line where a tag name is followed by another character, such
-    # as "\", "<" or U+00A0, is also read the HTML block way, with a tag name running to a
-    # tab, line feed, form feed, space, "/" or ">"; on any other line that way reads the
-    # line as the first does. A line
+    # as "\", "<" or U+00A0, or by a space, a tab or "/" and then by a "<" before any ">",
+    # is also read the HTML block way, with a tag name running to a tab, line feed, form
+    # feed, space, "/" or ">" and a tag past any "<" after that to the first ">"; on any
+    # other line that way reads the line as the first does. A line
     # where "/" or white space after a tag name is followed by a quote before any "<" or ">"
     # is also read with each quoted attribute value passed over whole; on any other line
     # that way reads the line as the first does. A line where "&" stands directly before "#"
@@ -2664,7 +2715,7 @@ def test_the_stated_steps_read_every_generated_line_as_the_checker_does():
             assert (checker.name_form(line, checker.SPACE_OR_TAB_HTML)
                     == stated_name_form(checker, line, any_space=False)), ascii(line)
         block = stated_name_form(checker, line, html_block=True)
-        if checker.OTHER_CHARACTER_IN_TAG_NAME.search(line):
+        if block_read(checker, line):
             assert checker.name_form(line, checker.HtmlBlockHtml()) == block, ascii(line)
         else:
             assert block == plain, ascii(line)
@@ -2683,7 +2734,7 @@ def test_the_stated_steps_read_every_generated_line_as_the_checker_does():
         if "][" in line:
             assert (checker.name_form(line, labels=STATED_LABELS)
                     == stated_name_form(checker, line, labels=STATED_LABELS)), ascii(line)
-            if checker.OTHER_CHARACTER_IN_TAG_NAME.search(line):
+            if block_read(checker, line):
                 stated = stated_name_form(checker, line, labels=STATED_LABELS,
                                           html_block=True)
                 assert (checker.name_form(line, checker.HtmlBlockHtml(), labels=STATED_LABELS)
@@ -2719,8 +2770,9 @@ def test_the_stated_label_rule_reads_every_generated_line_as_the_checker_does():
     # "[", would leave the cases above passing. A removed label is passed over with the "]"
     # that closes it, so with labels removed code spans stop being read on no line where
     # they go on being read with none removed, the reading span_lines takes. A line where a
-    # tag name is followed by another character, such as "\" or "[", is read the HTML block
-    # way too, with one HtmlBlockHtml in each label reading in turn, as `names` reads it, and
+    # tag name is followed by another character, such as "\" or "[", or by a space, a tab or
+    # "/" and then by a "<" before any ">", is read the HTML block way too, with one
+    # HtmlBlockHtml in each label reading in turn, as `names` reads it, and
     # a line where "/" or white space after a tag name is followed by a quote before any "<"
     # or ">" is read the quoted value way in each label reading.
     checker = load_checker()
@@ -2735,7 +2787,7 @@ def test_the_stated_label_rule_reads_every_generated_line_as_the_checker_does():
                     == stated_first_step(line, labels=labels)[1]), ascii(line)
         assert (not checker.step_one(line, labels=STATED_LABELS)[1]
                 or checker.step_one(line)[1]), ascii(line)
-        if checker.OTHER_CHARACTER_IN_TAG_NAME.search(line):
+        if block_read(checker, line):
             reading = checker.HtmlBlockHtml()
             for labels in (STATED_LABELS, None, STATED_LABELS):
                 stated = stated_name_form(checker, line, labels=labels, html_block=True)
@@ -2837,7 +2889,7 @@ def test_the_stated_element_rule_reads_every_generated_line_as_the_checker_does(
             assert (checker.name_form(line, checker.SPACE_OR_TAB_HTML, hide_elements=True)
                     == stated_name_form(checker, line, any_space=False,
                                         hide_elements=True)), ascii(line)
-        if checker.OTHER_CHARACTER_IN_TAG_NAME.search(line):
+        if block_read(checker, line):
             # One HtmlBlockHtml reads the line with and without the elements' text removed
             # in turn, as `names` reads it.
             reading = checker.HtmlBlockHtml()
