@@ -263,25 +263,85 @@ def test_technique_ids_nested_too_deep_to_parse_is_the_s8_finding_not_a_tracebac
         "  - S8 technique-ids.json is missing or does not parse"], proc.stderr
 
 
-def test_data_source_must_resolve_in_the_registry():
+def reader(tool: str = "example-tool") -> dict:
+    """A readBy citation with illustrative values: the validator checks its shape, not the file."""
+    return {"tool": tool, "repository": "example-org/example-tool", "commit": "0" * 40,
+            "path": "src/example.ts", "line": 1}
+
+
+def data_source(source_id: str = "honeypot") -> dict:
+    return {"id": source_id, "name": "Honeypot", "description": "Honeypot telemetry",
+            "readBy": [reader()]}
+
+
+def mapping(source: str = "honeypot", tool: str = "example-tool") -> dict:
+    return {"source": source, "tool": tool, "kind": "sensorField", "ref": "request.path"}
+
+
+def with_data_sources(registry: list, technique_sources: list):
+    """Return a mutation that sets the registry and the first technique's mappings."""
     def fn(root):
         m = load(root, "matrix.json")
-        m["techniques"][0]["dataSources"] = ["honeypot"]
+        m["dataSources"] = registry
+        m["techniques"][0]["dataSources"] = technique_sources
         dump(root, "matrix.json", m)
         regenerate_stix(root)
-    _red(mutate(fn), "S4 T-1001: dataSources value 'honeypot' is not in the dataSources registry")
+    return fn
+
+
+def test_data_source_must_resolve_in_the_registry():
+    _red(mutate(with_data_sources([], [mapping()])),
+         "S4 T-1001: dataSources source 'honeypot' is not in the dataSources registry")
 
 
 def test_data_source_resolves_when_registered():
-    def fn(root):
-        m = load(root, "matrix.json")
-        m["dataSources"] = [{"id": "honeypot", "name": "Honeypot", "description": "Honeypot telemetry"}]
-        m["techniques"][0]["dataSources"] = ["honeypot"]
-        dump(root, "matrix.json", m)
-        regenerate_stix(root)
-    proc = mutate(fn)
+    proc = mutate(with_data_sources([data_source()], [mapping()]))
     assert proc.returncode == 0, proc.stdout + proc.stderr
     assert "1 data sources" in proc.stdout
+
+
+def test_data_source_without_a_reader_citation_is_refused():
+    entry = data_source()
+    del entry["readBy"]
+    _red(mutate(with_data_sources([entry], [])),
+         "matrix.dataSources[0]: missing required property 'readBy'")
+
+
+def test_data_source_with_an_empty_reader_list_is_refused():
+    entry = dict(data_source(), readBy=[])
+    _red(mutate(with_data_sources([entry], [])),
+         "matrix.dataSources[0].readBy: 0 item(s), fewer than the minimum 1")
+
+
+def test_reader_citation_needs_a_line_and_a_pinned_commit():
+    citation = dict(reader(), commit="main")
+    del citation["line"]
+    proc = mutate(with_data_sources([dict(data_source(), readBy=[citation])], []))
+    _red(proc, "matrix.dataSources[0].readBy[0]: missing required property 'line'")
+    assert "matrix.dataSources[0].readBy[0].commit: 'main' does not match" in proc.stderr, proc.stderr
+
+
+def test_technique_mapping_must_name_the_check_signature_or_sensor_field():
+    bare = {"source": "honeypot", "tool": "example-tool"}
+    proc = mutate(with_data_sources([data_source()], [bare]))
+    _red(proc, "matrix.techniques[0].dataSources[0]: missing required property 'kind'")
+    assert "matrix.techniques[0].dataSources[0]: missing required property 'ref'" in proc.stderr, proc.stderr
+
+
+def test_technique_mapping_kind_is_a_check_a_signature_or_a_sensor_field():
+    proc = mutate(with_data_sources([data_source()], [dict(mapping(), kind="rule")]))
+    _red(proc, "matrix.techniques[0].dataSources[0].kind: 'rule' is not one of")
+
+
+def test_technique_mapping_is_an_object_not_a_bare_source_id():
+    _red(mutate(with_data_sources([data_source()], ["honeypot"])),
+         "matrix.techniques[0].dataSources[0]: expected type object, got str")
+
+
+def test_technique_mapping_names_a_tool_that_the_source_reader_citations_cite():
+    _red(mutate(with_data_sources([data_source()], [mapping(tool="other-tool")])),
+         "S4 T-1001: dataSources source 'honeypot' names tool 'other-tool', which its readBy "
+         "does not cite (example-tool)")
 
 
 def test_deprecated_requires_replaced_by():

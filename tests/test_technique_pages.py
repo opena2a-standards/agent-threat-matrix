@@ -8,8 +8,9 @@ page and the line, and ``--fix`` must restore the shipped text. The checker used
 only the Attack Class and OASB Controls lines, so a class move in the data left the HMA
 Checks line, the References class link and the tactic tables on the old values while CI
 stayed green. The Mitigation section, rendered from ``oasbControls`` with the OASB-1 control
-titles pinned in related-projects.json, the absent Severity line and the Evidence Gap line
-every adapted page carries are checked the same way.
+titles pinned in related-projects.json, the absent Severity line, the Evidence Gap line
+every adapted page carries and the Data Sources line of a technique that maps a data source
+are checked the same way.
 """
 
 import importlib.util
@@ -869,3 +870,81 @@ def test_gap_line_follows_a_tier_change_in_the_data(tree):
     assert run_checker(tree, "--fix").returncode == 0
     page = (tree / "techniques" / "T-1001.md").read_text(encoding="utf-8")
     assert "- **Evidence Tier:** adapted\n" + CHK.ADAPTED_GAP + "\n" in page
+
+
+# A vocabulary entry and two uses of it, as matrix.json carries them; the values are
+# illustrative, and the page check reads only the source id and name and the four mapping keys.
+EXAMPLE_SOURCE = {"id": "example-log", "name": "Example request log", "description": "Example",
+                  "readBy": [{"tool": "example-sensor", "repository": "example-org/example-sensor",
+                              "commit": "0" * 40, "path": "src/example.ts", "line": 1}]}
+EXAMPLE_MAPPINGS = [
+    {"source": "example-log", "tool": "example-sensor", "kind": "sensorField", "ref": "path"},
+    {"source": "example-log", "tool": "example-sensor", "kind": "check", "ref": "EX-001"},
+]
+EXAMPLE_LINE = ("- **Data Sources:** Example request log (example-sensor sensor field path, "
+                "example-sensor check EX-001)")
+T1001_CONTROLS = "- **OASB Controls:** 1.1, 1.2, 1.3, 1.4, 10.5"
+
+
+def map_data_sources(root: Path, mappings: list, vocabulary: list) -> None:
+    matrix_path = root / "matrix.json"
+    matrix = json.loads(matrix_path.read_text(encoding="utf-8"))
+    matrix["dataSources"] = vocabulary
+    next(t for t in matrix["techniques"] if t["id"] == "T-1001")["dataSources"] = mappings
+    matrix_path.write_text(json.dumps(matrix, indent=2), encoding="utf-8")
+
+
+def test_a_mapped_data_source_is_red_until_the_page_names_it_and_fix_writes_it(tree):
+    map_data_sources(tree, EXAMPLE_MAPPINGS, [EXAMPLE_SOURCE])
+
+    result = run_checker(tree)
+    assert result.returncode == 1, result.stdout
+    assert f"T-1001: page has no 'Data Sources' line; matrix.json says '{EXAMPLE_LINE}'" in result.stdout
+
+    assert run_checker(tree, "--fix").returncode == 0
+    page = (tree / "techniques" / "T-1001.md").read_text(encoding="utf-8")
+    assert T1001_CONTROLS + "\n" + EXAMPLE_LINE + "\n" in page
+    assert "example-log" not in page
+    result = run_checker(tree)
+    assert result.returncode == 0, result.stdout
+    assert "and 1 of 61 technique pages carry a Data Sources line" in result.stdout
+
+
+def test_a_data_sources_line_that_shows_the_source_id_is_red_and_fixed(tree):
+    map_data_sources(tree, EXAMPLE_MAPPINGS, [EXAMPLE_SOURCE])
+    page = tree / "techniques" / "T-1001.md"
+    by_id = EXAMPLE_LINE.replace("Example request log", "example-log")
+    mutate(page, T1001_CONTROLS + "\n", T1001_CONTROLS + "\n" + by_id + "\n")
+
+    result = run_checker(tree)
+    assert result.returncode == 1, result.stdout
+    assert f"T-1001: Data Sources line is '{by_id}', matrix.json says '{EXAMPLE_LINE}'" in result.stdout
+
+    assert run_checker(tree, "--fix").returncode == 0
+    text = page.read_text(encoding="utf-8")
+    assert EXAMPLE_LINE in text and by_id not in text
+
+
+def test_a_data_sources_line_on_a_technique_that_maps_none_is_red_and_dropped(tree):
+    page = tree / "techniques" / "T-1001.md"
+    before = page.read_text(encoding="utf-8")
+    mutate(page, T1001_CONTROLS + "\n", T1001_CONTROLS + "\n" + EXAMPLE_LINE + "\n")
+
+    result = run_checker(tree)
+    assert result.returncode == 1, result.stdout
+    assert "T-1001: page has a Data Sources line, and matrix.json maps no data source" in result.stdout
+
+    assert run_checker(tree, "--fix").returncode == 0
+    assert page.read_text(encoding="utf-8") == before
+
+
+def test_a_source_the_vocabulary_does_not_hold_is_red_and_left_alone(tree):
+    map_data_sources(tree, EXAMPLE_MAPPINGS, [])
+    page = tree / "techniques" / "T-1001.md"
+    before = page.read_text(encoding="utf-8")
+
+    result = run_checker(tree, "--fix")
+    assert result.returncode == 1, result.stdout
+    assert ("T-1001: matrix.json maps data source example-log, which the dataSources vocabulary "
+            "does not hold, so the page has no name to show") in result.stdout
+    assert page.read_text(encoding="utf-8") == before

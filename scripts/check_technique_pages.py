@@ -36,14 +36,24 @@ one ``- **Evidence Gap:**`` line, and no other page carries that line. The three
 pages showed only ``Evidence Tier: adapted`` while EVIDENCE_AUDIT.md said they stated the
 gap.
 
+A technique that maps a data source in its ``dataSources`` carries one
+``- **Data Sources:**`` line, directly under its OASB Controls line, and a technique that maps
+none carries no such line. The line shows each source by the ``name`` the top-level
+``dataSources`` vocabulary gives it, never by its id, followed in parentheses by the tool and
+the check, signature or sensor field that uses it for this technique, as in
+``- **Data Sources:** Example log (example-sensor sensor field path)``. A source the vocabulary
+does not hold has no name to show, so the check fails for that page and leaves its Data
+Sources line as it is.
+
 Run with ``--fix`` to rewrite those lines, the Mitigation section and the tactic pages from
-the data, to drop a Severity line or an Evidence Gap line the data does not back, and to add
-a missing Evidence Gap line directly under the Evidence Tier line. Every other line of a
+the data, to drop a Severity line, an Evidence Gap line or a Data Sources line the data does
+not back, to add a missing Evidence Gap line directly under the Evidence Tier line, and to
+add a missing Data Sources line directly under the OASB Controls line. Every other line of a
 technique page is left alone. Any other missing technique-page line, a repeated line or
 Mitigation section, and a missing Mitigation section have no single place to write the data
 to, a Mitigation section that holds a fenced code block may hold the rest of the page
-behind an unclosed fence, and a control with no title has no line to write, so ``--fix``
-reports each of them and still exits 1.
+behind an unclosed fence, and a control with no title or a source with no name has no line
+to write, so ``--fix`` reports each of them and still exits 1.
 
 A read of matrix.json that raises an OSError, a ValueError or a RecursionError (see
 ``read_json``) is reported in one line on standard error,
@@ -53,9 +63,11 @@ does not hold what this check needs from it (see ``SHAPE``), in the line
 ``FAIL: matrix.json parses but has the wrong shape: <reason>``: an object whose
 ``techniques`` array holds objects with a string ``id``, a ``name``, a ``tactic``, an
 ``attackClass`` and an ``evidenceTier``, a ``description`` that is absent, null or a string,
-and ``hmaChecks`` and ``oasbControls`` that are each absent, null or an array of strings, and
-whose ``tactics`` array holds objects with a string ``id``, a ``name``, an ``order`` and a
-string ``description``. related-projects.json is then read the same way, in the lines
+``hmaChecks`` and ``oasbControls`` that are each absent, null or an array of strings, and
+``dataSources`` that is absent, null or an array of objects with a string ``source``, ``tool``,
+``kind`` and ``ref``, whose ``tactics`` array holds objects with a string ``id``, a ``name``, an
+``order`` and a string ``description``, and whose ``dataSources`` array holds objects with a
+string ``id`` and ``name``. related-projects.json is then read the same way, in the lines
 ``FAIL: related-projects.json is missing or does not parse: <reason>`` and
 ``FAIL: related-projects.json parses but has the wrong shape: <reason>``: it must be an
 object whose ``oasb`` object holds a ``controlTitles`` object with a string for each
@@ -80,6 +92,9 @@ DVAA_LABEL = "DVAA Validation"
 ADAPTED_GAP = ("- **Evidence Gap:** Adapted from traditional environments. This technique has no "
                "agent-specific observation and no lab reproduction yet.")
 GAP_RE = re.compile(r"^(?P<line>- \*\*Evidence Gap:\*\*.*)$", re.M)
+DATA_SOURCES_RE = re.compile(r"^(?P<line>- \*\*Data Sources:\*\*.*)$", re.M)
+# How a Data Sources line words the kind of each use a technique's dataSources mapping names.
+USE_KINDS = {"check": "check", "signature": "signature", "sensorField": "sensor field"}
 SEVERITY_RE = re.compile(r"^(?P<line>\*\*Severity:\*\*.*)$", re.M)
 MITIGATION_RE = re.compile(r"^(?P<line>## Mitigation)$", re.M)
 SECTION_RE = re.compile(r"^(?P<line>## .*)$", re.M)
@@ -107,6 +122,7 @@ FIELD_PATTERNS = (
 )
 FIELDS = tuple((label, re.compile(pattern, re.M), render) for label, pattern, render in FIELD_PATTERNS)
 TIER_RE = next(regex for label, regex, _ in FIELDS if label == "Evidence Tier")
+CONTROLS_RE = next(regex for label, regex, _ in FIELDS if label == "OASB Controls")
 NO_PROCEDURES_RE = re.compile(rf"^(?P<line>{re.escape(NO_PROCEDURES)})$", re.M)
 # Block structure, matched in a line from where the markers and indentation of the block
 # quotes and list items that hold it end, after tabs are expanded to stops of four columns.
@@ -320,9 +336,11 @@ def find_lines(regex: re.Pattern, text: str) -> list[re.Match]:
     return [m for m in regex.finditer(text) if not fenced(m.start())]
 
 
-def check_technique_page(technique: dict, text: str, titles: dict) -> tuple[list[str], str]:
+def check_technique_page(technique: dict, text: str, titles: dict,
+                         names: dict) -> tuple[list[str], str]:
     """Return the page's disagreements with the data and the page with them rewritten.
-    ``titles`` holds the OASB-1 title of each control id."""
+    ``titles`` holds the OASB-1 title of each control id, ``names`` the vocabulary name of
+    each data source id."""
     tid = technique["id"]
     failures = []
     updated = text
@@ -358,6 +376,8 @@ def check_technique_page(technique: dict, text: str, titles: dict) -> tuple[list
 
     gap_failures, updated = check_evidence_gap(technique, updated)
     failures.extend(gap_failures)
+    source_failures, updated = check_data_sources(technique, updated, names)
+    failures.extend(source_failures)
     mitigation_failures, updated = check_mitigation(technique, updated, titles)
     failures.extend(mitigation_failures)
     return failures, updated
@@ -390,6 +410,55 @@ def check_evidence_gap(technique: dict, text: str) -> tuple[list[str], str]:
         text = text[:end] + "\n" + ADAPTED_GAP + text[end:]
     return [f"{tid}: adapted page does not state its evidence gap; matrix.json tier adapted "
             f"says '{ADAPTED_GAP}'"], text
+
+
+def render_data_sources(technique: dict, names: dict) -> str | None:
+    """The Data Sources line: each source the technique maps, in the order it first maps it,
+    by its vocabulary name in ``names``, with the uses the technique maps for it; None for a
+    technique that maps none."""
+    uses = {}
+    for mapping in technique.get("dataSources") or []:
+        kind = USE_KINDS.get(mapping["kind"], mapping["kind"])
+        uses.setdefault(mapping["source"], []).append(f"{mapping['tool']} {kind} {mapping['ref']}")
+    if not uses:
+        return None
+    return "- **Data Sources:** " + "; ".join(
+        f"{names[source]} ({', '.join(listed)})" for source, listed in uses.items())
+
+
+def check_data_sources(technique: dict, text: str, names: dict) -> tuple[list[str], str]:
+    """Return the Data Sources line's disagreement with the data and the page rewritten. A
+    technique that maps a data source carries the line once, and a missing one goes directly
+    under the OASB Controls line; a source ``names`` does not hold leaves the page alone."""
+    tid = technique["id"]
+    mapped = [mapping["source"] for mapping in technique.get("dataSources") or []]
+    unnamed = [source for source in dict.fromkeys(mapped) if source not in names]
+    if unnamed:
+        noun = "source" if len(unnamed) == 1 else "sources"
+        return [f"{tid}: matrix.json maps data {noun} {', '.join(unnamed)}, which the "
+                f"dataSources vocabulary does not hold, so the page has no name to show"], text
+    want = render_data_sources(technique, names)
+    found = find_lines(DATA_SOURCES_RE, text)
+    if want is None:
+        if not found:
+            return [], text
+        for match in reversed(found):
+            start, end = match.span("line")
+            text = text[:start] + text[end + 1:]
+        return [f"{tid}: page has a Data Sources line, and matrix.json maps no data source"], text
+    if len(found) > 1:
+        return [f"{tid}: page has {len(found)} 'Data Sources' lines"], text
+    if found:
+        have = found[0].group("line")
+        if have == want:
+            return [], text
+        return ([f"{tid}: Data Sources line is '{have}', matrix.json says '{want}'"],
+                _replace(text, found[0], want))
+    controls = find_lines(CONTROLS_RE, text)
+    if len(controls) == 1:
+        end = controls[0].end("line")
+        text = text[:end] + "\n" + want + text[end:]
+    return [f"{tid}: page has no 'Data Sources' line; matrix.json says '{want}'"], text
 
 
 def expected_mitigation(technique: dict, titles: dict) -> str:
@@ -494,13 +563,14 @@ def check_pages(matrix: dict, titles: dict, fix: bool) -> list[str]:
     """Return every page disagreement; with ``fix``, rewrite what the data can render.
     ``titles`` holds the OASB-1 title of each control id."""
     failures = []
+    names = {source["id"]: source["name"] for source in matrix["dataSources"]}
     for technique in matrix["techniques"]:
         page = ROOT / "techniques" / f"{technique['id']}.md"
         if not page.exists():
             failures.append(f"{technique['id']}: no page at techniques/{technique['id']}.md")
             continue
         text = page.read_text(encoding="utf-8")
-        page_failures, updated = check_technique_page(technique, text, titles)
+        page_failures, updated = check_technique_page(technique, text, titles, names)
         failures.extend(page_failures)
         if fix and updated != text:
             page.write_text(updated, encoding="utf-8")
@@ -549,10 +619,15 @@ def read_json(name: str):
 
 
 # What ``wrong_shape`` asks of a key it reads from an object: present, with any value;
-# present, as a string; absent, null or a string; absent, null or an array of strings. Each
-# but the first is worded as the reason line words it.
+# present, as a string; absent, null or a string; absent, null or an array of strings;
+# absent, null or an array of objects each holding a string at every key of MAPPING_KEYS.
+# Each but the first is worded as the reason line words it.
 ANY, STRING = "any value", "a string"
 STRING_OR_NULL, STRINGS_OR_NULL = "a string or null", "an array of strings or null"
+MAPPINGS_OR_NULL = "an array of objects or null"
+OPTIONAL = (STRING_OR_NULL, STRINGS_OR_NULL, MAPPINGS_OR_NULL)
+# The keys of a technique's dataSources mapping, each joined into the Data Sources line.
+MAPPING_KEYS = ("source", "tool", "kind", "ref")
 
 # What this check needs from matrix.json, in the order ``wrong_shape`` checks it: each array
 # and the keys of its objects, with what each must hold. An id is a string, as
@@ -562,8 +637,10 @@ STRING_OR_NULL, STRINGS_OR_NULL = "a string or null", "an array of strings or nu
 SHAPE = (
     ("techniques", (("id", STRING), ("name", ANY), ("tactic", ANY), ("attackClass", ANY),
                     ("description", STRING_OR_NULL), ("hmaChecks", STRINGS_OR_NULL),
-                    ("oasbControls", STRINGS_OR_NULL), ("evidenceTier", ANY))),
+                    ("oasbControls", STRINGS_OR_NULL), ("evidenceTier", ANY),
+                    ("dataSources", MAPPINGS_OR_NULL))),
     ("tactics", (("id", STRING), ("name", ANY), ("order", ANY), ("description", STRING))),
+    ("dataSources", (("id", STRING), ("name", STRING))),
 )
 
 
@@ -586,9 +663,20 @@ def wrong_value(item: dict, field: str, kind: str, where: str) -> str | None:
     """None when the object ``item`` holds ``field`` as ``kind`` asks, or the reason it does
     not; ``where`` names the object, as in "techniques[0]"."""
     if field not in item:
-        return None if kind in (STRING_OR_NULL, STRINGS_OR_NULL) else f"{where} has no {field}"
+        return None if kind in OPTIONAL else f"{where} has no {field}"
     value = item[field]
     if kind == ANY or (value is None and kind != STRING):
+        return None
+    if kind == MAPPINGS_OR_NULL:
+        if not isinstance(value, list):
+            return f"{where}.{field} is {json_type(value)}, not {kind}"
+        for n, entry in enumerate(value):
+            if not isinstance(entry, dict):
+                return f"{where}.{field}[{n}] is {json_type(entry)}, not an object"
+            for key in MAPPING_KEYS:
+                cause = wrong_value(entry, key, STRING, f"{where}.{field}[{n}]")
+                if cause is not None:
+                    return cause
         return None
     if kind == STRINGS_OR_NULL:
         if not isinstance(value, list):
@@ -680,10 +768,13 @@ def main(argv: list[str]) -> int:
             report("FAIL: could not rewrite", remaining)
             return 1
 
+    mapped = sum(1 for technique in matrix["techniques"] if technique.get("dataSources"))
     print(f"OK: {len(matrix['techniques'])} technique pages and {len(matrix['tactics'])} tactic "
           "pages agree with matrix.json on every data line and Mitigation section, every control "
           f"a Mitigation section lists carries its title from {RELATED}, every adapted page "
-          "states its evidence gap, and no technique page carries a Severity line")
+          "states its evidence gap, no technique page carries a Severity line, and "
+          f"{mapped} of {len(matrix['techniques'])} technique pages carry a Data Sources line, "
+          "naming each source by its vocabulary name")
     return 0
 
 
