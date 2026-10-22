@@ -134,6 +134,18 @@
           "source_name": "agent-threat-matrix",
           "external_id": "T-1001",
           "url": "https://threats.opena2a.org/techniques/T-1001"
+        },
+        {
+          "source_name": "mitre-attack",
+          "external_id": "T1595",
+          "url": "https://attack.mitre.org/techniques/T1595/",
+          "description": "broadMatch: ATT&CK 20.0 Active Scanning is broader; here it is the agent's own exposed HTTP surface (health, info and discovery routes)"
+        },
+        {
+          "source_name": "mitre-atlas",
+          "external_id": "AML.T0006.002",
+          "url": "https://atlas.mitre.org/techniques/AML.T0006.002",
+          "description": "closeMatch: ATLAS 2026.09 Scan for Exposed AI Infrastructure: locating reachable AI agent endpoints by their predictable paths"
         }
       ],
       "kill_chain_phases": [
@@ -158,6 +170,12 @@
           "source_name": "agent-threat-matrix",
           "external_id": "T-1002",
           "url": "https://threats.opena2a.org/techniques/T-1002"
+        },
+        {
+          "source_name": "mitre-atlas",
+          "external_id": "AML.T0084.001",
+          "url": "https://atlas.mitre.org/techniques/AML.T0084.001",
+          "description": "closeMatch: ATLAS 2026.09 Discover AI Agent Configuration: Tool Definitions: enumerating the tools the agent exposes"
         },
         {
           "source_name": "honeypot-telemetry",
@@ -189,6 +207,18 @@
           "url": "https://threats.opena2a.org/techniques/T-1003"
         },
         {
+          "source_name": "mitre-atlas",
+          "external_id": "AML.T0069.002",
+          "url": "https://atlas.mitre.org/techniques/AML.T0069.002",
+          "description": "closeMatch: ATLAS 2026.09 Discover LLM System Information: System Prompt: reading the agent's system instructions"
+        },
+        {
+          "source_name": "mitre-atlas",
+          "external_id": "AML.T0056",
+          "url": "https://atlas.mitre.org/techniques/AML.T0056",
+          "description": "relatedMatch: ATLAS 2026.09 Extract LLM System Prompt: the same object, read as exfiltration rather than reconnaissance"
+        },
+        {
           "source_name": "honeypot-telemetry",
           "url": "https://api.oa2a.org/api/v1/threat-matrix",
           "description": "honeypot-telemetry evidence dated 2026-10-19: The wildPrevalence and wildSampleCount this endpoint served for the technique on this date; they measure engagement with a honeypot, not a production attack rate."
@@ -216,6 +246,12 @@
           "source_name": "agent-threat-matrix",
           "external_id": "T-1004",
           "url": "https://threats.opena2a.org/techniques/T-1004"
+        },
+        {
+          "source_name": "mitre-atlas",
+          "external_id": "AML.T0069",
+          "url": "https://atlas.mitre.org/techniques/AML.T0069",
+          "description": "relatedMatch: ATLAS 2026.09 Discover LLM System Information: probing to learn the model's constraints and guardrail behaviour"
         }
       ],
       "kill_chain_phases": [
@@ -240,6 +276,12 @@
           "source_name": "agent-threat-matrix",
           "external_id": "T-1005",
           "url": "https://threats.opena2a.org/techniques/T-1005"
+        },
+        {
+          "source_name": "mitre-atlas",
+          "external_id": "AML.T0133",
+          "url": "https://atlas.mitre.org/techniques/AML.T0133",
+          "description": "closeMatch: ATLAS 2026.09 Discover AI Agent Runtime Capabilities: surfacing the agent's full tool, action and permission set"
         }
       ],
       "kill_chain_phases": [
@@ -314,6 +356,18 @@
           "url": "https://threats.opena2a.org/techniques/T-2001"
         },
         {
+          "source_name": "mitre-attack",
+          "external_id": "T1699",
+          "url": "https://attack.mitre.org/techniques/T1699/",
+          "description": "closeMatch: ATT&CK 20.0 Direct Prompt Injection: malicious prompts input directly to override instructions"
+        },
+        {
+          "source_name": "mitre-atlas",
+          "external_id": "AML.T0051.000",
+          "url": "https://atlas.mitre.org/techniques/AML.T0051.000",
+          "description": "closeMatch: ATLAS 2026.09 LLM Prompt Injection: Direct: prompts injected directly by a user of the model"
+        },
+        {
           "source_name": "honeypot-telemetry",
           "url": "https://api.oa2a.org/api/v1/threat-matrix",
           "description": "honeypot-telemetry evidence dated 2026-10-19: The wildPrevalence and wildSampleCount this endpoint served for the technique on this date; they measure engagement with a honeypot, not a production attack rate."
@@ -341,6 +395,18 @@
           "source_name": "agent-threat-matrix",
           "external_id": "T-2002",
           "url": "https://threats.opena2a.org/techniques/T-2002"
+        },
+        {
+          "source_name": "mitre-attack",
+          "external_id": "T1698",
+          "url": "https://attack.mitre.org/techniques/T1698/",
+          "description": "closeMatch: ATT&CK 20.0 Indirect Prompt Injection: prompts embedded in content the agent retrieves and processes"
+        },
+        {
+          "source_name": "mitre-atlas",
+          "external_id": "AML.T0051.001",
+          "url": "https://atlas.mitre.org/techniques/AML.T0051.001",
+          "description": "closeMatch: ATLAS 2026.09 LLM Prompt Injection: Indirect: instructions delivered through a separate data channel the agent ingests"
         },
         {
           "source_name": "honeypot-telemetry",
@@ -372,6 +438,18 @@
           "url": "https://threats.opena2a.org/techniques/T-2003"
         },
         {
+          "source_name": "mitre-attack",
+          "external_id": "T1699",
+          "url": "https://attack.mitre.org/techniques/T1699/",
+          "description": "relatedMatch: ATT&CK 20.0 Direct Prompt Injection folds role impersonation to bypass safeguards into direct injection"
+        },
+        {
+          "source_name": "mitre-atlas",
+          "external_id": "AML.T0054",
+          "url": "https://atlas.mitre.org/techniques/AML.T0054",
+          "description": "closeMatch: ATLAS 2026.09 LLM Jailbreak: role-play is a named method of overriding safety behaviour"
+        },
+        {
           "source_name": "honeypot-telemetry",
           "url": "https://api.oa2a.org/api/v1/threat-matrix",
           "description": "honeypot-telemetry evidence dated 2026-10-19: The wildPrevalence and wildSampleCount this endpoint served for the technique on this date; they measure engagement with a honeypot, not a production attack rate."
@@ -399,6 +477,12 @@
           "source_name": "agent-threat-matrix",
           "external_id": "T-2004",
           "url": "https://threats.opena2a.org/techniques/T-2004"
+        },
+        {
+          "source_name": "mitre-atlas",
+          "external_id": "AML.T0054",
+          "url": "https://atlas.mitre.org/techniques/AML.T0054",
+          "description": "relatedMatch: ATLAS 2026.09 LLM Jailbreak: context saturation reaches the same guardrail bypass by a different means"
         },
         {
           "source_name": "honeypot-telemetry",
@@ -430,6 +514,12 @@
           "url": "https://threats.opena2a.org/techniques/T-2005"
         },
         {
+          "source_name": "mitre-atlas",
+          "external_id": "AML.T0110.000",
+          "url": "https://atlas.mitre.org/techniques/AML.T0110.000",
+          "description": "closeMatch: ATLAS 2026.09 AI Agent Tool Poisoning: Definition and Instructions: instructions planted in a tool's model-visible definition"
+        },
+        {
           "source_name": "honeypot-telemetry",
           "url": "https://api.oa2a.org/api/v1/threat-matrix",
           "description": "honeypot-telemetry evidence dated 2026-10-19: The wildPrevalence and wildSampleCount this endpoint served for the technique on this date; they measure engagement with a honeypot, not a production attack rate."
@@ -457,6 +547,18 @@
           "source_name": "agent-threat-matrix",
           "external_id": "T-2006",
           "url": "https://threats.opena2a.org/techniques/T-2006"
+        },
+        {
+          "source_name": "mitre-attack",
+          "external_id": "T1027.018",
+          "url": "https://attack.mitre.org/techniques/T1027/018/",
+          "description": "closeMatch: ATT&CK 20.0 Invisible Unicode: non-rendering characters that its text cites as a carrier for AI prompt injection"
+        },
+        {
+          "source_name": "mitre-atlas",
+          "external_id": "AML.T0068",
+          "url": "https://atlas.mitre.org/techniques/AML.T0068",
+          "description": "closeMatch: ATLAS 2026.09 LLM Prompt Obfuscation: hiding injected instructions from humans and guardrails"
         },
         {
           "source_name": "honeypot-telemetry",
@@ -488,6 +590,12 @@
           "url": "https://threats.opena2a.org/techniques/T-2007"
         },
         {
+          "source_name": "mitre-atlas",
+          "external_id": "AML.T0054",
+          "url": "https://atlas.mitre.org/techniques/AML.T0054",
+          "description": "relatedMatch: ATLAS 2026.09 LLM Jailbreak: gradual multi-turn shifting is a method of overriding safety behaviour"
+        },
+        {
           "source_name": "honeypot-telemetry",
           "url": "https://api.oa2a.org/api/v1/threat-matrix",
           "description": "honeypot-telemetry evidence dated 2026-10-19: The wildPrevalence and wildSampleCount this endpoint served for the technique on this date; they measure engagement with a honeypot, not a production attack rate."
@@ -515,6 +623,18 @@
           "source_name": "agent-threat-matrix",
           "external_id": "T-2008",
           "url": "https://threats.opena2a.org/techniques/T-2008"
+        },
+        {
+          "source_name": "mitre-attack",
+          "external_id": "T1699",
+          "url": "https://attack.mitre.org/techniques/T1699/",
+          "description": "relatedMatch: ATT&CK 20.0 Direct Prompt Injection: overriding system-level instructions across the prompt boundary"
+        },
+        {
+          "source_name": "mitre-atlas",
+          "external_id": "AML.T0051.000",
+          "url": "https://atlas.mitre.org/techniques/AML.T0051.000",
+          "description": "relatedMatch: ATLAS 2026.09 LLM Prompt Injection: Direct: a direct injection that crosses the system and user prompt boundary"
         },
         {
           "source_name": "honeypot-telemetry",
@@ -546,6 +666,18 @@
           "url": "https://threats.opena2a.org/techniques/T-3001"
         },
         {
+          "source_name": "mitre-attack",
+          "external_id": "T1552",
+          "url": "https://attack.mitre.org/techniques/T1552/",
+          "description": "broadMatch: ATT&CK 20.0 Unsecured Credentials is broader; here the store is the agent's system prompt"
+        },
+        {
+          "source_name": "mitre-atlas",
+          "external_id": "AML.T0083",
+          "url": "https://atlas.mitre.org/techniques/AML.T0083",
+          "description": "closeMatch: ATLAS 2026.09 Credentials from AI Agent Configuration: the system prompt is part of the agent's configuration"
+        },
+        {
           "source_name": "honeypot-telemetry",
           "url": "https://api.oa2a.org/api/v1/threat-matrix",
           "description": "honeypot-telemetry evidence dated 2026-10-19: The wildPrevalence and wildSampleCount this endpoint served for the technique on this date; they measure engagement with a honeypot, not a production attack rate."
@@ -573,6 +705,18 @@
           "source_name": "agent-threat-matrix",
           "external_id": "T-3002",
           "url": "https://threats.opena2a.org/techniques/T-3002"
+        },
+        {
+          "source_name": "mitre-attack",
+          "external_id": "T1552",
+          "url": "https://attack.mitre.org/techniques/T1552/",
+          "description": "broadMatch: ATT&CK 20.0 Unsecured Credentials is broader; here the store is the agent process environment"
+        },
+        {
+          "source_name": "mitre-atlas",
+          "external_id": "AML.T0083",
+          "url": "https://atlas.mitre.org/techniques/AML.T0083",
+          "description": "closeMatch: ATLAS 2026.09 Credentials from AI Agent Configuration: keys and tokens the agent reads from its configuration"
         }
       ],
       "kill_chain_phases": [
@@ -597,6 +741,12 @@
           "source_name": "agent-threat-matrix",
           "external_id": "T-3003",
           "url": "https://threats.opena2a.org/techniques/T-3003"
+        },
+        {
+          "source_name": "mitre-atlas",
+          "external_id": "AML.T0098",
+          "url": "https://atlas.mitre.org/techniques/AML.T0098",
+          "description": "closeMatch: ATLAS 2026.09 AI Agent Tool Credential Harvesting: credentials captured from the responses of the agent's tools"
         }
       ],
       "kill_chain_phases": [
@@ -621,6 +771,18 @@
           "source_name": "agent-threat-matrix",
           "external_id": "T-3004",
           "url": "https://threats.opena2a.org/techniques/T-3004"
+        },
+        {
+          "source_name": "mitre-attack",
+          "external_id": "T1552",
+          "url": "https://attack.mitre.org/techniques/T1552/",
+          "description": "broadMatch: ATT&CK 20.0 Unsecured Credentials is broader; here the store is the agent's persistent memory"
+        },
+        {
+          "source_name": "mitre-atlas",
+          "external_id": "AML.T0055",
+          "url": "https://atlas.mitre.org/techniques/AML.T0055",
+          "description": "broadMatch: ATLAS 2026.09 Unsecured Credentials is broader; the agent memory store is the application-specific repository"
         }
       ],
       "kill_chain_phases": [
@@ -645,6 +807,18 @@
           "source_name": "agent-threat-matrix",
           "external_id": "T-3005",
           "url": "https://threats.opena2a.org/techniques/T-3005"
+        },
+        {
+          "source_name": "mitre-attack",
+          "external_id": "T1552.001",
+          "url": "https://attack.mitre.org/techniques/T1552/001/",
+          "description": "closeMatch: ATT&CK 20.0 Unsecured Credentials: Credentials In Files: configuration files that hold credentials"
+        },
+        {
+          "source_name": "mitre-atlas",
+          "external_id": "AML.T0083",
+          "url": "https://atlas.mitre.org/techniques/AML.T0083",
+          "description": "closeMatch: ATLAS 2026.09 Credentials from AI Agent Configuration: credentials read from agent configuration files"
         }
       ],
       "kill_chain_phases": [
@@ -669,6 +843,12 @@
           "source_name": "agent-threat-matrix",
           "external_id": "T-3006",
           "url": "https://threats.opena2a.org/techniques/T-3006"
+        },
+        {
+          "source_name": "mitre-atlas",
+          "external_id": "AML.T0057",
+          "url": "https://atlas.mitre.org/techniques/AML.T0057",
+          "description": "closeMatch: ATLAS 2026.09 LLM Data Leakage: inducing the model to leak sensitive information from its context"
         }
       ],
       "kill_chain_phases": [
@@ -693,6 +873,12 @@
           "source_name": "agent-threat-matrix",
           "external_id": "T-4001",
           "url": "https://threats.opena2a.org/techniques/T-4001"
+        },
+        {
+          "source_name": "mitre-atlas",
+          "external_id": "AML.T0053",
+          "url": "https://atlas.mitre.org/techniques/AML.T0053",
+          "description": "relatedMatch: ATLAS 2026.09 AI Agent Tool Invocation: driving the agent to act beyond its declared capability scope"
         },
         {
           "source_name": "honeypot-telemetry",
@@ -724,6 +910,12 @@
           "url": "https://threats.opena2a.org/techniques/T-4002"
         },
         {
+          "source_name": "mitre-atlas",
+          "external_id": "AML.T0051.000",
+          "url": "https://atlas.mitre.org/techniques/AML.T0051.000",
+          "description": "relatedMatch: ATLAS 2026.09 LLM Prompt Injection: Direct: impersonating a privileged role through injected prompts"
+        },
+        {
           "source_name": "honeypot-telemetry",
           "url": "https://api.oa2a.org/api/v1/threat-matrix",
           "description": "honeypot-telemetry evidence dated 2026-10-19: The wildPrevalence and wildSampleCount this endpoint served for the technique on this date; they measure engagement with a honeypot, not a production attack rate."
@@ -751,6 +943,12 @@
           "source_name": "agent-threat-matrix",
           "external_id": "T-4003",
           "url": "https://threats.opena2a.org/techniques/T-4003"
+        },
+        {
+          "source_name": "mitre-atlas",
+          "external_id": "AML.T0053",
+          "url": "https://atlas.mitre.org/techniques/AML.T0053",
+          "description": "relatedMatch: ATLAS 2026.09 AI Agent Tool Invocation: driving a tool call with attacker-chosen parameters"
         }
       ],
       "kill_chain_phases": [
@@ -804,6 +1002,18 @@
           "source_name": "agent-threat-matrix",
           "external_id": "T-4005",
           "url": "https://threats.opena2a.org/techniques/T-4005"
+        },
+        {
+          "source_name": "mitre-attack",
+          "external_id": "T1027.018",
+          "url": "https://attack.mitre.org/techniques/T1027/018/",
+          "description": "closeMatch: ATT&CK 20.0 Invisible Unicode: non-rendering characters used to slip content past filters"
+        },
+        {
+          "source_name": "mitre-atlas",
+          "external_id": "AML.T0068",
+          "url": "https://atlas.mitre.org/techniques/AML.T0068",
+          "description": "closeMatch: ATLAS 2026.09 LLM Prompt Obfuscation: obfuscation that evades a regex-based policy filter"
         }
       ],
       "kill_chain_phases": [
@@ -828,6 +1038,12 @@
           "source_name": "agent-threat-matrix",
           "external_id": "T-4006",
           "url": "https://threats.opena2a.org/techniques/T-4006"
+        },
+        {
+          "source_name": "mitre-atlas",
+          "external_id": "AML.T0054",
+          "url": "https://atlas.mitre.org/techniques/AML.T0054",
+          "description": "relatedMatch: ATLAS 2026.09 LLM Jailbreak: displacing safety instructions reaches the same guardrail removal"
         },
         {
           "source_name": "honeypot-telemetry",
@@ -857,6 +1073,12 @@
           "source_name": "agent-threat-matrix",
           "external_id": "T-5001",
           "url": "https://threats.opena2a.org/techniques/T-5001"
+        },
+        {
+          "source_name": "mitre-atlas",
+          "external_id": "AML.T0053",
+          "url": "https://atlas.mitre.org/techniques/AML.T0053",
+          "description": "relatedMatch: ATLAS 2026.09 AI Agent Tool Invocation: a tool issuing a server-side request the agent would not otherwise reach"
         }
       ],
       "kill_chain_phases": [
@@ -910,6 +1132,12 @@
           "source_name": "agent-threat-matrix",
           "external_id": "T-5003",
           "url": "https://threats.opena2a.org/techniques/T-5003"
+        },
+        {
+          "source_name": "mitre-atlas",
+          "external_id": "AML.T0053",
+          "url": "https://atlas.mitre.org/techniques/AML.T0053",
+          "description": "relatedMatch: ATLAS 2026.09 AI Agent Tool Invocation: using tool access to reach successive MCP servers"
         }
       ],
       "kill_chain_phases": [
@@ -934,6 +1162,18 @@
           "source_name": "agent-threat-matrix",
           "external_id": "T-5004",
           "url": "https://threats.opena2a.org/techniques/T-5004"
+        },
+        {
+          "source_name": "mitre-attack",
+          "external_id": "T1078",
+          "url": "https://attack.mitre.org/techniques/T1078/",
+          "description": "broadMatch: ATT&CK 20.0 Valid Accounts is broader; here the credentials were harvested from the agent and replayed"
+        },
+        {
+          "source_name": "mitre-atlas",
+          "external_id": "AML.T0012",
+          "url": "https://atlas.mitre.org/techniques/AML.T0012",
+          "description": "relatedMatch: ATLAS 2026.09 Valid Accounts: reusing obtained credentials to reach adjacent services"
         }
       ],
       "kill_chain_phases": [
@@ -958,6 +1198,18 @@
           "source_name": "agent-threat-matrix",
           "external_id": "T-5005",
           "url": "https://threats.opena2a.org/techniques/T-5005"
+        },
+        {
+          "source_name": "mitre-attack",
+          "external_id": "T1210",
+          "url": "https://attack.mitre.org/techniques/T1210/",
+          "description": "relatedMatch: ATT&CK 20.0 Exploitation of Remote Services: reaching database-level access from the agent's SQL tool"
+        },
+        {
+          "source_name": "mitre-atlas",
+          "external_id": "AML.T0053",
+          "url": "https://atlas.mitre.org/techniques/AML.T0053",
+          "description": "relatedMatch: ATLAS 2026.09 AI Agent Tool Invocation: a database tool turned into the access path to the data store"
         }
       ],
       "kill_chain_phases": [
@@ -982,6 +1234,18 @@
           "source_name": "agent-threat-matrix",
           "external_id": "T-5006",
           "url": "https://threats.opena2a.org/techniques/T-5006"
+        },
+        {
+          "source_name": "mitre-attack",
+          "external_id": "T1046",
+          "url": "https://attack.mitre.org/techniques/T1046/",
+          "description": "closeMatch: ATT&CK 20.0 Network Service Discovery: listing services reachable from the agent's network position"
+        },
+        {
+          "source_name": "mitre-atlas",
+          "external_id": "AML.T0075",
+          "url": "https://atlas.mitre.org/techniques/AML.T0075",
+          "description": "relatedMatch: ATLAS 2026.09 Enterprise Resource Discovery: discovering internal systems and services from the agent"
         }
       ],
       "kill_chain_phases": [
@@ -1006,6 +1270,12 @@
           "source_name": "agent-threat-matrix",
           "external_id": "T-6001",
           "url": "https://threats.opena2a.org/techniques/T-6001"
+        },
+        {
+          "source_name": "mitre-atlas",
+          "external_id": "AML.T0080.000",
+          "url": "https://atlas.mitre.org/techniques/AML.T0080.000",
+          "description": "closeMatch: ATLAS 2026.09 AI Agent Context Poisoning: Memory: planted entries that persist across chat sessions"
         },
         {
           "source_name": "honeypot-telemetry",
@@ -1035,6 +1305,18 @@
           "source_name": "agent-threat-matrix",
           "external_id": "T-6002",
           "url": "https://threats.opena2a.org/techniques/T-6002"
+        },
+        {
+          "source_name": "mitre-atlas",
+          "external_id": "AML.T0061",
+          "url": "https://atlas.mitre.org/techniques/AML.T0061",
+          "description": "closeMatch: ATLAS 2026.09 LLM Prompt Self-Replication: an instruction that causes the model to replicate it"
+        },
+        {
+          "source_name": "mitre-atlas",
+          "external_id": "AML.T0080.000",
+          "url": "https://atlas.mitre.org/techniques/AML.T0080.000",
+          "description": "relatedMatch: ATLAS 2026.09 AI Agent Context Poisoning: Memory: the replicating entry lives in agent memory"
         }
       ],
       "kill_chain_phases": [
@@ -1059,6 +1341,12 @@
           "source_name": "agent-threat-matrix",
           "external_id": "T-6003",
           "url": "https://threats.opena2a.org/techniques/T-6003"
+        },
+        {
+          "source_name": "mitre-atlas",
+          "external_id": "AML.T0081",
+          "url": "https://atlas.mitre.org/techniques/AML.T0081",
+          "description": "closeMatch: ATLAS 2026.09 Modify AI Agent Configuration: configuration changes that persist beyond a single agent"
         }
       ],
       "kill_chain_phases": [
@@ -1083,6 +1371,18 @@
           "source_name": "agent-threat-matrix",
           "external_id": "T-6004",
           "url": "https://threats.opena2a.org/techniques/T-6004"
+        },
+        {
+          "source_name": "mitre-attack",
+          "external_id": "T1176",
+          "url": "https://attack.mitre.org/techniques/T1176/",
+          "description": "relatedMatch: ATT&CK 20.0 Software Extensions: a skill or plugin is the agent's analogue of a persistent extension"
+        },
+        {
+          "source_name": "mitre-atlas",
+          "external_id": "AML.T0110",
+          "url": "https://atlas.mitre.org/techniques/AML.T0110",
+          "description": "closeMatch: ATLAS 2026.09 AI Agent Tool Poisoning: a backdoored tool or skill package, which ATLAS names among agent tools"
         },
         {
           "source_name": "honeypot-telemetry",
@@ -1112,6 +1412,12 @@
           "source_name": "agent-threat-matrix",
           "external_id": "T-6005",
           "url": "https://threats.opena2a.org/techniques/T-6005"
+        },
+        {
+          "source_name": "mitre-attack",
+          "external_id": "T1053",
+          "url": "https://attack.mitre.org/techniques/T1053/",
+          "description": "broadMatch: ATT&CK 20.0 Scheduled Task/Job is broader; here the schedule is the agent's heartbeat or periodic callback"
         }
       ],
       "kill_chain_phases": [
@@ -1136,6 +1442,12 @@
           "source_name": "agent-threat-matrix",
           "external_id": "T-6006",
           "url": "https://threats.opena2a.org/techniques/T-6006"
+        },
+        {
+          "source_name": "mitre-atlas",
+          "external_id": "AML.T0110",
+          "url": "https://atlas.mitre.org/techniques/AML.T0110",
+          "description": "relatedMatch: ATLAS 2026.09 AI Agent Tool Poisoning: registering a persistent malicious tool in the agent's catalog"
         }
       ],
       "kill_chain_phases": [
@@ -1160,6 +1472,18 @@
           "source_name": "agent-threat-matrix",
           "external_id": "T-7001",
           "url": "https://threats.opena2a.org/techniques/T-7001"
+        },
+        {
+          "source_name": "mitre-attack",
+          "external_id": "T1083",
+          "url": "https://attack.mitre.org/techniques/T1083/",
+          "description": "closeMatch: ATT&CK 20.0 File and Directory Discovery: enumerating files on the agent's accessible file system"
+        },
+        {
+          "source_name": "mitre-atlas",
+          "external_id": "AML.T0037",
+          "url": "https://atlas.mitre.org/techniques/AML.T0037",
+          "description": "closeMatch: ATLAS 2026.09 Data from Local System: searching local file systems for files of interest"
         }
       ],
       "kill_chain_phases": [
@@ -1184,6 +1508,18 @@
           "source_name": "agent-threat-matrix",
           "external_id": "T-7002",
           "url": "https://threats.opena2a.org/techniques/T-7002"
+        },
+        {
+          "source_name": "mitre-attack",
+          "external_id": "T1213.006",
+          "url": "https://attack.mitre.org/techniques/T1213/006/",
+          "description": "closeMatch: ATT&CK 20.0 Data from Information Repositories: Databases: collecting from databases the agent can reach"
+        },
+        {
+          "source_name": "mitre-atlas",
+          "external_id": "AML.T0085",
+          "url": "https://atlas.mitre.org/techniques/AML.T0085",
+          "description": "relatedMatch: ATLAS 2026.09 Data from AI Services: collecting from data sources the agent reaches through its tools"
         }
       ],
       "kill_chain_phases": [
@@ -1208,6 +1544,18 @@
           "source_name": "agent-threat-matrix",
           "external_id": "T-7003",
           "url": "https://threats.opena2a.org/techniques/T-7003"
+        },
+        {
+          "source_name": "mitre-attack",
+          "external_id": "T1119",
+          "url": "https://attack.mitre.org/techniques/T1119/",
+          "description": "relatedMatch: ATT&CK 20.0 Automated Collection: harvesting data through the agent's authenticated tool access"
+        },
+        {
+          "source_name": "mitre-atlas",
+          "external_id": "AML.T0085.001",
+          "url": "https://atlas.mitre.org/techniques/AML.T0085.001",
+          "description": "closeMatch: ATLAS 2026.09 Data from AI Services: AI Agent Tools: prompting the agent to retrieve data through its tools"
         }
       ],
       "kill_chain_phases": [
@@ -1232,6 +1580,12 @@
           "source_name": "agent-threat-matrix",
           "external_id": "T-7004",
           "url": "https://threats.opena2a.org/techniques/T-7004"
+        },
+        {
+          "source_name": "mitre-atlas",
+          "external_id": "AML.T0085",
+          "url": "https://atlas.mitre.org/techniques/AML.T0085",
+          "description": "relatedMatch: ATLAS 2026.09 Data from AI Services: dumping the agent's memory store as an accessible data source"
         },
         {
           "source_name": "honeypot-telemetry",
@@ -1261,6 +1615,18 @@
           "source_name": "agent-threat-matrix",
           "external_id": "T-7005",
           "url": "https://threats.opena2a.org/techniques/T-7005"
+        },
+        {
+          "source_name": "mitre-attack",
+          "external_id": "T1552.001",
+          "url": "https://attack.mitre.org/techniques/T1552/001/",
+          "description": "relatedMatch: ATT&CK 20.0 Unsecured Credentials: Credentials In Files: configuration files harvested for the secrets they hold"
+        },
+        {
+          "source_name": "mitre-atlas",
+          "external_id": "AML.T0037",
+          "url": "https://atlas.mitre.org/techniques/AML.T0037",
+          "description": "closeMatch: ATLAS 2026.09 Data from Local System: collecting configuration files from the local system"
         }
       ],
       "kill_chain_phases": [
@@ -1285,6 +1651,18 @@
           "source_name": "agent-threat-matrix",
           "external_id": "T-7006",
           "url": "https://threats.opena2a.org/techniques/T-7006"
+        },
+        {
+          "source_name": "mitre-atlas",
+          "external_id": "AML.T0085.000",
+          "url": "https://atlas.mitre.org/techniques/AML.T0085.000",
+          "description": "closeMatch: ATLAS 2026.09 Data from AI Services: RAG Databases: extracting records from the RAG store"
+        },
+        {
+          "source_name": "mitre-atlas",
+          "external_id": "AML.T0057",
+          "url": "https://atlas.mitre.org/techniques/AML.T0057",
+          "description": "relatedMatch: ATLAS 2026.09 LLM Data Leakage: inducing the model to disclose private data"
         }
       ],
       "kill_chain_phases": [
@@ -1309,6 +1687,18 @@
           "source_name": "agent-threat-matrix",
           "external_id": "T-8001",
           "url": "https://threats.opena2a.org/techniques/T-8001"
+        },
+        {
+          "source_name": "mitre-attack",
+          "external_id": "T1700",
+          "url": "https://attack.mitre.org/techniques/T1700/",
+          "description": "closeMatch: ATT&CK 20.0 AI-Enabled Exfiltration: abusing a sanctioned agent tool, here the email tool, to exfiltrate"
+        },
+        {
+          "source_name": "mitre-atlas",
+          "external_id": "AML.T0086",
+          "url": "https://atlas.mitre.org/techniques/AML.T0086",
+          "description": "closeMatch: ATLAS 2026.09 Exfiltration via AI Agent Tool Invocation: sending data out through the agent's email tool"
         }
       ],
       "kill_chain_phases": [
@@ -1333,6 +1723,18 @@
           "source_name": "agent-threat-matrix",
           "external_id": "T-8002",
           "url": "https://threats.opena2a.org/techniques/T-8002"
+        },
+        {
+          "source_name": "mitre-attack",
+          "external_id": "T1700",
+          "url": "https://attack.mitre.org/techniques/T1700/",
+          "description": "closeMatch: ATT&CK 20.0 AI-Enabled Exfiltration: abusing the agent's fetch tool to send data to an attacker endpoint"
+        },
+        {
+          "source_name": "mitre-atlas",
+          "external_id": "AML.T0086",
+          "url": "https://atlas.mitre.org/techniques/AML.T0086",
+          "description": "closeMatch: ATLAS 2026.09 Exfiltration via AI Agent Tool Invocation: an outbound request through the agent's fetch tool"
         },
         {
           "source_name": "honeypot-telemetry",
@@ -1362,6 +1764,18 @@
           "source_name": "agent-threat-matrix",
           "external_id": "T-8003",
           "url": "https://threats.opena2a.org/techniques/T-8003"
+        },
+        {
+          "source_name": "mitre-attack",
+          "external_id": "T1048",
+          "url": "https://attack.mitre.org/techniques/T1048/",
+          "description": "closeMatch: ATT&CK 20.0 Exfiltration Over Alternative Protocol, which names DNS among its protocols"
+        },
+        {
+          "source_name": "mitre-atlas",
+          "external_id": "AML.T0025",
+          "url": "https://atlas.mitre.org/techniques/AML.T0025",
+          "description": "relatedMatch: ATLAS 2026.09 Exfiltration via Cyber Means: exfiltration by a traditional network channel"
         }
       ],
       "kill_chain_phases": [
@@ -1386,6 +1800,18 @@
           "source_name": "agent-threat-matrix",
           "external_id": "T-8004",
           "url": "https://threats.opena2a.org/techniques/T-8004"
+        },
+        {
+          "source_name": "mitre-attack",
+          "external_id": "T1700",
+          "url": "https://attack.mitre.org/techniques/T1700/",
+          "description": "closeMatch: ATT&CK 20.0 AI-Enabled Exfiltration: chaining the agent's sanctioned tools to move data out"
+        },
+        {
+          "source_name": "mitre-atlas",
+          "external_id": "AML.T0086",
+          "url": "https://atlas.mitre.org/techniques/AML.T0086",
+          "description": "closeMatch: ATLAS 2026.09 Exfiltration via AI Agent Tool Invocation: a chain of tool calls that stages and sends data"
         },
         {
           "source_name": "honeypot-telemetry",
@@ -1415,6 +1841,12 @@
           "source_name": "agent-threat-matrix",
           "external_id": "T-8005",
           "url": "https://threats.opena2a.org/techniques/T-8005"
+        },
+        {
+          "source_name": "mitre-atlas",
+          "external_id": "AML.T0057",
+          "url": "https://atlas.mitre.org/techniques/AML.T0057",
+          "description": "closeMatch: ATLAS 2026.09 LLM Data Leakage: data carried out in the model's own responses"
         }
       ],
       "kill_chain_phases": [
@@ -1439,6 +1871,18 @@
           "source_name": "agent-threat-matrix",
           "external_id": "T-8006",
           "url": "https://threats.opena2a.org/techniques/T-8006"
+        },
+        {
+          "source_name": "mitre-attack",
+          "external_id": "T1567.004",
+          "url": "https://attack.mitre.org/techniques/T1567/004/",
+          "description": "closeMatch: ATT&CK 20.0 Exfiltration Over Web Service: Exfiltration Over Webhook, which names Slack and Discord"
+        },
+        {
+          "source_name": "mitre-atlas",
+          "external_id": "AML.T0086",
+          "url": "https://atlas.mitre.org/techniques/AML.T0086",
+          "description": "closeMatch: ATLAS 2026.09 Exfiltration via AI Agent Tool Invocation: pre-allowed messaging APIs used as the write tool"
         }
       ],
       "kill_chain_phases": [
@@ -1463,6 +1907,18 @@
           "source_name": "agent-threat-matrix",
           "external_id": "T-9001",
           "url": "https://threats.opena2a.org/techniques/T-9001"
+        },
+        {
+          "source_name": "mitre-attack",
+          "external_id": "T1565",
+          "url": "https://attack.mitre.org/techniques/T1565/",
+          "description": "closeMatch: ATT&CK 20.0 Data Manipulation: inserting, deleting or altering data to affect outcomes"
+        },
+        {
+          "source_name": "mitre-atlas",
+          "external_id": "AML.T0101",
+          "url": "https://atlas.mitre.org/techniques/AML.T0101",
+          "description": "relatedMatch: ATLAS 2026.09 Data Destruction via AI Agent Tool Invocation: the destructive case of manipulating data through a tool"
         }
       ],
       "kill_chain_phases": [
@@ -1487,6 +1943,18 @@
           "source_name": "agent-threat-matrix",
           "external_id": "T-9002",
           "url": "https://threats.opena2a.org/techniques/T-9002"
+        },
+        {
+          "source_name": "mitre-attack",
+          "external_id": "T1499",
+          "url": "https://attack.mitre.org/techniques/T1499/",
+          "description": "closeMatch: ATT&CK 20.0 Endpoint Denial of Service: exhausting the resources the service runs on"
+        },
+        {
+          "source_name": "mitre-atlas",
+          "external_id": "AML.T0029",
+          "url": "https://atlas.mitre.org/techniques/AML.T0029",
+          "description": "closeMatch: ATLAS 2026.09 Denial of AI Service: degrading or shutting down the AI service by overload"
         },
         {
           "source_name": "honeypot-telemetry",
@@ -1516,6 +1984,18 @@
           "source_name": "agent-threat-matrix",
           "external_id": "T-9003",
           "url": "https://threats.opena2a.org/techniques/T-9003"
+        },
+        {
+          "source_name": "mitre-attack",
+          "external_id": "T1059",
+          "url": "https://attack.mitre.org/techniques/T1059/",
+          "description": "relatedMatch: ATT&CK 20.0 Command and Scripting Interpreter: deploying code through the agent's execution capability"
+        },
+        {
+          "source_name": "mitre-atlas",
+          "external_id": "AML.T0112",
+          "url": "https://atlas.mitre.org/techniques/AML.T0112",
+          "description": "relatedMatch: ATLAS 2026.09 Machine Compromise: executing arbitrary code by abusing AI-enabled components"
         }
       ],
       "kill_chain_phases": [
@@ -1569,6 +2049,12 @@
           "source_name": "agent-threat-matrix",
           "external_id": "T-9005",
           "url": "https://threats.opena2a.org/techniques/T-9005"
+        },
+        {
+          "source_name": "mitre-atlas",
+          "external_id": "AML.T0048.001",
+          "url": "https://atlas.mitre.org/techniques/AML.T0048.001",
+          "description": "closeMatch: ATLAS 2026.09 External Harms: Reputational Harm: degrading public trust in the operator"
         }
       ],
       "kill_chain_phases": [
@@ -1593,6 +2079,18 @@
           "source_name": "agent-threat-matrix",
           "external_id": "T-9006",
           "url": "https://threats.opena2a.org/techniques/T-9006"
+        },
+        {
+          "source_name": "mitre-attack",
+          "external_id": "T1195.001",
+          "url": "https://attack.mitre.org/techniques/T1195/001/",
+          "description": "closeMatch: ATT&CK 20.0 Supply Chain Compromise: Compromise Software Dependencies and Development Tools: poisoned upstream packages"
+        },
+        {
+          "source_name": "mitre-atlas",
+          "external_id": "AML.T0010.005",
+          "url": "https://atlas.mitre.org/techniques/AML.T0010.005",
+          "description": "closeMatch: ATLAS 2026.09 AI Supply Chain Compromise: AI Agent Tool: a compromised MCP server or tool reaching downstream agents"
         },
         {
           "source_name": "honeypot-telemetry",
@@ -1648,6 +2146,18 @@
           "url": "https://threats.opena2a.org/techniques/T-4007"
         },
         {
+          "source_name": "mitre-attack",
+          "external_id": "T1036.005",
+          "url": "https://attack.mitre.org/techniques/T1036/005/",
+          "description": "relatedMatch: ATT&CK 20.0 Masquerading: Match Legitimate Resource Name or Location: squatting on a legitimate tool's name"
+        },
+        {
+          "source_name": "mitre-atlas",
+          "external_id": "AML.T0110",
+          "url": "https://atlas.mitre.org/techniques/AML.T0110",
+          "description": "relatedMatch: ATLAS 2026.09 AI Agent Tool Poisoning: a planted tool that impersonates or shadows a legitimate one"
+        },
+        {
           "source_name": "honeypot-telemetry",
           "url": "https://api.oa2a.org/api/v1/threat-matrix",
           "description": "honeypot-telemetry evidence dated 2026-10-19: The wildPrevalence and wildSampleCount this endpoint served for the technique on this date; they measure engagement with a honeypot, not a production attack rate."
@@ -1675,6 +2185,18 @@
           "source_name": "agent-threat-matrix",
           "external_id": "T-6007",
           "url": "https://threats.opena2a.org/techniques/T-6007"
+        },
+        {
+          "source_name": "mitre-atlas",
+          "external_id": "AML.T0080",
+          "url": "https://atlas.mitre.org/techniques/AML.T0080",
+          "description": "closeMatch: ATLAS 2026.09 AI Agent Context Poisoning: persisting across sessions by changing the agent's context"
+        },
+        {
+          "source_name": "mitre-atlas",
+          "external_id": "AML.T0121",
+          "url": "https://atlas.mitre.org/techniques/AML.T0121",
+          "description": "relatedMatch: ATLAS 2026.09 AI Agent Environment Reconstruction: recovering state to continue after a reset"
         },
         {
           "source_name": "honeypot-telemetry",

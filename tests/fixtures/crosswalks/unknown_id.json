@@ -1,0 +1,31 @@
+{
+  "techniques": [
+    {
+      "id": "T-0001",
+      "atlasMapping": [
+        {
+          "id": "AML.T0051.000",
+          "relationship": "closeMatch",
+          "note": "ATLAS 2026.09 LLM Prompt Injection: Direct"
+        }
+      ]
+    },
+    {
+      "id": "T-0002",
+      "attackMapping": [
+        {
+          "id": "T9999",
+          "relationship": "closeMatch",
+          "note": "ATT&CK 20.0 not a real technique"
+        }
+      ],
+      "atlasMapping": [
+        {
+          "id": "AML.T9999",
+          "relationship": "closeMatch",
+          "note": "ATLAS 2026.09 not a real technique"
+        }
+      ]
+    }
+  ]
+}
