@@ -25,7 +25,7 @@
       "pattern": "^[0-9a-f]{40}$"
     },
     "dvaa": {
-      "description": "The DVAA scenario pages that name a technique, read from a git clone of the repository at one commit.",
+      "description": "The DVAA pages that lab-reproduction entries cite, read from a git clone of the repository at one commit: the scenario pages that name a technique, and the challenges and scenario pages a technique's dvaaValidation names.",
       "type": "object",
       "required": ["repository", "head", "read", "pages"],
       "additionalProperties": false,
@@ -48,6 +48,94 @@
             "$ref": "#/$defs/page"
           },
           "x-semantic": "no path twice"
+        },
+        "challenges": {
+          "$ref": "#/$defs/challengeFile",
+          "description": "Absent when no technique's dvaaValidation names a challenge the file defines at head."
+        },
+        "scenarios": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/scenarioPage"
+          },
+          "description": "Absent when no technique's dvaaValidation names a scenario whose page head holds.",
+          "x-semantic": "at least one entry; no path twice; each the page of a scenario a technique's dvaaValidation names"
+        }
+      }
+    },
+    "challengeFile": {
+      "description": "DVAA's challenge definitions, pinned as a page is, with each challenge a technique's dvaaValidation names. The permalink of a challenge, <repository>/blob/<commit>/<path>#L<line>, is the reference of the lab-reproduction entries it backs.",
+      "type": "object",
+      "required": ["path", "commit", "committed", "blob", "named"],
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "const": "src/challenges/index.js"
+        },
+        "commit": {
+          "$ref": "#/$defs/objectId",
+          "description": "The last commit at or before head that changed the file."
+        },
+        "committed": {
+          "$ref": "#/$defs/date",
+          "description": "The date of that commit as its committer recorded it, and the date of the entries the challenges back.",
+          "x-semantic": "no later than read"
+        },
+        "blob": {
+          "$ref": "#/$defs/objectId",
+          "description": "The git blob id of the file at that commit."
+        },
+        "named": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/challenge"
+          },
+          "x-semantic": "at least one entry; no id twice; each id named by a technique's dvaaValidation"
+        }
+      }
+    },
+    "challenge": {
+      "description": "One challenge of the file's CHALLENGES object, as the file defines it: the line of its key, its id and its name.",
+      "type": "object",
+      "required": ["line", "id", "name"],
+      "additionalProperties": false,
+      "properties": {
+        "line": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^[^'\\\\\\s]+$"
+        },
+        "name": {
+          "type": "string",
+          "pattern": "^[^'\\\\\\r\\n]+$"
+        }
+      }
+    },
+    "scenarioPage": {
+      "description": "The page of a scenario a technique's dvaaValidation names, pinned as a page is. Its permalink, <repository>/blob/<commit>/<path>, is the reference of the lab-reproduction entries it backs.",
+      "type": "object",
+      "required": ["path", "commit", "committed", "blob"],
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "type": "string",
+          "pattern": "^scenarios/[A-Za-z0-9_-]+/README\\.md$"
+        },
+        "commit": {
+          "$ref": "#/$defs/objectId",
+          "description": "The last commit at or before head that changed the page."
+        },
+        "committed": {
+          "$ref": "#/$defs/date",
+          "description": "The date of that commit as its committer recorded it, and the date of the entries the page backs.",
+          "x-semantic": "no later than read"
+        },
+        "blob": {
+          "$ref": "#/$defs/objectId",
+          "description": "The git blob id of the page at that commit."
         }
       }
     },

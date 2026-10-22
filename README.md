@@ -66,6 +66,7 @@ When referencing the framework:
 - [Attack paths](docs/attack-paths.md): complete kill chain traversals demonstrated in DVAA
 - [Evidence tiers](docs/evidence-tiers.md) and [EVIDENCE_AUDIT.md](EVIDENCE_AUDIT.md): the tier definitions, the evidence standard with each tier's technique count, and every technique's tier justification
 - [Schema](docs/schema.md): what `python3 scripts/validate_matrix.py` checks in `matrix.json`, `technique-ids.json` and the STIX bundle
+- [Data sources](docs/data-sources.md): the data a defender collects to see each technique, the code that reads each source, and the techniques that map none
 - [Use cases](docs/use-cases.md): the situations the matrix answers, the commands for each, and the catalogs that already cover networks and AI systems
 - [CONTRIBUTING.md](CONTRIBUTING.md) and [CHANGELOG.md](CHANGELOG.md): the repository structure, proposing techniques and attack classes, and changes to the matrix and its checks
 - Related projects: [HackMyAgent](https://github.com/opena2a-org/hackmyagent) (automated detection), [DVAA](https://github.com/opena2a-org/damn-vulnerable-ai-agent) (lab validation), [OASB](https://oasb.ai) (defensive controls) and [AI Agent Kill Chain](https://github.com/opena2a-org/ai-agent-kill-chain) (the kill chain stages)

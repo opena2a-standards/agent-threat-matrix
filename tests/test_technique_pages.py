@@ -1,18 +1,20 @@
 """Technique and tactic page checker tests.
 
 Every case runs scripts/check_technique_pages.py against a scratch copy of matrix.json,
-techniques/ and tactics/ so the committed files are never perturbed. The shipped tree must
-be green. Each data line a technique page shares with matrix.json, and each row of a tactic
-page's technique table, is then changed in one place: the checker must go red naming the
-page and the line, and ``--fix`` must restore the shipped text. The checker used to compare
-only the Attack Class and OASB Controls lines, so a class move in the data left the HMA
-Checks line, the References class link and the tactic tables on the old values while CI
-stayed green. The Mitigation section, rendered from ``oasbControls`` with the OASB-1 control
+techniques/, tactics/ and docs/data-sources.md so the committed files are never perturbed.
+The shipped tree must be green. Each data line a technique page shares with matrix.json, and
+each row of a tactic page's technique table, is then changed in one place: the checker must
+go red naming the page and the line, and ``--fix`` must restore the shipped text. The checker
+used to compare only the Attack Class and OASB Controls lines, so a class move in the data left
+the HMA Checks line, the References class link and the tactic tables on the old values while
+CI stayed green. The Mitigation section, rendered from ``oasbControls`` with the OASB-1 control
 titles pinned in related-projects.json, the absent Severity line, the Evidence Gap line
 every adapted page carries and the Data Sources line of a technique that maps a data source
 are checked the same way. So are the Evidence lines of the References section, one per
 ``evidence`` entry directly under the Tactic link: the entries reached the STIX bundle while
-every References section linked only the technique's attack class and tactic pages.
+every References section linked only the technique's attack class and tactic pages. So is
+docs/data-sources.md, rendered in full from the data source vocabulary and the techniques
+that map none.
 """
 
 import importlib.util
@@ -48,6 +50,8 @@ def scratch_tree() -> Path:
     shutil.copy(ROOT / "related-projects.json", td / "related-projects.json")
     shutil.copytree(ROOT / "techniques", td / "techniques")
     shutil.copytree(ROOT / "tactics", td / "tactics")
+    (td / "docs").mkdir()
+    shutil.copy(ROOT / CHK.DATA_SOURCES_PAGE, td / CHK.DATA_SOURCES_PAGE)
     return td
 
 
@@ -875,7 +879,9 @@ def test_gap_line_follows_a_tier_change_in_the_data(tree):
 
 
 # A vocabulary entry and two uses of it, as matrix.json carries them; the values are
-# illustrative, and the page check reads only the source id and name and the four mapping keys.
+# illustrative, and the page check reads the entry's id, name, description and readBy and the
+# four mapping keys. map_data_sources puts the uses on T-1001 in place of its own. A case that
+# needs a technique mapping none uses T-2009, which the shipped matrix.json leaves unmapped.
 EXAMPLE_SOURCE = {"id": "example-log", "name": "Example request log", "description": "Example",
                   "readBy": [{"tool": "example-sensor", "repository": "example-org/example-sensor",
                               "commit": "0" * 40, "path": "src/example.ts", "line": 1}]}
@@ -885,15 +891,123 @@ EXAMPLE_MAPPINGS = [
 ]
 EXAMPLE_LINE = ("- **Data Sources:** Example request log (example-sensor sensor field path, "
                 "example-sensor check EX-001)")
+EXAMPLE_ROW = ("| Example request log | `example-log` | Example | [example-sensor src/example.ts:1]"
+               "(https://github.com/example-org/example-sensor/blob/" + "0" * 40
+               + "/src/example.ts#L1) |")
 T1001_CONTROLS = "- **OASB Controls:** 1.1, 1.2, 1.3, 1.4, 10.5"
+UNMAPPED = "T-2009"
+UNMAPPED_CONTROLS = "- **OASB Controls:** 3.1, 3.2, 8.1"
+UNMAPPED_ROW = "| [T-2009](../techniques/T-2009.md) | Parser Differential Exploitation |"
+SHIPPED = json.loads((ROOT / "matrix.json").read_text(encoding="utf-8"))
+SHIPPED_MAPPED = sum(1 for t in SHIPPED["techniques"] if t.get("dataSources"))
 
 
-def map_data_sources(root: Path, mappings: list, vocabulary: list) -> None:
+def unmapped_in(root: Path) -> dict:
+    """T-2009 as matrix.json under root carries it, asserted to map no data source."""
+    matrix = json.loads((root / "matrix.json").read_text(encoding="utf-8"))
+    technique = next(t for t in matrix["techniques"] if t["id"] == UNMAPPED)
+    assert not technique.get("dataSources"), f"{UNMAPPED} maps a data source; pick an unmapped technique"
+    return technique
+
+
+def map_data_sources(root: Path, mappings: list, vocabulary: list, tid: str = "T-1001") -> None:
+    """Add ``vocabulary`` to the shipped vocabulary and give ``tid`` ``mappings`` in place of
+    its own. Its page drops the Data Sources line its own mappings render, so the page carries
+    none, as the page of a technique that maps none does."""
     matrix_path = root / "matrix.json"
     matrix = json.loads(matrix_path.read_text(encoding="utf-8"))
-    matrix["dataSources"] = vocabulary
-    next(t for t in matrix["techniques"] if t["id"] == "T-1001")["dataSources"] = mappings
+    technique = next(t for t in matrix["techniques"] if t["id"] == tid)
+    names = {source["id"]: source["name"] for source in matrix["dataSources"]}
+    shipped_line = CHK.render_data_sources(technique, names)
+    if shipped_line is not None:
+        mutate(root / "techniques" / f"{tid}.md", shipped_line + "\n", "")
+    matrix["dataSources"] += vocabulary
+    technique["dataSources"] = mappings
     matrix_path.write_text(json.dumps(matrix, indent=2), encoding="utf-8")
+
+
+def test_the_shipped_vocabulary_is_cited_and_shown_by_name_on_every_mapped_page():
+    assert SHIPPED["dataSources"], "the data source vocabulary is empty"
+    names = {source["id"]: source["name"] for source in SHIPPED["dataSources"]}
+    for source in SHIPPED["dataSources"]:
+        assert source["readBy"], f"{source['id']} cites no reading code"
+    for technique in SHIPPED["techniques"]:
+        line = CHK.render_data_sources(technique, names)
+        if line is None:
+            continue
+        text = (ROOT / "techniques" / f"{technique['id']}.md").read_text(encoding="utf-8")
+        assert line in text.splitlines(), technique["id"]
+        for mapping in technique["dataSources"]:
+            assert f"{names[mapping['source']]} (" in line and f"{mapping['source']} (" not in line
+
+
+def test_the_data_sources_page_links_each_entry_to_the_line_it_cites():
+    text = (ROOT / CHK.DATA_SOURCES_PAGE).read_text(encoding="utf-8")
+    for source in SHIPPED["dataSources"]:
+        for reader in source["readBy"]:
+            url = (f"https://github.com/{reader['repository']}/blob/{reader['commit']}/"
+                   f"{reader['path']}#L{reader['line']}")
+            row = next((row for row in text.splitlines()
+                        if row.startswith(f"| {source['name']} | `{source['id']}` |")), None)
+            assert row is not None, source["id"]
+            assert f"[{reader['tool']} {reader['path']}:{reader['line']}]({url})" in row
+
+
+def test_the_data_sources_page_lists_exactly_the_techniques_that_map_none():
+    text = (ROOT / CHK.DATA_SOURCES_PAGE).read_text(encoding="utf-8")
+    listed = re.findall(r"^\| \[(T-\d{4}(?:\.\d{3})?)\]\(\.\./techniques/", text, re.M)
+    assert listed == [t["id"] for t in SHIPPED["techniques"] if not t.get("dataSources")]
+    assert UNMAPPED in listed
+
+
+def test_a_stale_data_sources_page_is_red_and_fixed(tree):
+    page = tree / CHK.DATA_SOURCES_PAGE
+    shipped = page.read_text(encoding="utf-8")
+    row = next(line for line in shipped.splitlines() if line.startswith(UNMAPPED_ROW))
+    mutate(page, row + "\n", "")
+
+    result = run_checker(tree)
+    assert result.returncode == 1, result.stdout
+    assert f"docs/data-sources.md: line {shipped.splitlines().index(row) + 1} is " in result.stdout
+    assert f"matrix.json says '{row}'" in result.stdout
+
+    assert run_checker(tree, "--fix").returncode == 0
+    assert page.read_text(encoding="utf-8") == shipped
+
+
+def test_the_data_sources_page_follows_a_mapping_and_a_new_entry_in_the_data(tree):
+    unmapped_in(tree)
+    map_data_sources(tree, EXAMPLE_MAPPINGS, [EXAMPLE_SOURCE], UNMAPPED)
+
+    result = run_checker(tree)
+    assert result.returncode == 1, result.stdout
+    assert "docs/data-sources.md: line " in result.stdout
+
+    assert run_checker(tree, "--fix").returncode == 0
+    lines = (tree / CHK.DATA_SOURCES_PAGE).read_text(encoding="utf-8").splitlines()
+    assert EXAMPLE_ROW in lines
+    assert not any(line.startswith(UNMAPPED_ROW) for line in lines)
+    assert run_checker(tree).returncode == 0
+
+
+def test_a_missing_data_sources_page_is_red_and_written(tree):
+    page = tree / CHK.DATA_SOURCES_PAGE
+    shipped = page.read_text(encoding="utf-8")
+    page.unlink()
+
+    result = run_checker(tree)
+    assert result.returncode == 1, result.stdout
+    assert "docs/data-sources.md: no page" in result.stdout
+
+    assert run_checker(tree, "--fix").returncode == 0
+    assert page.read_text(encoding="utf-8") == shipped
+
+
+def test_a_pipe_in_a_name_or_description_stays_in_its_cell():
+    source = dict(EXAMPLE_SOURCE, name="Request | log", description="Read | parsed")
+    matrix = {"dataSources": [source], "techniques": [dict(SHIPPED["techniques"][0], dataSources=[])]}
+    text = CHK.render_data_sources_page(matrix)
+    assert "| Request \\| log | `example-log` | Read \\| parsed | [example-sensor" in text
 
 
 def test_a_mapped_data_source_is_red_until_the_page_names_it_and_fix_writes_it(tree):
@@ -909,7 +1023,7 @@ def test_a_mapped_data_source_is_red_until_the_page_names_it_and_fix_writes_it(t
     assert "example-log" not in page
     result = run_checker(tree)
     assert result.returncode == 0, result.stdout
-    assert "and 1 of 61 technique pages carry a Data Sources line" in result.stdout
+    assert f"{SHIPPED_MAPPED} of 61 technique pages carry a Data Sources line" in result.stdout
 
 
 def test_a_data_sources_line_that_shows_the_source_id_is_red_and_fixed(tree):
@@ -928,13 +1042,14 @@ def test_a_data_sources_line_that_shows_the_source_id_is_red_and_fixed(tree):
 
 
 def test_a_data_sources_line_on_a_technique_that_maps_none_is_red_and_dropped(tree):
-    page = tree / "techniques" / "T-1001.md"
+    unmapped_in(tree)
+    page = tree / "techniques" / "T-2009.md"
     before = page.read_text(encoding="utf-8")
-    mutate(page, T1001_CONTROLS + "\n", T1001_CONTROLS + "\n" + EXAMPLE_LINE + "\n")
+    mutate(page, UNMAPPED_CONTROLS + "\n", UNMAPPED_CONTROLS + "\n" + EXAMPLE_LINE + "\n")
 
     result = run_checker(tree)
     assert result.returncode == 1, result.stdout
-    assert "T-1001: page has a Data Sources line, and matrix.json maps no data source" in result.stdout
+    assert "T-2009: page has a Data Sources line, and matrix.json maps no data source" in result.stdout
 
     assert run_checker(tree, "--fix").returncode == 0
     assert page.read_text(encoding="utf-8") == before
@@ -963,9 +1078,14 @@ T2001_LINKS = ["- Attack Class: [SOUL-INJECT](../attack-classes/SOUL-INJECT.md)"
 T2001_EVIDENCE = (f"- Evidence: honeypot-telemetry dated 2026-10-19, [{ENDPOINT}]({ENDPOINT}). The "
                   "wildPrevalence and wildSampleCount this endpoint served for the technique on this "
                   "date; they measure engagement with a honeypot, not a production attack rate.")
+# The DVAA challenge T-2001's dvaaValidation names, L1-03, at the line of its key.
+T2001_CHALLENGE = ("https://github.com/opena2a-org/damn-vulnerable-ai-agent/blob/"
+                   "eb6f66cc40e5ce5743b27cf3fe33d52e5ac69014/src/challenges/index.js#L98")
+T2001_LAB = f"- Evidence: lab-reproduction dated 2026-10-07, [{T2001_CHALLENGE}]({T2001_CHALLENGE})"
+T2001_LISTED = f"lab-reproduction {T2001_CHALLENGE} 2026-10-07; honeypot-telemetry {ENDPOINT} 2026-10-19"
 T2001_NOT_LISTED = (f"T-2001: References section does not list the evidence entries matrix.json "
-                    f"carries (honeypot-telemetry {ENDPOINT} 2026-10-19), one Evidence line each in "
-                    f"order directly under the Tactic link")
+                    f"carries ({T2001_LISTED}), one Evidence line each in order directly under the "
+                    f"Tactic link")
 T1001_TACTIC = "- Tactic: [reconnaissance](../tactics/reconnaissance.md)\n"
 ADDED_ENTRY = {"type": "publication", "reference": "https://example.org/post", "date": "2026-10-20"}
 
@@ -991,9 +1111,9 @@ def edit_technique(root: Path, tid: str, change) -> None:
     path.write_text(json.dumps(matrix, indent=2), encoding="utf-8")
 
 
-def test_t2001_references_cite_the_endpoint_its_evidence_entry_was_read_from():
+def test_t2001_references_cite_the_dvaa_challenge_and_the_endpoint_its_entries_were_read_from():
     text = (ROOT / "techniques" / "T-2001.md").read_text(encoding="utf-8")
-    assert references(text) == T2001_LINKS + [T2001_EVIDENCE]
+    assert references(text) == T2001_LINKS + [T2001_LAB, T2001_EVIDENCE]
 
 
 @pytest.mark.parametrize("technique", TECHNIQUES, ids=[t["id"] for t in TECHNIQUES])
@@ -1106,13 +1226,12 @@ def test_evidence_lines_follow_an_entry_added_to_the_data(tree):
     result = run_checker(tree)
     assert result.returncode == 1, result.stdout
     assert (f"T-2001: References section does not list the evidence entries matrix.json carries "
-            f"(honeypot-telemetry {ENDPOINT} 2026-10-19; publication https://example.org/post "
-            f"2026-10-20), one Evidence line each in order directly under the Tactic link") \
-        in result.stdout
+            f"({T2001_LISTED}; publication https://example.org/post 2026-10-20), one Evidence line "
+            f"each in order directly under the Tactic link") in result.stdout
 
     assert run_checker(tree, "--fix").returncode == 0
     page = (tree / "techniques" / "T-2001.md").read_text(encoding="utf-8")
-    assert references(page) == T2001_LINKS + [T2001_EVIDENCE, evidence_line(ADDED_ENTRY)]
+    assert references(page) == T2001_LINKS + [T2001_LAB, T2001_EVIDENCE, evidence_line(ADDED_ENTRY)]
     assert run_checker(tree).returncode == 0
 
 
@@ -1121,7 +1240,7 @@ def test_evidence_lines_follow_the_entries_removed_from_the_data(tree):
 
     result = run_checker(tree)
     assert result.returncode == 1, result.stdout
-    assert ("T-2001: page has an Evidence line, and matrix.json carries no evidence entry for "
+    assert ("T-2001: page has 2 Evidence lines, and matrix.json carries no evidence entry for "
             "the technique") in result.stdout
 
     assert run_checker(tree, "--fix").returncode == 0

@@ -1,9 +1,9 @@
-"""scripts/pin_evidence_sources.py pins the DVAA scenario pages that name a technique and writes the entries they back.
+"""scripts/pin_evidence_sources.py pins the DVAA pages that back lab-reproduction entries and writes the entries they back.
 
 Every case runs the script on a scratch copy of the tree against a small git repository
-built in the test and laid out as DVAA lays out its scenarios, so no case reads the network
-and the committed files are never written. The pages of that repository are test data:
-their steps, labels and dates are written here.
+built in the test and laid out as DVAA lays out its scenarios and its challenges, so no case
+reads the network and the committed files are never written. The pages of that repository
+are test data: their steps, labels, challenges and dates are written here.
 """
 
 import importlib.util
@@ -63,6 +63,38 @@ FIRST = "2026-03-01T12:00:00-06:00"
 SECOND = "2026-04-22T18:27:45-06:00"
 THIRD = "2026-05-01T09:00:00+02:00"
 LATER = "2026-06-01T08:00:00+00:00"
+NAMED = "2026-06-15T10:00:00-06:00"
+AFTER = "2026-07-01T09:00:00-06:00"
+CHALLENGE_FILE = "src/challenges/index.js"
+RUG_PULL = "scenarios/mcp-rug-pull/README.md"
+# Laid out as DVAA's challenge file: the challenges are the keys of the CHALLENGES object.
+CHALLENGES_TEXT = ("/**\n"
+                   " * Test data laid out as DVAA lays out its challenges.\n"
+                   " */\n"
+                   "\n"
+                   "export const CHALLENGES = {\n"
+                   "  // Level 1\n"
+                   "\n"
+                   "  'L1-03': {\n"
+                   "    id: 'L1-03',\n"
+                   "    level: 1,\n"
+                   "    name: 'Basic Prompt Injection',\n"
+                   "    successCriteria: {\n"
+                   "      name: 'A nested property, not the name of the challenge',\n"
+                   "    },\n"
+                   "  },\n"
+                   "\n"
+                   "  'L9-01': {\n"
+                   "    id: 'L9-01',\n"
+                   "    name: 'A challenge no technique names',\n"
+                   "  },\n"
+                   "};\n"
+                   "\n"
+                   "export function getChallenge(id) {\n"
+                   "  return CHALLENGES[id];\n"
+                   "}\n")
+# The page of a scenario a dvaaValidation names; it names no technique in bold.
+RUG_PULL_TEXT = "# MCP Rug Pull\n\nA tool changes its description after it is approved.\n"
 
 
 def today() -> str:
@@ -122,6 +154,22 @@ def dvaa(tmp_path: Path) -> SimpleNamespace:
     return SimpleNamespace(path=repo, first=first, second=second, head=head)
 
 
+@pytest.fixture
+def named(dvaa: SimpleNamespace) -> SimpleNamespace:
+    """That repository with a challenge file and the page of a scenario, at a later head: the
+    challenge L1-03, which T-2001's dvaaValidation names in the shipped matrix.json, a challenge
+    no technique names, and the page of mcp-rug-pull, which T-9006's dvaaValidation names."""
+    write(dvaa.path, CHALLENGE_FILE, CHALLENGES_TEXT)
+    write(dvaa.path, RUG_PULL, RUG_PULL_TEXT)
+    dvaa.named = commit(dvaa.path, "challenges", NAMED, CHALLENGE_FILE, RUG_PULL)
+    dvaa.head = dvaa.named
+    return dvaa
+
+
+def line_of(text: str, line: str) -> int:
+    return text.split("\n").index(line) + 1
+
+
 def run_pin(tree: Path, dvaa_path: Path, *args: str) -> subprocess.CompletedProcess:
     env = dict(GIT_ENV, GIT_CEILING_DIRECTORIES=str(Path(dvaa_path).parent))
     return subprocess.run([sys.executable, str(tree / SCRIPT), "--dvaa", str(dvaa_path), *args],
@@ -147,6 +195,11 @@ def technique(matrix: dict, tid: str) -> dict:
 
 def snapshot(root: Path) -> dict:
     return {rel: (root / rel).read_bytes() for rel in FILES if (root / rel).is_file()}
+
+
+def not_dvaa(t: dict) -> list:
+    """The entries of a technique that do not cite DVAA, which the script keeps."""
+    return [e for e in t.get("evidence", []) if not PIN.written_here(e)]
 
 
 def link(commit_id: str, path: str) -> str:
@@ -199,14 +252,17 @@ def test_writes_the_entries_the_pins_back_and_drops_the_ones_they_no_longer_back
         {"type": LAB, "reference": link(dvaa.first, CHAIN), "date": "2026-03-01"}] + telemetry
     assert technique(matrix, "T-1004")["evidence"] == [
         {"type": LAB, "reference": link(dvaa.second, PROBE), "date": "2026-04-22"}]
-    # A label that is not the technique's name backs no entry.
-    assert technique(matrix, "T-2001")["evidence"] == technique(shipped, "T-2001")["evidence"]
+    # A label that is not the technique's name backs no entry, and this clone defines no
+    # challenge, so the challenge T-2001's dvaaValidation names backs none either.
+    assert technique(matrix, "T-2001")["evidence"] == not_dvaa(technique(shipped, "T-2001"))
     # The shipped entries cite pages these pins do not hold, so they go, and with them an
     # evidence array left empty.
-    for tid in ("T-1006", "T-4003", "T-5003"):
-        assert [e["type"] for e in technique(shipped, tid)["evidence"]] == [LAB], tid
+    for tid in ("T-1006", "T-4003", "T-5003", "T-7007"):
+        assert {e["type"] for e in technique(shipped, tid)["evidence"]} == {LAB}, tid
         assert "evidence" not in technique(matrix, tid), tid
-    assert f"written on T-1002, T-1004, T-1006, T-4003, T-5003; updated is {matrix['updated']}" in proc.stdout
+    # Every shipped entry that cites DVAA cites a page or file this clone does not hold.
+    written = [t["id"] for t in shipped["techniques"] if not_dvaa(t) != t.get("evidence", [])]
+    assert f"written on {', '.join(written)}; updated is {matrix['updated']}" in proc.stdout
     assert matrix["updated"] == max(shipped["updated"], today())
     gaps = sorted(t["id"] for t in matrix["techniques"] if not t.get("evidence"))
     assert load(tree, "evidence-gaps.json")["ids"] == gaps
@@ -285,6 +341,102 @@ def test_head_pins_the_clone_at_another_commit(tree, dvaa):
     assert pins["head"] == dvaa.first
     assert [page["path"] for page in pins["pages"]] == [CHAIN]
     assert "evidence" not in technique(load(tree), "T-1004")
+
+
+# --------------------------------------------------------------------------- what a dvaaValidation names
+
+def challenge_entry(commit_id: str, text: str, date_: str) -> dict:
+    line = line_of(text, "  'L1-03': {")
+    return {"type": LAB, "reference": f"{link(commit_id, CHALLENGE_FILE)}#L{line}", "date": date_}
+
+
+def test_pins_the_challenge_and_the_scenario_page_a_dvaa_validation_names(tree, named):
+    shipped = load(ROOT)
+    assert technique(shipped, "T-2001")["dvaaValidation"] == "L1-03"
+    assert technique(shipped, "T-9006")["dvaaValidation"] == "mcp-rug-pull"
+    proc = run_pin(tree, named.path)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    want = expected_pins(named, today())
+    want["dvaa"]["challenges"] = {
+        "path": CHALLENGE_FILE, "commit": named.named, "committed": "2026-06-15",
+        "blob": blob(named.path, named.named, CHALLENGE_FILE),
+        "named": [{"line": line_of(CHALLENGES_TEXT, "  'L1-03': {"), "id": "L1-03",
+                   "name": "Basic Prompt Injection"}]}
+    want["dvaa"]["scenarios"] = [{"path": RUG_PULL, "commit": named.named, "committed": "2026-06-15",
+                                  "blob": blob(named.path, named.named, RUG_PULL)}]
+    # L9-01 is defined, and no technique names it, so it is not pinned.
+    assert load(tree, "evidence-sources.json") == want
+    assert (f"evidence-sources.json pins the 1 DVAA challenges and 1 scenario pages a technique's "
+            f"dvaaValidation names at {named.head}, and matrix.json carries the 2 {LAB} entries they "
+            f"back") in proc.stdout, proc.stdout
+    # A value that names no challenge or scenario page the clone holds is printed with its
+    # technique: T-1003 names L1-01, which this clone does not define.
+    assert "  T-1001 'All agents expose /health and /info'" in proc.stdout, proc.stdout
+    assert "  T-1003 'L1-01'" in proc.stdout, proc.stdout
+    assert "  T-9001 'ToolBot write_file', 'DataBot SQL'" in proc.stdout, proc.stdout
+
+
+def test_writes_the_entries_a_dvaa_validation_backs_after_the_page_entries(tree, named):
+    shipped = load(ROOT)
+    matrix = load(tree)
+    technique(matrix, "T-1002")["dvaaValidation"] = "ToolBot tools/list, mcp-rug-pull"
+    dump(tree, matrix)
+    proc = run_pin(tree, named.path)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    matrix = load(tree)
+    scenario = {"type": LAB, "reference": link(named.named, RUG_PULL), "date": "2026-06-15"}
+    challenge = challenge_entry(named.named, CHALLENGES_TEXT, "2026-06-15")
+    assert technique(matrix, "T-2001")["evidence"] == [challenge] + not_dvaa(technique(shipped, "T-2001"))
+    assert technique(matrix, "T-9006")["evidence"] == [scenario] + not_dvaa(technique(shipped, "T-9006"))
+    # The page T-1002 is named on comes first, then what its dvaaValidation names, then the rest.
+    assert technique(matrix, "T-1002")["evidence"] == [
+        {"type": LAB, "reference": link(named.first, CHAIN), "date": "2026-03-01"}, scenario,
+    ] + not_dvaa(technique(shipped, "T-1002"))
+    validated = run_validator(tree)
+    assert validated.returncode == 0, validated.stdout + validated.stderr
+
+
+def test_check_passes_on_the_dvaa_validation_pins_and_fails_on_one_edited_by_hand(tree, named):
+    assert run_pin(tree, named.path).returncode == 0
+    before = snapshot(tree)
+    checked = run_pin(tree, named.path, "--check")
+    assert checked.returncode == 0, checked.stdout + checked.stderr
+    assert snapshot(tree) == before
+    sources = load(tree, "evidence-sources.json")
+    sources["dvaa"]["challenges"]["named"][0]["line"] += 1
+    dump(tree, sources, "evidence-sources.json")
+    proc = run_pin(tree, named.path, "--check")
+    assert proc.returncode == 1, proc.stdout + proc.stderr
+    assert (f"evidence-sources.json is not what {named.path} holds at {named.head}: {CHALLENGE_FILE} is "
+            f"pinned with named other than the clone gives") in proc.stderr, proc.stderr
+
+
+def test_check_fails_on_a_scenario_page_the_pins_leave_out(tree, named):
+    assert run_pin(tree, named.path).returncode == 0
+    sources = load(tree, "evidence-sources.json")
+    del sources["dvaa"]["scenarios"]
+    dump(tree, sources, "evidence-sources.json")
+    proc = run_pin(tree, named.path, "--check")
+    assert proc.returncode == 1, proc.stdout + proc.stderr
+    assert f"{RUG_PULL} is the page of a scenario a dvaaValidation names and is not pinned" in proc.stderr
+
+
+def test_a_challenge_moved_after_the_pin_moves_its_line_and_its_entry(tree, named):
+    assert run_pin(tree, named.path).returncode == 0
+    text = CHALLENGES_TEXT.replace("  // Level 1\n", "  // Level 1: Beginner\n  // One line more.\n")
+    write(named.path, CHALLENGE_FILE, text)
+    later = commit(named.path, "challenge comment", AFTER, CHALLENGE_FILE)
+    proc = run_pin(tree, named.path)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    pins = load(tree, "evidence-sources.json")["dvaa"]
+    assert (pins["challenges"]["commit"], pins["challenges"]["committed"]) == (later, "2026-07-01")
+    assert pins["challenges"]["named"] == [
+        {"line": line_of(CHALLENGES_TEXT, "  'L1-03': {") + 1, "id": "L1-03", "name": "Basic Prompt Injection"}]
+    # The scenario page did not change, so it stays pinned at the commit that wrote it.
+    assert pins["scenarios"][0]["commit"] == named.named
+    assert technique(load(tree), "T-2001")["evidence"][0] == challenge_entry(later, text, "2026-07-01")
+    validated = run_validator(tree)
+    assert validated.returncode == 0, validated.stdout + validated.stderr
 
 
 # --------------------------------------------------------------------------- --check
@@ -386,6 +538,47 @@ def test_a_page_that_is_not_utf8_is_refused(tree, dvaa):
     proc = run_pin(tree, dvaa.path)
     assert proc.returncode == 1, proc.stdout + proc.stderr
     assert f"FAIL: scenarios/bad/README.md at {head} is not valid UTF-8" in proc.stderr, proc.stderr
+    assert snapshot(tree) == before
+
+
+@pytest.mark.parametrize("text, needle", [
+    ("export const OTHER = {\n};\n",
+     "<file> at <head> holds no CHALLENGES object, an 'export const CHALLENGES = {' line closed by a "
+     "'};' line, so its challenges are not read"),
+    ("export const CHALLENGES = {\n  'L1-03': {\n    id: 'L1-03',\n",
+     "<file> at <head> holds no CHALLENGES object"),
+    ("export const CHALLENGES = {\n};\n",
+     "<file> at <head> defines no challenge in its CHALLENGES object as a key '<id>': { two spaces in, "
+     "so its challenges are not read"),
+    ("export const CHALLENGES = {\n  'L1-03': {\n    id: 'L1-04',\n    name: 'Basic Prompt Injection',\n"
+     "  },\n};\n",
+     "<file>:2 at <head> defines 'L1-03' with id 'L1-04', so which challenge it is cannot be read"),
+    ("export const CHALLENGES = {\n  'L1-03': {\n    name: 'Basic Prompt Injection',\n  },\n};\n",
+     "<file>:2 at <head> defines 'L1-03' with no id: '<id>', line, so which challenge it is cannot be read"),
+    ("export const CHALLENGES = {\n  'L1-03': {\n    id: 'L1-03',\n    name: 'Agent\\'s Prompt',\n  },\n};\n",
+     "<file>:2 at <head> defines 'L1-03' with no name: '<name>', line holding a name with no quote or "
+     "backslash in it"),
+    ("export const CHALLENGES = {\n  'L1-03': {\n    id: 'L1-03',\n    name: 'One',\n  },\n"
+     "  'L1-03': {\n    id: 'L1-03',\n    name: 'Two',\n  },\n};\n",
+     "<file>:6 at <head> defines 'L1-03' again: line 2 defines it already"),
+])
+def test_a_challenge_file_the_script_cannot_read_is_refused(tree, dvaa, text, needle):
+    write(dvaa.path, CHALLENGE_FILE, text)
+    head = commit(dvaa.path, "challenges", LATER, CHALLENGE_FILE)
+    before = snapshot(tree)
+    proc = run_pin(tree, dvaa.path)
+    assert proc.returncode == 1, proc.stdout + proc.stderr
+    assert "FAIL: " + needle.replace("<file>", CHALLENGE_FILE).replace("<head>", head) in proc.stderr, proc.stderr
+    assert snapshot(tree) == before
+
+
+def test_a_challenge_file_that_is_not_utf8_is_refused(tree, dvaa):
+    write(dvaa.path, CHALLENGE_FILE, b"export const CHALLENGES = {\n  // \xff\n};\n")
+    head = commit(dvaa.path, "challenges", LATER, CHALLENGE_FILE)
+    before = snapshot(tree)
+    proc = run_pin(tree, dvaa.path)
+    assert proc.returncode == 1, proc.stdout + proc.stderr
+    assert f"FAIL: {CHALLENGE_FILE} at {head} is not valid UTF-8" in proc.stderr, proc.stderr
     assert snapshot(tree) == before
 
 

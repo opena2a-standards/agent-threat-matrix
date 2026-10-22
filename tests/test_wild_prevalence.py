@@ -347,14 +347,16 @@ def test_sync_keeps_evidence_entries_that_do_not_cite_the_endpoint(tree):
 
 
 def test_sync_drops_an_evidence_array_it_leaves_empty(tree):
-    shipped = technique(load(tree), "T-2001")
+    # T-2002 carries only the telemetry entry: its dvaaValidation names no DVAA challenge or
+    # scenario, and no pinned page names it.
+    shipped = technique(load(tree), "T-2002")
     assert [e["type"] for e in shipped["evidence"]] == [TELEMETRY]
     payload = served(load(tree))
-    assert all(e["id"] != "T-2001" or e["wildSampleCount"] == 0 for e in payload["techniques"])
+    assert all(e["id"] != "T-2002" or e["wildSampleCount"] == 0 for e in payload["techniques"])
     proc = run_sync(tree, "--payload", str(write_payload(tree, payload)), "--read-date", today())
     assert proc.returncode == 0, proc.stdout + proc.stderr
-    assert "evidence" not in technique(load(tree), "T-2001")
-    assert "T-2001" in load(tree, "evidence-gaps.json")["ids"]
+    assert "evidence" not in technique(load(tree), "T-2002")
+    assert "T-2002" in load(tree, "evidence-gaps.json")["ids"]
 
 
 def test_sync_refuses_evidence_that_is_not_an_array_and_writes_nothing(tree):
