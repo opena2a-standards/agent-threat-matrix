@@ -26,6 +26,7 @@ victim's multi-agent system, so T-4004, T-5002 and T-9004 remain unmapped. ATLAS
 names exploiting an automated artifact-processing pipeline at ingest, which is a different
 surface from the in-agent prompt-assembly pipeline T-7007 targets.
 
-Membership is checked in CI-shaped tests: `tests/test_crosswalks.py` asserts this list equals
-the set of techniques in `matrix.json` carrying no mapping, so an entry cannot drift from the
-data.
+Membership is checked by a local test that no workflow runs. Run it with
+`python3 -m pytest -q tests/test_crosswalks.py`: it asserts that the ids in the first column of
+the table above equal the techniques in `matrix.json` carrying no mapping, so removing a row,
+or adding one for a technique that carries a mapping, fails it.
