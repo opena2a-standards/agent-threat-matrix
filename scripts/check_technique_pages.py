@@ -38,9 +38,12 @@ gap.
 
 A technique that maps a data source in its ``dataSources`` carries one
 ``- **Data Sources:**`` line, directly under its OASB Controls line, and a technique that maps
-none carries no such line. The line shows each source by the ``name`` the top-level
-``dataSources`` vocabulary gives it, never by its id, followed in parentheses by the tool and
-the check, signature or sensor field that uses it for this technique, as in
+none carries no such line. Outside fenced code blocks, a Data Sources line elsewhere on the
+page fails, except on a page with no OASB Controls line or more than one: that page already
+fails for its missing or repeated OASB Controls line, and only the text of its Data Sources
+line is checked. The line shows each source by the ``name`` the top-level ``dataSources``
+vocabulary gives it, never by its id, followed in parentheses by the tool and the check,
+signature or sensor field that uses it for this technique, as in
 ``- **Data Sources:** Example log (example-sensor sensor field path)``. A source the vocabulary
 does not hold has no name to show, so the check fails for that page and leaves its Data
 Sources line as it is.
@@ -55,15 +58,16 @@ pages while the STIX bundle already carried the entries of 26 techniques.
 
 Run with ``--fix`` to rewrite those lines, the Mitigation section and the tactic pages from
 the data, to drop a Severity line, an Evidence Gap line or a Data Sources line the data does
-not back, to add a missing Evidence Gap line directly under the Evidence Tier line, to add a
-missing Data Sources line directly under the OASB Controls line, and to write the Evidence
-lines directly under the Tactic link, dropping every other Evidence line. Every other line of
-a technique page is left alone. Any other missing technique-page line, a repeated line or
-Mitigation section, and a missing Mitigation section have no single place to write the data
-to, nor do the Evidence lines of a technique that carries entries on a page with no Tactic
-link or more than one, a Mitigation section that holds a fenced code block may hold the rest
-of the page behind an unclosed fence, and a control with no title or a source with no name
-has no line to write, so ``--fix`` reports each of them and still exits 1.
+not back, to add a missing Evidence Gap line directly under the Evidence Tier line, to write
+the Evidence lines directly under the Tactic link, dropping every other Evidence line, and,
+on a page with one OASB Controls line, to write a missing Data Sources line, or move one
+found elsewhere on the page, directly under it. Every other line of a technique page is left
+alone. Any other missing technique-page line, a repeated line or Mitigation section, and a
+missing Mitigation section have no single place to write the data to, nor do the Evidence
+lines of a technique that carries entries on a page with no Tactic link or more than one, a
+Mitigation section that holds a fenced code block may hold the rest of the page behind an
+unclosed fence, and a control with no title or a source with no name has no line to write,
+so ``--fix`` reports each of them and still exits 1.
 
 A read of matrix.json that raises an OSError, a ValueError or a RecursionError (see
 ``read_json``) is reported in one line on standard error,
@@ -443,9 +447,11 @@ def render_data_sources(technique: dict, names: dict) -> str | None:
 
 
 def check_data_sources(technique: dict, text: str, names: dict) -> tuple[list[str], str]:
-    """Return the Data Sources line's disagreement with the data and the page rewritten. A
-    technique that maps a data source carries the line once, and a missing one goes directly
-    under the OASB Controls line; a source ``names`` does not hold leaves the page alone."""
+    """Return the Data Sources line's disagreements with the data and the page rewritten. A
+    technique that maps a data source carries the line once, directly under the OASB Controls
+    line, where a missing one is written and one found elsewhere is moved. On a page with no
+    OASB Controls line or more than one, only the text of a line found is checked. A source
+    ``names`` does not hold leaves the page alone."""
     tid = technique["id"]
     mapped = [mapping["source"] for mapping in technique.get("dataSources") or []]
     unnamed = [source for source in dict.fromkeys(mapped) if source not in names]
@@ -464,17 +470,23 @@ def check_data_sources(technique: dict, text: str, names: dict) -> tuple[list[st
         return [f"{tid}: page has a Data Sources line, and matrix.json maps no data source"], text
     if len(found) > 1:
         return [f"{tid}: page has {len(found)} 'Data Sources' lines"], text
-    if found:
-        have = found[0].group("line")
-        if have == want:
-            return [], text
-        return ([f"{tid}: Data Sources line is '{have}', matrix.json says '{want}'"],
-                _replace(text, found[0], want))
+    # The line goes directly under the OASB Controls line. A page with none, or more than one,
+    # fails on that line and gets no Data Sources line written or moved.
     controls = find_lines(CONTROLS_RE, text)
-    if len(controls) == 1:
-        end = controls[0].end("line")
-        text = text[:end] + "\n" + want + text[end:]
-    return [f"{tid}: page has no 'Data Sources' line; matrix.json says '{want}'"], text
+    anchor = controls[0] if len(controls) == 1 else None
+    if not found:
+        if anchor is not None:
+            end = anchor.end("line")
+            text = text[:end] + "\n" + want + text[end:]
+        return [f"{tid}: page has no 'Data Sources' line; matrix.json says '{want}'"], text
+    have = found[0].group("line")
+    failures = []
+    if have != want:
+        failures.append(f"{tid}: Data Sources line is '{have}', matrix.json says '{want}'")
+    if anchor is None or found[0].start("line") == anchor.end("line") + 1:
+        return failures, _replace(text, found[0], want)
+    failures.append(f"{tid}: Data Sources line is not directly under the OASB Controls line")
+    return failures, _move_under(text, found[0], anchor, want)
 
 
 def expected_mitigation(technique: dict, titles: dict) -> str:
@@ -576,6 +588,15 @@ def _drop_line(text: str, match: re.Match) -> str:
 def _replace(text: str, match: re.Match, line: str) -> str:
     start, end = match.span("line")
     return text[:start] + line + text[end:]
+
+
+def _move_under(text: str, match: re.Match, anchor: re.Match, line: str) -> str:
+    """Drop the line ``match`` holds and write ``line`` directly under the one ``anchor`` holds."""
+    start, end = match.span("line")
+    at = anchor.end("line")
+    if start > at:
+        return text[:at] + "\n" + line + text[at:start] + text[end + 1:]
+    return text[:start] + text[end + 1:at] + "\n" + line + text[at:]
 
 
 def _remove_procedure_line(text: str, match: re.Match) -> str:

@@ -1,0 +1,168 @@
+{
+  "description": "The DVAA scenario pages that name a technique, pinned by scripts/pin_evidence_sources.py from a git clone of the repository, read at the commit head on the date read. A page is scenarios/<name>/README.md that names a technique in bold as **T-NNNN (Label):**, the form DVAA gives the steps of an attack chain. commit is the last commit at or before head that changed the page, committed is that commit's date as its committer recorded it, blob is the git blob id of the page there, and names lists each such name as the page writes it: its line, the technique id and the label. scripts/validate_matrix.py resolves a lab-reproduction evidence entry against this file: its reference is the permalink of a page, <repository>/blob/<commit>/<path>, its date is the page's committed date, and the page names the technique's id with the technique's name in matrix.json as the label. Written by the script, not by hand: python3 scripts/pin_evidence_sources.py --dvaa <clone> --check fails when this file, apart from read, differs from what the clone holds at head.",
+  "dvaa": {
+    "repository": "https://github.com/opena2a-org/damn-vulnerable-ai-agent",
+    "head": "57918267d8d529ceec6d40fc9836ab09d128eee4",
+    "read": "2026-10-21",
+    "pages": [
+      {
+        "path": "scenarios/agent-thresh-01/README.md",
+        "commit": "6dd0c4434a9cc8b4d61e3ea5efa9fd42d0273f57",
+        "committed": "2026-10-06",
+        "blob": "ef5db56ece9c38d35348f2cbf4fdc68d49b16108",
+        "names": [
+          {
+            "line": 19,
+            "technique": "T-6004",
+            "label": "Agent Instruction Injection"
+          },
+          {
+            "line": 21,
+            "technique": "T-2001",
+            "label": "Threshold Exhaustion"
+          },
+          {
+            "line": 23,
+            "technique": "T-8002",
+            "label": "Consent Fatigue Exfiltration"
+          }
+        ]
+      },
+      {
+        "path": "scenarios/atc-forgery-attack/README.md",
+        "commit": "53112b4c9fea1a1facd1827aa95f30f154e16e24",
+        "committed": "2026-03-25",
+        "blob": "97c6a8c12bf30537094678a2594ad7f401f28f2b",
+        "names": [
+          {
+            "line": 14,
+            "technique": "T-1006",
+            "label": "Agent Card Discovery"
+          },
+          {
+            "line": 16,
+            "technique": "T-5001",
+            "label": "Agent Impersonation"
+          },
+          {
+            "line": 18,
+            "technique": "T-9004",
+            "label": "Integrity Bypass"
+          }
+        ]
+      },
+      {
+        "path": "scenarios/behavioral-drift-to-exfil/README.md",
+        "commit": "3ca7415a17a834885ceaec35d1cfed125c2fe3ac",
+        "committed": "2026-04-22",
+        "blob": "4dc3b761d4cd75de413fa802d8b96991a41c8a4a",
+        "names": [
+          {
+            "line": 16,
+            "technique": "T-6004",
+            "label": "SOUL Drift"
+          },
+          {
+            "line": 18,
+            "technique": "T-1004",
+            "label": "Security Level Probing"
+          },
+          {
+            "line": 20,
+            "technique": "T-3001",
+            "label": "Data Collection"
+          },
+          {
+            "line": 22,
+            "technique": "T-8002",
+            "label": "Encoded Exfiltration"
+          }
+        ]
+      },
+      {
+        "path": "scenarios/prompt-to-lateral-movement/README.md",
+        "commit": "6dd0c4434a9cc8b4d61e3ea5efa9fd42d0273f57",
+        "committed": "2026-10-06",
+        "blob": "4dffb22600e50a00e36d3aa4eb5f52effc755f20",
+        "names": [
+          {
+            "line": 14,
+            "technique": "T-2001",
+            "label": "Prompt Injection"
+          },
+          {
+            "line": 16,
+            "technique": "T-1002",
+            "label": "Tool Discovery"
+          },
+          {
+            "line": 18,
+            "technique": "T-5003",
+            "label": "MCP Server Hopping"
+          },
+          {
+            "line": 20,
+            "technique": "T-4003",
+            "label": "Tool Parameter Injection"
+          }
+        ]
+      },
+      {
+        "path": "scenarios/rag-poison-to-impersonation/README.md",
+        "commit": "6dd0c4434a9cc8b4d61e3ea5efa9fd42d0273f57",
+        "committed": "2026-10-06",
+        "blob": "7fa30e337f68f4ae449c525478f8239e8dfc8000",
+        "names": [
+          {
+            "line": 14,
+            "technique": "T-2005",
+            "label": "RAG Poisoning"
+          },
+          {
+            "line": 16,
+            "technique": "T-5001",
+            "label": "Agent Impersonation"
+          },
+          {
+            "line": 18,
+            "technique": "T-4005",
+            "label": "Delegation Abuse"
+          },
+          {
+            "line": 20,
+            "technique": "T-3003",
+            "label": "Memory Extraction"
+          }
+        ]
+      },
+      {
+        "path": "scenarios/supply-chain-to-rce/README.md",
+        "commit": "53112b4c9fea1a1facd1827aa95f30f154e16e24",
+        "committed": "2026-03-25",
+        "blob": "2ecf3d909b999795a8680f07c1c97d5755ef725d",
+        "names": [
+          {
+            "line": 16,
+            "technique": "T-2006",
+            "label": "Supply Chain Install"
+          },
+          {
+            "line": 18,
+            "technique": "T-6001",
+            "label": "Heartbeat Persistence"
+          },
+          {
+            "line": 20,
+            "technique": "T-3002",
+            "label": "Credential File Access"
+          },
+          {
+            "line": 22,
+            "technique": "T-8001",
+            "label": "Covert Exfiltration"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -77,14 +77,30 @@ or change the technique's tier; the tier is assigned by the maintainers and audi
 `EVIDENCE_AUDIT.md`.
 
 An entry is accepted only where `scripts/validate_matrix.py` resolves its reference to a
-source it reads, so no entry rests on a citation nobody read. The validator resolves one
-kind of entry: a `honeypot-telemetry` entry whose reference is the registry endpoint in
-`wildPrevalenceSource` and whose date is the read date there, on a technique whose
-`wildSampleCount` is above 0. `scripts/sync_wild_prevalence.py` writes that entry when it
-records the read. An entry of any other kind is refused until the validator reads its
-source. `evidence-gaps.json` lists the techniques with no entry; `scripts/generate_stix.py`
-writes it and the validator fails when it differs from that rendering, so a gap is closed
-by an entry that resolves, never by text.
+source it reads, so no entry rests on a citation nobody read. The validator resolves two
+kinds of entry:
+
+- A `honeypot-telemetry` entry whose reference is the registry endpoint in
+  `wildPrevalenceSource` and whose date is the read date there, on a technique whose
+  `wildSampleCount` is above 0. `scripts/sync_wild_prevalence.py` writes that entry when it
+  records the read.
+- A `lab-reproduction` entry whose reference is the permalink of a DVAA scenario page that
+  `evidence-sources.json` pins, `<repository>/blob/<commit>/<path>`, whose date is the date
+  of the commit in that permalink, and whose technique the page names by its id with the
+  technique's name in `matrix.json` as the label, in bold as `**T-NNNN (Label):**`, the form
+  DVAA gives the steps of an attack chain. `scripts/pin_evidence_sources.py` reads a git
+  clone of DVAA and writes the pins and these entries. A pin records the page's path, the
+  last commit that changed the page as of the commit the clone was read at, that commit's
+  date, the page's git blob id, and each technique the page names, with its line and its
+  label. A page that names an id under a label that is not that technique's name backs no
+  entry, and the script prints each such name. The validator does not read the clone;
+  `python3 scripts/pin_evidence_sources.py --dvaa <clone> --check` fails when the pins, or
+  the entries they back, differ from what the clone holds at the commit the pins record.
+
+An entry of any other kind is refused until the validator reads its source.
+`evidence-gaps.json` lists the techniques with no entry; `scripts/generate_stix.py` writes
+it and the validator fails when it differs from that rendering, so a gap is closed by an
+entry that resolves, never by text.
 
 The References section of a technique's page lists each of its entries in one line,
 directly under the Tactic link and in `matrix.json` order: the entry's type and date, its

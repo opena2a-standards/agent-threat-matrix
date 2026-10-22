@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://threats.opena2a.org/schema/evidence-sources.schema.json",
+  "title": "AI Agent Threat Matrix evidence sources",
+  "description": "Shape of evidence-sources.json: the pages of related projects that evidence entries in matrix.json cite, each pinned at the commit that wrote it. scripts/pin_evidence_sources.py writes the file from a git clone; scripts/validate_matrix.py checks it against this schema and the rules the schema cannot express (see the x-semantic notes), and resolves a lab-reproduction evidence entry against it.",
+  "type": "object",
+  "required": ["description", "dvaa"],
+  "additionalProperties": false,
+  "properties": {
+    "description": {
+      "type": "string"
+    },
+    "dvaa": {
+      "$ref": "#/$defs/dvaa"
+    }
+  },
+  "$defs": {
+    "date": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+      "x-semantic": "a calendar date"
+    },
+    "objectId": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "dvaa": {
+      "description": "The DVAA scenario pages that name a technique, read from a git clone of the repository at one commit.",
+      "type": "object",
+      "required": ["repository", "head", "read", "pages"],
+      "additionalProperties": false,
+      "properties": {
+        "repository": {
+          "const": "https://github.com/opena2a-org/damn-vulnerable-ai-agent"
+        },
+        "head": {
+          "$ref": "#/$defs/objectId",
+          "description": "The commit the clone was read at."
+        },
+        "read": {
+          "$ref": "#/$defs/date",
+          "description": "The date the clone was read.",
+          "x-semantic": "no later than the day the validator runs"
+        },
+        "pages": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/page"
+          },
+          "x-semantic": "no path twice"
+        }
+      }
+    },
+    "page": {
+      "description": "One scenario page and the techniques it names. Its permalink, <repository>/blob/<commit>/<path>, is the reference of the lab-reproduction entries it backs.",
+      "type": "object",
+      "required": ["path", "commit", "committed", "blob", "names"],
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "type": "string",
+          "pattern": "^scenarios/[A-Za-z0-9_-]+/README\\.md$"
+        },
+        "commit": {
+          "$ref": "#/$defs/objectId",
+          "description": "The last commit at or before head that changed the page."
+        },
+        "committed": {
+          "$ref": "#/$defs/date",
+          "description": "The date of that commit as its committer recorded it, and the date of the entries the page backs.",
+          "x-semantic": "no later than read"
+        },
+        "blob": {
+          "$ref": "#/$defs/objectId",
+          "description": "The git blob id of the page at that commit."
+        },
+        "names": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/name"
+          },
+          "x-semantic": "at least one entry"
+        }
+      }
+    },
+    "name": {
+      "description": "One name of a technique on the page, in bold as **T-NNNN (Label):**, the form DVAA gives the steps of an attack chain, as the page writes it.",
+      "type": "object",
+      "required": ["line", "technique", "label"],
+      "additionalProperties": false,
+      "properties": {
+        "line": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "technique": {
+          "type": "string",
+          "pattern": "^T-[0-9]{4}(\\.[0-9]{3})?$"
+        },
+        "label": {
+          "type": "string",
+          "pattern": "^[^()\\s]([^()\\r\\n]*[^()\\s])?$"
+        }
+      }
+    }
+  }
+}

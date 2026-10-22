@@ -5,12 +5,15 @@ committed files are never perturbed. The shipped tree must be green; each rule t
 validator enforces is proven red on one minimal mutation.
 """
 
+import importlib.util
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
 import tempfile
+import unicodedata
 from datetime import date
 from pathlib import Path
 
@@ -18,8 +21,11 @@ import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
 FILES = ("matrix.json", "technique-ids.json", "schema/threat-matrix-v1.2.schema.json",
-         "schema/consumer-readiness.json", "scripts/validate_matrix.py",
-         "scripts/generate_stix.py", "stix/agent-threat-matrix-bundle.json", "evidence-gaps.json")
+         "schema/consumer-readiness.json", "schema/evidence-sources.schema.json",
+         "scripts/validate_matrix.py", "scripts/generate_stix.py",
+         "stix/agent-threat-matrix-bundle.json", "evidence-gaps.json", "evidence-sources.json")
+INPUT_SCHEMAS = ["schema/threat-matrix-v1.2.schema.json", "schema/consumer-readiness.json",
+                 "schema/evidence-sources.schema.json"]
 
 
 def scratch_tree(td: Path = None) -> Path:
@@ -192,8 +198,7 @@ def replace_with_directory(rel: str):
     return fn
 
 
-@pytest.mark.parametrize("rel", ["matrix.json", "schema/threat-matrix-v1.2.schema.json",
-                                 "schema/consumer-readiness.json"])
+@pytest.mark.parametrize("rel", ["matrix.json"] + INPUT_SCHEMAS)
 def test_directory_at_an_input_path_is_one_fail_line_not_a_traceback(rel):
     proc = mutate(replace_with_directory(rel))
     assert proc.returncode == 1, proc.stdout + proc.stderr
@@ -217,8 +222,7 @@ def test_file_where_the_schema_directory_should_be_names_the_system_reason():
     proc = mutate(fn)
     assert proc.returncode == 1, proc.stdout + proc.stderr
     assert proc.stderr.splitlines() == [
-        "FAIL: schema/threat-matrix-v1.2.schema.json is missing or does not parse: Not a directory",
-        "FAIL: schema/consumer-readiness.json is missing or does not parse: Not a directory",
+        f"FAIL: {rel} is missing or does not parse: Not a directory" for rel in INPUT_SCHEMAS
     ], proc.stderr
 
 
@@ -243,8 +247,7 @@ def nested(kind: str) -> str:
 
 
 @pytest.mark.parametrize("kind", ["array", "object"])
-@pytest.mark.parametrize("rel", ["matrix.json", "schema/threat-matrix-v1.2.schema.json",
-                                 "schema/consumer-readiness.json"])
+@pytest.mark.parametrize("rel", ["matrix.json"] + INPUT_SCHEMAS)
 def test_input_nested_too_deep_to_parse_is_one_fail_line_not_a_traceback(rel, kind):
     proc = mutate(lambda root: (root / rel).write_text(nested(kind)))
     assert proc.returncode == 1, proc.stdout + proc.stderr
@@ -924,7 +927,9 @@ def git_scratch_tree(updated: str) -> Path:
     return history_tree(stamp)
 
 
-def edit_technique_name(root: Path, tid: str = "T-1006") -> None:
+def edit_technique_name(root: Path, tid: str = "T-1001") -> None:
+    # T-1001 carries no evidence entry: a pinned page names a technique by its name, so
+    # renaming a technique that cites one is an S15 finding as well as a content change.
     m = load(root, "matrix.json")
     t = next(t for t in m["techniques"] if t["id"] == tid)
     t["name"] += " (edited)"
@@ -961,7 +966,7 @@ def today() -> str:
 
 def test_s13_technique_change_without_moving_updated_is_red():
     proc = run_in_git_tree("2026-06-03", edit_technique_name)
-    _red(proc, f"S13 matrix.json content differs from HEAD (techniques T-1006) but updated is "
+    _red(proc, f"S13 matrix.json content differs from HEAD (techniques T-1001) but updated is "
                f"2026-06-03, older than today {today()}; set updated to {today()}")
 
 
@@ -1067,7 +1072,7 @@ def test_telemetry_entry_on_a_technique_the_endpoint_served_no_samples_for_is_re
                f"served no samples for the technique on {source['read']}: its wildSampleCount is 0")
 
 
-@pytest.mark.parametrize("kind", ["observation", "lab-reproduction", "publication", "advisory"])
+@pytest.mark.parametrize("kind", ["observation", "publication", "advisory"])
 def test_reference_of_a_kind_the_validator_reads_no_source_for_is_red(kind):
     reference = "https://example.org/no-such-page"
     proc, index = run_with_evidence("T-1001", {"type": kind, "reference": reference, "date": "2026-01-01"})
@@ -1117,6 +1122,213 @@ def test_stix_attack_patterns_carry_each_evidence_reference():
                    for r, e in zip(tail, evidence)), t["id"]
         carried += len(evidence)
     assert carried == sum(len(t.get("evidence", [])) for t in matrix["techniques"]) > 0
+
+
+# --------------------------------------------------------------------------- S15 lab-reproduction entries
+
+LAB = "lab-reproduction"
+DVAA = "https://github.com/opena2a-org/damn-vulnerable-ai-agent"
+LATERAL = "scenarios/prompt-to-lateral-movement/README.md"
+THRESH = "scenarios/agent-thresh-01/README.md"
+
+
+def pinned_pages(root: Path = ROOT) -> list:
+    return load(root, "evidence-sources.json")["dvaa"]["pages"]
+
+
+def permalink(page: dict) -> str:
+    return f"{DVAA}/blob/{page['commit']}/{page['path']}"
+
+
+def page_entry(path: str, **change) -> dict:
+    """The lab-reproduction entry that cites the pinned page at path, with change applied."""
+    page = next(p for p in pinned_pages() if p["path"] == path)
+    return dict({"type": LAB, "reference": permalink(page), "date": page["committed"]}, **change)
+
+
+def test_shipped_lab_entries_cite_a_pinned_page_that_names_the_technique():
+    pages = {permalink(page): page for page in pinned_pages()}
+    cited = 0
+    for t in load(ROOT, "matrix.json")["techniques"]:
+        for entry in t.get("evidence", []):
+            if entry["type"] == LAB:
+                page = pages[entry["reference"]]
+                assert entry["date"] == page["committed"], t["id"]
+                assert (t["id"], t["name"]) in [(n["technique"], n["label"]) for n in page["names"]], t["id"]
+                cited += 1
+    assert cited > 0
+
+
+def test_every_pinned_name_that_is_its_technique_name_is_cited():
+    techniques = {t["id"]: t for t in load(ROOT, "matrix.json")["techniques"]}
+    for page in pinned_pages():
+        entry = {"type": LAB, "reference": permalink(page), "date": page["committed"]}
+        for name in page["names"]:
+            t = techniques.get(name["technique"])
+            if t is not None and t["name"] == name["label"]:
+                assert entry in t.get("evidence", []), (page["path"], name)
+
+
+def test_lab_entry_citing_a_page_no_pin_holds_is_red():
+    # The commit is pinned, the page is not: no record stands behind the reference, so the
+    # entry would cite a page nobody read.
+    entry = page_entry(LATERAL)
+    dead = entry["reference"].replace("prompt-to-lateral-movement", "no-such-scenario")
+    proc, index = run_with_evidence("T-1001", dict(entry, reference=dead))
+    _red(proc, f"S15 T-1001: evidence[{index}] reference {dead!r} does not resolve: evidence-sources.json "
+               f"pins no page with this reference, so the validator cannot show it was read")
+
+
+def test_lab_entry_citing_a_pinned_page_that_does_not_name_the_technique_is_red():
+    entry = page_entry(LATERAL)
+    proc, index = run_with_evidence("T-1001", entry)
+    _red(proc, f"S15 T-1001: evidence[{index}] reference {entry['reference']!r} does not resolve: the page "
+               f"evidence-sources.json pins at this reference names no T-1001")
+
+
+@pytest.mark.parametrize("path, label", [(LATERAL, "Prompt Injection"), (THRESH, "Threshold Exhaustion")])
+def test_lab_entry_citing_a_page_that_names_the_id_under_another_label_is_red(path, label):
+    # Both pages name T-2001, under labels that are not Direct Prompt Injection.
+    entry = page_entry(path)
+    proc, index = run_with_evidence("T-2001", entry)
+    _red(proc, f"S15 T-2001: evidence[{index}] reference {entry['reference']!r} does not resolve: the page "
+               f"names T-2001 as {label!r}, not as 'Direct Prompt Injection', its name in matrix.json")
+
+
+def test_lab_entry_dated_other_than_the_commit_that_wrote_the_page_is_red():
+    entry = page_entry(LATERAL, date="2026-10-21")
+    proc, index = run_with_evidence("T-1002", entry)
+    _red(proc, f"S15 T-1002: evidence[{index}] reference {entry['reference']!r} does not resolve: its date "
+               f"2026-10-21 is not {page_entry(LATERAL)['date']}, the date evidence-sources.json gives the "
+               f"commit that wrote the page")
+
+
+def test_renaming_a_technique_a_pinned_page_names_leaves_its_lab_entry_unresolved():
+    # The page names T-1006 by the name it had when the page was pinned; pin the page again
+    # once it names the technique as matrix.json does.
+    def fn(root):
+        edit_technique_name(root, "T-1006")
+        regenerate_stix(root)
+    reference = page_entry("scenarios/atc-forgery-attack/README.md")["reference"]
+    _red(mutate(fn), f"S15 T-1006: evidence[0] reference {reference!r} does not resolve: the page names "
+                     f"T-1006 as 'Agent Card Discovery', not as 'Agent Card Discovery (edited)', its name "
+                     f"in matrix.json")
+
+
+def test_repeated_lab_entry_is_red():
+    proc, index = run_with_evidence("T-1002", page_entry(LATERAL))
+    _red(proc, f"S15 T-1002: evidence[{index}] repeats evidence[0] (the same type, reference and date)")
+
+
+def test_lab_entry_resolves_once_a_pinned_page_names_the_technique_under_its_name():
+    # The validator before this rule refused every lab-reproduction entry; it reads the pins now.
+    def fn(root):
+        sources = load(root, "evidence-sources.json")
+        page = next(p for p in sources["dvaa"]["pages"] if p["path"] == LATERAL)
+        page["names"].append({"line": 99, "technique": "T-1001", "label": "Endpoint Enumeration"})
+        dump(root, "evidence-sources.json", sources)
+        m = load(root, "matrix.json")
+        technique_of(m, "T-1001")["evidence"] = [page_entry(LATERAL)]
+        dump(root, "matrix.json", m)
+        regenerate_stix(root)
+    proc = mutate(fn)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert "32 evidence entries resolved (30 techniques with none)" in proc.stdout, proc.stdout
+
+
+# --------------------------------------------------------------------------- S17 evidence-sources.json
+
+
+def edit_sources(change):
+    """A mutation that applies change to evidence-sources.json in a scratch tree."""
+    def fn(root):
+        sources = load(root, "evidence-sources.json")
+        change(sources["dvaa"])
+        dump(root, "evidence-sources.json", sources)
+    return fn
+
+
+def test_s17_missing_sources_file_is_red_and_no_lab_entry_resolves():
+    proc = mutate(lambda root: (root / "evidence-sources.json").unlink())
+    _red(proc, "S17 evidence-sources.json is missing or does not parse: no such file")
+    assert "does not resolve: evidence-sources.json pins no page with this reference" in proc.stderr
+
+
+def test_s17_directory_at_the_sources_file_is_red():
+    _red(mutate(replace_with_directory("evidence-sources.json")),
+         "S17 evidence-sources.json is missing or does not parse: a directory, not a file")
+
+
+@pytest.mark.parametrize("change, needle", [
+    (lambda d: d["pages"][0].update(blob="ef5db56"),
+     "S17 evidence-sources.dvaa.pages[0].blob: 'ef5db56' does not match ^[0-9a-f]{40}$"),
+    (lambda d: d.update(repository="https://github.com/example/fork"),
+     "S17 evidence-sources.dvaa.repository: expected 'https://github.com/opena2a-org/damn-vulnerable-ai-agent', "
+     "got 'https://github.com/example/fork'"),
+    (lambda d: d["pages"][0].update(path="../README.md"),
+     "S17 evidence-sources.dvaa.pages[0].path: '../README.md' does not match"),
+    (lambda d: d["pages"][0]["names"][0].update(label="(Prompt Injection)"),
+     "S17 evidence-sources.dvaa.pages[0].names[0].label: '(Prompt Injection)' does not match"),
+    (lambda d: d["pages"][0]["names"][0].update(line=0),
+     "S17 evidence-sources.dvaa.pages[0].names[0].line: 0 is below the minimum 1"),
+    (lambda d: d["pages"][0].update(note="read in full"),
+     "S17 evidence-sources.dvaa.pages[0]: unexpected property 'note'"),
+    (lambda d: d.pop("head"), "S17 evidence-sources.dvaa: missing required property 'head'"),
+])
+def test_s17_sources_file_outside_its_schema_is_red_and_no_lab_entry_resolves(change, needle):
+    proc = mutate(edit_sources(change))
+    _red(proc, needle)
+    assert "does not resolve: evidence-sources.json pins no page with this reference" in proc.stderr
+
+
+def test_s17_read_date_that_is_not_a_calendar_date_is_red():
+    _red(mutate(edit_sources(lambda d: d.update(read="2026-02-30"))),
+         "S17 evidence-sources.dvaa.read: '2026-02-30' is not a calendar date")
+
+
+def test_s17_read_date_later_than_today_is_red():
+    _red(mutate(edit_sources(lambda d: d.update(read="2999-01-01"))),
+         f"S17 evidence-sources.dvaa.read: 2999-01-01 is later than today, {date.today().isoformat()}")
+
+
+def test_s17_page_committed_later_than_the_read_is_red():
+    def change(d):
+        d["pages"][0]["committed"] = "2026-10-22"
+        d["read"] = "2026-10-21"
+    _red(mutate(edit_sources(change)),
+         f"S17 evidence-sources.dvaa.pages[0] ({THRESH}): committed 2026-10-22 is later than read "
+         f"2026-10-21, the date the clone was read")
+
+
+def test_s17_committed_date_that_is_not_a_calendar_date_is_red():
+    _red(mutate(edit_sources(lambda d: d["pages"][0].update(committed="2026-13-01"))),
+         f"S17 evidence-sources.dvaa.pages[0] ({THRESH}): committed '2026-13-01' is not a calendar date")
+
+
+def test_s17_page_that_names_no_technique_is_red():
+    _red(mutate(edit_sources(lambda d: d["pages"][0].update(names=[]))),
+         f"S17 evidence-sources.dvaa.pages[0] ({THRESH}): names no technique; a page is pinned for "
+         f"the techniques it names")
+
+
+def test_s17_sources_schema_keyword_outside_the_checker_subset_is_red():
+    # The pinned pages meet the bound, so the keyword the checker does not read is the only
+    # cause of the red run.
+    def fn(root):
+        schema = load(root, "schema/evidence-sources.schema.json")
+        schema["$defs"]["dvaa"]["properties"]["pages"]["maxItems"] = len(pinned_pages(root))
+        dump(root, "schema/evidence-sources.schema.json", schema)
+    _red(mutate(fn), "S17 schema/evidence-sources.schema.json: schema keyword 'maxItems' at "
+                     "evidence-sources.dvaa.pages is outside the supported subset")
+
+
+def test_s17_page_pinned_twice_is_red():
+    def change(d):
+        d["pages"].append(dict(d["pages"][0], commit=d["head"]))
+    proc = mutate(edit_sources(change))
+    last = len(pinned_pages())
+    _red(proc, f"S17 evidence-sources.dvaa.pages[{last}] ({THRESH}): evidence-sources.dvaa.pages[0] pins "
+               f"this page already")
 
 
 # --------------------------------------------------------------------------- S16 evidence gap list
@@ -1181,3 +1393,139 @@ def test_s16_gap_list_out_of_step_with_the_evidence_is_red():
 def test_s16_missing_gap_list_is_red():
     _red(mutate(lambda root: (root / "evidence-gaps.json").unlink()),
          "S16 evidence-gaps.json is missing; run scripts/generate_stix.py")
+
+
+# --------------------------------------------------------------------------- schema patterns
+# A JSON Schema pattern is an ECMA-262 regular expression. Python's re reads some of the same
+# text another way: its $ also matches before a final newline, so "T-1001\n" passed
+# ^T-[0-9]{4}$, which ECMA-262 refuses.
+
+
+@pytest.fixture(scope="module")
+def validator():
+    spec = importlib.util.spec_from_file_location("validate_matrix", ROOT / "scripts" / "validate_matrix.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def pattern_errors(validator, value: str, pattern: str) -> list:
+    """What the shape pass reports for a string ``value`` against ``pattern``."""
+    checker = validator.SchemaChecker({})
+    checker.check(value, {"type": "string", "pattern": pattern}, "value")
+    return checker.errors
+
+
+def schema_patterns(node) -> set:
+    """Every ``pattern`` the schema states."""
+    if isinstance(node, dict):
+        found = {node["pattern"]} if isinstance(node.get("pattern"), str) else set()
+        return found.union(*(schema_patterns(value) for value in node.values()))
+    if isinstance(node, list):
+        return set().union(*(schema_patterns(value) for value in node))
+    return set()
+
+
+def test_reader_commit_and_mapping_ref_that_end_in_a_newline_are_refused():
+    # Both passed, and scripts/check_technique_pages.py --fix then wrote the ref across two
+    # lines of the technique page, which the runs after it reported as differing from
+    # matrix.json.
+    commit = "0" * 40 + "\n"
+    registry = [dict(data_source(), readBy=[dict(reader(), commit=commit)])]
+    proc = mutate(with_data_sources(registry, [dict(mapping(), ref="request.path\n")]))
+    _red(proc, f"matrix.dataSources[0].readBy[0].commit: {commit!r} does not match ^[0-9a-f]{{40}}$")
+    assert r"matrix.techniques[0].dataSources[0].ref: 'request.path\n' does not match ^\S(.*\S)?$" \
+        in proc.stderr, proc.stderr
+
+
+def test_every_schema_pattern_that_ends_in_a_dollar_refuses_its_value_with_a_newline_after_it(validator):
+    """Each such pattern is tried on the first value checked against it in the shipped
+    matrix, with a data source, a mapping and a versioned sub-technique added so that every
+    pattern is reached."""
+    schema = load(ROOT, "schema/threat-matrix-v1.2.schema.json")
+    matrix = load(ROOT, "matrix.json")
+    matrix["dataSources"] = [data_source()]
+    first = matrix["techniques"][0]
+    first["dataSources"] = [mapping()]
+    matrix["techniques"].append(dict(first, id=first["id"] + ".001", parentId=first["id"],
+                                     version="1.0.0"))
+    samples = {}
+
+    class Recorder(validator.SchemaChecker):
+        def check(self, value, schema, path):
+            if "pattern" in schema and isinstance(value, str):
+                samples.setdefault(schema["pattern"], value)
+            super().check(value, schema, path)
+
+    recorder = Recorder(schema)
+    recorder.check(matrix, schema, "matrix")
+    assert recorder.errors == []
+    patterns = schema_patterns(schema)
+    assert patterns <= set(samples), sorted(patterns - set(samples))
+    anchored = sorted(pattern for pattern in patterns if pattern.endswith("$"))
+    assert anchored
+    for pattern in anchored:
+        value = samples[pattern]
+        assert pattern_errors(validator, value, pattern) == [], pattern
+        assert pattern_errors(validator, value + "\n", pattern) == [
+            f"value: {value + chr(10)!r} does not match {pattern}"]
+
+
+REF = ("dataSourceMapping", "ref")
+READER_PATH = ("sourceReader", "path")
+
+
+@pytest.mark.parametrize("field,value,accepted", [
+    # ECMA-262's . does not match \r, U+2028 or U+2029; Python's does.
+    (REF, "request\rpath", False),
+    (REF, "request\N{LINE SEPARATOR}path", False),
+    (REF, "request\N{PARAGRAPH SEPARATOR}path", False),
+    # U+FEFF is white space to ECMA-262's \s and \S and not to Python's; U+001C and U+0085
+    # are white space to Python's and not to ECMA-262's.
+    (REF, "request.path\N{ZERO WIDTH NO-BREAK SPACE}", False),
+    (REF, "request.path\x1c", True),
+    (REF, "\x85request.path", True),
+    (READER_PATH, "src/\N{ZERO WIDTH NO-BREAK SPACE}example.ts", False),
+    (READER_PATH, "src/\x1cexample.ts", True),
+    (READER_PATH, "\x85src/example.ts", True),
+])
+def test_schema_pattern_reads_dot_and_white_space_as_ecma_262_does(validator, field, value, accepted):
+    definition, prop = field
+    schema = load(ROOT, "schema/threat-matrix-v1.2.schema.json")
+    pattern = schema["$defs"][definition]["properties"][prop]["pattern"]
+    want = [] if accepted else [f"value: {value!r} does not match {pattern}"]
+    assert pattern_errors(validator, value, pattern) == want
+
+
+@pytest.mark.parametrize("pattern,value,accepted", [
+    (r"^\d$", "\N{ARABIC-INDIC DIGIT THREE}", False),  # ECMA-262's \d is [0-9]
+    (r"^\D$", "\N{ARABIC-INDIC DIGIT THREE}", True),
+    (r"^\w$", "\N{LATIN SMALL LETTER E WITH ACUTE}", False),  # and its \w is [A-Za-z0-9_]
+    (r"^\W$", "\N{LATIN SMALL LETTER E WITH ACUTE}", True),
+    (r"^a\b", "a\N{LATIN SMALL LETTER E WITH ACUTE}", True),
+    (r"^a\B", "a\N{LATIN SMALL LETTER E WITH ACUTE}", False),
+    (r"^a[]", "ab", False),  # [] matches no character
+    (r"^a[^]$", "a\n", True),  # [^] matches any character
+    (r"^a[^]b$", "a\rb", True),
+    (r"^[a\S]$", "\x1c", True),  # \S inside a class reads ECMA-262's white space too
+    (r"^[a\S]$", "\N{ZERO WIDTH NO-BREAK SPACE}", False),
+    (r"^[^a\S]$", "\N{ZERO WIDTH NO-BREAK SPACE}", True),
+    (r"^[^a\S]$", "\x1c", False),
+])
+def test_pattern_constructs_the_schema_does_not_use_are_read_as_ecma_262_does(validator, pattern, value,
+                                                                               accepted):
+    want = [] if accepted else [f"value: {value!r} does not match {pattern}"]
+    assert pattern_errors(validator, value, pattern) == want
+
+
+def test_white_space_and_its_complement_are_the_code_points_ecma_262_names(validator):
+    """Tab, vertical tab, form feed, U+FEFF and the Space_Separator (Zs) code points are
+    white space; \\n, \\r, U+2028 and U+2029 are line terminators. ECMA_NOT_SPACE holds
+    every other code point."""
+    codes = range(0x110000)
+    zs = {code for code in codes if unicodedata.category(chr(code)) == "Zs"}
+    want = {0x09, 0x0B, 0x0C, 0xFEFF, 0x0A, 0x0D, 0x2028, 0x2029} | zs
+    space = re.compile(f"[{validator.ECMA_SPACE}]")
+    not_space = re.compile(f"[{validator.ECMA_NOT_SPACE}]")
+    assert {code for code in codes if space.match(chr(code))} == want
+    assert {code for code in codes if not_space.match(chr(code))} == set(codes) - want

@@ -8,8 +8,11 @@ Standard library only, no network. Two passes:
    ``type``, ``required``, ``properties``, ``additionalProperties``, ``items``,
    ``enum``, ``const``, ``pattern``, ``minimum``, ``maximum``, ``minItems`` and local
    ``$ref`` into ``$defs``. Any other keyword in the schema is a fault in this checker's
-   coverage and fails loudly rather than being silently ignored. A ``number`` is
-   finite: the NaN and Infinity that Python's json module reads are not JSON numbers.
+   coverage and fails loudly rather than being silently ignored. A ``pattern`` is an
+   ECMA-262 regular expression, the dialect JSON Schema names for it, and is applied after
+   ``ecma_pattern`` rewrites the constructs it names, which Python's re reads another way.
+   A ``number`` is finite: the NaN and Infinity that Python's json module reads are not
+   JSON numbers.
    An ``integer`` or ``number`` too large to convert to a 64-bit float, which JSON
    allows, is reported as not a finite number. An integer longer than Python's int
    string conversion limit (4300 digits by default) does not parse, and the FAIL line
@@ -60,16 +63,28 @@ Standard library only, no network. Two passes:
         ``honeypot-telemetry`` entry resolves when its reference is the
         ``wildPrevalenceSource`` url, its date is the ``wildPrevalenceSource`` read
         date, and the technique's ``wildSampleCount`` is above 0, so the endpoint
-        served telemetry for the technique on that date. No other reference
-        resolves: the validator records no other source, so a citation it cannot
-        read is refused rather than taken on trust
+        served telemetry for the technique on that date. A ``lab-reproduction``
+        entry resolves when its reference is the permalink of a page that
+        evidence-sources.json pins, ``<repository>/blob/<commit>/<path>``, its date
+        is the page's ``committed`` date, and the page names the technique's id with
+        the technique's name as the label, so the page at that commit names the
+        technique. No other reference resolves: the validator records no other
+        source, so a citation it cannot read is refused rather than taken on trust
    - S16 evidence-gaps.json is byte-identical to what scripts/generate_stix.py
         renders from this matrix.json: the sorted ids of the techniques whose
         ``evidence`` is empty or absent
+   - S17 evidence-sources.json has the shape schema/evidence-sources.schema.json
+        gives; its ``read`` date and each page's ``committed`` date are calendar
+        dates, ``read`` is no later than today and no ``committed`` is later than
+        ``read``; no page is pinned twice; and every page names a technique. The
+        validator does not read the clone the pins were taken from:
+        ``python3 scripts/pin_evidence_sources.py --dvaa <clone> --check`` compares
+        them with it
 
 Exit 0 when everything holds, 1 otherwise.
 """
 
+import functools
 import json
 import math
 import os
@@ -88,7 +103,10 @@ TECHNIQUE_IDS = ROOT / "technique-ids.json"
 STIX_BUNDLE = ROOT / "stix" / "agent-threat-matrix-bundle.json"
 STIX_GENERATOR = ROOT / "scripts" / "generate_stix.py"
 EVIDENCE_GAPS = ROOT / "evidence-gaps.json"
+EVIDENCE_SOURCES = ROOT / "evidence-sources.json"
+SOURCES_SCHEMA = ROOT / "schema" / "evidence-sources.schema.json"
 TELEMETRY = "honeypot-telemetry"
+LAB = "lab-reproduction"
 
 DOTTED_RE = re.compile(r"^(T-[0-9]{4})\.[0-9]{3}$")
 # Applied with fullmatch: ``$`` also matches before a trailing newline.
@@ -135,6 +153,57 @@ TYPE_CHECKS = {
     "null": lambda v: v is None,
 }
 
+# The code points ECMA-262 reads as white space or a line terminator, which its \s matches,
+# as the contents of a Python class. Python's \s also matches U+001C to U+001F and U+0085,
+# and does not match U+FEFF.
+ECMA_SPACE = (r"\t\n\v\f\r \xa0\U00001680\U00002000-\U0000200a\U00002028\U00002029"
+              r"\U0000202f\U0000205f\U00003000\U0000feff")
+# Every other code point, which ECMA-262's \S matches, for a \S inside a class.
+ECMA_NOT_SPACE = (r"\x00-\x08\x0e-\x1f\x21-\x9f\xa1-\U0000167f\U00001681-\U00001fff"
+                  r"\U0000200b-\U00002027\U0000202a-\U0000202e\U00002030-\U0000205e"
+                  r"\U00002060-\U00002fff\U00003001-\U0000fefe\U0000ff00-\U0010ffff")
+# The line terminators, which ECMA-262's . does not match. Python's . matches all but \n.
+ECMA_LINE_TERMINATORS = r"\n\r\U00002028\U00002029"
+
+
+@functools.lru_cache(maxsize=None)
+def ecma_pattern(pattern: str) -> re.Pattern:
+    """A schema ``pattern``, an ECMA-262 regular expression as JSON Schema has it, compiled
+    for Python's re.
+
+    These constructs, which Python reads another way, are rewritten to the ECMA-262
+    reading: ``$`` outside a class matches only at the end of the string, where Python's
+    also matches before a final newline; ``.`` does not match the ECMA_LINE_TERMINATORS;
+    ``\\s`` matches ECMA_SPACE and ``\\S`` every other code point, inside a class and
+    outside one; ``[]`` matches no character and ``[^]`` any character, where Python reads
+    that ``]`` as a member of the class. ``re.ASCII`` reads ``\\d``, ``\\w`` and ``\\b`` and
+    their capitals as ASCII, as ECMA-262 does.
+    """
+    out, in_class, i = [], False, 0
+    while i < len(pattern):
+        token, width = pattern[i], 1
+        if token == "\\" and i + 1 < len(pattern):
+            token, width = pattern[i:i + 2], 2
+            if token == r"\s":
+                token = ECMA_SPACE if in_class else f"[{ECMA_SPACE}]"
+            elif token == r"\S":
+                token = ECMA_NOT_SPACE if in_class else f"[^{ECMA_SPACE}]"
+        elif in_class:
+            in_class = token != "]"
+        elif pattern.startswith("[]", i):
+            token, width = "(?!)", 2
+        elif pattern.startswith("[^]", i):
+            token, width = "(?s:.)", 3
+        elif token == "[":
+            in_class = True
+        elif token == "$":
+            token = r"\Z"
+        elif token == ".":
+            token = f"[^{ECMA_LINE_TERMINATORS}]"
+        out.append(token)
+        i += width
+    return re.compile("".join(out), re.ASCII)
+
 
 class SchemaChecker:
     def __init__(self, schema: dict):
@@ -176,7 +245,7 @@ class SchemaChecker:
                 return
 
         if "pattern" in schema and isinstance(value, str):
-            if not re.search(schema["pattern"], value):
+            if not ecma_pattern(schema["pattern"]).search(value):
                 self.errors.append(f"{path}: {value!r} does not match {schema['pattern']}")
 
         if TYPE_CHECKS["number"](value):
@@ -307,11 +376,34 @@ def resolve_matrix_commit(commit: str, listed, errors: list) -> str:
     return "ids match matrix.json at that commit"
 
 
-def unresolved_reason(entry: dict, technique: dict, source: dict):
+def unpinned_reason(entry: dict, technique: dict, pages: dict):
+    """Why a lab-reproduction entry does not resolve to a pinned page (S15), or None."""
+    page = pages.get(entry["reference"])
+    if page is None:
+        return (f"evidence-sources.json pins no page with this reference, so the validator cannot show "
+                f"it was read; a {LAB} reference resolves only to the permalink of a pinned page, "
+                f"<repository>/blob/<commit>/<path>")
+    if entry["date"] != page["committed"]:
+        return (f"its date {entry['date']} is not {page['committed']}, the date evidence-sources.json "
+                f"gives the commit that wrote the page")
+    tid, name = technique["id"], technique["name"]
+    labels = [n["label"] for n in page["names"] if n["technique"] == tid]
+    if not labels:
+        return f"the page evidence-sources.json pins at this reference names no {tid}"
+    if name not in labels:
+        named = " and ".join(repr(label) for label in labels)
+        return f"the page names {tid} as {named}, not as {name!r}, its name in matrix.json"
+    return None
+
+
+def unresolved_reason(entry: dict, technique: dict, source: dict, pages: dict):
     """Why an evidence entry does not resolve (S15), or None when it does."""
+    if entry["type"] == LAB:
+        return unpinned_reason(entry, technique, pages)
     if entry["type"] != TELEMETRY:
         return (f"the validator reads no {entry['type']} source, so it cannot show the reference "
-                f"was read; it resolves a {TELEMETRY} entry only, against wildPrevalenceSource")
+                f"was read; it resolves a {TELEMETRY} entry against wildPrevalenceSource and a {LAB} "
+                f"entry against evidence-sources.json")
     if entry["reference"] != source["url"]:
         return (f"a {TELEMETRY} reference resolves only to the endpoint wildPrevalenceSource "
                 f"names, {source['url']}")
@@ -324,12 +416,12 @@ def unresolved_reason(entry: dict, technique: dict, source: dict):
     return None
 
 
-def evidence_findings(technique: dict, tid: str, source: dict) -> list:
+def evidence_findings(technique: dict, tid: str, source: dict, pages: dict) -> list:
     """S15 lines for the evidence entries of one technique."""
     findings = []
     first = {}
     for index, entry in enumerate(technique.get("evidence", [])):
-        reason = unresolved_reason(entry, technique, source)
+        reason = unresolved_reason(entry, technique, source, pages)
         if reason:
             findings.append(f"S15 {tid}: evidence[{index}] reference {entry['reference']!r} "
                             f"does not resolve: {reason}")
@@ -342,7 +434,7 @@ def evidence_findings(technique: dict, tid: str, source: dict) -> list:
     return findings
 
 
-def semantic_checks(matrix: dict, readiness: dict, technique_ids_file, errors: list) -> str:
+def semantic_checks(matrix: dict, readiness: dict, technique_ids_file, pages: dict, errors: list) -> str:
     """Append one line per semantic failure; return the matrixCommit note for the summary."""
     commit_note = ""
     techniques = matrix["techniques"]
@@ -395,7 +487,7 @@ def semantic_checks(matrix: dict, readiness: dict, technique_ids_file, errors: l
                 f"registry with scripts/sync_wild_prevalence.py rather than editing them"
             )
 
-        errors.extend(evidence_findings(t, tid, matrix["wildPrevalenceSource"]))
+        errors.extend(evidence_findings(t, tid, matrix["wildPrevalenceSource"], pages))
 
         status = t.get("status", "active")
         replaced_by = t.get("replacedBy")
@@ -454,6 +546,59 @@ def semantic_checks(matrix: dict, readiness: dict, technique_ids_file, errors: l
             if tid not in ids:
                 errors.append(f"S9 attackPaths {path['id']}: step {tid} is not a technique id")
     return commit_note
+
+
+def calendar_date(value: str) -> bool:
+    try:
+        date.fromisoformat(value)
+    except ValueError:
+        return False
+    return True
+
+
+def pinned_pages(schema: dict, today: str, errors: list) -> dict:
+    """S17: append one line per fault in evidence-sources.json; return its pages by permalink.
+
+    A file that does not parse, or does not have the shape its schema gives, has fields that
+    cannot be read, so it pins no page that S15 resolves an entry against.
+    """
+    sources, cause = read_json(EVIDENCE_SOURCES)
+    if sources is None:
+        errors.append(f"S17 evidence-sources.json is missing or does not parse: {cause}")
+        return {}
+    checker = SchemaChecker(schema)
+    try:
+        checker.check(sources, schema, "evidence-sources")
+    except ValueError as exc:
+        errors.append(f"S17 schema/evidence-sources.schema.json: {exc}")
+        return {}
+    if checker.errors:
+        errors.extend(f"S17 {error}" for error in checker.errors)
+        return {}
+    dvaa = sources["dvaa"]
+    read = dvaa["read"]
+    if not calendar_date(read):
+        errors.append(f"S17 evidence-sources.dvaa.read: {read!r} is not a calendar date")
+    elif read > today:
+        errors.append(f"S17 evidence-sources.dvaa.read: {read} is later than today, {today}")
+    pages, first = {}, {}
+    for index, page in enumerate(dvaa["pages"]):
+        where = f"evidence-sources.dvaa.pages[{index}] ({page['path']})"
+        committed = page["committed"]
+        if not calendar_date(committed):
+            errors.append(f"S17 {where}: committed {committed!r} is not a calendar date")
+        elif calendar_date(read) and committed > read:
+            errors.append(f"S17 {where}: committed {committed} is later than read {read}, the date the "
+                          f"clone was read")
+        if not page["names"]:
+            errors.append(f"S17 {where}: names no technique; a page is pinned for the techniques it names")
+        if page["path"] in first:
+            errors.append(f"S17 {where}: evidence-sources.dvaa.pages[{first[page['path']]}] pins this "
+                          f"page already")
+        else:
+            first[page["path"]] = index
+        pages[f"{dvaa['repository']}/blob/{page['commit']}/{page['path']}"] = page
+    return pages
 
 
 def stix_check(errors: list):
@@ -558,14 +703,15 @@ def load_json(path: Path):
 
 
 def main() -> int:
-    loaded = {path: read_json(path) for path in (MATRIX, SCHEMA, READINESS)}
+    inputs = (MATRIX, SCHEMA, READINESS, SOURCES_SCHEMA)
+    loaded = {path: read_json(path) for path in inputs}
     if any(data is None for data, _ in loaded.values()):
         for path, (data, cause) in loaded.items():
             if data is None:
                 print(f"FAIL: {path.relative_to(ROOT)} is missing or does not parse: {cause}",
                       file=sys.stderr)
         return 1
-    matrix, schema, readiness = (loaded[path][0] for path in (MATRIX, SCHEMA, READINESS))
+    matrix, schema, readiness, sources_schema = (loaded[path][0] for path in inputs)
 
     checker = SchemaChecker(schema)
     try:
@@ -577,9 +723,14 @@ def main() -> int:
 
     technique_ids_file = load_json(TECHNIQUE_IDS)
     commit_note = ""
+    pages = {}
     if not errors:
-        commit_note = semantic_checks(matrix, readiness, technique_ids_file, errors)
-        freshness_check(matrix, committed_matrix(), date.today().isoformat(), errors)
+        today = date.today().isoformat()
+        source_errors = []
+        pages = pinned_pages(sources_schema, today, source_errors)
+        commit_note = semantic_checks(matrix, readiness, technique_ids_file, pages, errors)
+        errors.extend(source_errors)
+        freshness_check(matrix, committed_matrix(), today, errors)
         stix_check(errors)
     else:
         errors.append("semantic checks skipped until the schema violations above are fixed")
@@ -596,7 +747,8 @@ def main() -> int:
     print(
         f"matrix.json validates against schema 1.2: {len(matrix['techniques'])} techniques "
         f"({sub} sub-techniques), {len(matrix['dataSources'])} data sources, "
-        f"{entries} evidence entries resolved ({bare} techniques with none), "
+        f"{entries} evidence entries resolved ({bare} techniques with none) against "
+        f"wildPrevalenceSource and the {len(pages)} pages evidence-sources.json pins, "
         f"technique-ids.json, STIX bundle and evidence-gaps.json in sync "
         f"(matrixCommit {technique_ids_file['matrixCommit']}, {commit_note})"
     )
