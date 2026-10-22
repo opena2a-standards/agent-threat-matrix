@@ -104,8 +104,20 @@ after them that is not such a digit in the line as written, such as < or *, so
 "&#x30<b>D<x\\>VAA" reads "0DVAA" and names DVAA, as do "DVA&#65", "DVA&#x41" and
 "DVA&#00000065;", where CommonMark reads a reference only with the ; and at most seven
 decimal or six hexadecimal digits and shows each of the three as written in a paragraph.
-No such reference starts inside HTML or a code span, or at an escaped &. The line names
-DVAA when any reading does. On the way, as
+No such reference starts inside HTML or a code span, or at an escaped &. Each of these
+readings is also made with the text of each style, script and
+template element removed, as a browser shows none of it: going along the line, a start
+tag removed as above whose name is style, script or template opens that element unless a
+style or script element is open, and an end tag removed as above closes the element
+opened last where it has that element's name, each name read in any ASCII letter case and,
+whichever reading removed the tag, as the HTML block reading reads a tag name, to the
+first tab, line feed, form feed, space, / or >; where a start tag opens an element while
+none is open, what stands from that start tag to the end of the end tag that closes the
+element, or to the end of the line where none does, is removed. So "DV<style>x</style>AA",
+"DV<script>x</script>AA", "DV<template>x</template>AA" and
+"DV<template><template></template>x</template>AA" name DVAA, while
+"DV<style>x</script>AA", "DV<style" U+00A0 ">x</style>AA" and "DV<style>x</style" U+00A0
+">AA" do not. The line names DVAA when any reading does. On the way, as
 CommonMark reads them, the character a \\ escapes and
 the text of a code span are kept as text, which no later step reads as markup, HTML, a
 link span or a character reference, and the \\ and the backticks around the code span are
@@ -407,7 +419,9 @@ class HtmlBlockHtml:
     each tag before that one. Whether a tag finds a ">" turns on the line alone, so this
     holds also for readings that pass over different parts of the line, as the reading that
     removes a link label passes over the label and the reading that removes none does not:
-    `names` reads a line with one instance in each of its label readings."""
+    `names` reads a line with one instance in each of its label readings, and in the
+    readings that remove the text of style, script and template elements, which pass over
+    the same parts as the others."""
 
     def __init__(self):
         self.text, self.start, self.name_end = None, -1, -1
@@ -440,6 +454,32 @@ QUOTED_HTML = re.compile(RAW_HTML.pattern.replace(
 # A tag name followed by "/" or white space and then, before any "<" or ">", by a quote:
 # only on a line that holds one do RAW_HTML and QUOTED_HTML remove different text.
 QUOTE_AFTER_TAG_NAME = re.compile(r"""</?[A-Za-z][A-Za-z0-9-]*[\s/][^<>"']*["']""")
+
+# The elements a browser shows no text of, named in lower case: a style or script element
+# holds raw text, which runs to an end tag of its name, and the content of a template
+# element is not rendered. "DV<style>x</style>AA" shows "DVAA".
+HIDDEN_ELEMENTS = frozenset({"style", "script", "template"})
+
+# The elements of HIDDEN_ELEMENTS that hold raw text, inside which no tag opens an element:
+# in "<style><template></style>" the template is text, and so is the first "</template>" in
+# "<template><style></template></style></template>", where the last end tag closes the
+# template.
+RAW_TEXT_ELEMENTS = frozenset({"style", "script"})
+
+# "<" or "</" and the name of a tag that RAW_HTML, SPACE_OR_TAB_HTML, HTML_BLOCK_HTML or
+# QUOTED_HTML matches, read whichever pattern matched the tag as HTML_BLOCK_HTML reads a tag
+# name, with HTML_BLOCK_TAG_NAME after its first letter: an ASCII letter followed by any
+# characters other than a tab, line feed, form feed, space, "/" and ">", the six characters
+# at which a browser ends one. RAW_HTML and QUOTED_HTML also end a name at U+00A0 NO-BREAK
+# SPACE or U+3000 IDEOGRAPHIC SPACE, and a tag either removes there is named past that
+# character: "<style" U+00A0 ">" opens no style element, and "</style" U+00A0 ">" closes
+# none, which a browser reads as text inside a style element.
+TAG_START = re.compile(r"<(/?)([A-Za-z]" + HTML_BLOCK_TAG_NAME.pattern + ")")
+
+# A "<" followed by the name of an element in HIDDEN_ELEMENTS, in any ASCII letter case: a
+# line that holds none holds no start tag of one, and the reading that removes their text
+# reads it as the others do.
+HIDDEN_ELEMENT_START = re.compile(r"<(?:style|script|template)", re.IGNORECASE | re.ASCII)
 
 # A "]" followed by "(" with the text after it to the first ")" if no further "(" comes
 # first, which the second step removes whether or not they make a link: "[DV](url)AA" shows
@@ -878,7 +918,8 @@ def label_removals(stripped, labels):
     return removals
 
 
-def step_one(stripped, raw_html=RAW_HTML, spans=True, labels=None, references=None):
+def step_one(stripped, raw_html=RAW_HTML, spans=True, labels=None, references=None,
+             hide_elements=False):
     """(text, open): `stripped` after the first step the module description states. Its HTML
     is removed as `raw_html` matches it, `RAW_HTML` unless another is given; the character
     each backslash escapes and the text of each code span are kept as text, written in the
@@ -899,13 +940,23 @@ def step_one(stripped, raw_html=RAW_HTML, spans=True, labels=None, references=No
     passed over, so neither the "]" that closes it nor a backtick, "<" or backslash in it
     stops code spans being read, while the "]" before a label holding one of the last three
     has already stopped them: `open` is never true with `labels` where it is false with
-    `labels` None, the reading `span_lines` takes.
+    `labels` None, the reading `span_lines` takes. With `hide_elements` true, the text of
+    each element in `HIDDEN_ELEMENTS` is removed too, from the start tag that opens it while
+    none is open to the end of the end tag that closes it, or to the end of the line where
+    none does, each tag named as `TAG_START` reads the HTML `raw_html` matches, to the first
+    tab, line feed, form feed, space, "/" or ">" whatever `raw_html` is, as `HTML_BLOCK_HTML`
+    and a browser end a tag name: a start tag opens such an element unless one in
+    `RAW_TEXT_ELEMENTS` is open, and an end tag closes the element opened last where it has
+    that element's name. Removing the text of an element passes over no place on the line,
+    so `open`, and the places `raw_html` is asked to match at, are the same whether or not
+    `hide_elements` is true.
 
     Each closing run is looked up in the runs of its length, in order, past the ones already
     passed, a "<" that starts no HTML looks for the first ">" after it once for all the "<"
     before that ">", and a link label is scanned only up to the first "[" or "]" after its
-    "[" that no backslash escapes, where the next one can start: a line is read in linear
-    time."""
+    "[" that no backslash escapes, where the next one can start; the text of an element is
+    removed once, when the element that opened while none was open closes or the line ends:
+    a line is read in linear time."""
     runs = {}
     for run in BACKTICKS.finditer(stripped):
         runs.setdefault(len(run.group()), []).append(run.start())
@@ -915,6 +966,9 @@ def step_one(stripped, raw_html=RAW_HTML, spans=True, labels=None, references=No
     # The first ">" after the last "<" that starts no HTML, when no character in
     # HTML_UNSURE stands before it; a later "<" before it needs no new look.
     clear_to = -1
+    # The elements in HIDDEN_ELEMENTS open here, the one opened last at the end, and the
+    # length `out` had where the first of them opened.
+    elements, hidden_from = [], 0
     i, n = 0, len(stripped)
     while i < n:
         c = stripped[i]
@@ -932,6 +986,19 @@ def step_one(stripped, raw_html=RAW_HTML, spans=True, labels=None, references=No
                         clear_to = end
             found = raw_html.match(stripped, i)
             if found:
+                tag = TAG_START.match(found.group()) if hide_elements else None
+                if tag and tag.group(2).isascii():
+                    name = tag.group(2).lower()
+                    if tag.group(1):
+                        if elements and elements[-1] == name:
+                            elements.pop()
+                            if not elements:
+                                del out[hidden_from:]
+                    elif name in HIDDEN_ELEMENTS and not (
+                            elements and elements[-1] in RAW_TEXT_ELEMENTS):
+                        if not elements:
+                            hidden_from = len(out)
+                        elements.append(name)
                 i = found.end()
                 continue
         elif c == "\\" and stripped[i + 1:i + 2] in PUNCTUATION:
@@ -983,16 +1050,20 @@ def step_one(stripped, raw_html=RAW_HTML, spans=True, labels=None, references=No
                 continue
         out.append(c)
         i += 1
+    if elements:
+        del out[hidden_from:]
     return "".join(out), not reading or unmatched
 
 
-def name_form(stripped, raw_html=RAW_HTML, spans=True, labels=None, references=None):
+def name_form(stripped, raw_html=RAW_HTML, spans=True, labels=None, references=None,
+              hide_elements=False):
     """`stripped` as a name in it reads, by the three steps the module description states:
     `step_one`, which removes the raw HTML `raw_html` matches, `RAW_HTML` unless another is
     given, keeps as text the character each backslash escapes and the text of each code
     span, read unless `spans` is false, and removes each "]" directly followed by a link
     label that is blank or in `labels`, the labels the page holding the line defines, with
-    that label, and none with `labels` None, and with `references`, `HTML_BLOCK_REFERENCE`
+    that label, and none with `labels` None, and with `hide_elements` true the text of each
+    style, script and template element, and with `references`, `HTML_BLOCK_REFERENCE`
     in the HTML block reading, decodes each numeric character reference it matches where it
     stands as written and keeps what it stands for as text; then each "](...)" span
     `PAREN_SPAN` matches removed, whether or not it makes a link, then each "!" `IMAGE`
@@ -1004,7 +1075,7 @@ def name_form(stripped, raw_html=RAW_HTML, spans=True, labels=None, references=N
     label is read as written, as CommonMark reads one; and the markup is removed before the
     references are decoded, as a reference to "*" shows a star, while a reference decoded
     in the first step is kept as text, which shows a star too."""
-    text = step_one(stripped, raw_html, spans, labels, references)[0]
+    text = step_one(stripped, raw_html, spans, labels, references, hide_elements)[0]
     text = IMAGE.sub("", PAREN_SPAN.sub("", text)).translate(MARKUP)
     text = REFERENCE.sub(decoded, text)
     return nfkc(text).translate(CONFUSABLES)
@@ -1079,13 +1150,18 @@ def names(stripped, name, hiding=False, spans=True, labels=None):
     only looks like a definition, so "[x][DV](url)AA", which shows "[x]DVAA" unless the page
     defines DV, names DVAA by the reading that removes no label even with DV in `labels`,
     "[x][DV](u)[A][t]A" names DVAA by the reading that removes t alone with dv and t in
-    `labels`, while "[DV][dvaa]AA" names DVAA only with dvaa in `labels`. The name form
-    reads no code span with `spans` false, as `span_lines` gives for a line after one that
-    can leave a code span, HTML or a link span open, nor with `hiding` true. Where a name
-    form holds `name` only with combining marks directly after it that NFKC joins to its
-    last letter, or only once its letters are decomposed, the name form of the line
-    `detached` is read too, so a mark counts only where it is written as itself directly
-    after a letter or another mark: "DVAA" U+0301 does not name DVAA, while "DV**AA**" U+0301 and
+    `labels`, while "[DV][dvaa]AA" names DVAA only with dvaa in `labels`. Where
+    `HIDDEN_ELEMENT_START` finds a "<" and the name of a style, script or template element,
+    each of those readings is also made with the text of each such element removed,
+    `name_form` with `hide_elements` true, the one `HtmlBlockHtml` serving those readings
+    too: "DV<style>x</style>AA" names DVAA, as a browser shows no text of a style element.
+    The name form reads no code span with `spans` false, as `span_lines` gives for a line
+    after one that can leave a code span, HTML or a link span open, nor with `hiding` true.
+    Where a name form holds `name` only with combining marks directly after it that NFKC
+    joins to its last letter, or only once its letters are decomposed, the name form of the
+    line `detached` is read too, so a mark counts only where it is written as itself
+    directly after a letter or another mark: "DVAA" U+0301 does not name DVAA, while
+    "DV**AA**" U+0301 and
     "DV**AA&#x301;**" do, and "DVAA" U+0332, which NFKC leaves apart from the A, names DVAA.
     "DV" U+200B "AA", "DV&#8203;AA", "**DV**AA", "DV<!-- -->AA", "DVA" U+0410 and the
     fullwidth letters each name DVAA; "DVAA" U+0301 does not. On a line that carried such a
@@ -1120,15 +1196,20 @@ def names(stripped, name, hiding=False, spans=True, labels=None):
     # reads alike either way.
     removals = ([None] if labels is None or "][" not in stripped
                 else label_removals(stripped, labels))
+    # Only a line holding a start tag of a style, script or template element has text of
+    # one to remove, so a line without one reads alike either way.
+    hides = [False, True] if HIDDEN_ELEMENT_START.search(stripped) else [False]
     for raw_html, references in readings:
         for removal in removals:
-            form = name_form(stripped, raw_html, spans, removal, references)
-            if found(form):
-                return True
-            decomposed = unicodedata.normalize("NFKD", form).translate(CONFUSABLES)
-            if name in decomposed and found(name_form(detached(stripped, references), raw_html,
-                                                      spans, removal, references)):
-                return True
+            for hide in hides:
+                form = name_form(stripped, raw_html, spans, removal, references, hide)
+                if found(form):
+                    return True
+                decomposed = unicodedata.normalize("NFKD", form).translate(CONFUSABLES)
+                if name in decomposed and found(name_form(detached(stripped, references),
+                                                          raw_html, spans, removal,
+                                                          references, hide)):
+                    return True
     return False
 
 
