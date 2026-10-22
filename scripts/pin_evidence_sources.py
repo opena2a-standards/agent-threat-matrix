@@ -113,7 +113,14 @@ SOURCES_DESCRIPTION = (
     "matrix.json.")
 PAGE_RE = re.compile(r"scenarios/[A-Za-z0-9_-]+/README\.md")
 SCENARIO_NAME_RE = re.compile(r"[A-Za-z0-9_-]+")
-NAME_RE = re.compile(r"\*\*(T-[0-9]{4}(?:\.[0-9]{3})?) \(([^()\s](?:[^()\r\n]*[^()\s])?)\):\*\*")
+# The code points ECMA-262 reads as white space or a line terminator, which its \s matches,
+# as ECMA_SPACE in scripts/validate_matrix.py has them. The label pattern in
+# schema/evidence-sources.schema.json is read with that \s, so a label is read here with the
+# same set: Python's \s also matches U+001C to U+001F and U+0085, and does not match U+FEFF.
+ECMA_SPACE = (r"\t\n\v\f\r \xa0\U00001680\U00002000-\U0000200a\U00002028\U00002029"
+              r"\U0000202f\U0000205f\U00003000\U0000feff")
+NAME_RE = re.compile(rf"\*\*(T-[0-9]{{4}}(?:\.[0-9]{{3}})?) "
+                     rf"\(([^(){ECMA_SPACE}](?:[^()\r\n]*[^(){ECMA_SPACE}])?)\):\*\*")
 OFFSET_RE = re.compile(r"([+-])([0-9]{2})([0-9]{2})")
 CHALLENGE_FILE = "src/challenges/index.js"
 CHALLENGES_OPEN = "export const CHALLENGES = {"
