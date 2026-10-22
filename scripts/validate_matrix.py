@@ -8,8 +8,11 @@ Standard library only, no network. Two passes:
    ``type``, ``required``, ``properties``, ``additionalProperties``, ``items``,
    ``enum``, ``const``, ``pattern``, ``minimum``, ``maximum``, ``minItems`` and local
    ``$ref`` into ``$defs``. Any other keyword in the schema is a fault in this checker's
-   coverage and fails loudly rather than being silently ignored. A ``number`` is
-   finite: the NaN and Infinity that Python's json module reads are not JSON numbers.
+   coverage and fails loudly rather than being silently ignored. A ``pattern`` is an
+   ECMA-262 regular expression, the dialect JSON Schema names for it, and is applied after
+   ``ecma_pattern`` rewrites the constructs it names, which Python's re reads another way.
+   A ``number`` is finite: the NaN and Infinity that Python's json module reads are not
+   JSON numbers.
    An ``integer`` or ``number`` too large to convert to a 64-bit float, which JSON
    allows, is reported as not a finite number. An integer longer than Python's int
    string conversion limit (4300 digits by default) does not parse, and the FAIL line
@@ -70,6 +73,7 @@ Standard library only, no network. Two passes:
 Exit 0 when everything holds, 1 otherwise.
 """
 
+import functools
 import json
 import math
 import os
@@ -135,6 +139,57 @@ TYPE_CHECKS = {
     "null": lambda v: v is None,
 }
 
+# The code points ECMA-262 reads as white space or a line terminator, which its \s matches,
+# as the contents of a Python class. Python's \s also matches U+001C to U+001F and U+0085,
+# and does not match U+FEFF.
+ECMA_SPACE = (r"\t\n\v\f\r \xa0\U00001680\U00002000-\U0000200a\U00002028\U00002029"
+              r"\U0000202f\U0000205f\U00003000\U0000feff")
+# Every other code point, which ECMA-262's \S matches, for a \S inside a class.
+ECMA_NOT_SPACE = (r"\x00-\x08\x0e-\x1f\x21-\x9f\xa1-\U0000167f\U00001681-\U00001fff"
+                  r"\U0000200b-\U00002027\U0000202a-\U0000202e\U00002030-\U0000205e"
+                  r"\U00002060-\U00002fff\U00003001-\U0000fefe\U0000ff00-\U0010ffff")
+# The line terminators, which ECMA-262's . does not match. Python's . matches all but \n.
+ECMA_LINE_TERMINATORS = r"\n\r\U00002028\U00002029"
+
+
+@functools.lru_cache(maxsize=None)
+def ecma_pattern(pattern: str) -> re.Pattern:
+    """A schema ``pattern``, an ECMA-262 regular expression as JSON Schema has it, compiled
+    for Python's re.
+
+    These constructs, which Python reads another way, are rewritten to the ECMA-262
+    reading: ``$`` outside a class matches only at the end of the string, where Python's
+    also matches before a final newline; ``.`` does not match the ECMA_LINE_TERMINATORS;
+    ``\\s`` matches ECMA_SPACE and ``\\S`` every other code point, inside a class and
+    outside one; ``[]`` matches no character and ``[^]`` any character, where Python reads
+    that ``]`` as a member of the class. ``re.ASCII`` reads ``\\d``, ``\\w`` and ``\\b`` and
+    their capitals as ASCII, as ECMA-262 does.
+    """
+    out, in_class, i = [], False, 0
+    while i < len(pattern):
+        token, width = pattern[i], 1
+        if token == "\\" and i + 1 < len(pattern):
+            token, width = pattern[i:i + 2], 2
+            if token == r"\s":
+                token = ECMA_SPACE if in_class else f"[{ECMA_SPACE}]"
+            elif token == r"\S":
+                token = ECMA_NOT_SPACE if in_class else f"[^{ECMA_SPACE}]"
+        elif in_class:
+            in_class = token != "]"
+        elif pattern.startswith("[]", i):
+            token, width = "(?!)", 2
+        elif pattern.startswith("[^]", i):
+            token, width = "(?s:.)", 3
+        elif token == "[":
+            in_class = True
+        elif token == "$":
+            token = r"\Z"
+        elif token == ".":
+            token = f"[^{ECMA_LINE_TERMINATORS}]"
+        out.append(token)
+        i += width
+    return re.compile("".join(out), re.ASCII)
+
 
 class SchemaChecker:
     def __init__(self, schema: dict):
@@ -176,7 +231,7 @@ class SchemaChecker:
                 return
 
         if "pattern" in schema and isinstance(value, str):
-            if not re.search(schema["pattern"], value):
+            if not ecma_pattern(schema["pattern"]).search(value):
                 self.errors.append(f"{path}: {value!r} does not match {schema['pattern']}")
 
         if TYPE_CHECKS["number"](value):

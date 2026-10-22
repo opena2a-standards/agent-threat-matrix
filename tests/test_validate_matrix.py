@@ -5,12 +5,15 @@ committed files are never perturbed. The shipped tree must be green; each rule t
 validator enforces is proven red on one minimal mutation.
 """
 
+import importlib.util
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
 import tempfile
+import unicodedata
 from datetime import date
 from pathlib import Path
 
@@ -1181,3 +1184,139 @@ def test_s16_gap_list_out_of_step_with_the_evidence_is_red():
 def test_s16_missing_gap_list_is_red():
     _red(mutate(lambda root: (root / "evidence-gaps.json").unlink()),
          "S16 evidence-gaps.json is missing; run scripts/generate_stix.py")
+
+
+# --------------------------------------------------------------------------- schema patterns
+# A JSON Schema pattern is an ECMA-262 regular expression. Python's re reads some of the same
+# text another way: its $ also matches before a final newline, so "T-1001\n" passed
+# ^T-[0-9]{4}$, which ECMA-262 refuses.
+
+
+@pytest.fixture(scope="module")
+def validator():
+    spec = importlib.util.spec_from_file_location("validate_matrix", ROOT / "scripts" / "validate_matrix.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def pattern_errors(validator, value: str, pattern: str) -> list:
+    """What the shape pass reports for a string ``value`` against ``pattern``."""
+    checker = validator.SchemaChecker({})
+    checker.check(value, {"type": "string", "pattern": pattern}, "value")
+    return checker.errors
+
+
+def schema_patterns(node) -> set:
+    """Every ``pattern`` the schema states."""
+    if isinstance(node, dict):
+        found = {node["pattern"]} if isinstance(node.get("pattern"), str) else set()
+        return found.union(*(schema_patterns(value) for value in node.values()))
+    if isinstance(node, list):
+        return set().union(*(schema_patterns(value) for value in node))
+    return set()
+
+
+def test_reader_commit_and_mapping_ref_that_end_in_a_newline_are_refused():
+    # Both passed, and scripts/check_technique_pages.py --fix then wrote the ref across two
+    # lines of the technique page, which the runs after it reported as differing from
+    # matrix.json.
+    commit = "0" * 40 + "\n"
+    registry = [dict(data_source(), readBy=[dict(reader(), commit=commit)])]
+    proc = mutate(with_data_sources(registry, [dict(mapping(), ref="request.path\n")]))
+    _red(proc, f"matrix.dataSources[0].readBy[0].commit: {commit!r} does not match ^[0-9a-f]{{40}}$")
+    assert r"matrix.techniques[0].dataSources[0].ref: 'request.path\n' does not match ^\S(.*\S)?$" \
+        in proc.stderr, proc.stderr
+
+
+def test_every_schema_pattern_that_ends_in_a_dollar_refuses_its_value_with_a_newline_after_it(validator):
+    """Each such pattern is tried on the first value checked against it in the shipped
+    matrix, with a data source, a mapping and a versioned sub-technique added so that every
+    pattern is reached."""
+    schema = load(ROOT, "schema/threat-matrix-v1.2.schema.json")
+    matrix = load(ROOT, "matrix.json")
+    matrix["dataSources"] = [data_source()]
+    first = matrix["techniques"][0]
+    first["dataSources"] = [mapping()]
+    matrix["techniques"].append(dict(first, id=first["id"] + ".001", parentId=first["id"],
+                                     version="1.0.0"))
+    samples = {}
+
+    class Recorder(validator.SchemaChecker):
+        def check(self, value, schema, path):
+            if "pattern" in schema and isinstance(value, str):
+                samples.setdefault(schema["pattern"], value)
+            super().check(value, schema, path)
+
+    recorder = Recorder(schema)
+    recorder.check(matrix, schema, "matrix")
+    assert recorder.errors == []
+    patterns = schema_patterns(schema)
+    assert patterns <= set(samples), sorted(patterns - set(samples))
+    anchored = sorted(pattern for pattern in patterns if pattern.endswith("$"))
+    assert anchored
+    for pattern in anchored:
+        value = samples[pattern]
+        assert pattern_errors(validator, value, pattern) == [], pattern
+        assert pattern_errors(validator, value + "\n", pattern) == [
+            f"value: {value + chr(10)!r} does not match {pattern}"]
+
+
+REF = ("dataSourceMapping", "ref")
+READER_PATH = ("sourceReader", "path")
+
+
+@pytest.mark.parametrize("field,value,accepted", [
+    # ECMA-262's . does not match \r, U+2028 or U+2029; Python's does.
+    (REF, "request\rpath", False),
+    (REF, "request\N{LINE SEPARATOR}path", False),
+    (REF, "request\N{PARAGRAPH SEPARATOR}path", False),
+    # U+FEFF is white space to ECMA-262's \s and \S and not to Python's; U+001C and U+0085
+    # are white space to Python's and not to ECMA-262's.
+    (REF, "request.path\N{ZERO WIDTH NO-BREAK SPACE}", False),
+    (REF, "request.path\x1c", True),
+    (REF, "\x85request.path", True),
+    (READER_PATH, "src/\N{ZERO WIDTH NO-BREAK SPACE}example.ts", False),
+    (READER_PATH, "src/\x1cexample.ts", True),
+    (READER_PATH, "\x85src/example.ts", True),
+])
+def test_schema_pattern_reads_dot_and_white_space_as_ecma_262_does(validator, field, value, accepted):
+    definition, prop = field
+    schema = load(ROOT, "schema/threat-matrix-v1.2.schema.json")
+    pattern = schema["$defs"][definition]["properties"][prop]["pattern"]
+    want = [] if accepted else [f"value: {value!r} does not match {pattern}"]
+    assert pattern_errors(validator, value, pattern) == want
+
+
+@pytest.mark.parametrize("pattern,value,accepted", [
+    (r"^\d$", "\N{ARABIC-INDIC DIGIT THREE}", False),  # ECMA-262's \d is [0-9]
+    (r"^\D$", "\N{ARABIC-INDIC DIGIT THREE}", True),
+    (r"^\w$", "\N{LATIN SMALL LETTER E WITH ACUTE}", False),  # and its \w is [A-Za-z0-9_]
+    (r"^\W$", "\N{LATIN SMALL LETTER E WITH ACUTE}", True),
+    (r"^a\b", "a\N{LATIN SMALL LETTER E WITH ACUTE}", True),
+    (r"^a\B", "a\N{LATIN SMALL LETTER E WITH ACUTE}", False),
+    (r"^a[]", "ab", False),  # [] matches no character
+    (r"^a[^]$", "a\n", True),  # [^] matches any character
+    (r"^a[^]b$", "a\rb", True),
+    (r"^[a\S]$", "\x1c", True),  # \S inside a class reads ECMA-262's white space too
+    (r"^[a\S]$", "\N{ZERO WIDTH NO-BREAK SPACE}", False),
+    (r"^[^a\S]$", "\N{ZERO WIDTH NO-BREAK SPACE}", True),
+    (r"^[^a\S]$", "\x1c", False),
+])
+def test_pattern_constructs_the_schema_does_not_use_are_read_as_ecma_262_does(validator, pattern, value,
+                                                                               accepted):
+    want = [] if accepted else [f"value: {value!r} does not match {pattern}"]
+    assert pattern_errors(validator, value, pattern) == want
+
+
+def test_white_space_and_its_complement_are_the_code_points_ecma_262_names(validator):
+    """Tab, vertical tab, form feed, U+FEFF and the Space_Separator (Zs) code points are
+    white space; \\n, \\r, U+2028 and U+2029 are line terminators. ECMA_NOT_SPACE holds
+    every other code point."""
+    codes = range(0x110000)
+    zs = {code for code in codes if unicodedata.category(chr(code)) == "Zs"}
+    want = {0x09, 0x0B, 0x0C, 0xFEFF, 0x0A, 0x0D, 0x2028, 0x2029} | zs
+    space = re.compile(f"[{validator.ECMA_SPACE}]")
+    not_space = re.compile(f"[{validator.ECMA_NOT_SPACE}]")
+    assert {code for code in codes if space.match(chr(code))} == want
+    assert {code for code in codes if not_space.match(chr(code))} == set(codes) - want
