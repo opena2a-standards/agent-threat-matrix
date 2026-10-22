@@ -2,7 +2,7 @@
   "version": "1.2",
   "name": "AI Agent Threat Matrix",
   "created": "2026-03-24",
-  "updated": "2026-10-19",
+  "updated": "2026-10-21",
   "stixNamespace": "d43c7092-69ad-4822-b2cb-a48e459c4580",
   "tactics": [
     {
@@ -99,7 +99,15 @@
         "10.5"
       ],
       "wildPrevalence": 100,
-      "wildSampleCount": 2566
+      "wildSampleCount": 2566,
+      "evidence": [
+        {
+          "type": "honeypot-telemetry",
+          "reference": "https://api.oa2a.org/api/v1/threat-matrix",
+          "date": "2026-10-19",
+          "note": "The wildPrevalence and wildSampleCount this endpoint served for the technique on this date; they measure engagement with a honeypot, not a production attack rate."
+        }
+      ]
     },
     {
       "id": "T-1003",
@@ -119,7 +127,15 @@
         "1.4"
       ],
       "wildPrevalence": 100,
-      "wildSampleCount": 11308
+      "wildSampleCount": 11308,
+      "evidence": [
+        {
+          "type": "honeypot-telemetry",
+          "reference": "https://api.oa2a.org/api/v1/threat-matrix",
+          "date": "2026-10-19",
+          "note": "The wildPrevalence and wildSampleCount this endpoint served for the technique on this date; they measure engagement with a honeypot, not a production attack rate."
+        }
+      ]
     },
     {
       "id": "T-1004",
@@ -219,7 +235,15 @@
         "3.5"
       ],
       "wildPrevalence": 98.44,
-      "wildSampleCount": 7610
+      "wildSampleCount": 7610,
+      "evidence": [
+        {
+          "type": "honeypot-telemetry",
+          "reference": "https://api.oa2a.org/api/v1/threat-matrix",
+          "date": "2026-10-19",
+          "note": "The wildPrevalence and wildSampleCount this endpoint served for the technique on this date; they measure engagement with a honeypot, not a production attack rate."
+        }
+      ]
     },
     {
       "id": "T-2002",
@@ -244,7 +268,15 @@
         "3.5"
       ],
       "wildPrevalence": 97.97,
-      "wildSampleCount": 7592
+      "wildSampleCount": 7592,
+      "evidence": [
+        {
+          "type": "honeypot-telemetry",
+          "reference": "https://api.oa2a.org/api/v1/threat-matrix",
+          "date": "2026-10-19",
+          "note": "The wildPrevalence and wildSampleCount this endpoint served for the technique on this date; they measure engagement with a honeypot, not a production attack rate."
+        }
+      ]
     },
     {
       "id": "T-2003",
@@ -265,7 +297,15 @@
         "3.5"
       ],
       "wildPrevalence": 100,
-      "wildSampleCount": 3507
+      "wildSampleCount": 3507,
+      "evidence": [
+        {
+          "type": "honeypot-telemetry",
+          "reference": "https://api.oa2a.org/api/v1/threat-matrix",
+          "date": "2026-10-19",
+          "note": "The wildPrevalence and wildSampleCount this endpoint served for the technique on this date; they measure engagement with a honeypot, not a production attack rate."
+        }
+      ]
     },
     {
       "id": "T-2004",
@@ -287,7 +327,15 @@
         "3.5"
       ],
       "wildPrevalence": 100,
-      "wildSampleCount": 2886
+      "wildSampleCount": 2886,
+      "evidence": [
+        {
+          "type": "honeypot-telemetry",
+          "reference": "https://api.oa2a.org/api/v1/threat-matrix",
+          "date": "2026-10-19",
+          "note": "The wildPrevalence and wildSampleCount this endpoint served for the technique on this date; they measure engagement with a honeypot, not a production attack rate."
+        }
+      ]
     },
     {
       "id": "T-2005",
@@ -310,7 +358,15 @@
         "3.5"
       ],
       "wildPrevalence": 100,
-      "wildSampleCount": 2566
+      "wildSampleCount": 2566,
+      "evidence": [
+        {
+          "type": "honeypot-telemetry",
+          "reference": "https://api.oa2a.org/api/v1/threat-matrix",
+          "date": "2026-10-19",
+          "note": "The wildPrevalence and wildSampleCount this endpoint served for the technique on this date; they measure engagement with a honeypot, not a production attack rate."
+        }
+      ]
     },
     {
       "id": "T-2006",
@@ -335,7 +391,15 @@
         "3.5"
       ],
       "wildPrevalence": 100,
-      "wildSampleCount": 11099
+      "wildSampleCount": 11099,
+      "evidence": [
+        {
+          "type": "honeypot-telemetry",
+          "reference": "https://api.oa2a.org/api/v1/threat-matrix",
+          "date": "2026-10-19",
+          "note": "The wildPrevalence and wildSampleCount this endpoint served for the technique on this date; they measure engagement with a honeypot, not a production attack rate."
+        }
+      ]
     },
     {
       "id": "T-2007",
@@ -356,7 +420,15 @@
         "3.5"
       ],
       "wildPrevalence": 100,
-      "wildSampleCount": 5763
+      "wildSampleCount": 5763,
+      "evidence": [
+        {
+          "type": "honeypot-telemetry",
+          "reference": "https://api.oa2a.org/api/v1/threat-matrix",
+          "date": "2026-10-19",
+          "note": "The wildPrevalence and wildSampleCount this endpoint served for the technique on this date; they measure engagement with a honeypot, not a production attack rate."
+        }
+      ]
     },
     {
       "id": "T-2008",
@@ -377,7 +449,15 @@
         "3.5"
       ],
       "wildPrevalence": 97.97,
-      "wildSampleCount": 7592
+      "wildSampleCount": 7592,
+      "evidence": [
+        {
+          "type": "honeypot-telemetry",
+          "reference": "https://api.oa2a.org/api/v1/threat-matrix",
+          "date": "2026-10-19",
+          "note": "The wildPrevalence and wildSampleCount this endpoint served for the technique on this date; they measure engagement with a honeypot, not a production attack rate."
+        }
+      ]
     },
     {
       "id": "T-3001",
@@ -401,7 +481,15 @@
         "5.5"
       ],
       "wildPrevalence": 100,
-      "wildSampleCount": 3716
+      "wildSampleCount": 3716,
+      "evidence": [
+        {
+          "type": "honeypot-telemetry",
+          "reference": "https://api.oa2a.org/api/v1/threat-matrix",
+          "date": "2026-10-19",
+          "note": "The wildPrevalence and wildSampleCount this endpoint served for the technique on this date; they measure engagement with a honeypot, not a production attack rate."
+        }
+      ]
     },
     {
       "id": "T-3002",
@@ -542,7 +630,15 @@
         "2.5"
       ],
       "wildPrevalence": 100,
-      "wildSampleCount": 1988
+      "wildSampleCount": 1988,
+      "evidence": [
+        {
+          "type": "honeypot-telemetry",
+          "reference": "https://api.oa2a.org/api/v1/threat-matrix",
+          "date": "2026-10-19",
+          "note": "The wildPrevalence and wildSampleCount this endpoint served for the technique on this date; they measure engagement with a honeypot, not a production attack rate."
+        }
+      ]
     },
     {
       "id": "T-4002",
@@ -566,7 +662,15 @@
         "2.5"
       ],
       "wildPrevalence": 100,
-      "wildSampleCount": 2877
+      "wildSampleCount": 2877,
+      "evidence": [
+        {
+          "type": "honeypot-telemetry",
+          "reference": "https://api.oa2a.org/api/v1/threat-matrix",
+          "date": "2026-10-19",
+          "note": "The wildPrevalence and wildSampleCount this endpoint served for the technique on this date; they measure engagement with a honeypot, not a production attack rate."
+        }
+      ]
     },
     {
       "id": "T-4003",
@@ -611,7 +715,15 @@
         "2.5"
       ],
       "wildPrevalence": 100,
-      "wildSampleCount": 1870
+      "wildSampleCount": 1870,
+      "evidence": [
+        {
+          "type": "honeypot-telemetry",
+          "reference": "https://api.oa2a.org/api/v1/threat-matrix",
+          "date": "2026-10-19",
+          "note": "The wildPrevalence and wildSampleCount this endpoint served for the technique on this date; they measure engagement with a honeypot, not a production attack rate."
+        }
+      ]
     },
     {
       "id": "T-4005",
@@ -654,7 +766,15 @@
         "2.5"
       ],
       "wildPrevalence": 100,
-      "wildSampleCount": 2886
+      "wildSampleCount": 2886,
+      "evidence": [
+        {
+          "type": "honeypot-telemetry",
+          "reference": "https://api.oa2a.org/api/v1/threat-matrix",
+          "date": "2026-10-19",
+          "note": "The wildPrevalence and wildSampleCount this endpoint served for the technique on this date; they measure engagement with a honeypot, not a production attack rate."
+        }
+      ]
     },
     {
       "id": "T-5001",
@@ -708,7 +828,15 @@
         "7.4"
       ],
       "wildPrevalence": 100,
-      "wildSampleCount": 1870
+      "wildSampleCount": 1870,
+      "evidence": [
+        {
+          "type": "honeypot-telemetry",
+          "reference": "https://api.oa2a.org/api/v1/threat-matrix",
+          "date": "2026-10-19",
+          "note": "The wildPrevalence and wildSampleCount this endpoint served for the technique on this date; they measure engagement with a honeypot, not a production attack rate."
+        }
+      ]
     },
     {
       "id": "T-5003",
@@ -838,7 +966,15 @@
         "8.4"
       ],
       "wildPrevalence": 100,
-      "wildSampleCount": 2015
+      "wildSampleCount": 2015,
+      "evidence": [
+        {
+          "type": "honeypot-telemetry",
+          "reference": "https://api.oa2a.org/api/v1/threat-matrix",
+          "date": "2026-10-19",
+          "note": "The wildPrevalence and wildSampleCount this endpoint served for the technique on this date; they measure engagement with a honeypot, not a production attack rate."
+        }
+      ]
     },
     {
       "id": "T-6002",
@@ -915,7 +1051,15 @@
         "8.4"
       ],
       "wildPrevalence": 100,
-      "wildSampleCount": 2019
+      "wildSampleCount": 2019,
+      "evidence": [
+        {
+          "type": "honeypot-telemetry",
+          "reference": "https://api.oa2a.org/api/v1/threat-matrix",
+          "date": "2026-10-19",
+          "note": "The wildPrevalence and wildSampleCount this endpoint served for the technique on this date; they measure engagement with a honeypot, not a production attack rate."
+        }
+      ]
     },
     {
       "id": "T-6005",
@@ -1056,7 +1200,15 @@
         "4.4"
       ],
       "wildPrevalence": 100,
-      "wildSampleCount": 3716
+      "wildSampleCount": 3716,
+      "evidence": [
+        {
+          "type": "honeypot-telemetry",
+          "reference": "https://api.oa2a.org/api/v1/threat-matrix",
+          "date": "2026-10-19",
+          "note": "The wildPrevalence and wildSampleCount this endpoint served for the technique on this date; they measure engagement with a honeypot, not a production attack rate."
+        }
+      ]
     },
     {
       "id": "T-7005",
@@ -1144,7 +1296,15 @@
         "4.3"
       ],
       "wildPrevalence": 100,
-      "wildSampleCount": 3717
+      "wildSampleCount": 3717,
+      "evidence": [
+        {
+          "type": "honeypot-telemetry",
+          "reference": "https://api.oa2a.org/api/v1/threat-matrix",
+          "date": "2026-10-19",
+          "note": "The wildPrevalence and wildSampleCount this endpoint served for the technique on this date; they measure engagement with a honeypot, not a production attack rate."
+        }
+      ]
     },
     {
       "id": "T-8003",
@@ -1184,7 +1344,15 @@
         "4.3"
       ],
       "wildPrevalence": 100,
-      "wildSampleCount": 2089
+      "wildSampleCount": 2089,
+      "evidence": [
+        {
+          "type": "honeypot-telemetry",
+          "reference": "https://api.oa2a.org/api/v1/threat-matrix",
+          "date": "2026-10-19",
+          "note": "The wildPrevalence and wildSampleCount this endpoint served for the technique on this date; they measure engagement with a honeypot, not a production attack rate."
+        }
+      ]
     },
     {
       "id": "T-8005",
@@ -1268,7 +1436,15 @@
         "10.5"
       ],
       "wildPrevalence": 100,
-      "wildSampleCount": 4077
+      "wildSampleCount": 4077,
+      "evidence": [
+        {
+          "type": "honeypot-telemetry",
+          "reference": "https://api.oa2a.org/api/v1/threat-matrix",
+          "date": "2026-10-19",
+          "note": "The wildPrevalence and wildSampleCount this endpoint served for the technique on this date; they measure engagement with a honeypot, not a production attack rate."
+        }
+      ]
     },
     {
       "id": "T-9003",
@@ -1311,7 +1487,15 @@
         "10.2"
       ],
       "wildPrevalence": 100,
-      "wildSampleCount": 1870
+      "wildSampleCount": 1870,
+      "evidence": [
+        {
+          "type": "honeypot-telemetry",
+          "reference": "https://api.oa2a.org/api/v1/threat-matrix",
+          "date": "2026-10-19",
+          "note": "The wildPrevalence and wildSampleCount this endpoint served for the technique on this date; they measure engagement with a honeypot, not a production attack rate."
+        }
+      ]
     },
     {
       "id": "T-9005",
@@ -1360,7 +1544,15 @@
         "10.5"
       ],
       "wildPrevalence": 100,
-      "wildSampleCount": 2018
+      "wildSampleCount": 2018,
+      "evidence": [
+        {
+          "type": "honeypot-telemetry",
+          "reference": "https://api.oa2a.org/api/v1/threat-matrix",
+          "date": "2026-10-19",
+          "note": "The wildPrevalence and wildSampleCount this endpoint served for the technique on this date; they measure engagement with a honeypot, not a production attack rate."
+        }
+      ]
     },
     {
       "id": "T-2009",
@@ -1416,7 +1608,15 @@
         "6.2"
       ],
       "wildPrevalence": 100,
-      "wildSampleCount": 4655
+      "wildSampleCount": 4655,
+      "evidence": [
+        {
+          "type": "honeypot-telemetry",
+          "reference": "https://api.oa2a.org/api/v1/threat-matrix",
+          "date": "2026-10-19",
+          "note": "The wildPrevalence and wildSampleCount this endpoint served for the technique on this date; they measure engagement with a honeypot, not a production attack rate."
+        }
+      ]
     },
     {
       "id": "T-6007",
@@ -1444,7 +1644,15 @@
         "4.3"
       ],
       "wildPrevalence": 100,
-      "wildSampleCount": 2015
+      "wildSampleCount": 2015,
+      "evidence": [
+        {
+          "type": "honeypot-telemetry",
+          "reference": "https://api.oa2a.org/api/v1/threat-matrix",
+          "date": "2026-10-19",
+          "note": "The wildPrevalence and wildSampleCount this endpoint served for the technique on this date; they measure engagement with a honeypot, not a production attack rate."
+        }
+      ]
     },
     {
       "id": "T-7007",

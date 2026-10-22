@@ -18,10 +18,24 @@ Object types and their canonical names:
 ``created`` is the matrix ``created`` date and ``modified`` the matrix ``updated``
 date, both at midnight UTC. ``created_by_ref`` on every object points at the identity.
 
+Each ``evidence`` entry of a technique becomes one entry of its attack-pattern's
+``external_references``, after the matrix and mapping references, in the order of
+``evidence``: ``source_name`` is the entry's ``type``, ``url`` its ``reference``, and
+``description`` the type and the date, then the note when there is one. A reference that
+is not an https URL is refused, since it cannot be an external reference url.
+
+The script also writes evidence-gaps.json, the sorted ids of the techniques whose
+``evidence`` is empty or absent, and prints them. scripts/validate_matrix.py fails when
+the committed copy differs from that rendering, so the list is never edited by hand: a
+technique leaves it when an evidence entry that resolves is added to it in matrix.json
+and the file is rendered again.
+
 Usage::
 
-    python3 scripts/generate_stix.py             # writes stix/agent-threat-matrix-bundle.json
-    python3 scripts/generate_stix.py --output P  # writes P instead
+    python3 scripts/generate_stix.py                  # writes stix/agent-threat-matrix-bundle.json
+                                                      # and evidence-gaps.json
+    python3 scripts/generate_stix.py --output P       # writes the bundle to P instead
+    python3 scripts/generate_stix.py --gaps-output G  # writes the gap list to G instead
 
 Exit 0 on success. Exit 1 when matrix.json references something the bundle cannot
 resolve or when the rendered bundle fails its own structural self-check.
@@ -36,6 +50,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 MATRIX = ROOT / "matrix.json"
 DEFAULT_OUTPUT = ROOT / "stix" / "agent-threat-matrix-bundle.json"
+DEFAULT_GAPS_OUTPUT = ROOT / "evidence-gaps.json"
+GAPS_DESCRIPTION = ("The ids of the techniques in matrix.json whose evidence array is empty or "
+                    "absent, sorted. Written by scripts/generate_stix.py from matrix.json, never "
+                    "by hand; scripts/validate_matrix.py fails when this file differs from that "
+                    "rendering. A technique leaves the list when an evidence entry that resolves is "
+                    "added to it in matrix.json and this file is rendered again.")
 # The first line of the docstring, which ``python3 -OO`` strips.
 DESCRIPTION = "Render matrix.json as a STIX 2.1 bundle at stix/agent-threat-matrix-bundle.json."
 
@@ -88,6 +108,25 @@ def mapping_description(entry: dict) -> str:
     return f"{text}: {note}" if note else text
 
 
+def evidence_reference(tid: str, entry: dict) -> dict:
+    url = entry["reference"]
+    if not url.startswith("https://"):
+        raise GenerationError(f"{tid}: evidence reference {url!r} is not an https URL")
+    text = f"{entry['type']} evidence dated {entry['date']}"
+    note = entry.get("note")
+    return {"source_name": entry["type"], "url": url,
+            "description": f"{text}: {note}" if note else text}
+
+
+def evidence_gaps(matrix: dict) -> list:
+    """The sorted ids of the techniques whose evidence is empty or absent."""
+    return sorted(t["id"] for t in matrix["techniques"] if not t.get("evidence"))
+
+
+def render_gaps(matrix: dict) -> str:
+    return json.dumps({"description": GAPS_DESCRIPTION, "ids": evidence_gaps(matrix)}, indent=2) + "\n"
+
+
 def build_bundle(matrix: dict) -> dict:
     namespace = uuid.UUID(matrix["stixNamespace"])
     created = timestamp(matrix["created"])
@@ -131,6 +170,7 @@ def build_bundle(matrix: dict) -> dict:
         refs = [{"source_name": SOURCE_NAME, "external_id": tid, "url": TECHNIQUE_URL.format(id=tid)}]
         refs.extend(attack_reference(e) for e in technique.get("attackMapping", []))
         refs.extend(atlas_reference(e) for e in technique.get("atlasMapping", []))
+        refs.extend(evidence_reference(tid, e) for e in technique.get("evidence", []))
         obj.update({
             "name": technique["name"],
             "description": technique["description"],
@@ -265,6 +305,8 @@ def render(matrix: dict) -> str:
 def main(argv: list) -> int:
     parser = argparse.ArgumentParser(description=DESCRIPTION)
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT, help="where to write the bundle")
+    parser.add_argument("--gaps-output", type=Path, default=DEFAULT_GAPS_OUTPUT,
+                        help="where to write the ids of the techniques with no evidence entry")
     args = parser.parse_args(argv)
 
     matrix = json.loads(MATRIX.read_text(encoding="utf-8"))
@@ -277,6 +319,12 @@ def main(argv: list) -> int:
     args.output.write_text(text, encoding="utf-8")
     count = text.count('"type": "')
     print(f"wrote {args.output}: {count - 1} STIX objects")
+    args.gaps_output.parent.mkdir(parents=True, exist_ok=True)
+    args.gaps_output.write_text(render_gaps(matrix), encoding="utf-8")
+    gaps = evidence_gaps(matrix)
+    listed = f": {', '.join(gaps)}" if gaps else ""
+    print(f"wrote {args.gaps_output}: {len(gaps)} of {len(matrix['techniques'])} techniques "
+          f"carry no evidence entry{listed}")
     return 0
 
 

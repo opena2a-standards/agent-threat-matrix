@@ -52,7 +52,8 @@ Derived content is rendered from the normative content and is never edited by ha
 check fails when it differs from a fresh rendering:
 
 - the pages in `attack-classes/`: `python3 scripts/generate_class_markdown.py --check`;
-- the bundle in `stix/`: `python3 scripts/validate_matrix.py`;
+- the bundle in `stix/`, and `evidence-gaps.json`, the techniques that carry no evidence
+  entry: `python3 scripts/validate_matrix.py`;
 - the data lines of the pages in `techniques/`, and the whole of each page in `tactics/`:
   `python3 scripts/check_technique_pages.py`;
 - the counts on `README.md` and on the pages the README check reads with it, and the

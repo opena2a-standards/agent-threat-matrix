@@ -54,6 +54,17 @@ Standard library only, no network. Two passes:
         a git work tree or ``HEAD`` carries no matrix.json
    - S14 a technique whose ``wildPrevalence`` is above 0 has a ``wildSampleCount``
         above 0: a prevalence with no samples behind it was not measured
+   - S15 every ``evidence`` entry resolves to a source this validator reads, and a
+        technique lists no entry twice (the same type, reference and date). A
+        ``honeypot-telemetry`` entry resolves when its reference is the
+        ``wildPrevalenceSource`` url, its date is the ``wildPrevalenceSource`` read
+        date, and the technique's ``wildSampleCount`` is above 0, so the endpoint
+        served telemetry for the technique on that date. No other reference
+        resolves: the validator records no other source, so a citation it cannot
+        read is refused rather than taken on trust
+   - S16 evidence-gaps.json is byte-identical to what scripts/generate_stix.py
+        renders from this matrix.json: the sorted ids of the techniques whose
+        ``evidence`` is empty or absent
 
 Exit 0 when everything holds, 1 otherwise.
 """
@@ -75,6 +86,8 @@ READINESS = ROOT / "schema" / "consumer-readiness.json"
 TECHNIQUE_IDS = ROOT / "technique-ids.json"
 STIX_BUNDLE = ROOT / "stix" / "agent-threat-matrix-bundle.json"
 STIX_GENERATOR = ROOT / "scripts" / "generate_stix.py"
+EVIDENCE_GAPS = ROOT / "evidence-gaps.json"
+TELEMETRY = "honeypot-telemetry"
 
 DOTTED_RE = re.compile(r"^(T-[0-9]{4})\.[0-9]{3}$")
 # Applied with fullmatch: ``$`` also matches before a trailing newline.
@@ -290,6 +303,41 @@ def resolve_matrix_commit(commit: str, listed, errors: list) -> str:
     return "ids match matrix.json at that commit"
 
 
+def unresolved_reason(entry: dict, technique: dict, source: dict):
+    """Why an evidence entry does not resolve (S15), or None when it does."""
+    if entry["type"] != TELEMETRY:
+        return (f"the validator reads no {entry['type']} source, so it cannot show the reference "
+                f"was read; it resolves a {TELEMETRY} entry only, against wildPrevalenceSource")
+    if entry["reference"] != source["url"]:
+        return (f"a {TELEMETRY} reference resolves only to the endpoint wildPrevalenceSource "
+                f"names, {source['url']}")
+    if entry["date"] != source["read"]:
+        return (f"its date {entry['date']} is not {source['read']}, the date wildPrevalenceSource "
+                f"says the endpoint was read")
+    if technique["wildSampleCount"] == 0:
+        return (f"the endpoint served no samples for the technique on {source['read']}: its "
+                f"wildSampleCount is 0")
+    return None
+
+
+def evidence_findings(technique: dict, tid: str, source: dict) -> list:
+    """S15 lines for the evidence entries of one technique."""
+    findings = []
+    first = {}
+    for index, entry in enumerate(technique.get("evidence", [])):
+        reason = unresolved_reason(entry, technique, source)
+        if reason:
+            findings.append(f"S15 {tid}: evidence[{index}] reference {entry['reference']!r} "
+                            f"does not resolve: {reason}")
+        key = (entry["type"], entry["reference"], entry["date"])
+        if key in first:
+            findings.append(f"S15 {tid}: evidence[{index}] repeats evidence[{first[key]}] "
+                            f"(the same type, reference and date)")
+        else:
+            first[key] = index
+    return findings
+
+
 def semantic_checks(matrix: dict, readiness: dict, technique_ids_file, errors: list) -> str:
     """Append one line per semantic failure; return the matrixCommit note for the summary."""
     commit_note = ""
@@ -333,6 +381,8 @@ def semantic_checks(matrix: dict, readiness: dict, technique_ids_file, errors: l
                 f"prevalence with no samples behind it was not measured, so read both from the "
                 f"registry with scripts/sync_wild_prevalence.py rather than editing them"
             )
+
+        errors.extend(evidence_findings(t, tid, matrix["wildPrevalenceSource"]))
 
         status = t.get("status", "active")
         replaced_by = t.get("replacedBy")
@@ -394,23 +444,29 @@ def semantic_checks(matrix: dict, readiness: dict, technique_ids_file, errors: l
 
 
 def stix_check(errors: list):
-    if not STIX_BUNDLE.exists():
-        errors.append(f"S10 {STIX_BUNDLE.relative_to(ROOT)} is missing; run scripts/generate_stix.py")
+    """S10 and S16: the committed bundle and gap list are what the generator renders."""
+    missing = [(rule, path) for rule, path in (("S10", STIX_BUNDLE), ("S16", EVIDENCE_GAPS))
+               if not path.is_file()]
+    for rule, path in missing:
+        errors.append(f"{rule} {path.relative_to(ROOT)} is missing; run scripts/generate_stix.py")
+    if missing:
         return
     with tempfile.TemporaryDirectory(prefix="atm-stix-") as tmp:
         out = Path(tmp) / "bundle.json"
+        gaps = Path(tmp) / "evidence-gaps.json"
         proc = subprocess.run(
-            [sys.executable, str(STIX_GENERATOR), "--output", str(out)],
+            [sys.executable, str(STIX_GENERATOR), "--output", str(out), "--gaps-output", str(gaps)],
             capture_output=True, text=True, timeout=120,
         )
         if proc.returncode != 0:
             errors.append(f"S10 scripts/generate_stix.py failed: {proc.stderr.strip() or proc.stdout.strip()}")
             return
-        if out.read_bytes() != STIX_BUNDLE.read_bytes():
-            errors.append(
-                f"S10 {STIX_BUNDLE.relative_to(ROOT)} is not what scripts/generate_stix.py renders "
-                f"from matrix.json; regenerate it with: python3 scripts/generate_stix.py"
-            )
+        for rule, rendered, committed in (("S10", out, STIX_BUNDLE), ("S16", gaps, EVIDENCE_GAPS)):
+            if rendered.read_bytes() != committed.read_bytes():
+                errors.append(
+                    f"{rule} {committed.relative_to(ROOT)} is not what scripts/generate_stix.py "
+                    f"renders from matrix.json; regenerate it with: python3 scripts/generate_stix.py"
+                )
 
 
 def committed_matrix():
@@ -522,10 +578,13 @@ def main() -> int:
         return 1
 
     sub = sum(1 for t in matrix["techniques"] if "." in t["id"])
+    entries = sum(len(t.get("evidence", [])) for t in matrix["techniques"])
+    bare = sum(1 for t in matrix["techniques"] if not t.get("evidence"))
     print(
         f"matrix.json validates against schema 1.2: {len(matrix['techniques'])} techniques "
         f"({sub} sub-techniques), {len(matrix['dataSources'])} data sources, "
-        f"technique-ids.json and STIX bundle in sync "
+        f"{entries} evidence entries resolved ({bare} techniques with none), "
+        f"technique-ids.json, STIX bundle and evidence-gaps.json in sync "
         f"(matrixCommit {technique_ids_file['matrixCommit']}, {commit_note})"
     )
     return 0

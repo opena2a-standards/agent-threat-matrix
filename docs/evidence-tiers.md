@@ -76,6 +76,16 @@ Every value names a publicly resolvable kind of source. An `evidence` entry does
 or change the technique's tier; the tier is assigned by the maintainers and audited in
 `EVIDENCE_AUDIT.md`.
 
+An entry is accepted only where `scripts/validate_matrix.py` resolves its reference to a
+source it reads, so no entry rests on a citation nobody read. The validator resolves one
+kind of entry: a `honeypot-telemetry` entry whose reference is the registry endpoint in
+`wildPrevalenceSource` and whose date is the read date there, on a technique whose
+`wildSampleCount` is above 0. `scripts/sync_wild_prevalence.py` writes that entry when it
+records the read. An entry of any other kind is refused until the validator reads its
+source. `evidence-gaps.json` lists the techniques with no entry; `scripts/generate_stix.py`
+writes it and the validator fails when it differs from that rendering, so a gap is closed
+by an entry that resolves, never by text.
+
 ## Mapping to other registers
 
 Other registers classify evidence on their own axes. The ARIA behavioral sweep classifies a
