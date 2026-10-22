@@ -36,15 +36,17 @@ separates a normative change from an editorial one. In this repository the norma
 content is:
 
 - `matrix.json`, the matrix itself: every tactic, technique, attack class and attack path,
-  with each technique's evidence tier;
+  with each technique's evidence tier and its technique-level crosswalk to MITRE ATT&CK and
+  MITRE ATLAS, the `attackMapping` and `atlasMapping` arrays;
 - `technique-ids.json`, the technique id list, kept in step with `matrix.json`;
 - `canonical-classes.json`, the canonical attack classes resolved to technique ids;
 - `schema/`, the JSON Schema for `matrix.json` and the consumer-readiness gate on dotted
   ids;
 - `docs/evidence-tiers.md`, the definition of each evidence tier and the evidence standard;
 - `EVIDENCE_AUDIT.md`, the justification of every technique's tier;
-- `cross-references/`, the published placement of every technique against the external
-  frameworks;
+- `cross-references/`, the published mapping pages that relate the matrix to external
+  frameworks, and the index of the techniques they name, beside the technique-level
+  crosswalk that `matrix.json` carries;
 - the scope statement in `docs/overview.md`, under "What This Covers (and What It
   Doesn't)".
 
@@ -61,8 +63,23 @@ check fails when it differs from a fresh rendering:
 - the overlap counts in `cross-references/technique-overlap-index.md`:
   `python3 scripts/check_cross_references.py`.
 
+Three files under `crosswalks/` hold derived content that no check renders afresh.
+`tests/test_crosswalks.py` guards them; it is a local test that no workflow runs, run with
+`python3 -m pytest -q tests/test_crosswalks.py`:
+
+- the technique list of `crosswalks/unmapped.md`, the ids in the first column of its table,
+  which is typed by hand: the test fails when it differs from the techniques whose
+  `attackMapping` and `atlasMapping` are both empty in `matrix.json`;
+- the release snapshots `crosswalks/attack-release.json` and `crosswalks/atlas-release.json`,
+  derived from the external releases rather than from the normative content:
+  `scripts/build_crosswalk_index.py` writes them from a clone of each published data
+  repository, which is not vendored here, and they are never edited by hand. The test
+  resolves every `attackMapping` and `atlasMapping` id against them, and fails when the notes
+  in `matrix.json` name a release other than the one a snapshot records.
+
 Everything else is editorial: the prose of `README.md`, the pages under `docs/` other than
-the two named above, the prose of the technique pages, `CONTRIBUTING.md`, `CHANGELOG.md`,
+the two named above, the prose of the technique pages, `crosswalks/README.md` and the rest
+of `crosswalks/unmapped.md`, `CONTRIBUTING.md`, `CHANGELOG.md`,
 `ATTRIBUTION.md`, whose own rule is the "Contributor credit" section of CONTRIBUTING.md,
 and `related-projects.json`, the figures about related projects that the README check
 reads and the OASB-1 control titles that `scripts/check_technique_pages.py` writes into

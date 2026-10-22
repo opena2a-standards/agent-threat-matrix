@@ -6,8 +6,8 @@ Standard library only, no network. Two passes:
 1. Shape. matrix.json is checked against schema/threat-matrix-v1.2.schema.json by
    the subset JSON Schema checker below. The subset is what that schema uses:
    ``type``, ``required``, ``properties``, ``additionalProperties``, ``items``,
-   ``enum``, ``const``, ``pattern``, ``minimum``, ``maximum`` and local ``$ref``
-   into ``$defs``. Any other keyword in the schema is a fault in this checker's
+   ``enum``, ``const``, ``pattern``, ``minimum``, ``maximum``, ``minItems`` and local
+   ``$ref`` into ``$defs``. Any other keyword in the schema is a fault in this checker's
    coverage and fails loudly rather than being silently ignored. A ``number`` is
    finite: the NaN and Infinity that Python's json module reads are not JSON numbers.
    An ``integer`` or ``number`` too large to convert to a 64-bit float, which JSON
@@ -21,8 +21,9 @@ Standard library only, no network. Two passes:
    - S1 technique ids are unique
    - S2 ``tactic`` names an entry in tactics[]
    - S3 ``attackClass`` names an entry in attackClasses[]
-   - S4 ``dataSources`` values name entries in the top-level dataSources[] registry,
-        whose ids are themselves unique
+   - S4 each ``dataSources`` mapping of a technique names an entry in the top-level
+        dataSources[] registry, whose ids are themselves unique, and names a tool
+        that the entry's ``readBy`` cites
    - S5 ``replacedBy`` is present if and only if ``status`` is ``deprecated``, and
         names another technique
    - S6 ``parentId`` is present if and only if the id is dotted, names a technique,
@@ -101,7 +102,7 @@ GIT_LOCATION_VARS = ("GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR", "GIT_INDEX_FI
 
 SUPPORTED = {
     "type", "required", "properties", "additionalProperties", "items", "enum", "const",
-    "pattern", "minimum", "maximum", "$ref",
+    "pattern", "minimum", "maximum", "minItems", "$ref",
     # annotation-only keywords: carried in the schema for readers, no validation effect
     "$schema", "$id", "title", "description", "$defs", "x-semantic",
 }
@@ -201,6 +202,9 @@ class SchemaChecker:
                 for key in value:
                     if key not in properties:
                         self.check(value[key], additional, f"{path}.{key}")
+
+        if isinstance(value, list) and "minItems" in schema and len(value) < schema["minItems"]:
+            self.errors.append(f"{path}: {len(value)} item(s), fewer than the minimum {schema['minItems']}")
 
         if isinstance(value, list) and "items" in schema:
             for index, item in enumerate(value):
@@ -356,7 +360,9 @@ def semantic_checks(matrix: dict, readiness: dict, technique_ids_file, errors: l
     source_ids = [d["id"] for d in matrix.get("dataSources", [])]
     for dup in sorted({s for s in source_ids if source_ids.count(s) > 1}):
         errors.append(f"S4 dataSources registry: duplicate id {dup!r}")
-    source_ids = set(source_ids)
+    readers = {}
+    for d in matrix.get("dataSources", []):
+        readers.setdefault(d["id"], set()).update(r["tool"] for r in d["readBy"])
 
     for index, t in enumerate(techniques):
         tid = technique_label(t, index)
@@ -364,9 +370,16 @@ def semantic_checks(matrix: dict, readiness: dict, technique_ids_file, errors: l
             errors.append(f"S2 {tid}: tactic {t['tactic']!r} is not in tactics[]")
         if t["attackClass"] not in class_ids:
             errors.append(f"S3 {tid}: attackClass {t['attackClass']!r} is not in attackClasses[]")
-        for source in t.get("dataSources", []):
-            if source not in source_ids:
-                errors.append(f"S4 {tid}: dataSources value {source!r} is not in the dataSources registry")
+        for mapping in t.get("dataSources", []):
+            source, tool = mapping["source"], mapping["tool"]
+            if source not in readers:
+                errors.append(f"S4 {tid}: dataSources source {source!r} is not in the dataSources registry")
+            elif tool not in readers[source]:
+                errors.append(
+                    f"S4 {tid}: dataSources source {source!r} names tool {tool!r}, which its readBy "
+                    f"does not cite ({', '.join(sorted(readers[source]))}); cite where {tool!r} reads "
+                    f"the data, or name a tool that does"
+                )
 
         scenario = t.get("dvaaValidation")
         if t["evidenceTier"] == "adapted" and isinstance(scenario, str) and scenario.strip():

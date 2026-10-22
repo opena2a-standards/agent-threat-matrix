@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://threats.opena2a.org/schema/threat-matrix-v1.2.schema.json",
   "title": "AI Agent Threat Matrix 1.2",
-  "description": "Shape of matrix.json. Technique ids are T-NNNN, or T-NNNN.NNN for a sub-technique; sub-techniques sit flat in techniques[] and carry parentId. The nine technique fields required by 1.1 are unchanged and still required. Every field added in 1.2 is optional. Added after the 1.2 release and required: wildPrevalence and wildSampleCount on every technique, and the top-level wildPrevalenceSource that says where and when they were read. scripts/validate_matrix.py checks this schema with an in-repo subset checker and then the cross-field rules the schema cannot express (see the x-semantic notes).",
+  "description": "Shape of matrix.json. Technique ids are T-NNNN, or T-NNNN.NNN for a sub-technique; sub-techniques sit flat in techniques[] and carry parentId. The nine technique fields required by 1.1 are unchanged and still required. Every field added in 1.2 is optional. Added after the 1.2 release and required: wildPrevalence and wildSampleCount on every technique, and the top-level wildPrevalenceSource that says where and when they were read. Changed after the 1.2 release, while no technique carried a data source: an entry of the top-level dataSources registry requires readBy, and the items of a technique's dataSources are objects that name the source and the check, signature or sensor field that uses it, where they were bare ids. scripts/validate_matrix.py checks this schema with an in-repo subset checker and then the cross-field rules the schema cannot express (see the x-semantic notes).",
   "type": "object",
   "required": ["version", "name", "created", "updated", "stixNamespace", "tactics", "techniques", "attackClasses", "attackPaths", "dataSources", "wildPrevalenceSource"],
   "additionalProperties": false,
@@ -20,7 +20,7 @@
     "attackClasses": { "type": "array", "items": { "$ref": "#/$defs/attackClass" } },
     "attackPaths": { "type": "array", "items": { "$ref": "#/$defs/attackPath" } },
     "dataSources": {
-      "description": "Registry of data sources a technique may cite in its dataSources array. May be empty.",
+      "description": "The data source vocabulary: telemetry a defender can collect, where each entry cites the file and line of a tool or sensor that reads it. A technique cites entries in its dataSources array. May be empty.",
       "type": "array",
       "items": { "$ref": "#/$defs/dataSource" }
     },
@@ -91,9 +91,10 @@
         "attackMapping": { "type": "array", "items": { "$ref": "#/$defs/attackMappingEntry" } },
         "atlasMapping": { "type": "array", "items": { "$ref": "#/$defs/atlasMappingEntry" } },
         "dataSources": {
+          "description": "The data sources a defender collects to see this technique, each with the check, signature or sensor field that uses it for this technique. Absent or empty means unmapped.",
           "type": "array",
-          "items": { "type": "string" },
-          "x-semantic": "every value must be the id of an entry in the top-level dataSources[] registry"
+          "items": { "$ref": "#/$defs/dataSourceMapping" },
+          "x-semantic": "every source must be the id of an entry in the top-level dataSources[] registry, and every tool must be a tool that entry's readBy cites"
         },
         "evidence": {
           "type": "array",
@@ -160,12 +161,43 @@
     },
     "dataSource": {
       "type": "object",
-      "required": ["id", "name", "description"],
+      "required": ["id", "name", "description", "readBy"],
       "additionalProperties": false,
       "properties": {
         "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
         "name": { "type": "string" },
-        "description": { "type": "string" }
+        "description": { "type": "string" },
+        "readBy": {
+          "description": "The tools or sensors that read this data, each cited at the file and line that reads it. A source with no reader is not admitted.",
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/sourceReader" }
+        }
+      }
+    },
+    "sourceReader": {
+      "description": "One tool or sensor that reads a data source, cited at a file and line of its repository at a pinned commit.",
+      "type": "object",
+      "required": ["tool", "repository", "commit", "path", "line"],
+      "additionalProperties": false,
+      "properties": {
+        "tool": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$", "description": "The tool or sensor, named as a technique's dataSources mapping names it." },
+        "repository": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9-]*/[A-Za-z0-9._-]+$", "description": "GitHub owner/name of the repository that holds the reading code." },
+        "commit": { "type": "string", "pattern": "^[0-9a-f]{40}$", "description": "The 40-hex sha of the commit at which path and line were read." },
+        "path": { "type": "string", "pattern": "^[^/\\s][^\\s]*$", "description": "Path of the reading file, relative to the repository root." },
+        "line": { "type": "integer", "minimum": 1, "description": "Line of path, at commit, where the data is read." }
+      }
+    },
+    "dataSourceMapping": {
+      "description": "One data source a technique is seen in, and the check, signature or sensor field that uses it for this technique.",
+      "type": "object",
+      "required": ["source", "tool", "kind", "ref"],
+      "additionalProperties": false,
+      "properties": {
+        "source": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$", "description": "Id of an entry in the top-level dataSources[] registry." },
+        "tool": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$", "description": "The tool or sensor whose check, signature or sensor field this is; one that the source's readBy cites." },
+        "kind": { "enum": ["check", "signature", "sensorField"] },
+        "ref": { "type": "string", "pattern": "^\\S(.*\\S)?$", "description": "The check id, signature id or sensor field name, as the tool writes it." }
       }
     },
     "attackClass": {

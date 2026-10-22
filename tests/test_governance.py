@@ -270,6 +270,27 @@ def test_page_passes_the_docs_prose_check():
     assert PROSE.check_text(PAGE, text) == []
 
 
+def _paths_in(part: str) -> set:
+    """The paths named in code spans of `part`, read as the G3 check reads them."""
+    return {token for line in CHK.prose_lines(part)
+            for span in CHK.CODE_SPAN_RE.findall(line) for token in CHK.path_tokens(span)}
+
+
+def test_the_crosswalk_files_are_classified_with_the_check_that_guards_them():
+    # The page named no file under crosswalks/, so by its catch-all the unmapped list and the
+    # release snapshots were editorial, while unmapped.md says it is derived and checked.
+    section = CHK.section((ROOT / PAGE).read_text(encoding="utf-8"), CHK.PATHS_SECTION)
+    normative, _, rest = section.partition("Derived content")
+    derived, _, editorial = rest.partition("Everything else is editorial")
+    assert "attackMapping" in normative and "atlasMapping" in normative
+    assert {"crosswalks/unmapped.md", "crosswalks/attack-release.json",
+            "crosswalks/atlas-release.json", "tests/test_crosswalks.py"} <= _paths_in(derived)
+    assert {"crosswalks/README.md", "crosswalks/unmapped.md"} <= _paths_in(editorial)
+    crosswalks = ROOT / "crosswalks"
+    shipped = {p.relative_to(ROOT).as_posix() for p in [*crosswalks.glob("*.md"), *crosswalks.glob("*.json")]}
+    assert shipped and shipped <= _paths_in(section), sorted(shipped - _paths_in(section))
+
+
 def test_heading_slug_follows_the_fragment_rule():
     assert CHK.heading_slug("What This Covers (and What It Doesn't)") == "what-this-covers-and-what-it-doesnt"
     assert CHK.heading_slug("Evidence Standard") == "evidence-standard"
