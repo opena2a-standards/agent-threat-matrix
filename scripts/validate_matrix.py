@@ -68,16 +68,25 @@ Standard library only, no network. Two passes:
         evidence-sources.json pins, ``<repository>/blob/<commit>/<path>``, its date
         is the page's ``committed`` date, and the page names the technique's id with
         the technique's name as the label, so the page at that commit names the
-        technique. No other reference resolves: the validator records no other
-        source, so a citation it cannot read is refused rather than taken on trust
+        technique. It also resolves when its reference is the permalink of a
+        challenge evidence-sources.json pins, ``<repository>/blob/<commit>/<path>#L<line>``,
+        or of a scenario page it pins, its date is the ``committed`` date of that
+        file, and a value of the technique's ``dvaaValidation`` (the text between its
+        commas, trimmed) is the challenge's id or the scenario's name, so the lab work
+        the technique names was read at that commit. No other reference resolves: the
+        validator records no other source, so a citation it cannot read is refused
+        rather than taken on trust
    - S16 evidence-gaps.json is byte-identical to what scripts/generate_stix.py
         renders from this matrix.json: the sorted ids of the techniques whose
         ``evidence`` is empty or absent
    - S17 evidence-sources.json has the shape schema/evidence-sources.schema.json
-        gives; its ``read`` date and each page's ``committed`` date are calendar
-        dates, ``read`` is no later than today and no ``committed`` is later than
-        ``read``; no page is pinned twice; and every page names a technique. The
-        validator does not read the clone the pins were taken from:
+        gives; its ``read`` date and each ``committed`` date are calendar dates,
+        ``read`` is no later than today and no ``committed`` is later than ``read``;
+        no page or scenario page is pinned twice and no challenge is listed twice;
+        every page names a technique; ``challenges``, where present, lists a
+        challenge and ``scenarios`` a page; and a technique's ``dvaaValidation``
+        names each challenge and scenario pinned for one. The validator does not
+        read the clone the pins were taken from:
         ``python3 scripts/pin_evidence_sources.py --dvaa <clone> --check`` compares
         them with it
    - S18 a ``dataSources`` mapping of a technique whose ``tool`` is ``hackmyagent``
@@ -380,13 +389,49 @@ def resolve_matrix_commit(commit: str, listed, errors: list) -> str:
     return "ids match matrix.json at that commit"
 
 
-def unpinned_reason(entry: dict, technique: dict, pages: dict):
-    """Why a lab-reproduction entry does not resolve to a pinned page (S15), or None."""
-    page = pages.get(entry["reference"])
-    if page is None:
+def validation_values(technique: dict) -> list:
+    """The values a technique's dvaaValidation lists: the text between its commas, trimmed."""
+    value = technique.get("dvaaValidation")
+    if not isinstance(value, str):
+        return []
+    return [part.strip() for part in value.split(",") if part.strip()]
+
+
+def unpinned_reason(entry: dict, technique: dict, pages: dict, named: dict):
+    """Why a lab-reproduction entry resolves neither to a pinned page nor to a challenge or
+    scenario page pinned for a dvaaValidation (S15), or None when it resolves."""
+    page, pin = pages.get(entry["reference"]), named.get(entry["reference"])
+    if page is None and pin is None:
         return (f"evidence-sources.json pins no page with this reference, so the validator cannot show "
                 f"it was read; a {LAB} reference resolves only to the permalink of a pinned page, "
-                f"<repository>/blob/<commit>/<path>")
+                f"<repository>/blob/<commit>/<path>, or of a challenge or scenario page pinned for a "
+                f"dvaaValidation that names it")
+    reasons = []
+    for found, reason_of in ((pin, named_reason), (page, page_reason)):
+        if found is not None:
+            reason = reason_of(entry, technique, found)
+            if reason is None:
+                return None
+            reasons.append(reason)
+    return "; ".join(reasons)
+
+
+def named_reason(entry: dict, technique: dict, pin: dict):
+    """Why a lab-reproduction entry does not resolve to the challenge or scenario page pinned at
+    its reference (S15), or None."""
+    if entry["date"] != pin["committed"]:
+        return (f"its date {entry['date']} is not {pin['committed']}, the date evidence-sources.json "
+                f"gives the commit that wrote the file")
+    if pin["value"] not in validation_values(technique):
+        return (f"evidence-sources.json pins the DVAA {pin['kind']} {pin['value']} at this reference, "
+                f"and the technique's dvaaValidation, {technique.get('dvaaValidation')!r}, does not "
+                f"name it")
+    return None
+
+
+def page_reason(entry: dict, technique: dict, page: dict):
+    """Why a lab-reproduction entry does not resolve to the page pinned at its reference (S15),
+    or None."""
     if entry["date"] != page["committed"]:
         return (f"its date {entry['date']} is not {page['committed']}, the date evidence-sources.json "
                 f"gives the commit that wrote the page")
@@ -400,10 +445,10 @@ def unpinned_reason(entry: dict, technique: dict, pages: dict):
     return None
 
 
-def unresolved_reason(entry: dict, technique: dict, source: dict, pages: dict):
+def unresolved_reason(entry: dict, technique: dict, source: dict, pages: dict, named: dict):
     """Why an evidence entry does not resolve (S15), or None when it does."""
     if entry["type"] == LAB:
-        return unpinned_reason(entry, technique, pages)
+        return unpinned_reason(entry, technique, pages, named)
     if entry["type"] != TELEMETRY:
         return (f"the validator reads no {entry['type']} source, so it cannot show the reference "
                 f"was read; it resolves a {TELEMETRY} entry against wildPrevalenceSource and a {LAB} "
@@ -420,12 +465,12 @@ def unresolved_reason(entry: dict, technique: dict, source: dict, pages: dict):
     return None
 
 
-def evidence_findings(technique: dict, tid: str, source: dict, pages: dict) -> list:
+def evidence_findings(technique: dict, tid: str, source: dict, pages: dict, named: dict) -> list:
     """S15 lines for the evidence entries of one technique."""
     findings = []
     first = {}
     for index, entry in enumerate(technique.get("evidence", [])):
-        reason = unresolved_reason(entry, technique, source, pages)
+        reason = unresolved_reason(entry, technique, source, pages, named)
         if reason:
             findings.append(f"S15 {tid}: evidence[{index}] reference {entry['reference']!r} "
                             f"does not resolve: {reason}")
@@ -438,7 +483,8 @@ def evidence_findings(technique: dict, tid: str, source: dict, pages: dict) -> l
     return findings
 
 
-def semantic_checks(matrix: dict, readiness: dict, technique_ids_file, pages: dict, errors: list) -> str:
+def semantic_checks(matrix: dict, readiness: dict, technique_ids_file, pages: dict, named: dict,
+                    errors: list) -> str:
     """Append one line per semantic failure; return the matrixCommit note for the summary."""
     commit_note = ""
     techniques = matrix["techniques"]
@@ -497,7 +543,7 @@ def semantic_checks(matrix: dict, readiness: dict, technique_ids_file, pages: di
                 f"registry with scripts/sync_wild_prevalence.py rather than editing them"
             )
 
-        errors.extend(evidence_findings(t, tid, matrix["wildPrevalenceSource"], pages))
+        errors.extend(evidence_findings(t, tid, matrix["wildPrevalenceSource"], pages, named))
 
         status = t.get("status", "active")
         replaced_by = t.get("replacedBy")
@@ -566,25 +612,35 @@ def calendar_date(value: str) -> bool:
     return True
 
 
-def pinned_pages(schema: dict, today: str, errors: list) -> dict:
-    """S17: append one line per fault in evidence-sources.json; return its pages by permalink.
+def committed_findings(where: str, committed: str, read: str, errors: list) -> None:
+    """S17: a committed date is a calendar date no later than the read."""
+    if not calendar_date(committed):
+        errors.append(f"S17 {where}: committed {committed!r} is not a calendar date")
+    elif calendar_date(read) and committed > read:
+        errors.append(f"S17 {where}: committed {committed} is later than read {read}, the date the "
+                      f"clone was read")
+
+
+def pinned_sources(schema: dict, matrix: dict, today: str, errors: list):
+    """S17: append one line per fault in evidence-sources.json; return the pages it pins, and the
+    challenges and scenario pages it pins for a dvaaValidation, each by permalink.
 
     A file that does not parse, or does not have the shape its schema gives, has fields that
-    cannot be read, so it pins no page that S15 resolves an entry against.
+    cannot be read, so it pins nothing that S15 resolves an entry against.
     """
     sources, cause = read_json(EVIDENCE_SOURCES)
     if sources is None:
         errors.append(f"S17 evidence-sources.json is missing or does not parse: {cause}")
-        return {}
+        return {}, {}
     checker = SchemaChecker(schema)
     try:
         checker.check(sources, schema, "evidence-sources")
     except ValueError as exc:
         errors.append(f"S17 schema/evidence-sources.schema.json: {exc}")
-        return {}
+        return {}, {}
     if checker.errors:
         errors.extend(f"S17 {error}" for error in checker.errors)
-        return {}
+        return {}, {}
     dvaa = sources["dvaa"]
     read = dvaa["read"]
     if not calendar_date(read):
@@ -594,12 +650,7 @@ def pinned_pages(schema: dict, today: str, errors: list) -> dict:
     pages, first = {}, {}
     for index, page in enumerate(dvaa["pages"]):
         where = f"evidence-sources.dvaa.pages[{index}] ({page['path']})"
-        committed = page["committed"]
-        if not calendar_date(committed):
-            errors.append(f"S17 {where}: committed {committed!r} is not a calendar date")
-        elif calendar_date(read) and committed > read:
-            errors.append(f"S17 {where}: committed {committed} is later than read {read}, the date the "
-                          f"clone was read")
+        committed_findings(where, page["committed"], read, errors)
         if not page["names"]:
             errors.append(f"S17 {where}: names no technique; a page is pinned for the techniques it names")
         if page["path"] in first:
@@ -608,7 +659,57 @@ def pinned_pages(schema: dict, today: str, errors: list) -> dict:
         else:
             first[page["path"]] = index
         pages[f"{dvaa['repository']}/blob/{page['commit']}/{page['path']}"] = page
-    return pages
+    return pages, named_pins(dvaa, matrix, errors)
+
+
+def named_pins(dvaa: dict, matrix: dict, errors: list) -> dict:
+    """S17 for the challenges and scenario pages pinned for a dvaaValidation; return each by its
+    permalink, with its kind, the value that names it and its committed date."""
+    values = {value for technique in matrix["techniques"] for value in validation_values(technique)}
+    read, named = dvaa["read"], {}
+    challenges = dvaa.get("challenges")
+    if challenges is not None:
+        where = "evidence-sources.dvaa.challenges"
+        committed_findings(where, challenges["committed"], read, errors)
+        if not challenges["named"]:
+            errors.append(f"S17 {where}: names no challenge; the file is pinned for the challenges a "
+                          f"dvaaValidation names")
+        first = {}
+        for index, challenge in enumerate(challenges["named"]):
+            here = f"{where}.named[{index}] ({challenge['id']})"
+            if challenge["id"] in first:
+                errors.append(f"S17 {here}: {where}.named[{first[challenge['id']]}] lists this "
+                              f"challenge already")
+            else:
+                first[challenge["id"]] = index
+            if challenge["id"] not in values:
+                errors.append(f"S17 {here}: no technique's dvaaValidation names it; a challenge is "
+                              f"pinned for the techniques that name it")
+            reference = (f"{dvaa['repository']}/blob/{challenges['commit']}/{challenges['path']}"
+                         f"#L{challenge['line']}")
+            named[reference] = {"kind": "challenge", "value": challenge["id"],
+                                "committed": challenges["committed"]}
+    scenarios = dvaa.get("scenarios")
+    if scenarios is not None:
+        if not scenarios:
+            errors.append("S17 evidence-sources.dvaa.scenarios: pins no page; the key is written for "
+                          "the scenarios a dvaaValidation names")
+        first = {}
+        for index, page in enumerate(scenarios):
+            where = f"evidence-sources.dvaa.scenarios[{index}] ({page['path']})"
+            committed_findings(where, page["committed"], read, errors)
+            if page["path"] in first:
+                errors.append(f"S17 {where}: evidence-sources.dvaa.scenarios[{first[page['path']]}] pins "
+                              f"this page already")
+            else:
+                first[page["path"]] = index
+            name = page["path"].split("/")[1]
+            if name not in values:
+                errors.append(f"S17 {where}: no technique's dvaaValidation names the scenario {name!r}; "
+                              f"a scenario page is pinned for the techniques that name it")
+            named[f"{dvaa['repository']}/blob/{page['commit']}/{page['path']}"] = {
+                "kind": "scenario", "value": name, "committed": page["committed"]}
+    return named
 
 
 def stix_check(errors: list):
@@ -733,12 +834,12 @@ def main() -> int:
 
     technique_ids_file = load_json(TECHNIQUE_IDS)
     commit_note = ""
-    pages = {}
+    pages, named = {}, {}
     if not errors:
         today = date.today().isoformat()
         source_errors = []
-        pages = pinned_pages(sources_schema, today, source_errors)
-        commit_note = semantic_checks(matrix, readiness, technique_ids_file, pages, errors)
+        pages, named = pinned_sources(sources_schema, matrix, today, source_errors)
+        commit_note = semantic_checks(matrix, readiness, technique_ids_file, pages, named, errors)
         errors.extend(source_errors)
         freshness_check(matrix, committed_matrix(), today, errors)
         stix_check(errors)
@@ -754,11 +855,13 @@ def main() -> int:
     sub = sum(1 for t in matrix["techniques"] if "." in t["id"])
     entries = sum(len(t.get("evidence", [])) for t in matrix["techniques"])
     bare = sum(1 for t in matrix["techniques"] if not t.get("evidence"))
+    challenges = sum(1 for pin in named.values() if pin["kind"] == "challenge")
     print(
         f"matrix.json validates against schema 1.2: {len(matrix['techniques'])} techniques "
         f"({sub} sub-techniques), {len(matrix['dataSources'])} data sources, "
         f"{entries} evidence entries resolved ({bare} techniques with none) against "
-        f"wildPrevalenceSource and the {len(pages)} pages evidence-sources.json pins, "
+        f"wildPrevalenceSource and the {len(pages)} pages, {challenges} challenges and "
+        f"{len(named) - challenges} scenario pages evidence-sources.json pins, "
         f"technique-ids.json, STIX bundle and evidence-gaps.json in sync "
         f"(matrixCommit {technique_ids_file['matrixCommit']}, {commit_note})"
     )

@@ -1194,7 +1194,7 @@ def test_shipped_lab_entries_cite_a_pinned_page_that_names_the_technique():
     cited = 0
     for t in load(ROOT, "matrix.json")["techniques"]:
         for entry in t.get("evidence", []):
-            if entry["type"] == LAB:
+            if entry["type"] == LAB and entry["reference"] in pages:
                 page = pages[entry["reference"]]
                 assert entry["date"] == page["committed"], t["id"]
                 assert (t["id"], t["name"]) in [(n["technique"], n["label"]) for n in page["names"]], t["id"]
@@ -1276,7 +1276,143 @@ def test_lab_entry_resolves_once_a_pinned_page_names_the_technique_under_its_nam
         regenerate_stix(root)
     proc = mutate(fn)
     assert proc.returncode == 0, proc.stdout + proc.stderr
-    assert "32 evidence entries resolved (30 techniques with none)" in proc.stdout, proc.stdout
+    shipped = load(ROOT, "matrix.json")
+    # T-1001 carried no entry, so the tree has one entry more and one bare technique fewer.
+    assert "evidence" not in technique_of(shipped, "T-1001")
+    entries = sum(len(t.get("evidence", [])) for t in shipped["techniques"]) + 1
+    bare = sum(1 for t in shipped["techniques"] if not t.get("evidence")) - 1
+    assert f"{entries} evidence entries resolved ({bare} techniques with none)" in proc.stdout, proc.stdout
+
+
+# --------------------------------------------------------------------------- S15 entries a dvaaValidation backs
+
+CHALLENGE_FILE = "src/challenges/index.js"
+
+
+def pinned_dvaa(root: Path = ROOT) -> dict:
+    return load(root, "evidence-sources.json")["dvaa"]
+
+
+def named_pins(root: Path = ROOT) -> dict:
+    """The value a dvaaValidation names and the date of the file, by the permalink of each
+    challenge and scenario page evidence-sources.json pins for a dvaaValidation."""
+    dvaa = pinned_dvaa(root)
+    pins = {}
+    challenges = dvaa.get("challenges")
+    for challenge in challenges["named"] if challenges else []:
+        pins[f"{permalink(challenges)}#L{challenge['line']}"] = (challenge["id"], challenges["committed"])
+    for page in dvaa.get("scenarios", []):
+        pins[permalink(page)] = (page["path"].split("/")[1], page["committed"])
+    return pins
+
+
+def values_of(technique: dict) -> list:
+    return [part.strip() for part in (technique["dvaaValidation"] or "").split(",") if part.strip()]
+
+
+def named_entry(value: str, **change) -> dict:
+    """The lab-reproduction entry that cites the challenge or scenario page pinned for value."""
+    reference, (_, committed) = next((ref, pin) for ref, pin in named_pins().items() if pin[0] == value)
+    return dict({"type": LAB, "reference": reference, "date": committed}, **change)
+
+
+def test_shipped_lab_entries_that_cite_no_page_cite_what_their_dvaa_validation_names():
+    pages = {permalink(page) for page in pinned_pages()}
+    pins = named_pins()
+    cited = 0
+    for t in load(ROOT, "matrix.json")["techniques"]:
+        for entry in t.get("evidence", []):
+            if entry["type"] == LAB and entry["reference"] not in pages:
+                value, committed = pins[entry["reference"]]
+                assert entry["date"] == committed, t["id"]
+                assert value in values_of(t), t["id"]
+                cited += 1
+    assert cited > 0
+
+
+def test_every_challenge_and_scenario_page_pinned_for_a_dvaa_validation_is_cited_by_it():
+    by_value = {value: (reference, committed) for reference, (value, committed) in named_pins().items()}
+    for t in load(ROOT, "matrix.json")["techniques"]:
+        for value in values_of(t):
+            if value in by_value:
+                reference, committed = by_value[value]
+                entry = {"type": LAB, "reference": reference, "date": committed}
+                assert entry in t.get("evidence", []), (t["id"], value)
+
+
+def test_t2001_cites_the_dvaa_challenge_its_dvaa_validation_names():
+    # The page that names T-2001 under its own name is a challenge, L1-03; neither scenario page
+    # that names the id labels it Direct Prompt Injection.
+    t2001 = technique_of(load(ROOT, "matrix.json"), "T-2001")
+    challenges = pinned_dvaa()["challenges"]
+    line = next(c["line"] for c in challenges["named"] if c["id"] == "L1-03")
+    assert t2001["dvaaValidation"] == "L1-03"
+    assert t2001["evidence"][0] == {
+        "type": LAB, "reference": f"{DVAA}/blob/{challenges['commit']}/{CHALLENGE_FILE}#L{line}",
+        "date": challenges["committed"]}
+
+
+def test_challenge_entry_on_a_technique_whose_dvaa_validation_does_not_name_it_is_red():
+    entry = named_entry("L1-03")
+    proc, index = run_with_evidence("T-1001", entry)
+    _red(proc, f"S15 T-1001: evidence[{index}] reference {entry['reference']!r} does not resolve: "
+               f"evidence-sources.json pins the DVAA challenge L1-03 at this reference, and the "
+               f"technique's dvaaValidation, 'All agents expose /health and /info', does not name it")
+
+
+def test_scenario_entry_on_a_technique_whose_dvaa_validation_does_not_name_it_is_red():
+    entry = named_entry("mcp-rug-pull")
+    proc, index = run_with_evidence("T-1001", entry)
+    _red(proc, f"S15 T-1001: evidence[{index}] reference {entry['reference']!r} does not resolve: "
+               f"evidence-sources.json pins the DVAA scenario mcp-rug-pull at this reference, and the "
+               f"technique's dvaaValidation, 'All agents expose /health and /info', does not name it")
+
+
+def test_challenge_entry_dated_other_than_the_commit_that_wrote_the_file_is_red():
+    entry = named_entry("L1-03", date="2026-10-21")
+    proc, index = run_with_evidence("T-2001", entry)
+    _red(proc, f"S15 T-2001: evidence[{index}] reference {entry['reference']!r} does not resolve: its date "
+               f"2026-10-21 is not {named_entry('L1-03')['date']}, the date evidence-sources.json gives the "
+               f"commit that wrote the file")
+
+
+def test_challenge_entry_at_a_line_no_pin_holds_is_red():
+    entry = named_entry("L1-03")
+    line = int(entry["reference"].rsplit("#L", 1)[1])
+    moved = entry["reference"].rsplit("#L", 1)[0] + f"#L{line + 1}"
+    proc, index = run_with_evidence("T-2001", dict(entry, reference=moved))
+    _red(proc, f"S15 T-2001: evidence[{index}] reference {moved!r} does not resolve: evidence-sources.json "
+               f"pins no page with this reference, so the validator cannot show it was read")
+
+
+def test_editing_a_dvaa_validation_leaves_its_entry_unresolved_and_its_pin_unnamed():
+    def fn(root):
+        m = load(root, "matrix.json")
+        technique_of(m, "T-2001")["dvaaValidation"] = "L1-04"
+        dump(root, "matrix.json", m)
+        regenerate_stix(root)
+    proc = mutate(fn)
+    reference = named_entry("L1-03")["reference"]
+    index = next(i for i, c in enumerate(pinned_dvaa()["challenges"]["named"]) if c["id"] == "L1-03")
+    _red(proc,f"S15 T-2001: evidence[0] reference {reference!r} does not resolve: evidence-sources.json "
+               f"pins the DVAA challenge L1-03 at this reference, and the technique's dvaaValidation, "
+               f"'L1-04', does not name it")
+    assert (f"S17 evidence-sources.dvaa.challenges.named[{index}] (L1-03): no technique's dvaaValidation "
+            f"names it; a challenge is pinned for the techniques that name it") in proc.stderr, proc.stderr
+
+
+def test_entry_resolves_once_a_dvaa_validation_names_a_pinned_challenge():
+    # T-1001 names no lab work; once its dvaaValidation also lists L1-03, the entry citing the
+    # pinned challenge resolves.
+    def fn(root):
+        m = load(root, "matrix.json")
+        t1001 = technique_of(m, "T-1001")
+        t1001["dvaaValidation"] += ", L1-03"
+        t1001["evidence"] = [named_entry("L1-03")]
+        dump(root, "matrix.json", m)
+        regenerate_stix(root)
+    proc = mutate(fn)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
 
 
 # --------------------------------------------------------------------------- S17 evidence-sources.json
@@ -1317,6 +1453,13 @@ def test_s17_directory_at_the_sources_file_is_red():
     (lambda d: d["pages"][0].update(note="read in full"),
      "S17 evidence-sources.dvaa.pages[0]: unexpected property 'note'"),
     (lambda d: d.pop("head"), "S17 evidence-sources.dvaa: missing required property 'head'"),
+    (lambda d: d["challenges"].update(path="src/challenges/other.js"),
+     "S17 evidence-sources.dvaa.challenges.path: expected 'src/challenges/index.js', got 'src/challenges/other.js'"),
+    (lambda d: d["challenges"]["named"][0].update(id="L1 01"),
+     "S17 evidence-sources.dvaa.challenges.named[0].id: 'L1 01' does not match"),
+    (lambda d: d["challenges"].pop("named"), "S17 evidence-sources.dvaa.challenges: missing required property 'named'"),
+    (lambda d: d["scenarios"][0].update(names=[]),
+     "S17 evidence-sources.dvaa.scenarios[0]: unexpected property 'names'"),
 ])
 def test_s17_sources_file_outside_its_schema_is_red_and_no_lab_entry_resolves(change, needle):
     proc = mutate(edit_sources(change))
@@ -1372,6 +1515,64 @@ def test_s17_page_pinned_twice_is_red():
     last = len(pinned_pages())
     _red(proc, f"S17 evidence-sources.dvaa.pages[{last}] ({THRESH}): evidence-sources.dvaa.pages[0] pins "
                f"this page already")
+
+
+def test_s17_challenge_file_that_names_no_challenge_is_red():
+    _red(mutate(edit_sources(lambda d: d["challenges"].update(named=[]))),
+         "S17 evidence-sources.dvaa.challenges: names no challenge; the file is pinned for the challenges "
+         "a dvaaValidation names")
+
+
+def test_s17_challenge_listed_twice_is_red():
+    named = pinned_dvaa()["challenges"]["named"]
+    proc = mutate(edit_sources(lambda d: d["challenges"]["named"].append(dict(named[0]))))
+    _red(proc, f"S17 evidence-sources.dvaa.challenges.named[{len(named)}] ({named[0]['id']}): "
+               f"evidence-sources.dvaa.challenges.named[0] lists this challenge already")
+
+
+def test_s17_challenge_no_dvaa_validation_names_is_red():
+    named = pinned_dvaa()["challenges"]["named"]
+    extra = {"line": 1, "id": "L9-99", "name": "A challenge no technique names"}
+    proc = mutate(edit_sources(lambda d: d["challenges"]["named"].append(extra)))
+    _red(proc, f"S17 evidence-sources.dvaa.challenges.named[{len(named)}] (L9-99): no technique's "
+               f"dvaaValidation names it; a challenge is pinned for the techniques that name it")
+
+
+def test_s17_challenge_file_committed_later_than_the_read_is_red():
+    def change(d):
+        d["challenges"]["committed"] = "2026-10-22"
+        d["read"] = "2026-10-21"
+    _red(mutate(edit_sources(change)),
+         "S17 evidence-sources.dvaa.challenges: committed 2026-10-22 is later than read 2026-10-21, the "
+         "date the clone was read")
+
+
+def test_s17_scenarios_that_pin_no_page_is_red():
+    _red(mutate(edit_sources(lambda d: d.update(scenarios=[]))),
+         "S17 evidence-sources.dvaa.scenarios: pins no page; the key is written for the scenarios a "
+         "dvaaValidation names")
+
+
+def test_s17_scenario_page_pinned_twice_is_red():
+    scenarios = pinned_dvaa()["scenarios"]
+    proc = mutate(edit_sources(lambda d: d["scenarios"].append(dict(scenarios[0]))))
+    _red(proc, f"S17 evidence-sources.dvaa.scenarios[{len(scenarios)}] ({scenarios[0]['path']}): "
+               f"evidence-sources.dvaa.scenarios[0] pins this page already")
+
+
+def test_s17_scenario_page_no_dvaa_validation_names_is_red():
+    scenarios = pinned_dvaa()["scenarios"]
+    extra = dict(scenarios[0], path="scenarios/no-technique-names-it/README.md")
+    proc = mutate(edit_sources(lambda d: d["scenarios"].append(extra)))
+    _red(proc, f"S17 evidence-sources.dvaa.scenarios[{len(scenarios)}] (scenarios/no-technique-names-it/"
+               f"README.md): no technique's dvaaValidation names the scenario 'no-technique-names-it'; a "
+               f"scenario page is pinned for the techniques that name it")
+
+
+def test_s17_scenario_committed_date_that_is_not_a_calendar_date_is_red():
+    path = pinned_dvaa()["scenarios"][0]["path"]
+    _red(mutate(edit_sources(lambda d: d["scenarios"][0].update(committed="2026-13-01"))),
+         f"S17 evidence-sources.dvaa.scenarios[0] ({path}): committed '2026-13-01' is not a calendar date")
 
 
 # --------------------------------------------------------------------------- S16 evidence gap list

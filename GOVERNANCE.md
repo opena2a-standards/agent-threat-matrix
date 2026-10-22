@@ -84,8 +84,8 @@ of `crosswalks/unmapped.md`, `CONTRIBUTING.md`, `CHANGELOG.md`,
 `related-projects.json`, the figures about related projects that the README check
 reads and the OASB-1 control titles that `scripts/check_technique_pages.py` writes into
 the Mitigation section of each technique page, and `evidence-sources.json`, the DVAA
-scenario pages that `lab-reproduction` evidence entries cite, pinned from a git clone by
-`scripts/pin_evidence_sources.py`.
+scenario pages and challenges that `lab-reproduction` evidence entries cite, pinned from a
+git clone by `scripts/pin_evidence_sources.py`.
 
 A change to normative content is a normative change in the organization's sense and takes
 the route below. An editorial change is a pull request directly.

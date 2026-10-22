@@ -204,6 +204,11 @@
       ],
       "evidence": [
         {
+          "type": "lab-reproduction",
+          "reference": "https://github.com/opena2a-org/damn-vulnerable-ai-agent/blob/eb6f66cc40e5ce5743b27cf3fe33d52e5ac69014/src/challenges/index.js#L14",
+          "date": "2026-10-07"
+        },
+        {
           "type": "honeypot-telemetry",
           "reference": "https://api.oa2a.org/api/v1/threat-matrix",
           "date": "2026-10-19",
@@ -424,6 +429,11 @@
       ],
       "evidence": [
         {
+          "type": "lab-reproduction",
+          "reference": "https://github.com/opena2a-org/damn-vulnerable-ai-agent/blob/eb6f66cc40e5ce5743b27cf3fe33d52e5ac69014/src/challenges/index.js#L98",
+          "date": "2026-10-07"
+        },
+        {
           "type": "honeypot-telemetry",
           "reference": "https://api.oa2a.org/api/v1/threat-matrix",
           "date": "2026-10-19",
@@ -554,6 +564,11 @@
       ],
       "evidence": [
         {
+          "type": "lab-reproduction",
+          "reference": "https://github.com/opena2a-org/damn-vulnerable-ai-agent/blob/eb6f66cc40e5ce5743b27cf3fe33d52e5ac69014/src/challenges/index.js#L143",
+          "date": "2026-10-07"
+        },
+        {
           "type": "honeypot-telemetry",
           "reference": "https://api.oa2a.org/api/v1/threat-matrix",
           "date": "2026-10-19",
@@ -604,6 +619,11 @@
         }
       ],
       "evidence": [
+        {
+          "type": "lab-reproduction",
+          "reference": "https://github.com/opena2a-org/damn-vulnerable-ai-agent/blob/eb6f66cc40e5ce5743b27cf3fe33d52e5ac69014/src/challenges/index.js#L356",
+          "date": "2026-10-07"
+        },
         {
           "type": "honeypot-telemetry",
           "reference": "https://api.oa2a.org/api/v1/threat-matrix",
@@ -742,6 +762,11 @@
       ],
       "evidence": [
         {
+          "type": "lab-reproduction",
+          "reference": "https://github.com/opena2a-org/damn-vulnerable-ai-agent/blob/6dd0c4434a9cc8b4d61e3ea5efa9fd42d0273f57/scenarios/token-smuggling-unicode/README.md",
+          "date": "2026-10-06"
+        },
+        {
           "type": "honeypot-telemetry",
           "reference": "https://api.oa2a.org/api/v1/threat-matrix",
           "date": "2026-10-19",
@@ -843,6 +868,11 @@
       ],
       "evidence": [
         {
+          "type": "lab-reproduction",
+          "reference": "https://github.com/opena2a-org/damn-vulnerable-ai-agent/blob/eb6f66cc40e5ce5743b27cf3fe33d52e5ac69014/src/challenges/index.js#L670",
+          "date": "2026-10-07"
+        },
+        {
           "type": "honeypot-telemetry",
           "reference": "https://api.oa2a.org/api/v1/threat-matrix",
           "date": "2026-10-19",
@@ -932,6 +962,11 @@
         }
       ],
       "evidence": [
+        {
+          "type": "lab-reproduction",
+          "reference": "https://github.com/opena2a-org/damn-vulnerable-ai-agent/blob/eb6f66cc40e5ce5743b27cf3fe33d52e5ac69014/src/challenges/index.js#L55",
+          "date": "2026-10-07"
+        },
         {
           "type": "honeypot-telemetry",
           "reference": "https://api.oa2a.org/api/v1/threat-matrix",
@@ -1151,6 +1186,13 @@
           "id": "AML.T0055",
           "relationship": "broadMatch",
           "note": "ATLAS 2026.09 Unsecured Credentials is broader; the agent memory store is the application-specific repository"
+        }
+      ],
+      "evidence": [
+        {
+          "type": "lab-reproduction",
+          "reference": "https://github.com/opena2a-org/damn-vulnerable-ai-agent/blob/eb6f66cc40e5ce5743b27cf3fe33d52e5ac69014/src/challenges/index.js#L310",
+          "date": "2026-10-07"
         }
       ]
     },
@@ -1444,6 +1486,11 @@
       ],
       "evidence": [
         {
+          "type": "lab-reproduction",
+          "reference": "https://github.com/opena2a-org/damn-vulnerable-ai-agent/blob/eb6f66cc40e5ce5743b27cf3fe33d52e5ac69014/src/challenges/index.js#L893",
+          "date": "2026-10-07"
+        },
+        {
           "type": "honeypot-telemetry",
           "reference": "https://api.oa2a.org/api/v1/threat-matrix",
           "date": "2026-10-19",
@@ -1545,6 +1592,11 @@
       "wildSampleCount": 1870,
       "evidence": [
         {
+          "type": "lab-reproduction",
+          "reference": "https://github.com/opena2a-org/damn-vulnerable-ai-agent/blob/43557482f8e17b96bec06eda3e6f65fa0ceb566a/scenarios/delegation-privilege-escalation/README.md",
+          "date": "2026-04-13"
+        },
+        {
           "type": "honeypot-telemetry",
           "reference": "https://api.oa2a.org/api/v1/threat-matrix",
           "date": "2026-10-19",
@@ -1639,6 +1691,11 @@
       ],
       "evidence": [
         {
+          "type": "lab-reproduction",
+          "reference": "https://github.com/opena2a-org/damn-vulnerable-ai-agent/blob/eb6f66cc40e5ce5743b27cf3fe33d52e5ac69014/src/challenges/index.js#L400",
+          "date": "2026-10-07"
+        },
+        {
           "type": "honeypot-telemetry",
           "reference": "https://api.oa2a.org/api/v1/threat-matrix",
           "date": "2026-10-19",
@@ -1705,6 +1762,13 @@
           "relationship": "relatedMatch",
           "note": "ATLAS 2026.09 AI Agent Tool Invocation: a tool issuing a server-side request the agent would not otherwise reach"
         }
+      ],
+      "evidence": [
+        {
+          "type": "lab-reproduction",
+          "reference": "https://github.com/opena2a-org/damn-vulnerable-ai-agent/blob/eb6f66cc40e5ce5743b27cf3fe33d52e5ac69014/src/challenges/index.js#L585",
+          "date": "2026-10-07"
+        }
       ]
     },
     {
@@ -1747,6 +1811,11 @@
       "wildPrevalence": 100,
       "wildSampleCount": 1870,
       "evidence": [
+        {
+          "type": "lab-reproduction",
+          "reference": "https://github.com/opena2a-org/damn-vulnerable-ai-agent/blob/eb6f66cc40e5ce5743b27cf3fe33d52e5ac69014/src/challenges/index.js#L942",
+          "date": "2026-10-07"
+        },
         {
           "type": "honeypot-telemetry",
           "reference": "https://api.oa2a.org/api/v1/threat-matrix",
@@ -1813,6 +1882,11 @@
           "type": "lab-reproduction",
           "reference": "https://github.com/opena2a-org/damn-vulnerable-ai-agent/blob/6dd0c4434a9cc8b4d61e3ea5efa9fd42d0273f57/scenarios/prompt-to-lateral-movement/README.md",
           "date": "2026-10-06"
+        },
+        {
+          "type": "lab-reproduction",
+          "reference": "https://github.com/opena2a-org/damn-vulnerable-ai-agent/blob/43557482f8e17b96bec06eda3e6f65fa0ceb566a/scenarios/tool-chain-exfiltration/README.md",
+          "date": "2026-04-13"
         }
       ]
     },
@@ -2067,6 +2141,11 @@
       ],
       "evidence": [
         {
+          "type": "lab-reproduction",
+          "reference": "https://github.com/opena2a-org/damn-vulnerable-ai-agent/blob/eb6f66cc40e5ce5743b27cf3fe33d52e5ac69014/src/challenges/index.js#L268",
+          "date": "2026-10-07"
+        },
+        {
           "type": "honeypot-telemetry",
           "reference": "https://api.oa2a.org/api/v1/threat-matrix",
           "date": "2026-10-19",
@@ -2146,6 +2225,13 @@
           "id": "AML.T0080.000",
           "relationship": "relatedMatch",
           "note": "ATLAS 2026.09 AI Agent Context Poisoning: Memory: the replicating entry lives in agent memory"
+        }
+      ],
+      "evidence": [
+        {
+          "type": "lab-reproduction",
+          "reference": "https://github.com/opena2a-org/damn-vulnerable-ai-agent/blob/eb6f66cc40e5ce5743b27cf3fe33d52e5ac69014/src/challenges/index.js#L628",
+          "date": "2026-10-07"
         }
       ]
     },
@@ -2311,6 +2397,11 @@
       ],
       "evidence": [
         {
+          "type": "lab-reproduction",
+          "reference": "https://github.com/opena2a-org/damn-vulnerable-ai-agent/blob/43557482f8e17b96bec06eda3e6f65fa0ceb566a/scenarios/skill-backdoor-install/README.md",
+          "date": "2026-04-13"
+        },
+        {
           "type": "honeypot-telemetry",
           "reference": "https://api.oa2a.org/api/v1/threat-matrix",
           "date": "2026-10-19",
@@ -2441,6 +2532,13 @@
           "id": "AML.T0110",
           "relationship": "relatedMatch",
           "note": "ATLAS 2026.09 AI Agent Tool Poisoning: registering a persistent malicious tool in the agent's catalog"
+        }
+      ],
+      "evidence": [
+        {
+          "type": "lab-reproduction",
+          "reference": "https://github.com/opena2a-org/damn-vulnerable-ai-agent/blob/eb6f66cc40e5ce5743b27cf3fe33d52e5ac69014/src/challenges/index.js#L447",
+          "date": "2026-10-07"
         }
       ]
     },
@@ -3133,6 +3231,11 @@
       ],
       "evidence": [
         {
+          "type": "lab-reproduction",
+          "reference": "https://github.com/opena2a-org/damn-vulnerable-ai-agent/blob/eb6f66cc40e5ce5743b27cf3fe33d52e5ac69014/src/challenges/index.js#L756",
+          "date": "2026-10-07"
+        },
+        {
           "type": "honeypot-telemetry",
           "reference": "https://api.oa2a.org/api/v1/threat-matrix",
           "date": "2026-10-19",
@@ -3257,6 +3360,13 @@
           "id": "AML.T0086",
           "relationship": "closeMatch",
           "note": "ATLAS 2026.09 Exfiltration via AI Agent Tool Invocation: pre-allowed messaging APIs used as the write tool"
+        }
+      ],
+      "evidence": [
+        {
+          "type": "lab-reproduction",
+          "reference": "https://github.com/opena2a-org/damn-vulnerable-ai-agent/blob/6dd0c4434a9cc8b4d61e3ea5efa9fd42d0273f57/scenarios/sandbox-telegram-allowed/README.md",
+          "date": "2026-10-06"
         }
       ]
     },
@@ -3577,6 +3687,11 @@
       ],
       "evidence": [
         {
+          "type": "lab-reproduction",
+          "reference": "https://github.com/opena2a-org/damn-vulnerable-ai-agent/blob/43557482f8e17b96bec06eda3e6f65fa0ceb566a/scenarios/mcp-rug-pull/README.md",
+          "date": "2026-04-13"
+        },
+        {
           "type": "honeypot-telemetry",
           "reference": "https://api.oa2a.org/api/v1/threat-matrix",
           "date": "2026-10-19",
@@ -3611,7 +3726,14 @@
       ],
       "dataSources": [],
       "wildPrevalence": 0,
-      "wildSampleCount": 0
+      "wildSampleCount": 0,
+      "evidence": [
+        {
+          "type": "lab-reproduction",
+          "reference": "https://github.com/opena2a-org/damn-vulnerable-ai-agent/blob/6dd0c4434a9cc8b4d61e3ea5efa9fd42d0273f57/scenarios/parser-differential-json/README.md",
+          "date": "2026-10-06"
+        }
+      ]
     },
     {
       "id": "T-4007",
@@ -3656,6 +3778,11 @@
         }
       ],
       "evidence": [
+        {
+          "type": "lab-reproduction",
+          "reference": "https://github.com/opena2a-org/damn-vulnerable-ai-agent/blob/6dd0c4434a9cc8b4d61e3ea5efa9fd42d0273f57/scenarios/fake-tool-squatting/README.md",
+          "date": "2026-10-06"
+        },
         {
           "type": "honeypot-telemetry",
           "reference": "https://api.oa2a.org/api/v1/threat-matrix",
@@ -3705,6 +3832,11 @@
         }
       ],
       "evidence": [
+        {
+          "type": "lab-reproduction",
+          "reference": "https://github.com/opena2a-org/damn-vulnerable-ai-agent/blob/6dd0c4434a9cc8b4d61e3ea5efa9fd42d0273f57/scenarios/persistent-agent-memory-poison/README.md",
+          "date": "2026-10-06"
+        },
         {
           "type": "honeypot-telemetry",
           "reference": "https://api.oa2a.org/api/v1/threat-matrix",
@@ -4030,7 +4162,24 @@
         }
       ],
       "wildPrevalence": 0,
-      "wildSampleCount": 0
+      "wildSampleCount": 0,
+      "evidence": [
+        {
+          "type": "lab-reproduction",
+          "reference": "https://github.com/opena2a-org/damn-vulnerable-ai-agent/blob/6dd0c4434a9cc8b4d61e3ea5efa9fd42d0273f57/scenarios/context-lifecycle-split-injection/README.md",
+          "date": "2026-10-06"
+        },
+        {
+          "type": "lab-reproduction",
+          "reference": "https://github.com/opena2a-org/damn-vulnerable-ai-agent/blob/6dd0c4434a9cc8b4d61e3ea5efa9fd42d0273f57/scenarios/context-lifecycle-displacement/README.md",
+          "date": "2026-10-06"
+        },
+        {
+          "type": "lab-reproduction",
+          "reference": "https://github.com/opena2a-org/damn-vulnerable-ai-agent/blob/6dd0c4434a9cc8b4d61e3ea5efa9fd42d0273f57/scenarios/context-lifecycle-priority-hijack/README.md",
+          "date": "2026-10-06"
+        }
+      ]
     }
   ],
   "attackClasses": [

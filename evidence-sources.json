@@ -1,5 +1,5 @@
 {
-  "description": "The DVAA scenario pages that name a technique, pinned by scripts/pin_evidence_sources.py from a git clone of the repository, read at the commit head on the date read. A page is scenarios/<name>/README.md that names a technique in bold as **T-NNNN (Label):**, the form DVAA gives the steps of an attack chain. commit is the last commit at or before head that changed the page, committed is that commit's date as its committer recorded it, blob is the git blob id of the page there, and names lists each such name as the page writes it: its line, the technique id and the label. scripts/validate_matrix.py resolves a lab-reproduction evidence entry against this file: its reference is the permalink of a page, <repository>/blob/<commit>/<path>, its date is the page's committed date, and the page names the technique's id with the technique's name in matrix.json as the label. Written by the script, not by hand: python3 scripts/pin_evidence_sources.py --dvaa <clone> --check fails when this file, apart from read, differs from what the clone holds at head.",
+  "description": "The DVAA pages that lab-reproduction evidence entries in matrix.json cite, pinned by scripts/pin_evidence_sources.py from a git clone of the repository, read at the commit head on the date read. pages are the scenario pages, scenarios/<name>/README.md, that name a technique in bold as **T-NNNN (Label):**, the form DVAA gives the steps of an attack chain. commit is the last commit at or before head that changed the page, committed is that commit's date as its committer recorded it, blob is the git blob id of the page there, and names lists each such name as the page writes it: its line, the technique id and the label. challenges pins src/challenges/index.js the same way and lists in named each challenge a technique's dvaaValidation names: the line of its key, its id and its name. scenarios pins, the same way, the page of each scenario a technique's dvaaValidation names. scripts/validate_matrix.py resolves a lab-reproduction evidence entry against this file. Its reference is the permalink of a page, <repository>/blob/<commit>/<path>, its date is the page's committed date, and the page names the technique's id with the technique's name in matrix.json as the label. Or its reference is the permalink of a challenge, <repository>/blob/<commit>/<path>#L<line>, or of a scenario page, its date is the committed date of the file, and the technique's dvaaValidation names the challenge or the scenario. Written by the script, not by hand: python3 scripts/pin_evidence_sources.py --dvaa <clone> --check fails when this file, apart from read, differs from what the clone holds at head for matrix.json.",
   "dvaa": {
     "repository": "https://github.com/opena2a-org/damn-vulnerable-ai-agent",
     "head": "57918267d8d529ceec6d40fc9836ab09d128eee4",
@@ -162,6 +162,163 @@
             "label": "Covert Exfiltration"
           }
         ]
+      }
+    ],
+    "challenges": {
+      "path": "src/challenges/index.js",
+      "commit": "eb6f66cc40e5ce5743b27cf3fe33d52e5ac69014",
+      "committed": "2026-10-07",
+      "blob": "eeccdbc81f2ef729166eeeb198034add8eb00e3e",
+      "named": [
+        {
+          "line": 14,
+          "id": "L1-01",
+          "name": "Extract the System Prompt"
+        },
+        {
+          "line": 55,
+          "id": "L1-02",
+          "name": "API Key Leak"
+        },
+        {
+          "line": 98,
+          "id": "L1-03",
+          "name": "Basic Prompt Injection"
+        },
+        {
+          "line": 143,
+          "id": "L2-01",
+          "name": "Jailbreak via Roleplay"
+        },
+        {
+          "line": 268,
+          "id": "L2-04",
+          "name": "Persistent Memory Injection"
+        },
+        {
+          "line": 310,
+          "id": "L2-05",
+          "name": "Memory Credential Extraction"
+        },
+        {
+          "line": 356,
+          "id": "L2-06",
+          "name": "Context Padding Attack"
+        },
+        {
+          "line": 400,
+          "id": "L2-07",
+          "name": "Safety Instruction Displacement"
+        },
+        {
+          "line": 447,
+          "id": "L2-08",
+          "name": "Malicious Tool Registration"
+        },
+        {
+          "line": 585,
+          "id": "L3-02",
+          "name": "SSRF via MCP"
+        },
+        {
+          "line": 628,
+          "id": "L3-03",
+          "name": "Self-Replicating Memory Entry"
+        },
+        {
+          "line": 670,
+          "id": "L3-04",
+          "name": "System Prompt Extraction via Context Pressure"
+        },
+        {
+          "line": 756,
+          "id": "L3-06",
+          "name": "Tool Chain Data Exfiltration"
+        },
+        {
+          "line": 893,
+          "id": "L4-01",
+          "name": "Compromise SecureBot"
+        },
+        {
+          "line": 942,
+          "id": "L4-02",
+          "name": "Agent-to-Agent Attack Chain"
+        }
+      ]
+    },
+    "scenarios": [
+      {
+        "path": "scenarios/context-lifecycle-displacement/README.md",
+        "commit": "6dd0c4434a9cc8b4d61e3ea5efa9fd42d0273f57",
+        "committed": "2026-10-06",
+        "blob": "8bb72cd4baa3c210e644221e06f83368b4cd07d5"
+      },
+      {
+        "path": "scenarios/context-lifecycle-priority-hijack/README.md",
+        "commit": "6dd0c4434a9cc8b4d61e3ea5efa9fd42d0273f57",
+        "committed": "2026-10-06",
+        "blob": "76f66d61993d4fa7e9affe82cb31e78b0a86c6c8"
+      },
+      {
+        "path": "scenarios/context-lifecycle-split-injection/README.md",
+        "commit": "6dd0c4434a9cc8b4d61e3ea5efa9fd42d0273f57",
+        "committed": "2026-10-06",
+        "blob": "2b3edf43148211d551a45189c348fe0e0c9f850e"
+      },
+      {
+        "path": "scenarios/delegation-privilege-escalation/README.md",
+        "commit": "43557482f8e17b96bec06eda3e6f65fa0ceb566a",
+        "committed": "2026-04-13",
+        "blob": "1377b035edd5444f3e6e983710c8f8e1aebe2c24"
+      },
+      {
+        "path": "scenarios/fake-tool-squatting/README.md",
+        "commit": "6dd0c4434a9cc8b4d61e3ea5efa9fd42d0273f57",
+        "committed": "2026-10-06",
+        "blob": "2413c5060545e58a8c11cd0cd4fa30f4064d0b36"
+      },
+      {
+        "path": "scenarios/mcp-rug-pull/README.md",
+        "commit": "43557482f8e17b96bec06eda3e6f65fa0ceb566a",
+        "committed": "2026-04-13",
+        "blob": "473c228541fbe43f5145c8ab29f0e3942fda1107"
+      },
+      {
+        "path": "scenarios/parser-differential-json/README.md",
+        "commit": "6dd0c4434a9cc8b4d61e3ea5efa9fd42d0273f57",
+        "committed": "2026-10-06",
+        "blob": "5a73305134281575f61dda406b63589e07514359"
+      },
+      {
+        "path": "scenarios/persistent-agent-memory-poison/README.md",
+        "commit": "6dd0c4434a9cc8b4d61e3ea5efa9fd42d0273f57",
+        "committed": "2026-10-06",
+        "blob": "9e84f1459476bafa59ab113513017f970ff9d2cd"
+      },
+      {
+        "path": "scenarios/sandbox-telegram-allowed/README.md",
+        "commit": "6dd0c4434a9cc8b4d61e3ea5efa9fd42d0273f57",
+        "committed": "2026-10-06",
+        "blob": "093f9a848de754304af7d3e199517137f095ac9b"
+      },
+      {
+        "path": "scenarios/skill-backdoor-install/README.md",
+        "commit": "43557482f8e17b96bec06eda3e6f65fa0ceb566a",
+        "committed": "2026-04-13",
+        "blob": "60517edf34febbd0da5fab82ab4f9f8dedf89e48"
+      },
+      {
+        "path": "scenarios/token-smuggling-unicode/README.md",
+        "commit": "6dd0c4434a9cc8b4d61e3ea5efa9fd42d0273f57",
+        "committed": "2026-10-06",
+        "blob": "d40c2c2c2bf76e08d222786c772e6a4a2f68ea82"
+      },
+      {
+        "path": "scenarios/tool-chain-exfiltration/README.md",
+        "commit": "43557482f8e17b96bec06eda3e6f65fa0ceb566a",
+        "committed": "2026-04-13",
+        "blob": "37dee1dfe5cd5498138477cfb13bd9a05f5910bc"
       }
     ]
   }

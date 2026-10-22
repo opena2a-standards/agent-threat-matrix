@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Pin the DVAA scenario pages that name a technique into evidence-sources.json, and cite them in matrix.json.
+"""Pin the DVAA pages that back lab-reproduction evidence into evidence-sources.json, and cite them in matrix.json.
 
 DVAA documents a scenario in ``scenarios/<name>/README.md``, and some of those pages name a
 technique in bold as ``**T-2001 (Prompt Injection):**`` (the id, a label in parentheses,
@@ -26,6 +26,25 @@ pinned, backs no entry and is printed: a page that labels T-2001 "Threshold Exha
 does not name Direct Prompt Injection. So is a name whose id is not a technique in
 matrix.json.
 
+A technique's ``dvaaValidation`` in matrix.json names the DVAA lab work that reproduces it:
+free text, or the id of a challenge or the name of a scenario, several separated by commas.
+The script reads each value between the commas. A value that is the id of a challenge
+defined in ``src/challenges/index.js`` at the head, as a key ``'L1-03': {`` with
+``id: 'L1-03',`` and ``name: '<name>',`` among its properties, names that challenge; any
+other value that is the name of a directory under ``scenarios/`` holding a ``README.md``
+names that scenario. Under ``challenges`` the script pins the file as it pins a page
+(``path``, ``commit``, ``committed`` and ``blob``), with ``named``, each challenge a
+dvaaValidation names: the line of its key, its id and its name. Under ``scenarios`` it pins
+the page of each scenario a dvaaValidation names, as it pins a page but with no names. Each
+key is written only when it pins something. A pinned challenge or scenario page backs one
+``lab-reproduction`` entry on each technique whose dvaaValidation names it, after the
+entries the pages back and before every other entry, in the order the dvaaValidation names
+them. The reference of a challenge's entry is
+``<repository>/blob/<commit>/src/challenges/index.js#L<line>`` and of a scenario's the
+permalink of its page, and the date is the ``committed`` date of the file. A value that
+names no challenge or scenario at the head backs no entry, and the script prints it with its
+technique.
+
 When evidence-sources.json and matrix.json already hold what the clone holds at the head,
 nothing is written and ``read`` keeps the date the file records. Otherwise ``read`` is
 today; when matrix.json changes, ``updated`` moves to today if it is older, as
@@ -46,8 +65,11 @@ holds at that head.
 Exit 0 when the files hold what the clone holds, written or already there; 1 when the clone
 or a file cannot be read, a page is not valid UTF-8, the clone holds no scenario page that
 names a technique (so it is not read as a DVAA clone, and no entry is dropped on its word),
-the STIX bundle cannot be rendered, or under ``--check`` the files differ; 2 on a usage
-error.
+``src/challenges/index.js`` is there but is not valid UTF-8, holds no ``CHALLENGES`` object
+(an ``export const CHALLENGES = {`` line, closed by a ``};`` line), or defines in it no
+challenge, a challenge whose id is not its key, a challenge with no name or a challenge
+twice, the STIX bundle cannot be rendered, or under ``--check`` the files differ; 2 on a
+usage error.
 """
 
 import argparse
@@ -67,24 +89,39 @@ STIX_GENERATOR = ROOT / "scripts" / "generate_stix.py"
 REPOSITORY = "https://github.com/opena2a-org/damn-vulnerable-ai-agent"
 LAB = "lab-reproduction"
 # The first line of the docstring, which ``python3 -OO`` strips.
-DESCRIPTION = ("Pin the DVAA scenario pages that name a technique into evidence-sources.json, and "
-               "cite them in matrix.json.")
+DESCRIPTION = ("Pin the DVAA pages that back lab-reproduction evidence into evidence-sources.json, "
+               "and cite them in matrix.json.")
 SOURCES_DESCRIPTION = (
-    "The DVAA scenario pages that name a technique, pinned by scripts/pin_evidence_sources.py from a "
-    "git clone of the repository, read at the commit head on the date read. A page is "
-    "scenarios/<name>/README.md that names a technique in bold as **T-NNNN (Label):**, the form "
-    "DVAA gives the steps of an attack chain. commit is the last commit at or before head that "
-    "changed the page, committed is that commit's date as its committer recorded it, blob is the "
-    "git blob id of the page there, and names lists each such name as the page writes it: its "
-    "line, the technique id and the label. scripts/validate_matrix.py resolves a lab-reproduction evidence entry against "
-    "this file: its reference is the permalink of a page, <repository>/blob/<commit>/<path>, its "
-    "date is the page's committed date, and the page names the technique's id with the technique's "
-    "name in matrix.json as the label. Written by the script, not by hand: "
-    "python3 scripts/pin_evidence_sources.py --dvaa <clone> --check fails when this file, apart "
-    "from read, differs from what the clone holds at head.")
+    "The DVAA pages that lab-reproduction evidence entries in matrix.json cite, pinned by "
+    "scripts/pin_evidence_sources.py from a git clone of the repository, read at the commit head "
+    "on the date read. pages are the scenario pages, scenarios/<name>/README.md, that name a "
+    "technique in bold as **T-NNNN (Label):**, the form DVAA gives the steps of an attack chain. "
+    "commit is the last commit at or before head that changed the page, committed is that "
+    "commit's date as its committer recorded it, blob is the git blob id of the page there, and "
+    "names lists each such name as the page writes it: its line, the technique id and the label. "
+    "challenges pins src/challenges/index.js the same way and lists in named each challenge a "
+    "technique's dvaaValidation names: the line of its key, its id and its name. scenarios pins, "
+    "the same way, the page of each scenario a technique's dvaaValidation names. "
+    "scripts/validate_matrix.py resolves a lab-reproduction evidence entry against this file. "
+    "Its reference is the permalink of a page, <repository>/blob/<commit>/<path>, its date is the "
+    "page's committed date, and the page names the technique's id with the technique's name in "
+    "matrix.json as the label. Or its reference is the permalink of a challenge, "
+    "<repository>/blob/<commit>/<path>#L<line>, or of a scenario page, its date is the committed "
+    "date of the file, and the technique's dvaaValidation names the challenge or the scenario. "
+    "Written by the script, not by hand: python3 scripts/pin_evidence_sources.py --dvaa <clone> "
+    "--check fails when this file, apart from read, differs from what the clone holds at head for "
+    "matrix.json.")
 PAGE_RE = re.compile(r"scenarios/[A-Za-z0-9_-]+/README\.md")
+SCENARIO_NAME_RE = re.compile(r"[A-Za-z0-9_-]+")
 NAME_RE = re.compile(r"\*\*(T-[0-9]{4}(?:\.[0-9]{3})?) \(([^()\s](?:[^()\r\n]*[^()\s])?)\):\*\*")
 OFFSET_RE = re.compile(r"([+-])([0-9]{2})([0-9]{2})")
+CHALLENGE_FILE = "src/challenges/index.js"
+CHALLENGES_OPEN = "export const CHALLENGES = {"
+CHALLENGES_CLOSE = "};"
+# A challenge's key and its own properties, each on its line and applied with fullmatch: the
+# key two spaces in, its properties four. A nested object's properties sit deeper.
+CHALLENGE_KEY_RE = re.compile(r"  '([^'\\\s]+)': \{")
+CHALLENGE_FIELD_RE = re.compile(r"    (id|name): '([^'\\\r\n]+)',")
 
 # Variables that would point git at a repository other than the clone.
 GIT_LOCATION_VARS = ("GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR", "GIT_INDEX_FILE",
@@ -139,34 +176,125 @@ def commit_date(clone: Path, commit: str) -> str:
     raise Refused(f"commit {commit} in the clone carries no committer date git can read")
 
 
-def read_pages(clone: Path, head: str) -> list:
-    """The pins of the scenario pages at head that name a technique, sorted by path."""
-    pages = []
+def scenario_readmes(clone: Path, head: str) -> dict:
+    """The git blob id of each scenarios/<name>/README.md at head, by path."""
+    readmes = {}
     for record in git(clone, "ls-tree", "-r", "-z", "--full-tree", head, "--", "scenarios").split(b"\0"):
         meta, _, raw_path = record.partition(b"\t")
         fields = meta.decode("ascii", errors="replace").split()
         path = raw_path.decode("utf-8", errors="replace")
-        if len(fields) != 3 or fields[1] != "blob" or not PAGE_RE.fullmatch(path):
-            continue
-        blob = fields[2]
+        if len(fields) == 3 and fields[1] == "blob" and PAGE_RE.fullmatch(path):
+            readmes[path] = fields[2]
+    return readmes
+
+
+def pin_file(clone: Path, head: str, path: str, blob: str) -> dict:
+    """The pin of a file at head: its path, the last commit at or before head that changed it,
+    that commit's date, and the git blob id of the file."""
+    commit = git(clone, "rev-list", "-1", head, "--", path).decode().strip()
+    if git(clone, "rev-parse", "--verify", f"{commit}:{path}").decode().strip() != blob:
+        raise Refused(f"{path}: the last commit that changed it before {head}, {commit}, holds "
+                      f"another version of it than {head} does")
+    return {"path": path, "commit": commit, "committed": commit_date(clone, commit), "blob": blob}
+
+
+def read_pages(clone: Path, head: str, readmes: dict) -> list:
+    """The pins of the scenario pages at head that name a technique, sorted by path."""
+    pages = []
+    for path, blob in readmes.items():
         try:
             text = git(clone, "cat-file", "blob", blob).decode("utf-8")
         except UnicodeDecodeError as exc:
             raise Refused(f"{path} at {head} is not valid UTF-8: {exc}")
         names = [{"line": text.count("\n", 0, match.start()) + 1, "technique": match.group(1),
                   "label": match.group(2)} for match in NAME_RE.finditer(text)]
-        if not names:
-            continue
-        commit = git(clone, "rev-list", "-1", head, "--", path).decode().strip()
-        if git(clone, "rev-parse", "--verify", f"{commit}:{path}").decode().strip() != blob:
-            raise Refused(f"{path}: the last commit that changed it before {head}, {commit}, holds "
-                          f"another version of it than {head} does")
-        pages.append({"path": path, "commit": commit, "committed": commit_date(clone, commit),
-                      "blob": blob, "names": names})
+        if names:
+            pages.append(dict(pin_file(clone, head, path, blob), names=names))
     if not pages:
         raise Refused(f"the clone at {clone} holds no scenarios/<name>/README.md at {head} that names a "
                       f"technique in bold as **T-NNNN (Label):**, so it is not read as a DVAA clone")
     return sorted(pages, key=lambda page: page["path"])
+
+
+def read_challenges(clone: Path, head: str):
+    """The pin of src/challenges/index.js at head and the challenges it defines in its
+    CHALLENGES object, in file order, or None when head holds no such file."""
+    listed = git(clone, "ls-tree", "-z", "--full-tree", head, "--", CHALLENGE_FILE).split(b"\0")[0]
+    fields = listed.partition(b"\t")[0].decode("ascii", errors="replace").split()
+    if len(fields) != 3 or fields[1] != "blob":
+        return None
+    blob = fields[2]
+    try:
+        lines = git(clone, "cat-file", "blob", blob).decode("utf-8").split("\n")
+    except UnicodeDecodeError as exc:
+        raise Refused(f"{CHALLENGE_FILE} at {head} is not valid UTF-8: {exc}")
+    lines = [line[:-1] if line.endswith("\r") else line for line in lines]
+    start = next((index for index, line in enumerate(lines) if line == CHALLENGES_OPEN), None)
+    end = None if start is None else next(
+        (index for index in range(start + 1, len(lines)) if lines[index] == CHALLENGES_CLOSE), None)
+    if end is None:
+        raise Refused(f"{CHALLENGE_FILE} at {head} holds no CHALLENGES object, an '{CHALLENGES_OPEN}' "
+                      f"line closed by a '{CHALLENGES_CLOSE}' line, so its challenges are not read")
+    defined = []
+    for index in range(start + 1, end):
+        key = CHALLENGE_KEY_RE.fullmatch(lines[index])
+        if key:
+            defined.append({"line": index + 1, "key": key.group(1), "id": None, "name": None})
+            continue
+        field = CHALLENGE_FIELD_RE.fullmatch(lines[index])
+        if field and defined and defined[-1][field.group(1)] is None:
+            defined[-1][field.group(1)] = field.group(2)
+    if not defined:
+        raise Refused(f"{CHALLENGE_FILE} at {head} defines no challenge in its CHALLENGES object as a "
+                      f"key '<id>': {{ two spaces in, so its challenges are not read")
+    first = {}
+    for challenge in defined:
+        where = f"{CHALLENGE_FILE}:{challenge['line']} at {head} defines {challenge['key']!r}"
+        if challenge["id"] != challenge["key"]:
+            given = f"id {challenge['id']!r}" if challenge["id"] else "no id: '<id>', line"
+            raise Refused(f"{where} with {given}, so which challenge it is cannot be read")
+        if challenge["name"] is None:
+            raise Refused(f"{where} with no name: '<name>', line holding a name with no quote or "
+                          f"backslash in it")
+        if challenge["key"] in first:
+            raise Refused(f"{where} again: line {first[challenge['key']]} defines it already")
+        first[challenge["key"]] = challenge["line"]
+    return (pin_file(clone, head, CHALLENGE_FILE, blob),
+            [{"line": c["line"], "id": c["id"], "name": c["name"]} for c in defined])
+
+
+def validation_values(technique: dict) -> list:
+    """The values a technique's dvaaValidation lists: the text between its commas, trimmed."""
+    value = technique.get("dvaaValidation")
+    if not isinstance(value, str):
+        return []
+    return [part.strip() for part in value.split(",") if part.strip()]
+
+
+def read_named(clone: Path, head: str, matrix: dict, readmes: dict):
+    """The pins of the challenges and scenario pages at head a dvaaValidation names, keyed as
+    evidence-sources.json keeps them, and the values that name neither, by technique."""
+    challenges = read_challenges(clone, head)
+    defined = {challenge["id"] for challenge in challenges[1]} if challenges else set()
+    named, scenarios, unnamed = set(), set(), []
+    for technique in matrix["techniques"]:
+        missing = []
+        for value in validation_values(technique):
+            page = f"scenarios/{value}/README.md"
+            if value in defined:
+                named.add(value)
+            elif SCENARIO_NAME_RE.fullmatch(value) and page in readmes:
+                scenarios.add(page)
+            else:
+                missing.append(value)
+        if missing:
+            unnamed.append((technique["id"], missing))
+    block = {}
+    if named:
+        block["challenges"] = dict(challenges[0], named=[c for c in challenges[1] if c["id"] in named])
+    if scenarios:
+        block["scenarios"] = [pin_file(clone, head, page, readmes[page]) for page in sorted(scenarios)]
+    return block, unnamed
 
 
 def permalink(page: dict) -> str:
@@ -190,6 +318,42 @@ def backed_entries(matrix: dict, pages: list):
                 if entry not in cited:
                     cited.append(entry)
     return entries, mislabelled, unknown
+
+
+def named_entries(matrix: dict, block: dict) -> dict:
+    """The entries the challenges and scenario pages a dvaaValidation names back, by technique
+    id, in the order each dvaaValidation names them."""
+    cites = {}
+    for page in block.get("scenarios", []):
+        cites[page["path"].split("/")[1]] = {"type": LAB, "reference": permalink(page),
+                                             "date": page["committed"]}
+    challenges = block.get("challenges")
+    for challenge in challenges["named"] if challenges else []:
+        cites[challenge["id"]] = {"type": LAB, "reference": f"{permalink(challenges)}#L{challenge['line']}",
+                                  "date": challenges["committed"]}
+    entries = {}
+    for technique in matrix["techniques"]:
+        for value in validation_values(technique):
+            entry = cites.get(value)
+            if entry is None:
+                continue
+            cited = entries.setdefault(technique["id"], [])
+            if entry not in cited:
+                cited.append(dict(entry))
+    return entries
+
+
+def add_named(entries: dict, named: dict) -> int:
+    """Append to each technique's entries the ones its dvaaValidation backs that it does not
+    carry yet, after the ones the pages back; return how many were appended."""
+    added = 0
+    for tid, cites in named.items():
+        cited = entries.setdefault(tid, [])
+        for entry in cites:
+            if entry not in cited:
+                cited.append(entry)
+                added += 1
+    return added
 
 
 def written_here(entry) -> bool:
@@ -253,6 +417,30 @@ def pin_difference(old, new: dict) -> str:
         elif have[path] != want[path]:
             changed = [key for key in want[path] if have[path].get(key) != want[path][key]]
             details.append(f"{path} is pinned with {', '.join(changed) or 'keys'} other than the clone gives")
+    old_challenges, new_challenges = old.get("challenges"), new.get("challenges")
+    if old_challenges != new_challenges:
+        if new_challenges is None:
+            details.append(f"{CHALLENGE_FILE} is pinned, and no dvaaValidation names a challenge it "
+                           f"defines in the clone")
+        elif not isinstance(old_challenges, dict):
+            details.append(f"{CHALLENGE_FILE} defines a challenge a dvaaValidation names and is not pinned")
+        else:
+            changed = [key for key in new_challenges if old_challenges.get(key) != new_challenges[key]]
+            details.append(f"{CHALLENGE_FILE} is pinned with {', '.join(changed) or 'keys'} other than "
+                           f"the clone gives")
+    listed = old.get("scenarios") if isinstance(old.get("scenarios"), list) else []
+    have = {page.get("path"): page for page in listed if isinstance(page, dict)}
+    want = {page["path"]: page for page in new.get("scenarios", [])}
+    for path in sorted(set(have) | set(want), key=str):
+        if path not in want:
+            details.append(f"{path} is pinned as the page of a scenario a dvaaValidation names, and no "
+                           f"dvaaValidation names a scenario the clone holds there")
+        elif path not in have:
+            details.append(f"{path} is the page of a scenario a dvaaValidation names and is not pinned")
+        elif have[path] != want[path]:
+            changed = [key for key in want[path] if have[path].get(key) != want[path][key]]
+            details.append(f"{path} is pinned as a scenario page with {', '.join(changed) or 'keys'} "
+                           f"other than the clone gives")
     return "; ".join(details) or "the text of the file differs from what the script writes"
 
 
@@ -270,6 +458,23 @@ def report_names(mislabelled: list, unknown: list) -> None:
         print("Named with an id that is not a technique in matrix.json, so backing no entry:")
         for page, name in unknown:
             print(f"  {page['path']}:{name['line']} {name['technique']} {name['label']!r}")
+
+
+def named_line(block: dict, vcount: int) -> str:
+    """The line that states what the dvaaValidation pins hold and back."""
+    challenges = len(block["challenges"]["named"]) if "challenges" in block else 0
+    scenarios = len(block.get("scenarios", []))
+    return (f"evidence-sources.json pins the {challenges} DVAA challenges and {scenarios} scenario pages "
+            f"a technique's dvaaValidation names at {block['head']}, and matrix.json carries the "
+            f"{vcount} {LAB} entries they back")
+
+
+def report_unnamed(unnamed: list) -> None:
+    if unnamed:
+        print("A dvaaValidation value that names no DVAA challenge or scenario page at the head, so "
+              "backing no entry:")
+        for tid, values in unnamed:
+            print(f"  {tid} {', '.join(repr(value) for value in values)}")
 
 
 def parse_args(argv):
@@ -294,11 +499,17 @@ def main(argv=None) -> int:
         matrix = read_json(MATRIX)
         recorded = read_json(SOURCES) if args.check or SOURCES.exists() else None
         head = resolve_head(args.dvaa, recorded_head(recorded) if args.check else args.head or "HEAD")
-        block = {"repository": REPOSITORY, "head": head, "read": today, "pages": read_pages(args.dvaa, head)}
+        readmes = scenario_readmes(args.dvaa, head)
+        block = {"repository": REPOSITORY, "head": head, "read": today,
+                 "pages": read_pages(args.dvaa, head, readmes)}
+        named_block, unnamed = read_named(args.dvaa, head, matrix, readmes)
+        block.update(named_block)
         old = recorded.get("dvaa") if isinstance(recorded, dict) else None
         if isinstance(old, dict) and isinstance(old.get("read"), str) and without(old, "read") == without(block, "read"):
             block["read"] = old["read"]
         entries, mislabelled, unknown = backed_entries(matrix, block["pages"])
+        count = sum(len(cites) for cites in entries.values())
+        vcount = add_named(entries, named_entries(matrix, block))
         cited = copy.deepcopy(matrix)
         write_entries(cited, entries)
         current = SOURCES.read_text(encoding="utf-8") if recorded is not None else None
@@ -306,7 +517,6 @@ def main(argv=None) -> int:
         print(f"FAIL: {exc}; nothing is written", file=sys.stderr)
         return 1
 
-    count = sum(len(cites) for cites in entries.values())
     pages = len(block["pages"])
     matrix_changed = without(cited, "updated") != without(matrix, "updated")
     sources_text = render_sources(block)
@@ -324,20 +534,25 @@ def main(argv=None) -> int:
             return 1
         print(f"OK: evidence-sources.json pins the {pages} DVAA scenario pages that name a technique at "
               f"{head}, and matrix.json carries the {count} {LAB} entries they back")
+        print(named_line(block, vcount))
         report_names(mislabelled, unknown)
+        report_unnamed(unnamed)
         return 0
 
     if current == sources_text and not matrix_changed:
         print(f"evidence-sources.json already pins the {pages} DVAA scenario pages that name a technique "
               f"at {head}, read {block['read']}, and matrix.json carries the {count} {LAB} entries they "
               f"back; nothing written")
+        print(named_line(block, vcount))
         report_names(mislabelled, unknown)
+        report_unnamed(unnamed)
         return 0
 
     if current != sources_text:
         SOURCES.write_text(sources_text, encoding="utf-8")
     print(f"Pinned the {pages} DVAA scenario pages that name a technique at {head}, read {block['read']}, "
           f"in evidence-sources.json.")
+    print(named_line(block, vcount))
     if matrix_changed:
         if cited["updated"] < today:
             cited["updated"] = today
@@ -347,13 +562,14 @@ def main(argv=None) -> int:
             print(f"FAIL: matrix.json is written, but scripts/generate_stix.py failed: "
                   f"{proc.stderr.strip() or proc.stdout.strip()}", file=sys.stderr)
             return 1
-        print(f"matrix.json carries the {count} {LAB} entries they back, written on "
+        print(f"matrix.json carries the {count + vcount} {LAB} entries the pins back, written on "
               f"{', '.join(changed_techniques(matrix, cited))}; updated is {cited['updated']}, and the "
               f"STIX bundle and evidence-gaps.json are rendered again:")
         print(proc.stdout.strip())
     else:
-        print(f"matrix.json already carries the {count} {LAB} entries they back.")
+        print(f"matrix.json already carries the {count + vcount} {LAB} entries the pins back.")
     report_names(mislabelled, unknown)
+    report_unnamed(unnamed)
     return 0
 
 

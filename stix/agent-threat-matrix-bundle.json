@@ -224,6 +224,11 @@
           "description": "relatedMatch: ATLAS 2026.09 Extract LLM System Prompt: the same object, read as exfiltration rather than reconnaissance"
         },
         {
+          "source_name": "lab-reproduction",
+          "url": "https://github.com/opena2a-org/damn-vulnerable-ai-agent/blob/eb6f66cc40e5ce5743b27cf3fe33d52e5ac69014/src/challenges/index.js#L14",
+          "description": "lab-reproduction evidence dated 2026-10-07"
+        },
+        {
           "source_name": "honeypot-telemetry",
           "url": "https://api.oa2a.org/api/v1/threat-matrix",
           "description": "honeypot-telemetry evidence dated 2026-10-19: The wildPrevalence and wildSampleCount this endpoint served for the technique on this date; they measure engagement with a honeypot, not a production attack rate."
@@ -383,6 +388,11 @@
           "description": "closeMatch: ATLAS 2026.09 LLM Prompt Injection: Direct: prompts injected directly by a user of the model"
         },
         {
+          "source_name": "lab-reproduction",
+          "url": "https://github.com/opena2a-org/damn-vulnerable-ai-agent/blob/eb6f66cc40e5ce5743b27cf3fe33d52e5ac69014/src/challenges/index.js#L98",
+          "description": "lab-reproduction evidence dated 2026-10-07"
+        },
+        {
           "source_name": "honeypot-telemetry",
           "url": "https://api.oa2a.org/api/v1/threat-matrix",
           "description": "honeypot-telemetry evidence dated 2026-10-19: The wildPrevalence and wildSampleCount this endpoint served for the technique on this date; they measure engagement with a honeypot, not a production attack rate."
@@ -465,6 +475,11 @@
           "description": "closeMatch: ATLAS 2026.09 LLM Jailbreak: role-play is a named method of overriding safety behaviour"
         },
         {
+          "source_name": "lab-reproduction",
+          "url": "https://github.com/opena2a-org/damn-vulnerable-ai-agent/blob/eb6f66cc40e5ce5743b27cf3fe33d52e5ac69014/src/challenges/index.js#L143",
+          "description": "lab-reproduction evidence dated 2026-10-07"
+        },
+        {
           "source_name": "honeypot-telemetry",
           "url": "https://api.oa2a.org/api/v1/threat-matrix",
           "description": "honeypot-telemetry evidence dated 2026-10-19: The wildPrevalence and wildSampleCount this endpoint served for the technique on this date; they measure engagement with a honeypot, not a production attack rate."
@@ -498,6 +513,11 @@
           "external_id": "AML.T0054",
           "url": "https://atlas.mitre.org/techniques/AML.T0054",
           "description": "relatedMatch: ATLAS 2026.09 LLM Jailbreak: context saturation reaches the same guardrail bypass by a different means"
+        },
+        {
+          "source_name": "lab-reproduction",
+          "url": "https://github.com/opena2a-org/damn-vulnerable-ai-agent/blob/eb6f66cc40e5ce5743b27cf3fe33d52e5ac69014/src/challenges/index.js#L356",
+          "description": "lab-reproduction evidence dated 2026-10-07"
         },
         {
           "source_name": "honeypot-telemetry",
@@ -576,6 +596,11 @@
           "description": "closeMatch: ATLAS 2026.09 LLM Prompt Obfuscation: hiding injected instructions from humans and guardrails"
         },
         {
+          "source_name": "lab-reproduction",
+          "url": "https://github.com/opena2a-org/damn-vulnerable-ai-agent/blob/6dd0c4434a9cc8b4d61e3ea5efa9fd42d0273f57/scenarios/token-smuggling-unicode/README.md",
+          "description": "lab-reproduction evidence dated 2026-10-06"
+        },
+        {
           "source_name": "honeypot-telemetry",
           "url": "https://api.oa2a.org/api/v1/threat-matrix",
           "description": "honeypot-telemetry evidence dated 2026-10-19: The wildPrevalence and wildSampleCount this endpoint served for the technique on this date; they measure engagement with a honeypot, not a production attack rate."
@@ -652,6 +677,11 @@
           "description": "relatedMatch: ATLAS 2026.09 LLM Prompt Injection: Direct: a direct injection that crosses the system and user prompt boundary"
         },
         {
+          "source_name": "lab-reproduction",
+          "url": "https://github.com/opena2a-org/damn-vulnerable-ai-agent/blob/eb6f66cc40e5ce5743b27cf3fe33d52e5ac69014/src/challenges/index.js#L670",
+          "description": "lab-reproduction evidence dated 2026-10-07"
+        },
+        {
           "source_name": "honeypot-telemetry",
           "url": "https://api.oa2a.org/api/v1/threat-matrix",
           "description": "honeypot-telemetry evidence dated 2026-10-19: The wildPrevalence and wildSampleCount this endpoint served for the technique on this date; they measure engagement with a honeypot, not a production attack rate."
@@ -691,6 +721,11 @@
           "external_id": "AML.T0083",
           "url": "https://atlas.mitre.org/techniques/AML.T0083",
           "description": "closeMatch: ATLAS 2026.09 Credentials from AI Agent Configuration: the system prompt is part of the agent's configuration"
+        },
+        {
+          "source_name": "lab-reproduction",
+          "url": "https://github.com/opena2a-org/damn-vulnerable-ai-agent/blob/eb6f66cc40e5ce5743b27cf3fe33d52e5ac69014/src/challenges/index.js#L55",
+          "description": "lab-reproduction evidence dated 2026-10-07"
         },
         {
           "source_name": "honeypot-telemetry",
@@ -798,6 +833,11 @@
           "external_id": "AML.T0055",
           "url": "https://atlas.mitre.org/techniques/AML.T0055",
           "description": "broadMatch: ATLAS 2026.09 Unsecured Credentials is broader; the agent memory store is the application-specific repository"
+        },
+        {
+          "source_name": "lab-reproduction",
+          "url": "https://github.com/opena2a-org/damn-vulnerable-ai-agent/blob/eb6f66cc40e5ce5743b27cf3fe33d52e5ac69014/src/challenges/index.js#L310",
+          "description": "lab-reproduction evidence dated 2026-10-07"
         }
       ],
       "kill_chain_phases": [
@@ -931,6 +971,11 @@
           "description": "relatedMatch: ATLAS 2026.09 LLM Prompt Injection: Direct: impersonating a privileged role through injected prompts"
         },
         {
+          "source_name": "lab-reproduction",
+          "url": "https://github.com/opena2a-org/damn-vulnerable-ai-agent/blob/eb6f66cc40e5ce5743b27cf3fe33d52e5ac69014/src/challenges/index.js#L893",
+          "description": "lab-reproduction evidence dated 2026-10-07"
+        },
+        {
           "source_name": "honeypot-telemetry",
           "url": "https://api.oa2a.org/api/v1/threat-matrix",
           "description": "honeypot-telemetry evidence dated 2026-10-19: The wildPrevalence and wildSampleCount this endpoint served for the technique on this date; they measure engagement with a honeypot, not a production attack rate."
@@ -993,6 +1038,11 @@
           "source_name": "agent-threat-matrix",
           "external_id": "T-4004",
           "url": "https://threats.opena2a.org/techniques/T-4004"
+        },
+        {
+          "source_name": "lab-reproduction",
+          "url": "https://github.com/opena2a-org/damn-vulnerable-ai-agent/blob/43557482f8e17b96bec06eda3e6f65fa0ceb566a/scenarios/delegation-privilege-escalation/README.md",
+          "description": "lab-reproduction evidence dated 2026-04-13"
         },
         {
           "source_name": "honeypot-telemetry",
@@ -1066,6 +1116,11 @@
           "description": "relatedMatch: ATLAS 2026.09 LLM Jailbreak: displacing safety instructions reaches the same guardrail removal"
         },
         {
+          "source_name": "lab-reproduction",
+          "url": "https://github.com/opena2a-org/damn-vulnerable-ai-agent/blob/eb6f66cc40e5ce5743b27cf3fe33d52e5ac69014/src/challenges/index.js#L400",
+          "description": "lab-reproduction evidence dated 2026-10-07"
+        },
+        {
           "source_name": "honeypot-telemetry",
           "url": "https://api.oa2a.org/api/v1/threat-matrix",
           "description": "honeypot-telemetry evidence dated 2026-10-19: The wildPrevalence and wildSampleCount this endpoint served for the technique on this date; they measure engagement with a honeypot, not a production attack rate."
@@ -1099,6 +1154,11 @@
           "external_id": "AML.T0053",
           "url": "https://atlas.mitre.org/techniques/AML.T0053",
           "description": "relatedMatch: ATLAS 2026.09 AI Agent Tool Invocation: a tool issuing a server-side request the agent would not otherwise reach"
+        },
+        {
+          "source_name": "lab-reproduction",
+          "url": "https://github.com/opena2a-org/damn-vulnerable-ai-agent/blob/eb6f66cc40e5ce5743b27cf3fe33d52e5ac69014/src/challenges/index.js#L585",
+          "description": "lab-reproduction evidence dated 2026-10-07"
         }
       ],
       "kill_chain_phases": [
@@ -1123,6 +1183,11 @@
           "source_name": "agent-threat-matrix",
           "external_id": "T-5002",
           "url": "https://threats.opena2a.org/techniques/T-5002"
+        },
+        {
+          "source_name": "lab-reproduction",
+          "url": "https://github.com/opena2a-org/damn-vulnerable-ai-agent/blob/eb6f66cc40e5ce5743b27cf3fe33d52e5ac69014/src/challenges/index.js#L942",
+          "description": "lab-reproduction evidence dated 2026-10-07"
         },
         {
           "source_name": "honeypot-telemetry",
@@ -1163,6 +1228,11 @@
           "source_name": "lab-reproduction",
           "url": "https://github.com/opena2a-org/damn-vulnerable-ai-agent/blob/6dd0c4434a9cc8b4d61e3ea5efa9fd42d0273f57/scenarios/prompt-to-lateral-movement/README.md",
           "description": "lab-reproduction evidence dated 2026-10-06"
+        },
+        {
+          "source_name": "lab-reproduction",
+          "url": "https://github.com/opena2a-org/damn-vulnerable-ai-agent/blob/43557482f8e17b96bec06eda3e6f65fa0ceb566a/scenarios/tool-chain-exfiltration/README.md",
+          "description": "lab-reproduction evidence dated 2026-04-13"
         }
       ],
       "kill_chain_phases": [
@@ -1303,6 +1373,11 @@
           "description": "closeMatch: ATLAS 2026.09 AI Agent Context Poisoning: Memory: planted entries that persist across chat sessions"
         },
         {
+          "source_name": "lab-reproduction",
+          "url": "https://github.com/opena2a-org/damn-vulnerable-ai-agent/blob/eb6f66cc40e5ce5743b27cf3fe33d52e5ac69014/src/challenges/index.js#L268",
+          "description": "lab-reproduction evidence dated 2026-10-07"
+        },
+        {
           "source_name": "honeypot-telemetry",
           "url": "https://api.oa2a.org/api/v1/threat-matrix",
           "description": "honeypot-telemetry evidence dated 2026-10-19: The wildPrevalence and wildSampleCount this endpoint served for the technique on this date; they measure engagement with a honeypot, not a production attack rate."
@@ -1342,6 +1417,11 @@
           "external_id": "AML.T0080.000",
           "url": "https://atlas.mitre.org/techniques/AML.T0080.000",
           "description": "relatedMatch: ATLAS 2026.09 AI Agent Context Poisoning: Memory: the replicating entry lives in agent memory"
+        },
+        {
+          "source_name": "lab-reproduction",
+          "url": "https://github.com/opena2a-org/damn-vulnerable-ai-agent/blob/eb6f66cc40e5ce5743b27cf3fe33d52e5ac69014/src/challenges/index.js#L628",
+          "description": "lab-reproduction evidence dated 2026-10-07"
         }
       ],
       "kill_chain_phases": [
@@ -1410,6 +1490,11 @@
           "description": "closeMatch: ATLAS 2026.09 AI Agent Tool Poisoning: a backdoored tool or skill package, which ATLAS names among agent tools"
         },
         {
+          "source_name": "lab-reproduction",
+          "url": "https://github.com/opena2a-org/damn-vulnerable-ai-agent/blob/43557482f8e17b96bec06eda3e6f65fa0ceb566a/scenarios/skill-backdoor-install/README.md",
+          "description": "lab-reproduction evidence dated 2026-04-13"
+        },
+        {
           "source_name": "honeypot-telemetry",
           "url": "https://api.oa2a.org/api/v1/threat-matrix",
           "description": "honeypot-telemetry evidence dated 2026-10-19: The wildPrevalence and wildSampleCount this endpoint served for the technique on this date; they measure engagement with a honeypot, not a production attack rate."
@@ -1473,6 +1558,11 @@
           "external_id": "AML.T0110",
           "url": "https://atlas.mitre.org/techniques/AML.T0110",
           "description": "relatedMatch: ATLAS 2026.09 AI Agent Tool Poisoning: registering a persistent malicious tool in the agent's catalog"
+        },
+        {
+          "source_name": "lab-reproduction",
+          "url": "https://github.com/opena2a-org/damn-vulnerable-ai-agent/blob/eb6f66cc40e5ce5743b27cf3fe33d52e5ac69014/src/challenges/index.js#L447",
+          "description": "lab-reproduction evidence dated 2026-10-07"
         }
       ],
       "kill_chain_phases": [
@@ -1839,6 +1929,11 @@
           "description": "closeMatch: ATLAS 2026.09 Exfiltration via AI Agent Tool Invocation: a chain of tool calls that stages and sends data"
         },
         {
+          "source_name": "lab-reproduction",
+          "url": "https://github.com/opena2a-org/damn-vulnerable-ai-agent/blob/eb6f66cc40e5ce5743b27cf3fe33d52e5ac69014/src/challenges/index.js#L756",
+          "description": "lab-reproduction evidence dated 2026-10-07"
+        },
+        {
           "source_name": "honeypot-telemetry",
           "url": "https://api.oa2a.org/api/v1/threat-matrix",
           "description": "honeypot-telemetry evidence dated 2026-10-19: The wildPrevalence and wildSampleCount this endpoint served for the technique on this date; they measure engagement with a honeypot, not a production attack rate."
@@ -1908,6 +2003,11 @@
           "external_id": "AML.T0086",
           "url": "https://atlas.mitre.org/techniques/AML.T0086",
           "description": "closeMatch: ATLAS 2026.09 Exfiltration via AI Agent Tool Invocation: pre-allowed messaging APIs used as the write tool"
+        },
+        {
+          "source_name": "lab-reproduction",
+          "url": "https://github.com/opena2a-org/damn-vulnerable-ai-agent/blob/6dd0c4434a9cc8b4d61e3ea5efa9fd42d0273f57/scenarios/sandbox-telegram-allowed/README.md",
+          "description": "lab-reproduction evidence dated 2026-10-06"
         }
       ],
       "kill_chain_phases": [
@@ -2118,6 +2218,11 @@
           "description": "closeMatch: ATLAS 2026.09 AI Supply Chain Compromise: AI Agent Tool: a compromised MCP server or tool reaching downstream agents"
         },
         {
+          "source_name": "lab-reproduction",
+          "url": "https://github.com/opena2a-org/damn-vulnerable-ai-agent/blob/43557482f8e17b96bec06eda3e6f65fa0ceb566a/scenarios/mcp-rug-pull/README.md",
+          "description": "lab-reproduction evidence dated 2026-04-13"
+        },
+        {
           "source_name": "honeypot-telemetry",
           "url": "https://api.oa2a.org/api/v1/threat-matrix",
           "description": "honeypot-telemetry evidence dated 2026-10-19: The wildPrevalence and wildSampleCount this endpoint served for the technique on this date; they measure engagement with a honeypot, not a production attack rate."
@@ -2145,6 +2250,11 @@
           "source_name": "agent-threat-matrix",
           "external_id": "T-2009",
           "url": "https://threats.opena2a.org/techniques/T-2009"
+        },
+        {
+          "source_name": "lab-reproduction",
+          "url": "https://github.com/opena2a-org/damn-vulnerable-ai-agent/blob/6dd0c4434a9cc8b4d61e3ea5efa9fd42d0273f57/scenarios/parser-differential-json/README.md",
+          "description": "lab-reproduction evidence dated 2026-10-06"
         }
       ],
       "kill_chain_phases": [
@@ -2181,6 +2291,11 @@
           "external_id": "AML.T0110",
           "url": "https://atlas.mitre.org/techniques/AML.T0110",
           "description": "relatedMatch: ATLAS 2026.09 AI Agent Tool Poisoning: a planted tool that impersonates or shadows a legitimate one"
+        },
+        {
+          "source_name": "lab-reproduction",
+          "url": "https://github.com/opena2a-org/damn-vulnerable-ai-agent/blob/6dd0c4434a9cc8b4d61e3ea5efa9fd42d0273f57/scenarios/fake-tool-squatting/README.md",
+          "description": "lab-reproduction evidence dated 2026-10-06"
         },
         {
           "source_name": "honeypot-telemetry",
@@ -2224,6 +2339,11 @@
           "description": "relatedMatch: ATLAS 2026.09 AI Agent Environment Reconstruction: recovering state to continue after a reset"
         },
         {
+          "source_name": "lab-reproduction",
+          "url": "https://github.com/opena2a-org/damn-vulnerable-ai-agent/blob/6dd0c4434a9cc8b4d61e3ea5efa9fd42d0273f57/scenarios/persistent-agent-memory-poison/README.md",
+          "description": "lab-reproduction evidence dated 2026-10-06"
+        },
+        {
           "source_name": "honeypot-telemetry",
           "url": "https://api.oa2a.org/api/v1/threat-matrix",
           "description": "honeypot-telemetry evidence dated 2026-10-19: The wildPrevalence and wildSampleCount this endpoint served for the technique on this date; they measure engagement with a honeypot, not a production attack rate."
@@ -2251,6 +2371,21 @@
           "source_name": "agent-threat-matrix",
           "external_id": "T-7007",
           "url": "https://threats.opena2a.org/techniques/T-7007"
+        },
+        {
+          "source_name": "lab-reproduction",
+          "url": "https://github.com/opena2a-org/damn-vulnerable-ai-agent/blob/6dd0c4434a9cc8b4d61e3ea5efa9fd42d0273f57/scenarios/context-lifecycle-split-injection/README.md",
+          "description": "lab-reproduction evidence dated 2026-10-06"
+        },
+        {
+          "source_name": "lab-reproduction",
+          "url": "https://github.com/opena2a-org/damn-vulnerable-ai-agent/blob/6dd0c4434a9cc8b4d61e3ea5efa9fd42d0273f57/scenarios/context-lifecycle-displacement/README.md",
+          "description": "lab-reproduction evidence dated 2026-10-06"
+        },
+        {
+          "source_name": "lab-reproduction",
+          "url": "https://github.com/opena2a-org/damn-vulnerable-ai-agent/blob/6dd0c4434a9cc8b4d61e3ea5efa9fd42d0273f57/scenarios/context-lifecycle-priority-hijack/README.md",
+          "description": "lab-reproduction evidence dated 2026-10-06"
         }
       ],
       "kill_chain_phases": [

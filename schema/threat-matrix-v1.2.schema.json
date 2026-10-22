@@ -99,7 +99,7 @@
         "evidence": {
           "type": "array",
           "items": { "$ref": "#/$defs/evidenceEntry" },
-          "x-semantic": "every entry must resolve to a source scripts/validate_matrix.py reads, and no entry may repeat another's type, reference and date: a honeypot-telemetry entry resolves when its reference is the wildPrevalenceSource url, its date is the wildPrevalenceSource read date and the technique's wildSampleCount is above 0; a lab-reproduction entry resolves when its reference is the permalink of a page that evidence-sources.json pins, <repository>/blob/<commit>/<path>, its date is the page's committed date and the page names the technique's id with the technique's name as the label; no other reference resolves"
+          "x-semantic": "every entry must resolve to a source scripts/validate_matrix.py reads, and no entry may repeat another's type, reference and date: a honeypot-telemetry entry resolves when its reference is the wildPrevalenceSource url, its date is the wildPrevalenceSource read date and the technique's wildSampleCount is above 0; a lab-reproduction entry resolves when its reference is the permalink of a page that evidence-sources.json pins, <repository>/blob/<commit>/<path>, its date is the page's committed date and the page names the technique's id with the technique's name as the label, or when its reference is the permalink of a challenge, <repository>/blob/<commit>/<path>#L<line>, or of a scenario page that evidence-sources.json pins for a dvaaValidation, its date is the committed date of that file and a value of the technique's dvaaValidation is the challenge's id or the scenario's name; no other reference resolves"
         },
         "status": {
           "description": "Absent means active.",

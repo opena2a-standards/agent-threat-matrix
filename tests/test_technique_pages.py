@@ -1078,9 +1078,14 @@ T2001_LINKS = ["- Attack Class: [SOUL-INJECT](../attack-classes/SOUL-INJECT.md)"
 T2001_EVIDENCE = (f"- Evidence: honeypot-telemetry dated 2026-10-19, [{ENDPOINT}]({ENDPOINT}). The "
                   "wildPrevalence and wildSampleCount this endpoint served for the technique on this "
                   "date; they measure engagement with a honeypot, not a production attack rate.")
+# The DVAA challenge T-2001's dvaaValidation names, L1-03, at the line of its key.
+T2001_CHALLENGE = ("https://github.com/opena2a-org/damn-vulnerable-ai-agent/blob/"
+                   "eb6f66cc40e5ce5743b27cf3fe33d52e5ac69014/src/challenges/index.js#L98")
+T2001_LAB = f"- Evidence: lab-reproduction dated 2026-10-07, [{T2001_CHALLENGE}]({T2001_CHALLENGE})"
+T2001_LISTED = f"lab-reproduction {T2001_CHALLENGE} 2026-10-07; honeypot-telemetry {ENDPOINT} 2026-10-19"
 T2001_NOT_LISTED = (f"T-2001: References section does not list the evidence entries matrix.json "
-                    f"carries (honeypot-telemetry {ENDPOINT} 2026-10-19), one Evidence line each in "
-                    f"order directly under the Tactic link")
+                    f"carries ({T2001_LISTED}), one Evidence line each in order directly under the "
+                    f"Tactic link")
 T1001_TACTIC = "- Tactic: [reconnaissance](../tactics/reconnaissance.md)\n"
 ADDED_ENTRY = {"type": "publication", "reference": "https://example.org/post", "date": "2026-10-20"}
 
@@ -1106,9 +1111,9 @@ def edit_technique(root: Path, tid: str, change) -> None:
     path.write_text(json.dumps(matrix, indent=2), encoding="utf-8")
 
 
-def test_t2001_references_cite_the_endpoint_its_evidence_entry_was_read_from():
+def test_t2001_references_cite_the_dvaa_challenge_and_the_endpoint_its_entries_were_read_from():
     text = (ROOT / "techniques" / "T-2001.md").read_text(encoding="utf-8")
-    assert references(text) == T2001_LINKS + [T2001_EVIDENCE]
+    assert references(text) == T2001_LINKS + [T2001_LAB, T2001_EVIDENCE]
 
 
 @pytest.mark.parametrize("technique", TECHNIQUES, ids=[t["id"] for t in TECHNIQUES])
@@ -1221,13 +1226,12 @@ def test_evidence_lines_follow_an_entry_added_to_the_data(tree):
     result = run_checker(tree)
     assert result.returncode == 1, result.stdout
     assert (f"T-2001: References section does not list the evidence entries matrix.json carries "
-            f"(honeypot-telemetry {ENDPOINT} 2026-10-19; publication https://example.org/post "
-            f"2026-10-20), one Evidence line each in order directly under the Tactic link") \
-        in result.stdout
+            f"({T2001_LISTED}; publication https://example.org/post 2026-10-20), one Evidence line "
+            f"each in order directly under the Tactic link") in result.stdout
 
     assert run_checker(tree, "--fix").returncode == 0
     page = (tree / "techniques" / "T-2001.md").read_text(encoding="utf-8")
-    assert references(page) == T2001_LINKS + [T2001_EVIDENCE, evidence_line(ADDED_ENTRY)]
+    assert references(page) == T2001_LINKS + [T2001_LAB, T2001_EVIDENCE, evidence_line(ADDED_ENTRY)]
     assert run_checker(tree).returncode == 0
 
 
@@ -1236,7 +1240,7 @@ def test_evidence_lines_follow_the_entries_removed_from_the_data(tree):
 
     result = run_checker(tree)
     assert result.returncode == 1, result.stdout
-    assert ("T-2001: page has an Evidence line, and matrix.json carries no evidence entry for "
+    assert ("T-2001: page has 2 Evidence lines, and matrix.json carries no evidence entry for "
             "the technique") in result.stdout
 
     assert run_checker(tree, "--fix").returncode == 0

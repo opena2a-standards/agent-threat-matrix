@@ -77,7 +77,7 @@ or change the technique's tier; the tier is assigned by the maintainers and audi
 `EVIDENCE_AUDIT.md`.
 
 An entry is accepted only where `scripts/validate_matrix.py` resolves its reference to a
-source it reads, so no entry rests on a citation nobody read. The validator resolves two
+source it reads, so no entry rests on a citation nobody read. The validator resolves three
 kinds of entry:
 
 - A `honeypot-telemetry` entry whose reference is the registry endpoint in
@@ -93,9 +93,26 @@ kinds of entry:
   last commit that changed the page as of the commit the clone was read at, that commit's
   date, the page's git blob id, and each technique the page names, with its line and its
   label. A page that names an id under a label that is not that technique's name backs no
-  entry, and the script prints each such name. The validator does not read the clone;
-  `python3 scripts/pin_evidence_sources.py --dvaa <clone> --check` fails when the pins, or
-  the entries they back, differ from what the clone holds at the commit the pins record.
+  entry, and the script prints each such name.
+- A `lab-reproduction` entry whose reference is the permalink of a DVAA challenge or
+  scenario page that `evidence-sources.json` pins for a technique's `dvaaValidation`, whose
+  date is the date of the commit in that permalink, and whose technique's `dvaaValidation`
+  names that challenge or scenario. `dvaaValidation` names the DVAA lab work that
+  reproduces the technique: free text, or the id of a challenge or the name of a scenario,
+  several separated by commas. `scripts/pin_evidence_sources.py` reads each value. A value
+  that is the id of a challenge defined in DVAA's `src/challenges/index.js` names that
+  challenge, and its entry cites the file at the line of the challenge's key,
+  `<repository>/blob/<commit>/src/challenges/index.js#L<line>`. Any other value that is the
+  name of a directory under `scenarios/` holding a `README.md` names that scenario, and its
+  entry cites the permalink of that page. A pin records the file's path, the last commit
+  that changed the file as of the commit the clone was read at, that commit's date and the
+  file's git blob id, and for a challenge the line of its key, its id and its name. A value
+  that names neither backs no entry, and the script prints each such value with its
+  technique.
+
+The validator does not read the clone;
+`python3 scripts/pin_evidence_sources.py --dvaa <clone> --check` fails when the pins, or the
+entries they back, differ from what the clone holds at the commit the pins record.
 
 An entry of any other kind is refused until the validator reads its source.
 `evidence-gaps.json` lists the techniques with no entry; `scripts/generate_stix.py` writes
