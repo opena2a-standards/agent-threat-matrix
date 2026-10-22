@@ -186,8 +186,11 @@ must change. This page records the process and decides no scope.
 Branch protection on `main` requires one status check, "Gate file approval", and sets no
 required review count and no code-owner review. That check passes for a pull request that
 changes nothing under `.github/`; a pull request that changes a file there needs an
-approving review on its current head commit from the approver named in
-`.github/workflows/gate-file-approval.yml`. Read the current settings with:
+approving review on its current head commit from one of the accounts named in the
+`approvers` line of `.github/workflows/gate-file-approval.yml`: the GitHub user
+`thebenignhacker`, or `benign-gate-reviewer[bot]`, the bot account of the gate-reviewer
+GitHub App. The check counts an approval from either account the same way. Read the
+current branch protection with:
 
 ```sh
 gh api repos/opena2a-standards/agent-threat-matrix/branches/main/protection
