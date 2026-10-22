@@ -156,16 +156,27 @@ otherwise the ] stays, and the [ and what
 follows it are read on. A page defines a label where, once such characters are removed, it
 holds a [ that no \\ escapes followed by that label and ]:, two labels being the same when
 they are after Unicode case folding, with white space at either end removed and each run
-of white space inside read as one space. Where a ] is so directly followed by a [, the
-line is also read with no label removed and, where two or three labels the page defines
-stand directly after a ] on it, with each other mix of them removed and kept, and it
-names DVAA when any of its readings does; a line holding four or more such labels is read
-with all of them removed and with none only. A page holding a definition-like text that
+of white space inside read as one space. A page holding a definition-like text that
 CommonMark does not read as a definition, such as one in a fenced code block, defines the
-label here too. So "[x][DV](url)AA", which CommonMark shows as "[x]DVAA" where the page
-does not define the label DV, names DVAA, as does "[x][DV](u)[A][t]A" on a page that
-defines t, with DV only in a fenced code block, which CommonMark shows as "[x]DVAA", while
-"[DV][dvaa]AA" names DVAA only where the page defines the label dvaa. Second, going along
+label here too. Where a ] is so directly followed by a [, the line is also read with no
+label removed and, where two or three labels the page defines stand directly after a ] on
+it, with each other mix of them removed and kept, and it names DVAA when any of its
+readings does. A line holding four or more such labels is read with all of them removed
+and with none and, where one to three of them are labels the page defines on no
+definition line, with each other mix of those removed and kept and the others removed. A
+definition-like text stands on a definition line where its [ starts a line, after at most
+three spaces, outside a fenced code block: so "[t]: x" does as a line of its own, also
+after one to three spaces, while "`[t]: x`", "[t]: x" after four spaces or a tab, and
+"[t]: x" on a line in a fenced code block do not. A fenced code block runs from a line
+that, after at most three spaces, starts with a run of three or more backticks with no
+backtick after it on the line, or of three or more tildes, to the first later line that
+is, after at most three spaces, a run of that character at least as long followed by
+nothing but spaces and tabs, or to the end of the page. So "[x][DV](url)AA", which
+CommonMark shows as "[x]DVAA" where the page does not define the label DV, names DVAA, as
+does "[x][DV](u)[A][t]A" on a page that defines t, with DV only in a fenced code block,
+which CommonMark shows as "[x]DVAA", and "[x][DV](u)[A][t]A [y][a] [z][b]" on such a page
+that also defines a and b, which CommonMark shows as "[x]DVAA y z", while "[DV][dvaa]AA"
+names DVAA only where the page defines the label dvaa. Second, going along
 what remains, each ] followed by ( is removed with the text after
 it to the first ) if no further ( comes first, whether or not they make a link, then each
 ! directly before a [, and then the Markdown characters * _ ~ ` [ ]. Third, its character
@@ -500,8 +511,17 @@ LINK_TARGET = re.compile(PAREN_SPAN.pattern + r"|\]\[[^\[\]]*\]")
 
 # The most labels the page defines, each directly after a "]", that a line can hold for
 # `label_removals` to read it with every mix of them removed and kept, which is at most
-# 2 to the power of this many readings of the line.
+# 2 to the power of this many readings of the line; and, on a line holding more, the most
+# of them in `unsure_labels` for it to read the line with every mix of those removed and
+# kept and the others removed.
 MIXED_LABELS = 3
+
+# A line that opens or closes a fenced code block where `unsure_labels` reads one: up to
+# three spaces, a run of three or more backticks or tildes, and the rest of the line. A
+# backtick run opens a block only where the rest of its line holds no backtick, and a run
+# closes the open block only where it is of that block's character, at least as long as
+# the run that opened it, with nothing but spaces and tabs in the rest of its line.
+FENCE = re.compile(r" {0,3}(`{3,}|~{3,})(.*)")
 
 # A "!" directly before a "[", removed so that an image reads as its alternative text:
 # "DV![](x.png)AA" names DVAA, while "DV!AA" does not.
@@ -766,16 +786,18 @@ def span_lines(lines):
 
 
 def page_labels(pages, lines):
-    """For each README line, as `classified` returns it, the link labels that the page
-    holding it defines (`defined_labels`), read from that page's lines with the characters
-    `hiding_kind` names removed: a link reference definition holds on its own page only, as
-    each page is a document of its own."""
+    """For each README line, as `classified` returns it, (labels, unsure): the link labels
+    that the page holding it defines (`defined_labels`), and those of them that it defines
+    only in definition-like texts CommonMark may not read as definitions (`unsure_labels`),
+    each read from that page's lines with the characters `hiding_kind` names removed: a
+    link reference definition holds on its own page only, as each page is a document of
+    its own."""
     labels = []
     starts = [first - 1 for first in pages.first_lines] + [len(lines)]
     for start, end in zip(starts, starts[1:]):
-        defined = defined_labels("\n".join(stripped for _, stripped, _ in lines[start:end]))
-        labels.extend([defined] * (end - start))
-    return labels or [frozenset()] * len(lines)
+        text = "\n".join(stripped for _, stripped, _ in lines[start:end])
+        labels.extend([(defined_labels(text), unsure_labels(text))] * (end - start))
+    return labels or [(frozenset(), frozenset())] * len(lines)
 
 
 def reference_text(reference):
@@ -867,16 +889,13 @@ def label_key(label):
     return " ".join(label.replace(BREAK, "").casefold().split())
 
 
-def defined_labels(text):
-    """The link labels page `text` defines, each as `label_key` gives it: each label, as
-    `label_end` reads one, that a "[" no backslash escapes opens and ":" directly follows,
-    such as "dvaa" in "[DVAA]: https://example.org". A blank label defines nothing. A
-    definition-like text that CommonMark does not read as one, such as one in a fenced code
-    block, is counted too, which `names` allows for by also reading each line with the
-    removals `label_removals` gives. Each "[" scans only up to the first "[" or "]" after it
-    that no backslash escapes, and a label found is passed over whole, so a page is read in
-    linear time."""
-    keys = set()
+def definitions(text):
+    """(start, key) for each definition-like text page `text` holds: each label, as
+    `label_end` reads one, that a "[" no backslash escapes opens at offset `start` and ":"
+    directly follows, `key` being the label as `label_key` gives it, such as "dvaa" in
+    "[DVAA]: https://example.org". A blank label defines nothing. Each "[" scans only up to
+    the first "[" or "]" after it that no backslash escapes, and a label found is passed
+    over whole, so a page is read in linear time."""
     i = 0
     while i < len(text):
         c = text[i]
@@ -888,26 +907,71 @@ def defined_labels(text):
             if end is not None:
                 key = label_key(text[i + 1:end - 1])
                 if key and text[end:end + 1] == ":":
-                    keys.add(key)
+                    yield i, key
                 i = end
                 continue
         i += 1
-    return frozenset(keys)
 
 
-def label_removals(stripped, labels):
+def defined_labels(text):
+    """The link labels page `text` defines, each as `label_key` gives it: the label of each
+    definition-like text `definitions` finds, such as "dvaa" in
+    "[DVAA]: https://example.org". A definition-like text that CommonMark does not read as
+    one, such as one in a fenced code block, is counted too, which `names` allows for by
+    also reading each line with the removals `label_removals` gives."""
+    return frozenset(key for _, key in definitions(text))
+
+
+def unsure_labels(text):
+    """The labels page `text` defines (`defined_labels`) only in definition-like texts that
+    CommonMark may not read as definitions: those whose "[" does not start a line, after at
+    most three spaces, outside a fenced code block, as in "`[t]: x`", in "[t]: x" after four
+    spaces or a tab, and in "[t]: x" on a line in a fenced code block. A fenced code block
+    runs from a line that `FENCE` matches, where a backtick run has no backtick after it on
+    the line, to the first later line that `FENCE` matches with a run of that character at
+    least as long and nothing but spaces and tabs after it, or to the end of the page. Each
+    line is read once, and `definitions` reads the page in linear time."""
+    starts = set()
+    fence = None
+    offset = 0
+    for line in text.split("\n"):
+        found = FENCE.match(line)
+        if fence:
+            run = found.group(1) if found else ""
+            if (run[:1] == fence[0] and len(run) >= len(fence)
+                    and not found.group(2).strip(" \t")):
+                fence = None
+        elif found and not (found.group(1)[0] == "`" and "`" in found.group(2)):
+            fence = found.group(1)
+        else:
+            indent = len(line) - len(line.lstrip(" "))
+            if indent <= 3 and line[indent:indent + 1] == "[":
+                starts.add(offset + indent)
+        offset += len(line) + 1
+    sure, keys = set(), set()
+    for start, key in definitions(text):
+        (sure if start in starts else keys).add(key)
+    return frozenset(keys - sure)
+
+
+def label_removals(stripped, labels, unsure=frozenset()):
     """The `labels` arguments `names` reads line `stripped` with, `labels` being the labels
-    the page holding it defines (`defined_labels`): `labels`, then None, which removes no
-    label, and, where two to `MIXED_LABELS` of those labels stand directly after a "]" on
-    the line, each other set of them that holds at least one, so that every mix of them
-    removed and kept is read. `defined_labels` also counts a text that only looks like a
-    definition, so of two labels on a line CommonMark can remove one and keep the other: on
-    a page that defines t, with DV only in a fenced code block, "[x][DV](u)[A][t]A" shows
-    "[x]DVAA", and of these readings only the one that removes t alone names DVAA there. A
-    line holding more such labels is read with all of them removed and with none only: each
-    reading reads the whole line, and k labels have 2 to the power k mixes. Each "[" after
-    a "]" scans its label only up to the first "[" or "]" after it that no backslash
-    escapes, as `label_end` does."""
+    the page holding it defines (`defined_labels`) and `unsure` those of them it defines
+    only in definition-like texts CommonMark may not read as definitions (`unsure_labels`):
+    `labels`, then None, which removes no label, and, where two to `MIXED_LABELS` of those
+    labels stand directly after a "]" on the line, each other set of them that holds at
+    least one, so that every mix of them removed and kept is read. `defined_labels` also
+    counts a text that only looks like a definition, so of two labels on a line CommonMark
+    can remove one and keep the other: on a page that defines t, with DV only in a fenced
+    code block, "[x][DV](u)[A][t]A" shows "[x]DVAA", and of these readings only the one
+    that removes t alone names DVAA there. A line holding more such labels is read with all
+    of them removed and with none and, where one to `MIXED_LABELS` of them are in `unsure`,
+    with each other mix of those removed and kept and the others removed: on a page that
+    defines t, a and b, with DV only in a fenced code block, "[x][DV](u)[A][t]A [y][a] [z][b]"
+    shows "[x]DVAA y z", which the reading that removes t, a and b names. Each reading
+    reads the whole line, and k labels have 2 to the power k mixes. Each "[" after a "]"
+    scans its label only up to the first "[" or "]" after it that no backslash escapes, as
+    `label_end` does."""
     keys = {}
     i = stripped.find("][")
     while i >= 0:
@@ -921,6 +985,13 @@ def label_removals(stripped, labels):
     if 1 < len(keys) <= MIXED_LABELS:
         for size in range(1, len(keys)):
             removals.extend(map(frozenset, itertools.combinations(keys, size)))
+    elif len(keys) > MIXED_LABELS:
+        mixed = [key for key in keys if key in unsure]
+        if len(mixed) <= MIXED_LABELS:
+            removed = frozenset(key for key in keys if key not in unsure)
+            for size in range(len(mixed)):
+                removals.extend(removed.union(chosen)
+                                for chosen in itertools.combinations(mixed, size))
     return removals
 
 
@@ -1131,7 +1202,7 @@ def detached(stripped, references=None):
     return "".join(out)
 
 
-def names(stripped, name, hiding=False, spans=True, labels=None):
+def names(stripped, name, hiding=False, spans=True, labels=None, unsure=frozenset()):
     """Whether a line that is `stripped` once the characters `hiding_kind` names are
     removed names `name`: it `holds` `name` as it stands or in its `name_form`, read with
     `RAW_HTML` and, where a tag name is followed by white space other than a space or
@@ -1150,15 +1221,19 @@ def names(stripped, name, hiding=False, spans=True, labels=None):
     directly followed by a link label that is blank or in `labels`, the labels the page
     holding the line defines, with that label; where a "]" stands directly before a "[",
     the line is also read with no label removed, as it is with `labels` None, and with the
-    other removals `label_removals` gives, in each of those readings, one `HtmlBlockHtml`
-    serving every label reading: on a page that defines DV,
+    other removals `label_removals` gives, `unsure` being the labels the page defines only
+    in definition-like texts CommonMark may not read as definitions (`unsure_labels`), in
+    each of those readings, one `HtmlBlockHtml` serving every label reading: on a page that
+    defines DV,
     "[x][DV](url)A<y\\>A <q\\" names DVAA only read with no label removed and as a browser
     reads "<y\\>" in an HTML block, after the reading that removes DV has held "<q\\", a tag
     that finds no ">". `defined_labels` also counts a text that
     only looks like a definition, so "[x][DV](url)AA", which shows "[x]DVAA" unless the page
     defines DV, names DVAA by the reading that removes no label even with DV in `labels`,
     "[x][DV](u)[A][t]A" names DVAA by the reading that removes t alone with dv and t in
-    `labels`, while "[DV][dvaa]AA" names DVAA only with dvaa in `labels`. Where
+    `labels`, "[x][DV](u)[A][t]A [y][a] [z][b]" by the reading that removes t, a and b with
+    dv, t, a and b in `labels` and dv in `unsure`, while "[DV][dvaa]AA" names DVAA only
+    with dvaa in `labels`. Where
     `HIDDEN_ELEMENT_START` finds a "<" and the name of a style, script or template element,
     each of those readings is also made with the text of each such element removed,
     `name_form` with `hide_elements` true, the one `HtmlBlockHtml` serving those readings
@@ -1204,7 +1279,7 @@ def names(stripped, name, hiding=False, spans=True, labels=None):
     # Only a "]" directly before a "[" can be removed with a label, so a line without one
     # reads alike either way.
     removals = ([None] if labels is None or "][" not in stripped
-                else label_removals(stripped, labels))
+                else label_removals(stripped, labels, unsure))
     # Only a line holding a start tag of a style, script or template element has text of
     # one to remove, so a line without one reads alike either way.
     hides = [False, True] if HIDDEN_ELEMENT_START.search(stripped) else [False]
@@ -1611,8 +1686,8 @@ def main(argv):
     # line also give the line with such characters removed, which decides whether it names
     # DVAA.
     lines = [classified(line) for line in readme.split("\n")]
-    naming = [names(stripped, "DVAA", bool(hidden), spans, labels)
-              for (_, stripped, hidden), spans, labels
+    naming = [names(stripped, "DVAA", bool(hidden), spans, labels, unsure)
+              for (_, stripped, hidden), spans, (labels, unsure)
               in zip(lines, span_lines(lines), page_labels(pages, lines))]
     dvaa_lines = lines_naming(lines, naming)
     pinned = "related-projects.json"
