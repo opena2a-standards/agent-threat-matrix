@@ -9,6 +9,7 @@ are test data: their steps, labels, challenges and dates are written here.
 import importlib.util
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -35,6 +36,9 @@ GIT_ENV = {key: value for key, value in os.environ.items()
 _spec = importlib.util.spec_from_file_location("pin_evidence_sources", ROOT / SCRIPT)
 PIN = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(PIN)
+_spec = importlib.util.spec_from_file_location("validate_matrix", ROOT / "scripts" / "validate_matrix.py")
+VALIDATOR = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(VALIDATOR)
 
 CHAIN = "scenarios/chain/README.md"
 PROBE = "scenarios/probe/README.md"
@@ -341,6 +345,42 @@ def test_head_pins_the_clone_at_another_commit(tree, dvaa):
     assert pins["head"] == dvaa.first
     assert [page["path"] for page in pins["pages"]] == [CHAIN]
     assert "evidence" not in technique(load(tree), "T-1004")
+
+
+def test_a_label_is_read_exactly_when_the_schema_admits_it():
+    """The schema's label pattern is read with ECMA-262's \\s, which matches U+FEFF and not
+    U+001C to U+001F or U+0085, where Python's \\s is the other way round. A label that
+    starts or ends with a code point either reading counts as white space is read only when
+    the validator admits it."""
+    schema = load(ROOT, "schema/evidence-sources.schema.json")
+    admits = VALIDATOR.ecma_pattern(schema["$defs"]["name"]["properties"]["label"]["pattern"])
+    ecma_space = re.compile(f"[{VALIDATOR.ECMA_SPACE}]")
+    codes = [code for code in range(0x110000)
+             if re.match(r"\s", chr(code)) or ecma_space.match(chr(code))] + [ord("A")]
+    assert {0xFEFF, 0x1C, 0x1F, 0x85} <= set(codes)
+    for code in codes:
+        for label in (f"Tool Discovery{chr(code)}", f"{chr(code)}Tool Discovery"):
+            match = PIN.NAME_RE.fullmatch(f"**T-1002 ({label}):**")
+            assert (match is not None and match.group(2) == label) == bool(admits.search(label)), \
+                (hex(code), label)
+
+
+def test_pins_only_the_labels_the_validator_admits(tree, dvaa):
+    spaces = "scenarios/spaces/README.md"
+    write(dvaa.path, spaces, ("# Spaces\n\n## Attack Chain\n\n"
+                              "1. **T-1002 (Tool Discovery\U0000feff):** U+FEFF before the parenthesis.\n\n"
+                              "2. **T-1004 (Security Level Probing\x1c):** U+001C before it.\n\n"
+                              "3. **T-1006 (\x85Agent Card Discovery):** U+0085 after the other one.\n"))
+    later = commit(dvaa.path, "spaces", LATER, spaces)
+    proc = run_pin(tree, dvaa.path)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    pins = load(tree, "evidence-sources.json")["dvaa"]
+    assert pins["pages"][2] == {"path": spaces, "commit": later, "committed": "2026-06-01",
+                                "blob": blob(dvaa.path, later, spaces),
+                                "names": [{"line": 7, "technique": "T-1004", "label": "Security Level Probing\x1c"},
+                                          {"line": 9, "technique": "T-1006", "label": "\x85Agent Card Discovery"}]}
+    validated = run_validator(tree)
+    assert validated.returncode == 0, validated.stdout + validated.stderr
 
 
 # --------------------------------------------------------------------------- what a dvaaValidation names
