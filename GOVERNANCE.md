@@ -40,8 +40,8 @@ content is:
   MITRE ATLAS, the `attackMapping` and `atlasMapping` arrays;
 - `technique-ids.json`, the technique id list, kept in step with `matrix.json`;
 - `canonical-classes.json`, the canonical attack classes resolved to technique ids;
-- `schema/`, the JSON Schema for `matrix.json` and the consumer-readiness gate on dotted
-  ids;
+- `schema/`, the JSON Schema for `matrix.json`, the JSON Schema for `evidence-sources.json`
+  and the consumer-readiness gate on dotted ids;
 - `docs/evidence-tiers.md`, the definition of each evidence tier and the evidence standard;
 - `EVIDENCE_AUDIT.md`, the justification of every technique's tier;
 - `cross-references/`, the published mapping pages that relate the matrix to external
@@ -81,9 +81,11 @@ Everything else is editorial: the prose of `README.md`, the pages under `docs/` 
 the two named above, the prose of the technique pages, `crosswalks/README.md` and the rest
 of `crosswalks/unmapped.md`, `CONTRIBUTING.md`, `CHANGELOG.md`,
 `ATTRIBUTION.md`, whose own rule is the "Contributor credit" section of CONTRIBUTING.md,
-and `related-projects.json`, the figures about related projects that the README check
+`related-projects.json`, the figures about related projects that the README check
 reads and the OASB-1 control titles that `scripts/check_technique_pages.py` writes into
-the Mitigation section of each technique page.
+the Mitigation section of each technique page, and `evidence-sources.json`, the DVAA
+scenario pages that `lab-reproduction` evidence entries cite, pinned from a git clone by
+`scripts/pin_evidence_sources.py`.
 
 A change to normative content is a normative change in the organization's sense and takes
 the route below. An editorial change is a pull request directly.

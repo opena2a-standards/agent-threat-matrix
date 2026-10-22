@@ -123,6 +123,11 @@
       ],
       "evidence": [
         {
+          "type": "lab-reproduction",
+          "reference": "https://github.com/opena2a-org/damn-vulnerable-ai-agent/blob/6dd0c4434a9cc8b4d61e3ea5efa9fd42d0273f57/scenarios/prompt-to-lateral-movement/README.md",
+          "date": "2026-10-06"
+        },
+        {
           "type": "honeypot-telemetry",
           "reference": "https://api.oa2a.org/api/v1/threat-matrix",
           "date": "2026-10-19",
@@ -195,6 +200,13 @@
           "relationship": "relatedMatch",
           "note": "ATLAS 2026.09 Discover LLM System Information: probing to learn the model's constraints and guardrail behaviour"
         }
+      ],
+      "evidence": [
+        {
+          "type": "lab-reproduction",
+          "reference": "https://github.com/opena2a-org/damn-vulnerable-ai-agent/blob/3ca7415a17a834885ceaec35d1cfed125c2fe3ac/scenarios/behavioral-drift-to-exfil/README.md",
+          "date": "2026-04-22"
+        }
       ]
     },
     {
@@ -241,7 +253,14 @@
         "7.4"
       ],
       "wildPrevalence": 0,
-      "wildSampleCount": 0
+      "wildSampleCount": 0,
+      "evidence": [
+        {
+          "type": "lab-reproduction",
+          "reference": "https://github.com/opena2a-org/damn-vulnerable-ai-agent/blob/53112b4c9fea1a1facd1827aa95f30f154e16e24/scenarios/atc-forgery-attack/README.md",
+          "date": "2026-03-25"
+        }
+      ]
     },
     {
       "id": "T-1007",
@@ -920,6 +939,13 @@
           "relationship": "relatedMatch",
           "note": "ATLAS 2026.09 AI Agent Tool Invocation: driving a tool call with attacker-chosen parameters"
         }
+      ],
+      "evidence": [
+        {
+          "type": "lab-reproduction",
+          "reference": "https://github.com/opena2a-org/damn-vulnerable-ai-agent/blob/6dd0c4434a9cc8b4d61e3ea5efa9fd42d0273f57/scenarios/prompt-to-lateral-movement/README.md",
+          "date": "2026-10-06"
+        }
       ]
     },
     {
@@ -1126,6 +1152,13 @@
           "id": "AML.T0053",
           "relationship": "relatedMatch",
           "note": "ATLAS 2026.09 AI Agent Tool Invocation: using tool access to reach successive MCP servers"
+        }
+      ],
+      "evidence": [
+        {
+          "type": "lab-reproduction",
+          "reference": "https://github.com/opena2a-org/damn-vulnerable-ai-agent/blob/6dd0c4434a9cc8b4d61e3ea5efa9fd42d0273f57/scenarios/prompt-to-lateral-movement/README.md",
+          "date": "2026-10-06"
         }
       ]
     },

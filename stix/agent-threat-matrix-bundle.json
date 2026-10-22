@@ -178,6 +178,11 @@
           "description": "closeMatch: ATLAS 2026.09 Discover AI Agent Configuration: Tool Definitions: enumerating the tools the agent exposes"
         },
         {
+          "source_name": "lab-reproduction",
+          "url": "https://github.com/opena2a-org/damn-vulnerable-ai-agent/blob/6dd0c4434a9cc8b4d61e3ea5efa9fd42d0273f57/scenarios/prompt-to-lateral-movement/README.md",
+          "description": "lab-reproduction evidence dated 2026-10-06"
+        },
+        {
           "source_name": "honeypot-telemetry",
           "url": "https://api.oa2a.org/api/v1/threat-matrix",
           "description": "honeypot-telemetry evidence dated 2026-10-19: The wildPrevalence and wildSampleCount this endpoint served for the technique on this date; they measure engagement with a honeypot, not a production attack rate."
@@ -252,6 +257,11 @@
           "external_id": "AML.T0069",
           "url": "https://atlas.mitre.org/techniques/AML.T0069",
           "description": "relatedMatch: ATLAS 2026.09 Discover LLM System Information: probing to learn the model's constraints and guardrail behaviour"
+        },
+        {
+          "source_name": "lab-reproduction",
+          "url": "https://github.com/opena2a-org/damn-vulnerable-ai-agent/blob/3ca7415a17a834885ceaec35d1cfed125c2fe3ac/scenarios/behavioral-drift-to-exfil/README.md",
+          "description": "lab-reproduction evidence dated 2026-04-22"
         }
       ],
       "kill_chain_phases": [
@@ -306,6 +316,11 @@
           "source_name": "agent-threat-matrix",
           "external_id": "T-1006",
           "url": "https://threats.opena2a.org/techniques/T-1006"
+        },
+        {
+          "source_name": "lab-reproduction",
+          "url": "https://github.com/opena2a-org/damn-vulnerable-ai-agent/blob/53112b4c9fea1a1facd1827aa95f30f154e16e24/scenarios/atc-forgery-attack/README.md",
+          "description": "lab-reproduction evidence dated 2026-03-25"
         }
       ],
       "kill_chain_phases": [
@@ -949,6 +964,11 @@
           "external_id": "AML.T0053",
           "url": "https://atlas.mitre.org/techniques/AML.T0053",
           "description": "relatedMatch: ATLAS 2026.09 AI Agent Tool Invocation: driving a tool call with attacker-chosen parameters"
+        },
+        {
+          "source_name": "lab-reproduction",
+          "url": "https://github.com/opena2a-org/damn-vulnerable-ai-agent/blob/6dd0c4434a9cc8b4d61e3ea5efa9fd42d0273f57/scenarios/prompt-to-lateral-movement/README.md",
+          "description": "lab-reproduction evidence dated 2026-10-06"
         }
       ],
       "kill_chain_phases": [
@@ -1138,6 +1158,11 @@
           "external_id": "AML.T0053",
           "url": "https://atlas.mitre.org/techniques/AML.T0053",
           "description": "relatedMatch: ATLAS 2026.09 AI Agent Tool Invocation: using tool access to reach successive MCP servers"
+        },
+        {
+          "source_name": "lab-reproduction",
+          "url": "https://github.com/opena2a-org/damn-vulnerable-ai-agent/blob/6dd0c4434a9cc8b4d61e3ea5efa9fd42d0273f57/scenarios/prompt-to-lateral-movement/README.md",
+          "description": "lab-reproduction evidence dated 2026-10-06"
         }
       ],
       "kill_chain_phases": [

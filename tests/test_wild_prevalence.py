@@ -21,9 +21,9 @@ import pytest
 ROOT = Path(__file__).resolve().parent.parent
 API_URL = "https://api.oa2a.org/api/v1/threat-matrix"
 FILES = ("matrix.json", "technique-ids.json", "schema/threat-matrix-v1.2.schema.json",
-         "schema/consumer-readiness.json", "scripts/validate_matrix.py",
-         "scripts/generate_stix.py", "scripts/sync_wild_prevalence.py",
-         "stix/agent-threat-matrix-bundle.json", "evidence-gaps.json")
+         "schema/consumer-readiness.json", "schema/evidence-sources.schema.json",
+         "scripts/validate_matrix.py", "scripts/generate_stix.py", "scripts/sync_wild_prevalence.py",
+         "stix/agent-threat-matrix-bundle.json", "evidence-gaps.json", "evidence-sources.json")
 STIX = "stix/agent-threat-matrix-bundle.json"
 TELEMETRY = "honeypot-telemetry"
 
@@ -298,9 +298,15 @@ def test_sync_keeps_a_read_date_older_than_today_and_still_moves_updated(tree):
     assert matrix["updated"] == today()
 
 
+def kept(t: dict) -> list:
+    """The entries of a technique that do not cite the endpoint, which the sync keeps."""
+    return [e for e in t.get("evidence", []) if e["type"] != TELEMETRY]
+
+
 def test_sync_dates_each_telemetry_entry_with_the_read_and_the_tree_validates(tree):
+    original = load(tree)
     read = (date.today() - timedelta(days=3)).isoformat()
-    payload = write_payload(tree, served(load(tree)))
+    payload = write_payload(tree, served(original))
     proc = run_sync(tree, "--payload", str(payload), "--read-date", read)
     assert proc.returncode == 0, proc.stdout + proc.stderr
     assert (f"and a {TELEMETRY} evidence entry dated {read} on the 2 with a wildSampleCount above 0"
@@ -308,9 +314,13 @@ def test_sync_dates_each_telemetry_entry_with_the_read_and_the_tree_validates(tr
     matrix = load(tree)
     ids = [t["id"] for t in matrix["techniques"]]
     for tid in ids[1:3]:
-        [entry] = technique(matrix, tid)["evidence"]
+        # The entries that do not cite the endpoint stay first, as they were; the one
+        # telemetry entry follows them.
+        *others, entry = technique(matrix, tid)["evidence"]
+        assert others == kept(technique(original, tid)), tid
         assert (entry["type"], entry["reference"], entry["date"]) == (TELEMETRY, API_URL, read), tid
-    assert load(tree, "evidence-gaps.json")["ids"] == sorted(set(ids) - set(ids[1:3]))
+    backed = {t["id"] for t in original["techniques"] if kept(t)}
+    assert load(tree, "evidence-gaps.json")["ids"] == sorted(set(ids) - set(ids[1:3]) - backed)
     validated = run_validator(tree)
     assert validated.returncode == 0, validated.stdout + validated.stderr
 
@@ -325,12 +335,15 @@ def test_sync_keeps_evidence_entries_that_do_not_cite_the_endpoint(tree):
     payload = write_payload(tree, served(matrix))
     proc = run_sync(tree, "--payload", str(payload), "--read-date", today())
     assert proc.returncode == 0, proc.stdout + proc.stderr
+    shipped = load(ROOT)
     matrix = load(tree)
-    # Served samples: the other entry stays first and the telemetry entry follows it.
+    # Served samples: the other entries stay first, in their order, and the telemetry entry
+    # follows them.
     assert [(e["type"], e["reference"]) for e in technique(matrix, ids[1])["evidence"]] == [
-        ("publication", other["reference"]), (TELEMETRY, API_URL)]
-    # Served none: the other entry stays and no telemetry entry is written.
-    assert technique(matrix, ids[5])["evidence"] == [other]
+        ("publication", other["reference"])] + [
+        (e["type"], e["reference"]) for e in kept(technique(shipped, ids[1]))] + [(TELEMETRY, API_URL)]
+    # Served none: the other entries stay and no telemetry entry is written.
+    assert technique(matrix, ids[5])["evidence"] == [other] + kept(technique(shipped, ids[5]))
 
 
 def test_sync_drops_an_evidence_array_it_leaves_empty(tree):
