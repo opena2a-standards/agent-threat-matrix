@@ -38,7 +38,12 @@ a link destination, a link title, two table cells, an autolink or an HTML attrib
 A tag inside the name whose quoted attribute value holds "<" or ">", as in 'DV<b x="<">AA'
 and "DV<b title='>'>AA", leaves the name showing "DVAA" too, as its own paragraph and
 between "<div>" and "</div>": the check read no DVAA on either line and exited 0, and each
-must now go red on both figures. Written with a combining mark directly after it, or with
+must now go red on both figures. A numeric character reference with no closing ";", or with
+more digits than CommonMark reads, written inside the name in an HTML block, as in
+"DVA&#65", leaves the name showing "DVAA" too, as a browser decodes it there where it stands
+as written, before it reads any tag, so "&#x30<b>D<x\\>VAA" shows "0DVAA": each such line
+must go red on both figures, and each line the check read as naming DVAA before must still
+go red. Written with a combining mark directly after it, or with
 a "!" inside it that does not stand before a "[", the name does not name DVAA; on a line
 that also carries a character that fails it, a mark directly after the name leaves the
 line naming DVAA, and the line goes red. The three steps README states for reading the
@@ -1271,6 +1276,159 @@ def test_a_name_in_an_html_block_hidden_by_a_tag_a_browser_reads_leaves_the_line
         shutil.rmtree(td)
 
 
+# DVAA written in an HTML block with a numeric character reference that CommonMark does not
+# read, as it has no closing ";" or more than seven decimal or six hexadecimal digits. A
+# browser decodes each there, so each line shows "DVAA (99 agents, ...)", the last with
+# U+0301 over the last A, which is kept apart from the name, as in "DVAA&#x301;", since it is
+# written as a reference. The check decoded a reference only as CommonMark reads one, found
+# no DVAA on any of these lines and exited 0.
+HTML_BLOCK_REFERENCE_NAMES = [
+    ("decimal reference with no closing ;", "DVA&#65"),
+    ("hexadecimal reference with no closing ;", "DVA&#x41"),
+    ("hexadecimal reference with an X and no closing ;", "DVA&#X41"),
+    ("decimal reference ended by a letter", "DV&#65A"),
+    ("decimal reference with eight digits", "DVA&#00000065;"),
+    ("hexadecimal reference with seven digits", "DVA&#x0000041;"),
+    ("reference to U+200B with no closing ;", "DV&#8203AA"),
+    ("reference to U+0301 with no closing ; after the name", "DVA&#65&#x301"),
+    # A browser reads a reference where it stands as written, before it reads any tag, so
+    # "<" ends "&#x30" and the line shows "0DVAA (99 agents, ...)". Decoded once the tags
+    # are removed, "&#x30D" would stand for U+030D before "VAA" and the reading would find
+    # no DVAA on the line.
+    ("reference with no closing ; ended by a tag before the name", "&#x30<b>D<x\\>VAA"),
+    ("references with no closing ; on both sides of a tag", "&#x3<b>DVA&#65"),
+]
+
+
+@pytest.mark.parametrize("written", [w for _, w in HTML_BLOCK_REFERENCE_NAMES],
+                         ids=[case for case, _ in HTML_BLOCK_REFERENCE_NAMES])
+def test_a_name_in_an_html_block_written_with_a_reference_a_browser_reads_leaves_the_line_read(
+        written):
+    td = scratch_tree()
+    try:
+        figures = f"{written} (99 agents, 77 vulnerability categories)"
+        mutate_readme(td, LICENSE_LINE, f"{LICENSE_LINE}\n<div>\n{figures}\n</div>\n")
+        line = where_of(td, figures)
+        r = run_checker(td)
+        assert r.returncode == 1, r.stdout
+        for failure in (
+            f"{line}: \"99 agents\" does not match related-projects.json "
+            "(DVAA agents: 21)",
+            f"{line}: \"77 vulnerability categories\" does not match "
+            "related-projects.json (DVAA vulnerability categories: 12)",
+        ):
+            assert failure in r.stderr, r.stderr
+    finally:
+        shutil.rmtree(td)
+
+
+# Lines the check read as naming DVAA before it decoded a reference with no closing ";" or
+# with more digits than CommonMark reads, as a browser does in an HTML block: the reading
+# that removes the tags a browser reads and leaves such a reference as written, decoding
+# the others once the HTML is removed, finds "DVAA" on each, and it is kept, so each line
+# still fails on both figures. Decoded where it stands, "&#x3D" stands for "=" and the line
+# shows "=VAA (99 agents, ...)", and "&#6" stands for U+0006 before "5;".
+NAMES_READ_BEFORE = [
+    ("hexadecimal reference with no closing ; before a tag", "&#x3DV<x\\>AA"),
+    ("decimal reference with its ; past a tag", "DVA&#6<x\\>5;"),
+]
+
+
+@pytest.mark.parametrize("written", [w for _, w in NAMES_READ_BEFORE],
+                         ids=[case for case, _ in NAMES_READ_BEFORE])
+def test_a_line_read_as_naming_dvaa_before_references_were_decoded_as_written_still_is(
+        written):
+    checker = load_checker()
+    assert checker.holds(checker.name_form(written, checker.HtmlBlockHtml()), "DVAA")
+    assert not checker.holds(checker.name_form(written, checker.HtmlBlockHtml(),
+                                               references=checker.HTML_BLOCK_REFERENCE), "DVAA")
+    td = scratch_tree()
+    try:
+        figures = f"{written} (99 agents, 77 vulnerability categories)"
+        mutate_readme(td, LICENSE_LINE, f"{LICENSE_LINE}\n<div>\n{figures}\n</div>\n")
+        line = where_of(td, figures)
+        r = run_checker(td)
+        assert r.returncode == 1, r.stdout
+        for failure in (
+            f"{line}: \"99 agents\" does not match related-projects.json "
+            "(DVAA agents: 21)",
+            f"{line}: \"77 vulnerability categories\" does not match "
+            "related-projects.json (DVAA vulnerability categories: 12)",
+        ):
+            assert failure in r.stderr, r.stderr
+    finally:
+        shutil.rmtree(td)
+
+
+# What a line reads as in the HTML block reading that decodes a numeric character reference
+# with or without a closing ";" and whatever its number of digits, where it stands as
+# written, as a browser reads one before it reads any tag: the decimal digits end at a
+# letter, while the hexadecimal digits run on over "A", so "&#x41A" stands for U+041A; a
+# tag or a Markdown character ends the digits, so "&#x30<b>D" stands for "0" before the
+# "D", and "&#6**5" for U+0006, a control character, before the "5"; a number past
+# U+10FFFF stands for U+FFFD; "&#" or "&#x" with no digit after it is no reference; and a
+# named reference is read as CommonMark reads one, only with its ";". Decoded once the tags
+# and the Markdown characters are removed, "&#x30<b>D" would stand for U+030D, a combining
+# mark, and the line would read U+030D "VAA", naming no DVAA.
+HTML_BLOCK_FORMS = [
+    ("decimal reference with no closing ;", "DVA&#65", "DVAA"),
+    ("hexadecimal reference with no closing ;", "DVA&#x41", "DVAA"),
+    ("decimal digits ended by a letter", "DV&#65A", "DVAA"),
+    ("hexadecimal digits running on over a letter", "DV&#x41A",
+     "DV\N{CYRILLIC CAPITAL LETTER KA}"),
+    ("decimal reference with eight digits", "DVA&#00000065;", "DVAA"),
+    ("hexadecimal reference with seven digits", "DVA&#x0000041;", "DVAA"),
+    ("reference to U+200B with no closing ;", "DV&#8203AA", "DVAA"),
+    ("number past U+10FFFF", "DVA&#1114112 A", "DVA\N{REPLACEMENT CHARACTER} A"),
+    ("no decimal digit", "DVA&#;A", "DVA&#;A"),
+    ("no hexadecimal digit", "DVA&#xyA", "DVA&#xyA"),
+    ("named reference with no closing ;", "DV&ampAA", "DV&ampAA"),
+    ("hexadecimal digits ended by a tag before a hexadecimal letter", "&#x30<b>D<x\\>VAA",
+     "0DVAA"),
+    ("hexadecimal digits ended by a tag before a digit", "DVA&#x4<b>1", "DVA1"),
+    ("decimal digits ended by a Markdown character", "DV&#6**5**A", "DV5A"),
+    ("references on both sides of a tag", "&#x3<b>DVA&#65", "DVAA"),
+    ("reference to a star", "DV&#42AA", "DV*AA"),
+]
+
+
+@pytest.mark.parametrize("text,form", [(t, f) for _, t, f in HTML_BLOCK_FORMS],
+                         ids=[case for case, _, _ in HTML_BLOCK_FORMS])
+def test_the_html_block_reading_decodes_a_numeric_reference_as_stated(text, form):
+    checker = load_checker()
+    assert checker.name_form(text, checker.HtmlBlockHtml(),
+                             references=checker.HTML_BLOCK_REFERENCE) == form
+    assert stated_name_form(checker, text, html_block=True, references=True) == form
+
+
+@pytest.mark.parametrize("digits", ["0" * 100_000 + "65", "x" + "0" * 100_000 + "41"],
+                         ids=["decimal", "hexadecimal"])
+def test_a_reference_with_any_number_of_digits_is_decoded_in_linear_time(digits):
+    # html.unescape reads the digits of a decimal reference with int, which by default
+    # refuses a string of more than 4,300 digits with a ValueError. Read with its leading
+    # zeros dropped, each reference stands for "A", and each line, of 100,000 zeros, is read
+    # in about 0.01 s on Python 3.14.
+    checker = load_checker()
+    start = time.perf_counter()
+    assert checker.names(f"DVA&#{digits}", "DVAA")
+    seconds = time.perf_counter() - start
+    assert seconds < 3, f"{seconds:.2f} s"
+
+
+def test_a_reference_with_more_digits_than_u10ffff_has_stands_for_u_fffd():
+    # Once its leading zeros are dropped, a reference with more digits than U+10FFFF has,
+    # seven decimal or six hexadecimal, is a number past U+10FFFF, which a browser reads as
+    # U+FFFD, as html.unescape gives for such a number of fewer digits: the 5,000 nines are
+    # more digits than int reads by default. A reference of fewer digits reads as
+    # html.unescape gives it.
+    checker = load_checker()
+    for reference in ("&#" + "9" * 5_000, "&#x" + "F" * 7, "&#00001114112;", "&#x110000"):
+        assert checker.reference_text(reference) == "\N{REPLACEMENT CHARACTER}", reference
+    assert html.unescape("&#1114112;") == "\N{REPLACEMENT CHARACTER}"
+    for reference in ("&#65", "&#00000065", "&#x0000041;", "&#1114111", "&#X10fffd", "&#0"):
+        assert checker.reference_text(reference) == html.unescape(reference), reference
+
+
 def test_a_tag_name_a_browser_reads_is_removed_only_in_the_html_block_reading():
     checker = load_checker()
     for written in ("DV<x\\>AA", "D<D\\\\</b>VAA", "DV<x\N{NO-BREAK SPACE}<y>AA",
@@ -1999,6 +2157,24 @@ def stated_html_end(line, i, any_space=True, html_block=False, quoted=False):
     return None
 
 
+def stated_numeric_end(line, i):
+    """Where the numeric character reference a browser reads at the "&" at line[i] in an
+    HTML block ends, as the line is written, or None: "&#" and the decimal digits after it
+    or "&#x" or "&#X" and the hexadecimal digits after it run over every such digit and over
+    a ";" directly after them, and need one digit or more."""
+    if not line.startswith("&#", i):
+        return None
+    j, digits = i + 2, string.digits
+    if line[j:j + 1] in ("x", "X"):
+        j, digits = j + 1, string.hexdigits
+    first = j
+    while j < len(line) and line[j] in digits:
+        j += 1
+    if j == first:
+        return None
+    return j + 1 if line[j:j + 1] == ";" else j
+
+
 def stated_reference_end(text, i):
     """Where the character reference CommonMark reads at the "&" at text[i] ends, or None."""
     end = text.find(";", i)
@@ -2065,18 +2241,26 @@ def stated_defined_labels(text):
 
 
 def stated_name_form(checker, line, any_space=True, labels=None, html_block=False,
-                     quoted=False):
+                     quoted=False, references=False):
     """`line` read by the three steps README states, as a plain scan rather than with the
     checker's patterns, with `any_space` false as in the second reading, with `labels` the
     labels the page defines, or None for the reading that removes no label, with
-    `html_block` true as in the HTML block reading, and with `quoted` true as in the reading
-    that passes over quoted attribute values. A reference is decoded by html.unescape, as
-    in the checker, and a decoded character that fails a line is dropped."""
+    `html_block` true as in the HTML block readings, with `quoted` true as in the reading
+    that passes over quoted attribute values, and with `references` true, beside
+    `html_block`, as in the HTML block reading that decodes each numeric reference where it
+    stands as written, with or without a closing ";" and whatever its number of digits. A
+    reference is decoded by html.unescape, as in the checker, and a decoded character that
+    fails a line is dropped."""
+    def shown(reference):
+        return [c for c in html.unescape(reference) if not checker.hiding_kind(c)]
+
     # First, going along the line, its HTML is removed wherever it stands, the character a
     # backslash escapes and the text of each code span are kept as text, each pair marked,
-    # and a "]" goes with the link label after it where the label is blank or defined.
+    # and a "]" goes with the link label after it where the label is blank or defined; with
+    # `references`, what a numeric reference shows, decoded where it stands, is kept as text
+    # too.
     pairs = stated_first_step(line, any_space, labels=labels, html_block=html_block,
-                              quoted=quoted)[0]
+                              quoted=quoted, shown=shown if references else None)[0]
     # Second, going along what remains, each "]" followed by "(" goes with the text after it
     # to the first ")" if no further "(" comes first, then each "!" directly before a "[",
     # and then the Markdown characters, none of them kept as text.
@@ -2109,7 +2293,7 @@ def stated_name_form(checker, line, any_space=True, labels=None, html_block=Fals
             run = "".join(c for c, _ in kept[i:j])
             end = stated_reference_end(run, 0)
             if end is not None:
-                text.extend(c for c in html.unescape(run[:end]) if not checker.hiding_kind(c))
+                text.extend(shown(run[:end]))
                 i += end
                 continue
         text.append(kept[i][0])
@@ -2145,12 +2329,15 @@ def stated_run_end(line, i):
 
 
 def stated_first_step(line, any_space=True, spans=True, labels=None, html_block=False,
-                      quoted=False):
+                      quoted=False, shown=None):
     """(pairs, open): `line` after the first step README states, each character with
     whether it is kept as text, and whether the lines after it read no code span. A "]"
     directly followed by a link label that is blank or in `labels` goes with the label,
     which is not read further; with `labels` None no label goes. HTML is removed as
-    `stated_html_end` reads it with `any_space`, `html_block` and `quoted`."""
+    `stated_html_end` reads it with `any_space`, `html_block` and `quoted`. With `shown`,
+    which gives the characters a reference shows, each numeric reference
+    `stated_numeric_end` reads at an "&" reached here, where it stands as written, goes with
+    those characters, each kept as text."""
     out, i, reading, unmatched = [], 0, spans, False
     while i < len(line):
         c = line[i]
@@ -2206,6 +2393,12 @@ def stated_first_step(line, any_space=True, spans=True, labels=None, html_block=
                                         or stated_label_key(line[i + 2:end - 1]) in labels):
                     i = end
                     continue
+        elif c == "&" and shown is not None:
+            end = stated_numeric_end(line, i)
+            if end is not None:
+                out.extend((s, True) for s in shown(line[i:end]))
+                i = end
+                continue
         out.append((c, False))
         i += 1
     return out, not reading or unmatched
@@ -2214,16 +2407,19 @@ def stated_first_step(line, any_space=True, spans=True, labels=None, html_block=
 # The generated lines are made of characters the first two steps act on, among them the
 # backtick, the backslash, "|" and "'" that decide where code spans are read, and, for two
 # pieces in five, of longer pieces: the openings and closes of HTML, character references,
-# white space other than a space, and characters NFKC or the confusables read as A, D or V
-# or leave beside them. Cases above pin orders of steps on their own: removing each "!"
-# before the link spans rather than after them ("exclamation mark before a link span"),
-# and in the second reading letting only a space and "/" end a tag name ("tab after a tag
-# name in the second reading") or only a space and a tab ("slash after a tag name in the
-# second reading").
+# among them numeric ones that only the HTML block reading decodes, with no closing ";" or
+# more digits than CommonMark reads, and ones whose digits a tag, a Markdown character or
+# a letter ends as written, white space other than a space, and characters NFKC or
+# the confusables read as A, D or V or leave beside them. Cases above pin orders of steps on
+# their own: removing each "!" before the link spans rather than after them ("exclamation
+# mark before a link span"), and in the second reading letting only a space and "/" end a
+# tag name ("tab after a tag name in the second reading") or only a space and a tab ("slash
+# after a tag name in the second reading").
 MARKUP_CHARACTERS = "[]()DVAx \"*_~`\\<>|'"
 PIECES = [
     *"/-!?=1&#;\t", "<x", "</A", "<!--", "-->", "<?", "?>", "<![CDATA[", "]]>", "<!",
     "&#68;", "&#x41;", "&#8203;", "&DD;", "&amp;", "&ast;", "&lowbar;",
+    "&#86", "&#x41", "&#X44", "&#00000065;", "&#x0000056;", "&#x301", "&#x3", "&#6",
     "\N{NO-BREAK SPACE}", "\N{IDEOGRAPHIC SPACE}", "\N{COMBINING ACUTE ACCENT}",
     "\N{LATIN CAPITAL LETTER A WITH ACUTE}", "\N{CYRILLIC CAPITAL LETTER A}",
     "\N{FULLWIDTH LATIN CAPITAL LETTER A}", "\N{LATIN CAPITAL LETTER AV}",
@@ -2249,9 +2445,12 @@ def test_the_stated_steps_read_every_generated_line_as_the_checker_does():
     # line as the first does. A line
     # where "/" or white space after a tag name is followed by a quote before any "<" or ">"
     # is also read with each quoted attribute value passed over whole; on any other line
-    # that way reads the line as the first does. A line holding "][" is also read with the
-    # labels in STATED_LABELS removed, the first way and, where they apply, the HTML block
-    # way and the quoted value way.
+    # that way reads the line as the first does. A line where "&" stands directly before "#"
+    # is also read the HTML block way with each numeric reference decoded where it stands as
+    # written, with or without a closing ";" and whatever its number of digits; on any other
+    # line that way reads the line as the HTML block way does. A line holding "][" is also
+    # read with the labels in STATED_LABELS removed, the first way and, where they apply,
+    # the HTML block ways and the quoted value way.
     checker = load_checker()
     rng = random.Random(80)
     for _ in range(STATED_LINES):
@@ -2272,6 +2471,13 @@ def test_the_stated_steps_read_every_generated_line_as_the_checker_does():
             assert checker.name_form(line, checker.QUOTED_HTML) == quoted, ascii(line)
         else:
             assert quoted == plain, ascii(line)
+        decoded = stated_name_form(checker, line, html_block=True, references=True)
+        if "&#" in line:
+            assert (checker.name_form(line, checker.HtmlBlockHtml(),
+                                      references=checker.HTML_BLOCK_REFERENCE)
+                    == decoded), ascii(line)
+        else:
+            assert decoded == block, ascii(line)
         if "][" in line:
             assert (checker.name_form(line, labels=STATED_LABELS)
                     == stated_name_form(checker, line, labels=STATED_LABELS)), ascii(line)
@@ -2283,6 +2489,12 @@ def test_the_stated_steps_read_every_generated_line_as_the_checker_does():
             if checker.QUOTE_AFTER_TAG_NAME.search(line):
                 stated = stated_name_form(checker, line, labels=STATED_LABELS, quoted=True)
                 assert (checker.name_form(line, checker.QUOTED_HTML, labels=STATED_LABELS)
+                        == stated), ascii(line)
+            if "&#" in line:
+                stated = stated_name_form(checker, line, labels=STATED_LABELS,
+                                          html_block=True, references=True)
+                assert (checker.name_form(line, checker.HtmlBlockHtml(), labels=STATED_LABELS,
+                                          references=checker.HTML_BLOCK_REFERENCE)
                         == stated), ascii(line)
 
 
@@ -2501,6 +2713,12 @@ def test_a_mark_after_markup_or_written_as_a_reference_is_put_apart():
                      "DVA\N{CYRILLIC CAPITAL LETTER A}\N{COMBINING ACUTE ACCENT}",
                      "DVAA&#65;"):
         assert checker.detached(attached) == attached
+    # In the HTML block reading a reference with no closing ";" is a reference too, and one
+    # to a mark is put apart; as CommonMark reads references, the line holds none, and
+    # nothing is put apart.
+    assert (checker.detached("DVA&#65&#x301", checker.HTML_BLOCK_REFERENCE)
+            == "DVA&#65" + checker.BREAK + "&#x301")
+    assert checker.detached("DVA&#65&#x301") == "DVA&#65&#x301"
     # No ASCII character is a combining mark, so none after the name needs a lookup.
     assert not any(checker.is_mark(code) for code in range(128))
 
