@@ -1228,15 +1228,20 @@ def test_a_name_written_with_markup_a_reference_or_a_confusable_letter_leaves_th
 
 
 # DVAA written in an HTML block, between "<div>" and "</div>", where a browser reads a tag
-# name to white space, "/" or ">": "<x\>" is a tag named "x\" and "<D\\</b>" a tag named
-# "d\\<" with an attribute "b", so each line shows "DVAA (99 agents, ...)". Both were read
-# as text, as a tag name of ASCII letters, digits and hyphens ends at neither "\" nor "<",
-# and the check found no DVAA on the line and exited 0.
+# name to a tab, line feed, form feed, space, "/" or ">": "<x\>" is a tag named "x\",
+# "<D\\</b>" a tag named "d\\<" with an attribute "b", and "<x" U+00A0 "<y>" a tag named
+# "x" U+00A0 "<y", so each line shows "DVAA (99 agents, ...)". Each was read as text, as a
+# tag name of ASCII letters, digits and hyphens ends at "\" and "<", and one that runs to
+# white space ends at U+00A0 and U+3000 IDEOGRAPHIC SPACE, and the check found no DVAA on
+# the line and exited 0. U+00A0 and U+3000 are written as escapes, as saved raw they read
+# as the space beside them.
 LICENSE_LINE = "Apache-2.0. The framework is free to use, cite, and build upon.\n"
 HTML_BLOCK_NAMES = [
     ("plain name", "DVAA"),
     ("tag with a backslash in its name", "DV<x\\>AA"),
     ("tag with a backslash and a < in its name", "D<D\\\\</b>VAA"),
+    ("tag with U+00A0 and a < in its name", "DV<x\N{NO-BREAK SPACE}<y>AA"),
+    ("tag with U+3000 and a < in its name", "DV<x\N{IDEOGRAPHIC SPACE}<y>AA"),
 ]
 
 
@@ -1264,7 +1269,8 @@ def test_a_name_in_an_html_block_hidden_by_a_tag_a_browser_reads_leaves_the_line
 
 def test_a_tag_name_a_browser_reads_is_removed_only_in_the_html_block_reading():
     checker = load_checker()
-    for written in ("DV<x\\>AA", "D<D\\\\</b>VAA"):
+    for written in ("DV<x\\>AA", "D<D\\\\</b>VAA", "DV<x\N{NO-BREAK SPACE}<y>AA",
+                    "DV<x\N{IDEOGRAPHIC SPACE}<y>AA"):
         assert checker.OTHER_CHARACTER_IN_TAG_NAME.search(written)
         assert not checker.holds(checker.name_form(written), "DVAA"), written
         assert checker.name_form(written, checker.HtmlBlockHtml()) == "DVAA", written
@@ -1280,9 +1286,13 @@ def test_a_tag_name_a_browser_reads_is_removed_only_in_the_html_block_reading():
         line = "".join(rng.choice(pieces) for _ in range(rng.randint(1, 16)))
         assert (checker.step_one(line, checker.HtmlBlockHtml())
                 == checker.step_one(line, checker.HTML_BLOCK_HTML)), ascii(line)
-    # Where every tag name ends at white space, "/", ">" or the end of the line, the
-    # reading is not added.
-    assert not checker.OTHER_CHARACTER_IN_TAG_NAME.search("DV<b>AA <i x='1'> <br/> <a")
+    # Where every tag name ends at a tab, a space, "/", ">" or the end of the line, the
+    # reading is not added; white space other than a tab or space does not end a tag name
+    # in an HTML block, so a tag name followed by it adds the reading.
+    assert not checker.OTHER_CHARACTER_IN_TAG_NAME.search("DV<b>AA <i x='1'> <br/> <a\t<p")
+    for space in ("\N{NO-BREAK SPACE}", "\N{IDEOGRAPHIC SPACE}", "\N{EM SPACE}"):
+        assert checker.OTHER_CHARACTER_IN_TAG_NAME.search(f"DV<b{space}x>AA"), ascii(space)
+        assert checker.HTML_BLOCK_TAG_NAME.match(f"b{space}x>").end() == 3, ascii(space)
 
 
 def test_one_html_block_reading_reads_a_line_alike_each_time():
@@ -1312,7 +1322,8 @@ def test_one_html_block_reading_reads_a_line_alike_each_time():
 
 
 @pytest.mark.parametrize("line", ["DV" + "<a" * 50_000, "DV" + "<a\\" * 40_000 + "AA",
-                                  "DV" + "<a</" * 30_000 + "AA"])
+                                  "DV" + "<a</" * 30_000 + "AA",
+                                  "DV" + "<a\N{NO-BREAK SPACE}" * 40_000 + "AA"])
 def test_the_html_block_reading_reads_a_long_line_in_linear_time(line):
     # A tag name in that reading can hold "<", so a tag that finds no ">" takes its name
     # past every "<" after it; looked for again from each "<" on a line of "<a", every
@@ -1791,7 +1802,7 @@ def stated_html_end(line, i, any_space=True, html_block=False):
     a space or tab follows a tag name, only a space, a tab or "/" lets a tag run on past
     its name to a ">". With `html_block` true, as in the reading README states where
     another character follows a tag name, the name after its first letter runs on over any
-    character other than white space, "/" and ">"."""
+    character other than a tab, line feed, form feed, space, "/" and ">"."""
     for opening, close in (("<!--", "-->"), ("<?", "?>"), ("<![CDATA[", "]]>")):
         if line.startswith(opening, i):
             end = line.find(close, i + len(opening))
@@ -1803,7 +1814,7 @@ def stated_html_end(line, i, any_space=True, html_block=False):
     if not ascii_letter_at(line, j):
         return None
     j += 1
-    while j < len(line) and (not (line[j].isspace() or line[j] in "/>") if html_block
+    while j < len(line) and (line[j] not in "\t\n\f />" if html_block
                              else line[j] in TAG_NAME):
         j += 1
     if j < len(line) and line[j] == ">":
@@ -2057,8 +2068,9 @@ def test_the_stated_steps_read_every_generated_line_as_the_checker_does():
     # with white space other than a space or tab is also read the second way README states,
     # with only a space, a tab or "/" ending a tag name; on any other line the two ways
     # remove the same HTML. A line where a tag name is followed by another character, such
-    # as "\" or "<", is also read the HTML block way, with a tag name running to white
-    # space, "/" or ">"; on any other line that way reads the line as the first does. A line
+    # as "\", "<" or U+00A0, is also read the HTML block way, with a tag name running to a
+    # tab, line feed, form feed, space, "/" or ">"; on any other line that way reads the
+    # line as the first does. A line
     # holding "][" is also read with the labels in STATED_LABELS removed, the first way and,
     # where it applies, the HTML block way.
     checker = load_checker()

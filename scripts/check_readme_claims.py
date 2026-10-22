@@ -81,10 +81,13 @@ ASCII letters, digits and hyphens, to a > right after the name or, after / or a 
 Unicode lists as white space (such as U+00A0 NO-BREAK SPACE), to the first > after that
 if no < comes first. Where white space other than a space or tab follows a tag name, the
 line is also read with only a space, a tab or / ending a tag name. Where a character other
-than an ASCII letter, digit, hyphen, white space, / or > follows a tag name, such as \\ or
-<, the line is also read as a browser reads a tag in an HTML block, with a name that is an
-ASCII letter followed by any characters other than white space, / and >, so "DV<x\\>AA"
-and "D<D\\\\</b>VAA" name DVAA. The line names DVAA when any reading does. On the way, as
+than an ASCII letter, digit, hyphen, tab, line feed, form feed, space, / or > follows a tag
+name, such as \\, < or U+00A0, the line is also read as a browser reads a tag in an HTML
+block, with a name that is an ASCII letter followed by any characters other than a tab,
+line feed, form feed, space, / and >, the six characters at which a browser ends a tag
+name, so that U+00A0 and U+3000 IDEOGRAPHIC SPACE do not end one: "DV<x\\>AA",
+"D<D\\\\</b>VAA" and "DV<x" U+00A0 "<y>AA" name DVAA. The line names DVAA when any
+reading does. On the way, as
 CommonMark reads them, the character a \\ escapes and
 the text of a code span are kept as text, which no later step reads as markup, HTML, a
 link span or a character reference, and the \\ and the backticks around the code span are
@@ -344,20 +347,24 @@ SPACE_OR_TAB_HTML = re.compile(
 # text.
 OTHER_SPACE_AFTER_TAG_NAME = re.compile(r"</?[A-Za-z][A-Za-z0-9-]*[^\S \t]")
 
-# RAW_HTML with a tag name of an ASCII letter followed by any characters other than white
-# space, "/" and ">", as a browser reads a tag in an HTML block: "<x\>" is a tag named "x\",
-# and "<D\\</b>" a tag named "d\\<" with an attribute "b", so "DV<x\>AA" and "D<D\\</b>VAA"
-# between "<div>" and "</div>" show "DVAA".
+# RAW_HTML with a tag name of an ASCII letter followed by any characters other than a tab,
+# line feed, form feed, space, "/" and ">", as a browser reads a tag in an HTML block, where
+# those six characters alone end a tag name: "<x\>" is a tag named "x\", "<D\\</b>" a tag
+# named "d\\<" with an attribute "b", and "<x" U+00A0 "<y>" a tag named "x" U+00A0 "<y", so
+# "DV<x\>AA", "D<D\\</b>VAA" and "DV<x" U+00A0 "<y>AA" between "<div>" and "</div>" show
+# "DVAA". After the name, only a tab, line feed, form feed, space or "/" lets the tag run on
+# to a ">", so a match takes the name to the first of the six: no shorter name is followed
+# by one of them.
 HTML_BLOCK_HTML = re.compile(
-    RAW_HTML.pattern.replace(r"[A-Za-z0-9-]*(?:[\s/]", r"[^\s/>]*(?:[\s/]"))
+    RAW_HTML.pattern.replace(r"[A-Za-z0-9-]*(?:[\s/]", r"[^\t\n\f />]*(?:[\t\n\f /]"))
 
-# A tag name followed by a character other than an ASCII letter, digit, hyphen, white space,
-# "/" or ">", such as "\" or "<": only on a line that holds one do RAW_HTML and
-# HTML_BLOCK_HTML remove different text.
-OTHER_CHARACTER_IN_TAG_NAME = re.compile(r"</?[A-Za-z][A-Za-z0-9-]*[^A-Za-z0-9\s/>-]")
+# A tag name followed by a character other than an ASCII letter, digit, hyphen, tab, line
+# feed, form feed, space, "/" or ">", such as "\", "<" or U+00A0 NO-BREAK SPACE: only on a
+# line that holds one do RAW_HTML and HTML_BLOCK_HTML remove different text.
+OTHER_CHARACTER_IN_TAG_NAME = re.compile(r"</?[A-Za-z][A-Za-z0-9-]*[^A-Za-z0-9\t\n\f />-]")
 
 # The tag name HTML_BLOCK_HTML reads from its first letter.
-HTML_BLOCK_TAG_NAME = re.compile(r"[^\s/>]*")
+HTML_BLOCK_TAG_NAME = re.compile(r"[^\t\n\f />]*")
 
 
 class HtmlBlockHtml:
@@ -927,9 +934,10 @@ def names(stripped, name, hiding=False, spans=True, labels=None):
     removed names `name`: it `holds` `name` as it stands or in its `name_form`, read with
     `RAW_HTML` and, where a tag name is followed by white space other than a space or
     tab, with `SPACE_OR_TAB_HTML` too, and where a tag name is followed by a character
-    other than an ASCII letter, digit, hyphen, white space, "/" or ">", as a browser reads a
-    tag in an HTML block too, with `HtmlBlockHtml`: "DV<x\\>AA" and "D<D\\\\</b>VAA" name
-    DVAA. Each name form removes a "]" directly followed by a
+    other than an ASCII letter, digit, hyphen, tab, line feed, form feed, space, "/" or ">",
+    as a browser reads a tag in an HTML block too, with `HtmlBlockHtml`: "DV<x\\>AA",
+    "D<D\\\\</b>VAA" and "DV<x" U+00A0 "<y>AA" name DVAA. Each name form removes a "]"
+    directly followed by a
     link label that is blank or in `labels`, the labels the page holding the line defines,
     with that label; where a "]" stands directly before a "[", the line is also read with no
     label removed, as it is with `labels` None, in each of those readings, one
