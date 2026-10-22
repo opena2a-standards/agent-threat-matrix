@@ -73,13 +73,13 @@
         },
         "oasbControls": { "type": "array", "items": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+$" } },
         "wildPrevalence": {
-          "description": "The wildPrevalence the registry endpoint in wildPrevalenceSource served for this technique on the read date: a percentage from 0 to 100, and 0 where it served none. Written by scripts/sync_wild_prevalence.py, not by hand. Read it with wildSampleCount and the read date. It does not set or change evidenceTier.",
+          "description": "The wildPrevalence the registry endpoint in wildPrevalenceSource served for this technique on the read date, and 0 where it served none. The registry computes it from its honeypot telemetry as callbacks per page visit in the technique's category: callbacks divided by page visits, as a percentage rounded to two decimals and capped at 100, and 0 where the category has no page visits. The callbacks are the canary fires in the technique's category and the payload callbacks of the payloads mapped to the technique. It measures engagement with a honeypot, not a production attack rate. Written by scripts/sync_wild_prevalence.py, not by hand. Read it with wildSampleCount and the read date. It does not set or change evidenceTier.",
           "type": "number",
           "minimum": 0,
           "maximum": 100
         },
         "wildSampleCount": {
-          "description": "The wildSampleCount the same endpoint served with wildPrevalence: a whole number of samples, and 0 where it served none. 0 means the technique has no wild samples behind it.",
+          "description": "The wildSampleCount the same endpoint served with wildPrevalence, and 0 where it served none: the callbacks plus the page visits behind that wildPrevalence, a whole number. 0 means the technique has no wild samples behind it.",
           "type": "integer",
           "minimum": 0,
           "x-semantic": "must be above 0 wherever wildPrevalence is above 0"
@@ -95,7 +95,11 @@
           "items": { "type": "string" },
           "x-semantic": "every value must be the id of an entry in the top-level dataSources[] registry"
         },
-        "evidence": { "type": "array", "items": { "$ref": "#/$defs/evidenceEntry" } },
+        "evidence": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/evidenceEntry" },
+          "x-semantic": "every entry must resolve to a source scripts/validate_matrix.py reads, and no entry may repeat another's type, reference and date: a honeypot-telemetry entry resolves when its reference is the wildPrevalenceSource url, its date is the wildPrevalenceSource read date and the technique's wildSampleCount is above 0; no other reference resolves"
+        },
         "status": {
           "description": "Absent means active.",
           "enum": ["draft", "active", "deprecated"]

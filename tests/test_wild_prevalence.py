@@ -23,8 +23,9 @@ API_URL = "https://api.oa2a.org/api/v1/threat-matrix"
 FILES = ("matrix.json", "technique-ids.json", "schema/threat-matrix-v1.2.schema.json",
          "schema/consumer-readiness.json", "scripts/validate_matrix.py",
          "scripts/generate_stix.py", "scripts/sync_wild_prevalence.py",
-         "stix/agent-threat-matrix-bundle.json")
+         "stix/agent-threat-matrix-bundle.json", "evidence-gaps.json")
 STIX = "stix/agent-threat-matrix-bundle.json"
+TELEMETRY = "honeypot-telemetry"
 
 
 def today() -> str:
@@ -251,9 +252,16 @@ def test_sync_writes_both_fields_on_every_technique_and_zero_where_none_is_serve
     assert f"Not listed by the endpoint, written as 0: {ids[-1]}" in proc.stdout, proc.stdout
     assert "Listed by the endpoint but not in matrix.json, left out: T-9999" in proc.stdout, proc.stdout
 
+    # The two techniques served samples carry one honeypot-telemetry entry citing this read,
+    # and the others carry none: the entries the shipped file holds for the earlier read go.
+    for t in matrix["techniques"]:
+        expected = [(API_URL, today())] if t["id"] in ids[1:3] else []
+        assert [(e["reference"], e["date"]) for e in t.get("evidence", []) if e["type"] == TELEMETRY] \
+            == expected, t["id"]
+
     # No other field moves: every technique keeps the rest of its record, and the file
     # keeps every other top-level value.
-    strip = ("wildPrevalence", "wildSampleCount")
+    strip = ("wildPrevalence", "wildSampleCount", "evidence")
     for old, new in zip(original["techniques"], matrix["techniques"]):
         assert {k: v for k, v in new.items() if k not in strip} == {k: v for k, v in old.items() if k not in strip}
     skip = ("updated", "techniques", "wildPrevalenceSource")
@@ -288,6 +296,64 @@ def test_sync_keeps_a_read_date_older_than_today_and_still_moves_updated(tree):
     matrix = load(tree)
     assert matrix["wildPrevalenceSource"]["read"] == read
     assert matrix["updated"] == today()
+
+
+def test_sync_dates_each_telemetry_entry_with_the_read_and_the_tree_validates(tree):
+    read = (date.today() - timedelta(days=3)).isoformat()
+    payload = write_payload(tree, served(load(tree)))
+    proc = run_sync(tree, "--payload", str(payload), "--read-date", read)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert (f"and a {TELEMETRY} evidence entry dated {read} on the 2 with a wildSampleCount above 0"
+            in proc.stdout), proc.stdout
+    matrix = load(tree)
+    ids = [t["id"] for t in matrix["techniques"]]
+    for tid in ids[1:3]:
+        [entry] = technique(matrix, tid)["evidence"]
+        assert (entry["type"], entry["reference"], entry["date"]) == (TELEMETRY, API_URL, read), tid
+    assert load(tree, "evidence-gaps.json")["ids"] == sorted(set(ids) - set(ids[1:3]))
+    validated = run_validator(tree)
+    assert validated.returncode == 0, validated.stdout + validated.stderr
+
+
+def test_sync_keeps_evidence_entries_that_do_not_cite_the_endpoint(tree):
+    matrix = load(tree)
+    ids = [t["id"] for t in matrix["techniques"]]
+    other = {"type": "publication", "reference": "https://example.org/paper", "date": "2026-01-01"}
+    for tid in (ids[1], ids[5]):
+        technique(matrix, tid)["evidence"] = [dict(other)] + technique(matrix, tid).get("evidence", [])
+    dump(tree, matrix)
+    payload = write_payload(tree, served(matrix))
+    proc = run_sync(tree, "--payload", str(payload), "--read-date", today())
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    matrix = load(tree)
+    # Served samples: the other entry stays first and the telemetry entry follows it.
+    assert [(e["type"], e["reference"]) for e in technique(matrix, ids[1])["evidence"]] == [
+        ("publication", other["reference"]), (TELEMETRY, API_URL)]
+    # Served none: the other entry stays and no telemetry entry is written.
+    assert technique(matrix, ids[5])["evidence"] == [other]
+
+
+def test_sync_drops_an_evidence_array_it_leaves_empty(tree):
+    shipped = technique(load(tree), "T-2001")
+    assert [e["type"] for e in shipped["evidence"]] == [TELEMETRY]
+    payload = served(load(tree))
+    assert all(e["id"] != "T-2001" or e["wildSampleCount"] == 0 for e in payload["techniques"])
+    proc = run_sync(tree, "--payload", str(write_payload(tree, payload)), "--read-date", today())
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert "evidence" not in technique(load(tree), "T-2001")
+    assert "T-2001" in load(tree, "evidence-gaps.json")["ids"]
+
+
+def test_sync_refuses_evidence_that_is_not_an_array_and_writes_nothing(tree):
+    matrix = load(tree)
+    matrix["techniques"][0]["evidence"] = "see the audit"
+    dump(tree, matrix)
+    before = (tree / "matrix.json").read_bytes()
+    proc = run_sync(tree, "--payload", str(write_payload(tree, served(matrix))), "--read-date", today())
+    assert proc.returncode == 1, proc.stdout + proc.stderr
+    assert (f"FAIL: {matrix['techniques'][0]['id']}: evidence in matrix.json is not an array; "
+            f"matrix.json is unchanged") in proc.stderr, proc.stderr
+    assert (tree / "matrix.json").read_bytes() == before
 
 
 def _entry(**values):

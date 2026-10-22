@@ -5,11 +5,15 @@ The registry endpoint ``API_URL`` serves ``wildPrevalence`` and ``wildSampleCoun
 techniques it lists. This script reads the endpoint once and, on each technique of
 matrix.json, writes the two values the endpoint serves for the technique with the same
 id, or 0 for both where the endpoint serves no value for it or does not list it. It
-records the endpoint and the read date in the top-level ``wildPrevalenceSource`` and
-writes no other technique field. When that changes matrix.json it also moves ``updated``
-to today if it is older, as scripts/validate_matrix.py requires of any change, and renders
-the STIX bundle again with scripts/generate_stix.py, whose objects take their
-``modified`` date from ``updated``.
+records the endpoint and the read date in the top-level ``wildPrevalenceSource``. In
+``evidence`` it writes the ``honeypot-telemetry`` entry that cites the same read: one on
+each technique the endpoint served a ``wildSampleCount`` above 0 for, with the endpoint as
+its reference and the read date as its date, after the technique's other entries, and
+none on the others. It leaves every other evidence entry as it was, drops an ``evidence``
+array it leaves empty, and writes no other technique field. When that changes matrix.json
+it also moves ``updated`` to today if it is older, as scripts/validate_matrix.py requires
+of any change, and renders the STIX bundle and evidence-gaps.json again with
+scripts/generate_stix.py, whose objects take their ``modified`` date from ``updated``.
 
 Usage::
 
@@ -24,8 +28,9 @@ parse, holds no technique list, lists an entry without a string id or one id twi
 lists none of the technique ids in matrix.json; a ``wildPrevalence`` or ``wildSampleCount``
 that is an integer too large to convert to a 64-bit float, which JSON allows and
 scripts/validate_matrix.py reports as not a finite number; a ``wildPrevalence`` that is not
-a number from 0 to 100; a ``wildSampleCount`` that is not a whole number of 0 or more; and a
-``wildPrevalence`` above 0 served with a ``wildSampleCount`` of 0.
+a number from 0 to 100; a ``wildSampleCount`` that is not a whole number of 0 or more; a
+``wildPrevalence`` above 0 served with a ``wildSampleCount`` of 0; and a technique in
+matrix.json whose ``evidence`` is not an array.
 
 Exit 0 when matrix.json was written or already held the values, 1 when the response is
 refused or the STIX bundle cannot be rendered, 2 on a usage error (a ``--read-date`` that
@@ -47,6 +52,9 @@ ROOT = Path(__file__).resolve().parent.parent
 MATRIX = ROOT / "matrix.json"
 STIX_GENERATOR = ROOT / "scripts" / "generate_stix.py"
 API_URL = "https://api.oa2a.org/api/v1/threat-matrix"
+TELEMETRY = "honeypot-telemetry"
+TELEMETRY_NOTE = ("The wildPrevalence and wildSampleCount this endpoint served for the technique on "
+                  "this date; they measure engagement with a honeypot, not a production attack rate.")
 # The first line of the docstring, which ``python3 -OO`` strips.
 DESCRIPTION = ("Read each technique's wild prevalence and wild sample count from the registry "
                "into matrix.json.")
@@ -107,6 +115,26 @@ def served_values(payload) -> dict:
     return values
 
 
+def cites_the_endpoint(entry) -> bool:
+    """Whether an evidence entry is the honeypot-telemetry entry this script writes."""
+    return isinstance(entry, dict) and entry.get("type") == TELEMETRY and entry.get("reference") == API_URL
+
+
+def write_telemetry_entry(technique: dict, samples: int, read_date: str) -> None:
+    """Leave the technique one entry citing this read if the endpoint served samples for it,
+    after its other entries, and none otherwise."""
+    evidence = technique.get("evidence", [])
+    if not isinstance(evidence, list):
+        raise Refused(f"{technique['id']}: evidence in matrix.json is not an array")
+    kept = [entry for entry in evidence if not cites_the_endpoint(entry)]
+    if samples > 0:
+        kept.append({"type": TELEMETRY, "reference": API_URL, "date": read_date, "note": TELEMETRY_NOTE})
+    if kept:
+        technique["evidence"] = kept
+    else:
+        technique.pop("evidence", None)
+
+
 def apply(matrix: dict, values: dict, read_date: str) -> dict:
     """Write the served values onto the techniques of matrix; return what was written."""
     ids = [t["id"] for t in matrix["techniques"]]
@@ -121,11 +149,13 @@ def apply(matrix: dict, values: dict, read_date: str) -> dict:
             absent.append(technique["id"])
         technique["wildPrevalence"] = prevalence
         technique["wildSampleCount"] = samples
+        write_telemetry_entry(technique, samples, read_date)
     matrix["wildPrevalenceSource"] = {"url": API_URL, "read": read_date}
     return {
         "absent": absent,
         "unlisted": sorted(set(values) - set(ids)),
         "aboveZero": sum(1 for t in matrix["techniques"] if t["wildPrevalence"] > 0),
+        "withSamples": sum(1 for t in matrix["techniques"] if t["wildSampleCount"] > 0),
     }
 
 
@@ -201,8 +231,9 @@ def main(argv=None) -> int:
         return 1
 
     print(f"Wrote wildPrevalence and wildSampleCount on {len(matrix['techniques'])} techniques from "
-          f"{API_URL}, read {read_date}: {report['aboveZero']} above 0. updated is "
-          f"{matrix['updated']} and the STIX bundle is rendered again.")
+          f"{API_URL}, read {read_date}: {report['aboveZero']} above 0, and a {TELEMETRY} evidence "
+          f"entry dated {read_date} on the {report['withSamples']} with a wildSampleCount above 0. "
+          f"updated is {matrix['updated']} and the STIX bundle and evidence-gaps.json are rendered again.")
     if report["absent"]:
         print(f"Not listed by the endpoint, written as 0: {', '.join(report['absent'])}")
     if report["unlisted"]:

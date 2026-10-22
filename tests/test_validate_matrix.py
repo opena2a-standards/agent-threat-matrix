@@ -19,7 +19,7 @@ import pytest
 ROOT = Path(__file__).resolve().parent.parent
 FILES = ("matrix.json", "technique-ids.json", "schema/threat-matrix-v1.2.schema.json",
          "schema/consumer-readiness.json", "scripts/validate_matrix.py",
-         "scripts/generate_stix.py", "stix/agent-threat-matrix-bundle.json")
+         "scripts/generate_stix.py", "stix/agent-threat-matrix-bundle.json", "evidence-gaps.json")
 
 
 def scratch_tree(td: Path = None) -> Path:
@@ -82,7 +82,7 @@ def test_shipped_tree_is_green():
 
 def test_committed_files_not_perturbed():
     proc = subprocess.run(["git", "-C", str(ROOT), "status", "--porcelain", "--",
-                           "matrix.json", "technique-ids.json", "stix", "schema"],
+                           "matrix.json", "technique-ids.json", "stix", "schema", "evidence-gaps.json"],
                           capture_output=True, text=True, timeout=30)
     if proc.returncode == 0:
         assert proc.stdout.strip() == "", proc.stdout
@@ -948,3 +948,176 @@ def test_shipped_updated_is_no_older_than_the_last_matrix_change():
                            "--", "matrix.json"], capture_output=True, text=True, timeout=30, env=GIT_ENV)
     assert last.returncode == 0, last.stderr
     assert load(ROOT, "matrix.json")["updated"] >= last.stdout.strip()
+
+
+# --------------------------------------------------------------------------- S15 evidence references
+
+TELEMETRY = "honeypot-telemetry"
+
+
+def technique_of(matrix: dict, tid: str) -> dict:
+    return next(t for t in matrix["techniques"] if t["id"] == tid)
+
+
+def run_with_evidence(tid: str, entry: dict, render: bool = True):
+    """Append entry to the evidence of technique tid in a scratch tree, render the STIX
+    bundle again unless render is False, and validate the tree.
+
+    Returns the process and the position the entry took in the technique's evidence[].
+    """
+    position = {}
+
+    def fn(root):
+        m = load(root, "matrix.json")
+        evidence = technique_of(m, tid).setdefault("evidence", [])
+        position["index"] = len(evidence)
+        evidence.append(entry)
+        dump(root, "matrix.json", m)
+        if render:
+            regenerate_stix(root)
+    proc = mutate(fn)
+    return proc, position["index"]
+
+
+def test_evidence_fixture_with_a_dead_reference_is_red():
+    # A path the registry endpoint does not serve: no source the validator reads stands
+    # behind it, so the entry would cite a page nobody read.
+    source = load(ROOT, "matrix.json")["wildPrevalenceSource"]
+    dead = source["url"] + "/retired"
+    proc, index = run_with_evidence("T-2001", {"type": TELEMETRY, "reference": dead, "date": source["read"]})
+    _red(proc, f"S15 T-2001: evidence[{index}] reference {dead!r} does not resolve: a honeypot-telemetry "
+               f"reference resolves only to the endpoint wildPrevalenceSource names, {source['url']}")
+
+
+def test_telemetry_entry_dated_other_than_the_read_is_red():
+    source = load(ROOT, "matrix.json")["wildPrevalenceSource"]
+    proc, index = run_with_evidence("T-2001", {"type": TELEMETRY, "reference": source["url"],
+                                               "date": "2026-01-01"})
+    _red(proc, f"S15 T-2001: evidence[{index}] reference {source['url']!r} does not resolve: its date "
+               f"2026-01-01 is not {source['read']}, the date wildPrevalenceSource says the endpoint was read")
+
+
+def test_telemetry_entry_on_a_technique_the_endpoint_served_no_samples_for_is_red():
+    matrix = load(ROOT, "matrix.json")
+    assert technique_of(matrix, "T-1001")["wildSampleCount"] == 0
+    source = matrix["wildPrevalenceSource"]
+    proc, index = run_with_evidence("T-1001", {"type": TELEMETRY, "reference": source["url"],
+                                               "date": source["read"]})
+    _red(proc, f"S15 T-1001: evidence[{index}] reference {source['url']!r} does not resolve: the endpoint "
+               f"served no samples for the technique on {source['read']}: its wildSampleCount is 0")
+
+
+@pytest.mark.parametrize("kind", ["observation", "lab-reproduction", "publication", "advisory"])
+def test_reference_of_a_kind_the_validator_reads_no_source_for_is_red(kind):
+    reference = "https://example.org/no-such-page"
+    proc, index = run_with_evidence("T-1001", {"type": kind, "reference": reference, "date": "2026-01-01"})
+    _red(proc, f"S15 T-1001: evidence[{index}] reference {reference!r} does not resolve: the validator "
+               f"reads no {kind} source, so it cannot show the reference was read")
+
+
+def test_repeated_evidence_entry_is_red():
+    matrix = load(ROOT, "matrix.json")
+    entry = dict(technique_of(matrix, "T-2001")["evidence"][0])
+    proc, index = run_with_evidence("T-2001", entry)
+    _red(proc, f"S15 T-2001: evidence[{index}] repeats evidence[0] (the same type, reference and date)")
+
+
+def test_evidence_reference_that_is_not_a_url_is_red_and_cannot_be_rendered():
+    reference = "the vendor advisory"
+    proc, index = run_with_evidence("T-1001", {"type": "advisory", "reference": reference,
+                                               "date": "2026-01-01"}, render=False)
+    _red(proc, f"S15 T-1001: evidence[{index}] reference {reference!r} does not resolve")
+    assert (f"S10 scripts/generate_stix.py failed: FAIL: T-1001: evidence reference {reference!r} "
+            f"is not an https URL") in proc.stderr, proc.stderr
+
+
+def test_shipped_telemetry_entries_cite_the_read_on_each_technique_with_samples():
+    matrix = load(ROOT, "matrix.json")
+    source = matrix["wildPrevalenceSource"]
+    for t in matrix["techniques"]:
+        cites = [e for e in t.get("evidence", []) if e["type"] == TELEMETRY]
+        if t["wildSampleCount"] > 0:
+            assert [(e["reference"], e["date"]) for e in cites] == [(source["url"], source["read"])], t["id"]
+        else:
+            assert cites == [], t["id"]
+
+
+def test_stix_attack_patterns_carry_each_evidence_reference():
+    matrix = load(ROOT, "matrix.json")
+    bundle = load(ROOT, "stix/agent-threat-matrix-bundle.json")
+    patterns = {o["external_references"][0]["external_id"]: o for o in bundle["objects"]
+                if o["type"] == "attack-pattern"}
+    carried = 0
+    for t in matrix["techniques"]:
+        evidence = t.get("evidence", [])
+        refs = patterns[t["id"]]["external_references"]
+        tail = refs[len(refs) - len(evidence):] if evidence else []
+        assert [(r["source_name"], r["url"]) for r in tail] == [(e["type"], e["reference"]) for e in evidence], t["id"]
+        assert all(r["description"].startswith(f"{e['type']} evidence dated {e['date']}")
+                   for r, e in zip(tail, evidence)), t["id"]
+        carried += len(evidence)
+    assert carried == sum(len(t.get("evidence", [])) for t in matrix["techniques"]) > 0
+
+
+# --------------------------------------------------------------------------- S16 evidence gap list
+
+
+def gap_ids(matrix: dict) -> list:
+    return sorted(t["id"] for t in matrix["techniques"] if not t.get("evidence"))
+
+
+def test_shipped_gap_list_names_every_technique_without_evidence():
+    matrix = load(ROOT, "matrix.json")
+    assert load(ROOT, "evidence-gaps.json")["ids"] == gap_ids(matrix)
+
+
+def test_generator_prints_the_techniques_left_without_evidence():
+    root = scratch_tree()
+    try:
+        (root / "evidence-gaps.json").unlink()
+        proc = subprocess.run(["python3", str(root / "scripts" / "generate_stix.py")],
+                              capture_output=True, text=True, timeout=120)
+        assert proc.returncode == 0, proc.stdout + proc.stderr
+        matrix = load(root, "matrix.json")
+        gaps = gap_ids(matrix)
+        assert (f"{root / 'evidence-gaps.json'}: {len(gaps)} of {len(matrix['techniques'])} techniques "
+                f"carry no evidence entry: {', '.join(gaps)}") in proc.stdout, proc.stdout
+        assert (root / "evidence-gaps.json").read_bytes() == (ROOT / "evidence-gaps.json").read_bytes()
+    finally:
+        shutil.rmtree(root)
+
+
+def test_gap_list_follows_the_evidence_when_the_files_are_rendered_again():
+    def fn(root):
+        m = load(root, "matrix.json")
+        del technique_of(m, "T-2001")["evidence"]
+        dump(root, "matrix.json", m)
+        regenerate_stix(root)
+        assert "T-2001" in load(root, "evidence-gaps.json")["ids"]
+    proc = mutate(fn)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+
+
+def test_s16_gap_list_edited_by_hand_is_red():
+    def fn(root):
+        gaps = load(root, "evidence-gaps.json")
+        gaps["ids"] = gaps["ids"][1:]
+        dump(root, "evidence-gaps.json", gaps)
+    _red(mutate(fn), "S16 evidence-gaps.json is not what scripts/generate_stix.py renders from matrix.json")
+
+
+def test_s16_gap_list_out_of_step_with_the_evidence_is_red():
+    def fn(root):
+        m = load(root, "matrix.json")
+        del technique_of(m, "T-2001")["evidence"]
+        dump(root, "matrix.json", m)
+        path = root / "stix" / "agent-threat-matrix-bundle.json"
+        subprocess.run(["python3", str(root / "scripts" / "generate_stix.py"), "--output", str(path),
+                        "--gaps-output", str(root / "unused-gaps.json")],
+                       check=True, capture_output=True, text=True, timeout=120)
+    _red(mutate(fn), "S16 evidence-gaps.json is not what scripts/generate_stix.py renders from matrix.json")
+
+
+def test_s16_missing_gap_list_is_red():
+    _red(mutate(lambda root: (root / "evidence-gaps.json").unlink()),
+         "S16 evidence-gaps.json is missing; run scripts/generate_stix.py")
