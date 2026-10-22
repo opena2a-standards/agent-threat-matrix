@@ -45,15 +45,25 @@ the check, signature or sensor field that uses it for this technique, as in
 does not hold has no name to show, so the check fails for that page and leaves its Data
 Sources line as it is.
 
+The ``## References`` section lists the technique's ``evidence`` entries too, in
+matrix.json order, one line each directly under the Tactic link: the entry's type and date,
+its reference as a link, then its note after a period where it has one, as in
+``- Evidence: honeypot-telemetry dated 2026-10-19, [<url>](<url>). <note>``. No other line
+of the page outside fenced code blocks starts ``- Evidence: ``, so a page whose technique
+carries no entry has none. The section linked only the technique's attack class and tactic
+pages while the STIX bundle already carried the entries of 26 techniques.
+
 Run with ``--fix`` to rewrite those lines, the Mitigation section and the tactic pages from
 the data, to drop a Severity line, an Evidence Gap line or a Data Sources line the data does
-not back, to add a missing Evidence Gap line directly under the Evidence Tier line, and to
-add a missing Data Sources line directly under the OASB Controls line. Every other line of a
-technique page is left alone. Any other missing technique-page line, a repeated line or
+not back, to add a missing Evidence Gap line directly under the Evidence Tier line, to add a
+missing Data Sources line directly under the OASB Controls line, and to write the Evidence
+lines directly under the Tactic link, dropping every other Evidence line. Every other line of
+a technique page is left alone. Any other missing technique-page line, a repeated line or
 Mitigation section, and a missing Mitigation section have no single place to write the data
-to, a Mitigation section that holds a fenced code block may hold the rest of the page
-behind an unclosed fence, and a control with no title or a source with no name has no line
-to write, so ``--fix`` reports each of them and still exits 1.
+to, nor do the Evidence lines of a technique that carries entries on a page with no Tactic
+link or more than one, a Mitigation section that holds a fenced code block may hold the rest
+of the page behind an unclosed fence, and a control with no title or a source with no name
+has no line to write, so ``--fix`` reports each of them and still exits 1.
 
 A read of matrix.json that raises an OSError, a ValueError or a RecursionError (see
 ``read_json``) is reported in one line on standard error,
@@ -63,11 +73,13 @@ does not hold what this check needs from it (see ``SHAPE``), in the line
 ``FAIL: matrix.json parses but has the wrong shape: <reason>``: an object whose
 ``techniques`` array holds objects with a string ``id``, a ``name``, a ``tactic``, an
 ``attackClass`` and an ``evidenceTier``, a ``description`` that is absent, null or a string,
-``hmaChecks`` and ``oasbControls`` that are each absent, null or an array of strings, and
+``hmaChecks`` and ``oasbControls`` that are each absent, null or an array of strings,
 ``dataSources`` that is absent, null or an array of objects with a string ``source``, ``tool``,
-``kind`` and ``ref``, whose ``tactics`` array holds objects with a string ``id``, a ``name``, an
-``order`` and a string ``description``, and whose ``dataSources`` array holds objects with a
-string ``id`` and ``name``. related-projects.json is then read the same way, in the lines
+``kind`` and ``ref``, and an ``evidence`` that is absent, null or an array of objects, each
+with a string ``type``, ``reference`` and ``date`` and a ``note`` that is absent, null or a
+string, whose ``tactics`` array holds objects with a string ``id``, a ``name``, an ``order``
+and a string ``description``, and whose ``dataSources`` array holds objects with a string
+``id`` and ``name``. related-projects.json is then read the same way, in the lines
 ``FAIL: related-projects.json is missing or does not parse: <reason>`` and
 ``FAIL: related-projects.json parses but has the wrong shape: <reason>``: it must be an
 object whose ``oasb`` object holds a ``controlTitles`` object with a string for each
@@ -123,6 +135,8 @@ FIELD_PATTERNS = (
 FIELDS = tuple((label, re.compile(pattern, re.M), render) for label, pattern, render in FIELD_PATTERNS)
 TIER_RE = next(regex for label, regex, _ in FIELDS if label == "Evidence Tier")
 CONTROLS_RE = next(regex for label, regex, _ in FIELDS if label == "OASB Controls")
+TACTIC_LINK_RE = next(regex for label, regex, _ in FIELDS if label == "References tactic")
+EVIDENCE_RE = re.compile(r"^(?P<line>- Evidence: .*)$", re.M)
 NO_PROCEDURES_RE = re.compile(rf"^(?P<line>{re.escape(NO_PROCEDURES)})$", re.M)
 # Block structure, matched in a line from where the markers and indentation of the block
 # quotes and list items that hold it end, after tabs are expanded to stops of four columns.
@@ -380,6 +394,8 @@ def check_technique_page(technique: dict, text: str, titles: dict,
     failures.extend(source_failures)
     mitigation_failures, updated = check_mitigation(technique, updated, titles)
     failures.extend(mitigation_failures)
+    evidence_failures, updated = check_evidence_lines(technique, updated)
+    failures.extend(evidence_failures)
     return failures, updated
 
 
@@ -505,6 +521,58 @@ def check_mitigation(technique: dict, text: str, titles: dict) -> tuple[list[str
     return failures, text[:start] + "\n\n" + want + trailer + text[end:]
 
 
+def evidence_line(entry: dict) -> str:
+    """The References line of one evidence entry: its type and date, its reference as a link,
+    then its note after a period where it has one."""
+    reference = entry["reference"]
+    line = f"- Evidence: {entry['type']} dated {entry['date']}, [{reference}]({reference})"
+    note = entry.get("note")
+    return f"{line}. {note}" if note else line
+
+
+def check_evidence_lines(technique: dict, text: str) -> tuple[list[str], str]:
+    """Return the Evidence lines' disagreement with ``evidence`` and the page rewritten. The
+    lines sit directly under the Tactic link, one per entry in matrix.json order, and the
+    page has no other Evidence line. They are written only where the page has exactly one
+    Tactic link. With none or more than one, the Tactic link check reports the page, and
+    lines that differ from the entries are reported too and left as they are."""
+    tid = technique["id"]
+    entries = technique.get("evidence") or []
+    want = [evidence_line(entry) for entry in entries]
+    found = find_lines(EVIDENCE_RE, text)
+    stripped = text
+    for match in reversed(found):
+        stripped = _drop_line(stripped, match)
+    if not want:
+        if not found:
+            return [], text
+        count = "an Evidence line" if len(found) == 1 else f"{len(found)} Evidence lines"
+        return [f"{tid}: page has {count}, and matrix.json carries no evidence entry for the "
+                f"technique"], stripped
+    tactic = find_lines(TACTIC_LINK_RE, stripped)
+    if len(tactic) == 1:
+        end = tactic[0].end("line")
+        rendered = stripped[:end] + "".join("\n" + line for line in want) + stripped[end:]
+        if rendered == text:
+            return [], text
+    elif [match.group("line") for match in found] == want:
+        return [], text
+    else:
+        rendered = text
+    listed = "; ".join(f"{e['type']} {e['reference']} {e['date']}" for e in entries)
+    return [f"{tid}: References section does not list the evidence entries matrix.json carries "
+            f"({listed}), one Evidence line each in order directly under the Tactic link"], rendered
+
+
+def _drop_line(text: str, match: re.Match) -> str:
+    """Drop a line with its line break: the one after it, or the one before it when the line
+    ends a page that has no final line break."""
+    start, end = match.span("line")
+    if end < len(text):
+        return text[:start] + text[end + 1:]
+    return text[:max(start - 1, 0)]
+
+
 def _replace(text: str, match: re.Match, line: str) -> str:
     start, end = match.span("line")
     return text[:start] + line + text[end:]
@@ -625,9 +693,12 @@ def read_json(name: str):
 ANY, STRING = "any value", "a string"
 STRING_OR_NULL, STRINGS_OR_NULL = "a string or null", "an array of strings or null"
 MAPPINGS_OR_NULL = "an array of objects or null"
-OPTIONAL = (STRING_OR_NULL, STRINGS_OR_NULL, MAPPINGS_OR_NULL)
+ENTRIES_OR_NULL = "an array of evidence entries or null"
+OPTIONAL = (STRING_OR_NULL, STRINGS_OR_NULL, MAPPINGS_OR_NULL, ENTRIES_OR_NULL)
 # The keys of a technique's dataSources mapping, each joined into the Data Sources line.
 MAPPING_KEYS = ("source", "tool", "kind", "ref")
+# The keys of an evidence entry, each written into its Evidence line, and what each must hold.
+ENTRY_SHAPE = (("type", STRING), ("reference", STRING), ("date", STRING), ("note", STRING_OR_NULL))
 
 # What this check needs from matrix.json, in the order ``wrong_shape`` checks it: each array
 # and the keys of its objects, with what each must hold. An id is a string, as
@@ -638,7 +709,7 @@ SHAPE = (
     ("techniques", (("id", STRING), ("name", ANY), ("tactic", ANY), ("attackClass", ANY),
                     ("description", STRING_OR_NULL), ("hmaChecks", STRINGS_OR_NULL),
                     ("oasbControls", STRINGS_OR_NULL), ("evidenceTier", ANY),
-                    ("dataSources", MAPPINGS_OR_NULL))),
+                    ("dataSources", MAPPINGS_OR_NULL), ("evidence", ENTRIES_OR_NULL))),
     ("tactics", (("id", STRING), ("name", ANY), ("order", ANY), ("description", STRING))),
     ("dataSources", (("id", STRING), ("name", STRING))),
 )
@@ -675,6 +746,17 @@ def wrong_value(item: dict, field: str, kind: str, where: str) -> str | None:
                 return f"{where}.{field}[{n}] is {json_type(entry)}, not an object"
             for key in MAPPING_KEYS:
                 cause = wrong_value(entry, key, STRING, f"{where}.{field}[{n}]")
+                if cause is not None:
+                    return cause
+        return None
+    if kind == ENTRIES_OR_NULL:
+        if not isinstance(value, list):
+            return f"{where}.{field} is {json_type(value)}, not {kind}"
+        for n, entry in enumerate(value):
+            if not isinstance(entry, dict):
+                return f"{where}.{field}[{n}] is {json_type(entry)}, not an object"
+            for key, entry_kind in ENTRY_SHAPE:
+                cause = wrong_value(entry, key, entry_kind, f"{where}.{field}[{n}]")
                 if cause is not None:
                     return cause
         return None
@@ -769,10 +851,13 @@ def main(argv: list[str]) -> int:
             return 1
 
     mapped = sum(1 for technique in matrix["techniques"] if technique.get("dataSources"))
+    entries = sum(len(t.get("evidence") or []) for t in matrix["techniques"])
     print(f"OK: {len(matrix['techniques'])} technique pages and {len(matrix['tactics'])} tactic "
-          "pages agree with matrix.json on every data line and Mitigation section, every control "
-          f"a Mitigation section lists carries its title from {RELATED}, every adapted page "
-          "states its evidence gap, no technique page carries a Severity line, and "
+          "pages agree with matrix.json on every data line and Mitigation section, the References "
+          f"sections list the {entries} evidence {'entry' if entries == 1 else 'entries'} "
+          f"matrix.json carries, every control a Mitigation section lists carries its title from "
+          f"{RELATED}, every adapted page states its evidence gap, no technique page carries a "
+          "Severity line, and "
           f"{mapped} of {len(matrix['techniques'])} technique pages carry a Data Sources line, "
           "naming each source by its vocabulary name")
     return 0

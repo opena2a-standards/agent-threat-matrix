@@ -86,6 +86,13 @@ source. `evidence-gaps.json` lists the techniques with no entry; `scripts/genera
 writes it and the validator fails when it differs from that rendering, so a gap is closed
 by an entry that resolves, never by text.
 
+The References section of a technique's page lists each of its entries in one line,
+directly under the Tactic link and in `matrix.json` order: the entry's type and date, its
+reference as a link, then its note. `scripts/check_technique_pages.py` fails when a page's
+Evidence lines differ from the entries in `matrix.json`, and its `--fix` writes them, so the
+page cites the entries the STIX bundle carries. A technique with no entry has no Evidence
+line.
+
 ## Mapping to other registers
 
 Other registers classify evidence on their own axes. The ARIA behavioral sweep classifies a

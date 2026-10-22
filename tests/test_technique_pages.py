@@ -10,7 +10,9 @@ Checks line, the References class link and the tactic tables on the old values w
 stayed green. The Mitigation section, rendered from ``oasbControls`` with the OASB-1 control
 titles pinned in related-projects.json, the absent Severity line, the Evidence Gap line
 every adapted page carries and the Data Sources line of a technique that maps a data source
-are checked the same way.
+are checked the same way. So are the Evidence lines of the References section, one per
+``evidence`` entry directly under the Tactic link: the entries reached the STIX bundle while
+every References section linked only the technique's attack class and tactic pages.
 """
 
 import importlib.util
@@ -948,3 +950,221 @@ def test_a_source_the_vocabulary_does_not_hold_is_red_and_left_alone(tree):
     assert ("T-1001: matrix.json maps data source example-log, which the dataSources vocabulary "
             "does not hold, so the page has no name to show") in result.stdout
     assert page.read_text(encoding="utf-8") == before
+
+
+# matrix.json carried an evidence entry on 26 techniques and the STIX bundle carried each one
+# into its attack pattern, while the References section of every page linked only the
+# technique's attack class and tactic pages.
+REFERENCES_SECTION_RE = re.compile(r"^## References\n(.*?)(?=^## |\Z)", re.M | re.S)
+EVIDENCE_LINE_RE = re.compile(r"^- Evidence: .*$", re.M)
+ENDPOINT = "https://api.oa2a.org/api/v1/threat-matrix"
+T2001_LINKS = ["- Attack Class: [SOUL-INJECT](../attack-classes/SOUL-INJECT.md)",
+               "- Tactic: [initial-access](../tactics/initial-access.md)"]
+T2001_EVIDENCE = (f"- Evidence: honeypot-telemetry dated 2026-10-19, [{ENDPOINT}]({ENDPOINT}). The "
+                  "wildPrevalence and wildSampleCount this endpoint served for the technique on this "
+                  "date; they measure engagement with a honeypot, not a production attack rate.")
+T2001_NOT_LISTED = (f"T-2001: References section does not list the evidence entries matrix.json "
+                    f"carries (honeypot-telemetry {ENDPOINT} 2026-10-19), one Evidence line each in "
+                    f"order directly under the Tactic link")
+T1001_TACTIC = "- Tactic: [reconnaissance](../tactics/reconnaissance.md)\n"
+ADDED_ENTRY = {"type": "publication", "reference": "https://example.org/post", "date": "2026-10-20"}
+
+
+def evidence_line(entry: dict) -> str:
+    """An entry's Evidence line as a reader of the page sees it: the type and the date, the
+    reference as a link, then the note after a period where the entry has one."""
+    reference = entry["reference"]
+    line = f"- Evidence: {entry['type']} dated {entry['date']}, [{reference}]({reference})"
+    return f"{line}. {entry['note']}" if entry.get("note") else line
+
+
+def references(text: str) -> list[str]:
+    """The lines of a page's References section, blank lines left out."""
+    return [line for line in REFERENCES_SECTION_RE.search(text).group(1).split("\n") if line]
+
+
+def edit_technique(root: Path, tid: str, change) -> None:
+    """Apply change to technique tid in the matrix.json under root and write it back."""
+    path = root / "matrix.json"
+    matrix = json.loads(path.read_text(encoding="utf-8"))
+    change(next(t for t in matrix["techniques"] if t["id"] == tid))
+    path.write_text(json.dumps(matrix, indent=2), encoding="utf-8")
+
+
+def test_t2001_references_cite_the_endpoint_its_evidence_entry_was_read_from():
+    text = (ROOT / "techniques" / "T-2001.md").read_text(encoding="utf-8")
+    assert references(text) == T2001_LINKS + [T2001_EVIDENCE]
+
+
+@pytest.mark.parametrize("technique", TECHNIQUES, ids=[t["id"] for t in TECHNIQUES])
+def test_references_list_each_evidence_entry_under_the_tactic_link(technique):
+    text = (ROOT / "techniques" / f"{technique['id']}.md").read_text(encoding="utf-8")
+    entries = technique.get("evidence") or []
+    tactic = f"- Tactic: [{technique['tactic']}](../tactics/{technique['tactic']}.md)"
+    assert references(text)[1:] == [tactic] + [evidence_line(entry) for entry in entries]
+    assert len(EVIDENCE_LINE_RE.findall(text)) == len(entries)
+
+
+def test_every_evidence_entry_in_matrix_json_has_its_line_on_a_page():
+    entries = [entry for t in TECHNIQUES for entry in t.get("evidence") or []]
+    lines = [line for page in sorted((ROOT / "techniques").glob("*.md"))
+             for line in EVIDENCE_LINE_RE.findall(page.read_text(encoding="utf-8"))]
+    assert entries
+    assert len(lines) == len(entries)
+
+
+def test_the_checker_renders_an_entry_as_the_page_shows_it():
+    assert CHK.evidence_line(ADDED_ENTRY) == evidence_line(ADDED_ENTRY) == (
+        "- Evidence: publication dated 2026-10-20, [https://example.org/post](https://example.org/post)")
+    noted = dict(ADDED_ENTRY, note="Read in full.")
+    assert CHK.evidence_line(noted) == evidence_line(ADDED_ENTRY) + ". Read in full."
+
+
+def test_a_missing_evidence_line_is_red_and_fixed(tree):
+    page = tree / "techniques" / "T-2001.md"
+    before = page.read_text(encoding="utf-8")
+    mutate(page, T2001_EVIDENCE + "\n", "")
+
+    result = run_checker(tree)
+    assert result.returncode == 1, result.stdout
+    assert T2001_NOT_LISTED in result.stdout
+
+    assert run_checker(tree, "--fix").returncode == 0
+    assert page.read_text(encoding="utf-8") == before
+    assert run_checker(tree).returncode == 0
+
+
+STALE_EVIDENCE = [
+    ("date", T2001_EVIDENCE.replace("dated 2026-10-19", "dated 2026-10-18")),
+    ("type", T2001_EVIDENCE.replace("honeypot-telemetry", "observation")),
+    ("reference", T2001_EVIDENCE.replace(f"[{ENDPOINT}]({ENDPOINT})",
+                                         "[https://example.org/post](https://example.org/post)")),
+    ("no note", T2001_EVIDENCE.split(". The ")[0]),
+]
+
+
+@pytest.mark.parametrize("stale", [line for _, line in STALE_EVIDENCE],
+                         ids=[name for name, _ in STALE_EVIDENCE])
+def test_a_stale_evidence_line_is_red_and_fixed(tree, stale):
+    page = tree / "techniques" / "T-2001.md"
+    before = page.read_text(encoding="utf-8")
+    mutate(page, T2001_EVIDENCE, stale)
+
+    result = run_checker(tree)
+    assert result.returncode == 1, result.stdout
+    assert T2001_NOT_LISTED in result.stdout
+
+    assert run_checker(tree, "--fix").returncode == 0
+    assert page.read_text(encoding="utf-8") == before
+
+
+def test_an_evidence_line_outside_its_place_is_red_and_moved_back(tree):
+    page = tree / "techniques" / "T-2001.md"
+    before = page.read_text(encoding="utf-8")
+    mutate(page, T2001_EVIDENCE + "\n", "")
+    mutate(page, "- **Evidence Tier:** observed\n",
+           "- **Evidence Tier:** observed\n" + T2001_EVIDENCE + "\n")
+
+    result = run_checker(tree)
+    assert result.returncode == 1, result.stdout
+    assert T2001_NOT_LISTED in result.stdout
+
+    assert run_checker(tree, "--fix").returncode == 0
+    assert page.read_text(encoding="utf-8") == before
+
+
+def test_a_repeated_evidence_line_is_red_and_fixed(tree):
+    page = tree / "techniques" / "T-2001.md"
+    before = page.read_text(encoding="utf-8")
+    mutate(page, T2001_EVIDENCE + "\n", T2001_EVIDENCE + "\n" + T2001_EVIDENCE + "\n")
+
+    result = run_checker(tree)
+    assert result.returncode == 1, result.stdout
+    assert T2001_NOT_LISTED in result.stdout
+
+    assert run_checker(tree, "--fix").returncode == 0
+    assert page.read_text(encoding="utf-8") == before
+
+
+def test_an_evidence_line_on_a_technique_with_no_entry_is_red_and_dropped(tree):
+    page = tree / "techniques" / "T-1001.md"
+    before = page.read_text(encoding="utf-8")
+    mutate(page, T1001_TACTIC, T1001_TACTIC + T2001_EVIDENCE + "\n")
+
+    result = run_checker(tree)
+    assert result.returncode == 1, result.stdout
+    assert ("T-1001: page has an Evidence line, and matrix.json carries no evidence entry for "
+            "the technique") in result.stdout
+
+    assert run_checker(tree, "--fix").returncode == 0
+    assert page.read_text(encoding="utf-8") == before
+
+
+def test_evidence_lines_follow_an_entry_added_to_the_data(tree):
+    edit_technique(tree, "T-2001", lambda t: t["evidence"].append(ADDED_ENTRY))
+
+    result = run_checker(tree)
+    assert result.returncode == 1, result.stdout
+    assert (f"T-2001: References section does not list the evidence entries matrix.json carries "
+            f"(honeypot-telemetry {ENDPOINT} 2026-10-19; publication https://example.org/post "
+            f"2026-10-20), one Evidence line each in order directly under the Tactic link") \
+        in result.stdout
+
+    assert run_checker(tree, "--fix").returncode == 0
+    page = (tree / "techniques" / "T-2001.md").read_text(encoding="utf-8")
+    assert references(page) == T2001_LINKS + [T2001_EVIDENCE, evidence_line(ADDED_ENTRY)]
+    assert run_checker(tree).returncode == 0
+
+
+def test_evidence_lines_follow_the_entries_removed_from_the_data(tree):
+    edit_technique(tree, "T-2001", lambda t: t.pop("evidence"))
+
+    result = run_checker(tree)
+    assert result.returncode == 1, result.stdout
+    assert ("T-2001: page has an Evidence line, and matrix.json carries no evidence entry for "
+            "the technique") in result.stdout
+
+    assert run_checker(tree, "--fix").returncode == 0
+    page = (tree / "techniques" / "T-2001.md").read_text(encoding="utf-8")
+    assert references(page) == T2001_LINKS
+    assert run_checker(tree).returncode == 0
+
+
+def test_an_evidence_line_inside_a_fenced_block_is_not_a_data_line(tree):
+    page = tree / "techniques" / "T-1001.md"
+    mutate(page, "## References\n", "```markdown\n" + T2001_EVIDENCE + "\n```\n\n## References\n")
+    result = run_checker(tree)
+    assert result.returncode == 0, result.stdout
+
+
+def test_evidence_lines_with_no_tactic_link_to_go_under_are_left_alone(tree):
+    page = tree / "techniques" / "T-2001.md"
+    mutate(page, T2001_LINKS[1] + "\n", "")
+    mutate(page, T2001_EVIDENCE, T2001_EVIDENCE.replace("dated 2026-10-19", "dated 2026-10-18"))
+    stale = page.read_text(encoding="utf-8")
+
+    result = run_checker(tree)
+    assert result.returncode == 1, result.stdout
+    assert "T-2001: page has no 'References tactic' line" in result.stdout
+    assert T2001_NOT_LISTED in result.stdout
+
+    fixed = run_checker(tree, "--fix")
+    assert fixed.returncode == 1, "--fix has no Tactic link to write the lines under, so it stays red"
+    assert "FAIL: could not rewrite" in fixed.stdout
+    assert page.read_text(encoding="utf-8") == stale
+
+
+def test_evidence_lines_with_two_tactic_links_to_go_under_are_left_alone(tree):
+    page = tree / "techniques" / "T-2001.md"
+    mutate(page, T2001_EVIDENCE, T2001_EVIDENCE.replace("dated 2026-10-19", "dated 2026-10-18"))
+    mutate(page, "- **Evidence Tier:** observed\n",
+           "- **Evidence Tier:** observed\n" + T2001_LINKS[1] + "\n")
+    stale = page.read_text(encoding="utf-8")
+
+    result = run_checker(tree)
+    assert result.returncode == 1, result.stdout
+    assert "T-2001: page has 2 'References tactic' lines" in result.stdout
+    assert T2001_NOT_LISTED in result.stdout
+
+    assert run_checker(tree, "--fix").returncode == 1
+    assert page.read_text(encoding="utf-8") == stale

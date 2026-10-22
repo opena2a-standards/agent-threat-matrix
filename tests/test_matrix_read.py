@@ -296,6 +296,24 @@ SCRIPT_SHAPE_CASES = [
      shipped_with(("techniques", 0, "dataSources",
                    [{"source": "example-log", "tool": "example-sensor", "kind": "check"}])),
      "techniques[0].dataSources[0] has no ref"),
+    ("check_technique_pages.py", "evidence that is a string",
+     shipped_with(("techniques", 0, "evidence", "none")),
+     "techniques[0].evidence is a string, not an array of evidence entries or null"),
+    ("check_technique_pages.py", "an evidence entry that is a string",
+     shipped_with(("techniques", 0, "evidence", ["https://example.org/post"])),
+     "techniques[0].evidence[0] is a string, not an object"),
+    ("check_technique_pages.py", "an evidence entry with no reference",
+     shipped_with(("techniques", 0, "evidence", [{"type": "publication", "date": "2026-10-20"}])),
+     "techniques[0].evidence[0] has no reference"),
+    ("check_technique_pages.py", "an evidence type that is null",
+     shipped_with(("techniques", 1, "evidence", 0, "type", None)),
+     "techniques[1].evidence[0].type is null, not a string"),
+    ("check_technique_pages.py", "an evidence date that is a number",
+     shipped_with(("techniques", 1, "evidence", 0, "date", 20261019)),
+     "techniques[1].evidence[0].date is a number, not a string"),
+    ("check_technique_pages.py", "an evidence note that is an array",
+     shipped_with(("techniques", 1, "evidence", 0, "note", [])),
+     "techniques[1].evidence[0].note is an array, not a string or null"),
     ("check_cross_references.py", "no attackClasses key", shipped_with(("attackClasses", REMOVE)),
      "the top level has no attackClasses key"),
     ("check_cross_references.py", "a class that is a number",
@@ -332,7 +350,7 @@ READS = {
     "check_technique_pages.py": {
         None: ("techniques", "tactics", "dataSources"),
         "techniques": ("id", "name", "tactic", "attackClass", "description", "dvaaValidation",
-                       "hmaChecks", "oasbControls", "evidenceTier"),
+                       "hmaChecks", "oasbControls", "evidenceTier", "evidence"),
         "tactics": ("id", "name", "order", "description"),
     },
     "check_cross_references.py": {
@@ -357,7 +375,10 @@ def test_each_check_passes_on_the_shipped_matrix_json_reduced_to_the_keys_it_rea
         cut = {key: matrix[key] for key in keys[None]}
         for array, fields in keys.items():
             if array is not None:
-                cut[array] = [{field: item[field] for field in fields} for item in matrix[array]]
+                # evidence is absent on the techniques that carry no entry, so a key is kept
+                # where the shipped object has it.
+                cut[array] = [{field: item[field] for field in fields if field in item}
+                              for item in matrix[array]]
         (td / "matrix.json").write_text(json.dumps(cut, indent=2) + "\n", encoding="utf-8")
         proc = run(td, script)
         assert proc.returncode == 0, proc.stdout + proc.stderr
@@ -387,6 +408,8 @@ OPTIONAL_CASES = [
     ("check_technique_pages.py", "a technique with no description, hmaChecks or oasbControls",
      shipped_with(("techniques", 0, "description", REMOVE), ("techniques", 0, "hmaChecks", REMOVE),
                   ("techniques", 0, "oasbControls", REMOVE))),
+    ("check_technique_pages.py", "a technique with null evidence and an entry with a null note",
+     shipped_with(("techniques", 1, "evidence", None), ("techniques", 2, "evidence", 0, "note", None))),
     ("check_cross_references.py", "no version key", shipped_with(("version", REMOVE))),
 ]
 
