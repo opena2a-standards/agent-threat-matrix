@@ -126,8 +126,10 @@ CHALLENGE_FILE = "src/challenges/index.js"
 CHALLENGES_OPEN = "export const CHALLENGES = {"
 CHALLENGES_CLOSE = "};"
 # A challenge's key and its own properties, each on its line and applied with fullmatch: the
-# key two spaces in, its properties four. A nested object's properties sit deeper.
-CHALLENGE_KEY_RE = re.compile(r"  '([^'\\\s]+)': \{")
+# key two spaces in, its properties four. A nested object's properties sit deeper. The id
+# pattern in schema/evidence-sources.schema.json is read with ECMA-262's \s, so a key is read
+# with ECMA_SPACE, as a label is.
+CHALLENGE_KEY_RE = re.compile(rf"  '([^'\\{ECMA_SPACE}]+)': \{{")
 CHALLENGE_FIELD_RE = re.compile(r"    (id|name): '([^'\\\r\n]+)',")
 
 # Variables that would point git at a repository other than the clone.

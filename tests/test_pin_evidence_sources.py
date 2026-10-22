@@ -436,6 +436,47 @@ def test_writes_the_entries_a_dvaa_validation_backs_after_the_page_entries(tree,
     assert validated.returncode == 0, validated.stdout + validated.stderr
 
 
+def test_a_challenge_key_is_read_exactly_when_the_schema_admits_it():
+    """The schema's challenge id pattern is read with ECMA-262's \\s, which matches U+FEFF and
+    not U+001C to U+001F or U+0085, where Python's \\s is the other way round. A key holding a
+    code point either reading counts as white space is read only when the validator admits it
+    as an id."""
+    schema = load(ROOT, "schema/evidence-sources.schema.json")
+    admits = VALIDATOR.ecma_pattern(schema["$defs"]["challenge"]["properties"]["id"]["pattern"])
+    ecma_space = re.compile(f"[{VALIDATOR.ECMA_SPACE}]")
+    codes = [code for code in range(0x110000)
+             if re.match(r"\s", chr(code)) or ecma_space.match(chr(code))] + [ord("A")]
+    assert {0xFEFF, 0x1C, 0x1F, 0x85} <= set(codes)
+    for code in codes:
+        for key in (f"L1-03{chr(code)}", f"L1{chr(code)}03"):
+            match = PIN.CHALLENGE_KEY_RE.fullmatch(f"  '{key}': {{")
+            assert (match is not None and match.group(1) == key) == bool(admits.search(key)), \
+                (hex(code), key)
+
+
+def test_pins_only_the_challenge_ids_the_validator_admits(tree, dvaa):
+    """Of two keys, one holding U+0085 and one ending in U+FEFF, the script reads the first,
+    which T-2001's dvaaValidation names, and the validator passes on what it writes."""
+    named_id, refused_id = "L1\x8503", "L1-03\U0000feff"
+    text = ("export const CHALLENGES = {\n"
+            f"  '{named_id}': {{\n    id: '{named_id}',\n    name: 'Basic Prompt Injection',\n  }},\n"
+            f"  '{refused_id}': {{\n    id: '{refused_id}',\n    name: 'A key ending in U+FEFF',\n  }},\n"
+            "};\n")
+    write(dvaa.path, CHALLENGE_FILE, text)
+    head = commit(dvaa.path, "challenges", NAMED, CHALLENGE_FILE)
+    matrix = load(tree)
+    technique(matrix, "T-2001")["dvaaValidation"] = named_id
+    dump(tree, matrix)
+    proc = run_pin(tree, dvaa.path)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert load(tree, "evidence-sources.json")["dvaa"]["challenges"] == {
+        "path": CHALLENGE_FILE, "commit": head, "committed": "2026-06-15",
+        "blob": blob(dvaa.path, head, CHALLENGE_FILE),
+        "named": [{"line": 2, "id": named_id, "name": "Basic Prompt Injection"}]}
+    validated = run_validator(tree)
+    assert validated.returncode == 0, validated.stdout + validated.stderr
+
+
 def test_check_passes_on_the_dvaa_validation_pins_and_fails_on_one_edited_by_hand(tree, named):
     assert run_pin(tree, named.path).returncode == 0
     before = snapshot(tree)
