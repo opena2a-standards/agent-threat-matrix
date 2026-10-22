@@ -38,7 +38,12 @@ a link destination, a link title, two table cells, an autolink or an HTML attrib
 A tag inside the name whose quoted attribute value holds "<" or ">", as in 'DV<b x="<">AA'
 and "DV<b title='>'>AA", leaves the name showing "DVAA" too, as its own paragraph and
 between "<div>" and "</div>": the check read no DVAA on either line and exited 0, and each
-must now go red on both figures. Written with a combining mark directly after it, or with
+must now go red on both figures. A numeric character reference with no closing ";", or with
+more digits than CommonMark reads, written inside the name in an HTML block, as in
+"DVA&#65", leaves the name showing "DVAA" too, as a browser decodes it there where it stands
+as written, before it reads any tag, so "&#x30<b>D<x\\>VAA" shows "0DVAA": each such line
+must go red on both figures, and each line the check read as naming DVAA before must still
+go red. Written with a combining mark directly after it, or with
 a "!" inside it that does not stand before a "[", the name does not name DVAA; on a line
 that also carries a character that fails it, a mark directly after the name leaves the
 line naming DVAA, and the line goes red. The three steps README states for reading the
@@ -57,6 +62,19 @@ are removed with the "]" before them, also after a label the page does not defin
 same line. The line is also read with no label removed, so a definition-like line in a
 fenced code block, which CommonMark does not read as a definition, leaves the figures read,
 and a definition on another page defines nothing on this one.
+
+A browser shows no text of a style, script or template element, so "DV<style>x</style>AA
+(99 agents, 77 vulnerability categories)", set as its own paragraph after README's licence
+line, shows "DVAA (99 agents, 77 vulnerability categories)". The check removed the two tags,
+kept the text between them, read "DVxAA" and exited 0, and did so with script or template
+in place of style, and with a style start tag holding "<" in a quoted attribute value; each
+must now go red on both figures. A table of cases pins where an element starts and ends, a
+tag name ends where a browser and the HTML block reading end one, at a tab, line feed, form
+feed, space, "/" or ">", and at no other character Python's \\s matches, so that U+00A0 or
+U+3000 after the name of an element opens or closes none in any reading, the plain scan of
+the stated steps reads the element rule as the checker does on 100,000 generated lines,
+the reading that passes over quoted attribute values among them, and each of three lines
+of 50,000 elements is read with their text removed in under 3 seconds.
 
 The matrix version the README states under the title and in the framework citation is read
 against matrix.json, and a month and year on either line against the CHANGELOG.md heading
@@ -1271,6 +1289,195 @@ def test_a_name_in_an_html_block_hidden_by_a_tag_a_browser_reads_leaves_the_line
         shutil.rmtree(td)
 
 
+# DVAA written in an HTML block with a numeric character reference that CommonMark does not
+# read, as it has no closing ";" or more than seven decimal or six hexadecimal digits. A
+# browser decodes each there, so each line shows "DVAA (99 agents, ...)", the last with
+# U+0301 over the last A, which is kept apart from the name, as in "DVAA&#x301;", since it is
+# written as a reference. The check decoded a reference only as CommonMark reads one, found
+# no DVAA on any of these lines and exited 0.
+HTML_BLOCK_REFERENCE_NAMES = [
+    ("decimal reference with no closing ;", "DVA&#65"),
+    ("hexadecimal reference with no closing ;", "DVA&#x41"),
+    ("hexadecimal reference with an X and no closing ;", "DVA&#X41"),
+    ("decimal reference ended by a letter", "DV&#65A"),
+    ("decimal reference with eight digits", "DVA&#00000065;"),
+    ("hexadecimal reference with seven digits", "DVA&#x0000041;"),
+    ("reference to U+200B with no closing ;", "DV&#8203AA"),
+    ("reference to U+0301 with no closing ; after the name", "DVA&#65&#x301"),
+    # A browser reads a reference where it stands as written, before it reads any tag, so
+    # "<" ends "&#x30" and the line shows "0DVAA (99 agents, ...)". Decoded once the tags
+    # are removed, "&#x30D" would stand for U+030D before "VAA" and the reading would find
+    # no DVAA on the line.
+    ("reference with no closing ; ended by a tag before the name", "&#x30<b>D<x\\>VAA"),
+    ("references with no closing ; on both sides of a tag", "&#x3<b>DVA&#65"),
+]
+
+
+@pytest.mark.parametrize("written", [w for _, w in HTML_BLOCK_REFERENCE_NAMES],
+                         ids=[case for case, _ in HTML_BLOCK_REFERENCE_NAMES])
+def test_a_name_in_an_html_block_written_with_a_reference_a_browser_reads_leaves_the_line_read(
+        written):
+    td = scratch_tree()
+    try:
+        figures = f"{written} (99 agents, 77 vulnerability categories)"
+        mutate_readme(td, LICENSE_LINE, f"{LICENSE_LINE}\n<div>\n{figures}\n</div>\n")
+        line = where_of(td, figures)
+        r = run_checker(td)
+        assert r.returncode == 1, r.stdout
+        for failure in (
+            f"{line}: \"99 agents\" does not match related-projects.json "
+            "(DVAA agents: 21)",
+            f"{line}: \"77 vulnerability categories\" does not match "
+            "related-projects.json (DVAA vulnerability categories: 12)",
+        ):
+            assert failure in r.stderr, r.stderr
+    finally:
+        shutil.rmtree(td)
+
+
+# Lines the check read as naming DVAA before it decoded a reference with no closing ";" or
+# with more digits than CommonMark reads, as a browser does in an HTML block: the reading
+# that removes the tags a browser reads and leaves such a reference as written, decoding
+# the others once the HTML is removed, finds "DVAA" on each, and it is kept, so each line
+# still fails on both figures. Decoded where it stands, "&#x3D" stands for "=" and the line
+# shows "=VAA (99 agents, ...)", and "&#6" stands for U+0006 before "5;".
+NAMES_READ_BEFORE = [
+    ("hexadecimal reference with no closing ; before a tag", "&#x3DV<x\\>AA"),
+    ("decimal reference with its ; past a tag", "DVA&#6<x\\>5;"),
+]
+
+
+@pytest.mark.parametrize("written", [w for _, w in NAMES_READ_BEFORE],
+                         ids=[case for case, _ in NAMES_READ_BEFORE])
+def test_a_line_read_as_naming_dvaa_before_references_were_decoded_as_written_still_is(
+        written):
+    checker = load_checker()
+    assert checker.holds(checker.name_form(written, checker.HtmlBlockHtml()), "DVAA")
+    assert not checker.holds(checker.name_form(written, checker.HtmlBlockHtml(),
+                                               references=checker.HTML_BLOCK_REFERENCE), "DVAA")
+    td = scratch_tree()
+    try:
+        figures = f"{written} (99 agents, 77 vulnerability categories)"
+        mutate_readme(td, LICENSE_LINE, f"{LICENSE_LINE}\n<div>\n{figures}\n</div>\n")
+        line = where_of(td, figures)
+        r = run_checker(td)
+        assert r.returncode == 1, r.stdout
+        for failure in (
+            f"{line}: \"99 agents\" does not match related-projects.json "
+            "(DVAA agents: 21)",
+            f"{line}: \"77 vulnerability categories\" does not match "
+            "related-projects.json (DVAA vulnerability categories: 12)",
+        ):
+            assert failure in r.stderr, r.stderr
+    finally:
+        shutil.rmtree(td)
+
+
+# What a line reads as in the HTML block reading that decodes a numeric character reference
+# with or without a closing ";" and whatever its number of digits, where it stands as
+# written, as a browser reads one before it reads any tag: the decimal digits end at a
+# letter, while the hexadecimal digits run on over "A", so "&#x41A" stands for U+041A; a
+# tag or a Markdown character ends the digits, so "&#x30<b>D" stands for "0" before the
+# "D", and "&#6**5" for U+0006, a control character, before the "5"; a number past
+# U+10FFFF stands for U+FFFD; "&#" or "&#x" with no digit after it is no reference; and a
+# named reference is read as CommonMark reads one, only with its ";". Decoded once the tags
+# and the Markdown characters are removed, "&#x30<b>D" would stand for U+030D, a combining
+# mark, and the line would read U+030D "VAA", naming no DVAA.
+HTML_BLOCK_FORMS = [
+    ("decimal reference with no closing ;", "DVA&#65", "DVAA"),
+    ("hexadecimal reference with no closing ;", "DVA&#x41", "DVAA"),
+    ("decimal digits ended by a letter", "DV&#65A", "DVAA"),
+    ("hexadecimal digits running on over a letter", "DV&#x41A",
+     "DV\N{CYRILLIC CAPITAL LETTER KA}"),
+    ("decimal reference with eight digits", "DVA&#00000065;", "DVAA"),
+    ("hexadecimal reference with seven digits", "DVA&#x0000041;", "DVAA"),
+    ("reference to U+200B with no closing ;", "DV&#8203AA", "DVAA"),
+    ("number past U+10FFFF", "DVA&#1114112 A", "DVA\N{REPLACEMENT CHARACTER} A"),
+    ("no decimal digit", "DVA&#;A", "DVA&#;A"),
+    ("no hexadecimal digit", "DVA&#xyA", "DVA&#xyA"),
+    ("named reference with no closing ;", "DV&ampAA", "DV&ampAA"),
+    ("hexadecimal digits ended by a tag before a hexadecimal letter", "&#x30<b>D<x\\>VAA",
+     "0DVAA"),
+    ("hexadecimal digits ended by a tag before a digit", "DVA&#x4<b>1", "DVA1"),
+    ("decimal digits ended by a Markdown character", "DV&#6**5**A", "DV5A"),
+    ("references on both sides of a tag", "&#x3<b>DVA&#65", "DVAA"),
+    ("reference to a star", "DV&#42AA", "DV*AA"),
+]
+
+
+@pytest.mark.parametrize("text,form", [(t, f) for _, t, f in HTML_BLOCK_FORMS],
+                         ids=[case for case, _, _ in HTML_BLOCK_FORMS])
+def test_the_html_block_reading_decodes_a_numeric_reference_as_stated(text, form):
+    checker = load_checker()
+    assert checker.name_form(text, checker.HtmlBlockHtml(),
+                             references=checker.HTML_BLOCK_REFERENCE) == form
+    assert stated_name_form(checker, text, html_block=True, references=True) == form
+
+
+@pytest.mark.parametrize("digits", ["0" * 100_000 + "65", "x" + "0" * 100_000 + "41"],
+                         ids=["decimal", "hexadecimal"])
+def test_a_reference_with_any_number_of_digits_is_decoded_in_linear_time(digits):
+    # html.unescape reads the digits of a decimal reference with int, which by default
+    # refuses a string of more than 4,300 digits with a ValueError. Read with its leading
+    # zeros dropped, each reference stands for "A", and each line, of 100,000 zeros, is read
+    # in about 0.01 s on Python 3.14.
+    checker = load_checker()
+    start = time.perf_counter()
+    assert checker.names(f"DVA&#{digits}", "DVAA")
+    seconds = time.perf_counter() - start
+    assert seconds < 3, f"{seconds:.2f} s"
+
+
+def test_a_reference_with_more_digits_than_u10ffff_has_stands_for_u_fffd():
+    # Once its leading zeros are dropped, a reference with more digits than U+10FFFF has,
+    # seven decimal or six hexadecimal, is a number past U+10FFFF, which a browser reads as
+    # U+FFFD, as html.unescape gives for such a number of fewer digits: the 5,000 nines are
+    # more digits than int reads by default. A reference of fewer digits reads as
+    # html.unescape gives it.
+    checker = load_checker()
+    for reference in ("&#" + "9" * 5_000, "&#x" + "F" * 7, "&#00001114112;", "&#x110000"):
+        assert checker.reference_text(reference) == "\N{REPLACEMENT CHARACTER}", reference
+    assert html.unescape("&#1114112;") == "\N{REPLACEMENT CHARACTER}"
+    for reference in ("&#65", "&#00000065", "&#x0000041;", "&#1114111", "&#X10fffd", "&#0"):
+        assert checker.reference_text(reference) == html.unescape(reference), reference
+
+
+# DVAA set as its own paragraph after README's licence line, with a style, script or
+# template element holding text inside the name, the last a style element whose start tag
+# holds "<" in a quoted attribute value, which only the reading that passes over quoted
+# values reads as a tag. A browser shows no text of such an element, so each line shows
+# "DVAA (99 agents, 77 vulnerability categories)", while the check removed the two tags,
+# kept the text between them, read "DVxAA", found no DVAA and exited 0.
+ELEMENT_NAMES = [
+    ("plain name", "DVAA"),
+    ("style element", "DV<style>x</style>AA"),
+    ("script element", "DV<script>x</script>AA"),
+    ("template element", "DV<template>x</template>AA"),
+    ("style element with a quoted < in its start tag", 'DV<style title="<">x</style>AA'),
+]
+
+
+@pytest.mark.parametrize("written", [w for _, w in ELEMENT_NAMES],
+                         ids=[case for case, _ in ELEMENT_NAMES])
+def test_a_name_holding_an_element_a_browser_shows_no_text_of_leaves_the_line_read(written):
+    td = scratch_tree()
+    try:
+        figures = f"{written} (99 agents, 77 vulnerability categories)"
+        mutate_readme(td, LICENSE_LINE, f"{LICENSE_LINE}\n{figures}\n")
+        line = where_of(td, figures)
+        r = run_checker(td)
+        assert r.returncode == 1, r.stdout
+        for failure in (
+            f"{line}: \"99 agents\" does not match related-projects.json "
+            "(DVAA agents: 21)",
+            f"{line}: \"77 vulnerability categories\" does not match "
+            "related-projects.json (DVAA vulnerability categories: 12)",
+        ):
+            assert failure in r.stderr, r.stderr
+    finally:
+        shutil.rmtree(td)
+
+
 def test_a_tag_name_a_browser_reads_is_removed_only_in_the_html_block_reading():
     checker = load_checker()
     for written in ("DV<x\\>AA", "D<D\\\\</b>VAA", "DV<x\N{NO-BREAK SPACE}<y>AA",
@@ -1955,7 +2162,121 @@ def test_a_page_defines_the_labels_stated(text, labels):
     assert stated_defined_labels(text) == labels
 
 
+# What a line reads as with the text of each style, script and template element removed,
+# the reading `names` adds where a "<" is followed by the name of one. An element runs from
+# its start tag, in any ASCII letter case and with an attribute or a "/", to the end of the
+# end tag of its name that closes it, or to the end of the line where none does; inside a
+# style or script element no tag opens another, while a template element can hold any of
+# the three, and an end tag closes the element opened last, only where it has that
+# element's name. A "<" after a backslash starts no HTML, so it ends no element, and an end
+# tag whose name is followed by U+00A0 or U+3000 closes none: a browser ends a tag name only
+# at a tab, line feed, form feed, space, "/" or ">", so the name runs on past either.
+# Rendered as a CommonMark paragraph and shown in Chromium, each line shows the text of its
+# form but the last, which shows "DV-->AA": a browser ends the raw text of a style element
+# at the first "</style>", here inside what CommonMark reads as a comment, which the first
+# step removes whole. Neither names DVAA.
+ELEMENT_FORMS = [
+    ("style element", "DV<style>x</style>AA", "DVAA"),
+    ("script element", "DV<script>x</script>AA", "DVAA"),
+    ("template element", "DV<template>x</template>AA", "DVAA"),
+    ("names in other letter cases", "DV<STYLE>x</Style>AA", "DVAA"),
+    ("start tag with an attribute and end tag with a space",
+     'DV<script type="a">x</script >AA', "DVAA"),
+    ("start tag with a slash", "DV<style/>x</style>AA", "DVAA"),
+    ("two elements", "D<style>x</style>V<script>y</script>AA", "DVAA"),
+    ("element inside the name", "D<template>x</template>VAA", "DVAA"),
+    ("no end tag follows", "DV<style>AA", "DV"),
+    ("end tag of another element", "DV<style>x</script>AA", "DV"),
+    ("template in a template", "DV<template><template></template>x</template>AA", "DVAA"),
+    ("style in a template", "DV<template><style></template>x</style></template>AA", "DVAA"),
+    ("template in a style", "DV<style><template>x</style>AA", "DVAA"),
+    ("end tag of no open element", "DV<style><template></style>x</template>AA", "DVxAA"),
+    ("code span in an element", "DV<style>`x`</style>AA", "DVAA"),
+    ("end tag after a backslash", "DV<style>x\\</style>AA", "DV"),
+    ("end tag with U+00A0 after the name", "DV<style>x</style\N{NO-BREAK SPACE}>AA", "DV"),
+    ("end tag with U+3000 after the name", "DV<script>x</script\N{IDEOGRAPHIC SPACE}>AA",
+     "DV"),
+    ("end tag in a comment", "DV<style><!--</style>-->AA", "DV"),
+]
+
+
+@pytest.mark.parametrize("text,form", [(t, f) for _, t, f in ELEMENT_FORMS],
+                         ids=[case for case, _, _ in ELEMENT_FORMS])
+def test_the_text_of_an_element_is_removed_as_stated(text, form):
+    checker = load_checker()
+    assert checker.name_form(text, hide_elements=True) == form
+    assert stated_name_form(checker, text, hide_elements=True) == form
+
+
+# A browser ends a tag name only at a tab, line feed, form feed, space, "/" or ">", so
+# "<style" U+00A0 ">" is a tag named "style" U+00A0, which opens no style element, and in a
+# style element "</style" U+00A0 ">" is text. RAW_HTML removes either as a tag whose name
+# ends at U+00A0; the element rule names it past that, in each reading, so the text after
+# such a start tag stays and the text after such an end tag goes with the element to the
+# end of the line. Neither line names DVAA.
+def test_the_element_rule_ends_a_tag_name_where_a_browser_does():
+    checker = load_checker()
+    for end in "\t\n\f />":
+        assert checker.TAG_START.match(f"<Style{end}x").group(2) == "Style", ascii(end)
+    for space in ("\N{NO-BREAK SPACE}", "\N{IDEOGRAPHIC SPACE}", "\N{EM SPACE}"):
+        assert checker.TAG_START.match(f"</style{space}x>").group(2) == f"style{space}x"
+        for name in ("style", "script", "template"):
+            for text, form in ((f"DV<{name}{space}>x</{name}>AA", "DVxAA"),
+                               (f"DV<{name}>x</{name}{space}>AA", "DV")):
+                for reading in (checker.RAW_HTML, checker.HtmlBlockHtml()):
+                    assert (checker.name_form(text, reading, hide_elements=True)
+                            == form), ascii(text)
+                assert stated_name_form(checker, text, hide_elements=True) == form
+                assert (stated_name_form(checker, text, html_block=True, hide_elements=True)
+                        == form), ascii(text)
+                assert not checker.names(text, "DVAA"), ascii(text)
+
+
+# Where a tag name ends, read for each code point Python's \s matches, the white space an
+# earlier element rule ended a name at, and for "/" and ">". The HTML block reading ends a
+# tag name only at a tab, line feed, form feed, space, "/" or ">", as a browser does, and
+# the element rule names a tag the same way in every reading, the checker with TAG_START
+# and the plain scan with stated_tag: "<style" followed by any other white space opens no
+# style element, and the HTML block reading, which removes it as a tag whose name holds
+# that character, keeps the text after it.
+def test_the_element_rule_ends_a_tag_name_where_the_html_block_reading_does():
+    checker = load_checker()
+    spaces = [chr(code) for code in range(sys.maxunicode + 1) if chr(code).isspace()]
+    for c in spaces + ["/", ">"]:
+        ends, tag = c in "\t\n\f />", f"<style{c}x>"
+        assert (checker.TAG_START.match(tag).group(2) == "style") == ends, ascii(c)
+        assert (checker.HTML_BLOCK_TAG_NAME.match(tag, 2).end() == 6) == ends, ascii(c)
+        assert (stated_tag(tag, 0) == (False, "style")) == ends, ascii(c)
+        if checker.hiding_kind(c) is None:
+            text, form = f"DV<style{c}>x</style>AA", "DVAA" if ends else "DVxAA"
+            assert (checker.name_form(text, checker.HtmlBlockHtml(), hide_elements=True)
+                    == form), ascii(c)
+            assert (stated_name_form(checker, text, html_block=True, hide_elements=True)
+                    == form), ascii(c)
+            assert checker.names(text, "DVAA") == ends, ascii(c)
+
+
+# A start tag whose quoted attribute value holds "<" is a tag only in the reading that
+# passes over quoted values, and there it opens a style element as in the other readings:
+# 'DV<style title="<">x</style>AA' names DVAA only read that way with the text of the
+# element removed, as a browser reads the value whole and shows no text of the element.
+def test_a_start_tag_read_past_a_quoted_value_opens_an_element():
+    checker = load_checker()
+    line = 'DV<style title="<">x</style>AA'
+    assert checker.QUOTE_AFTER_TAG_NAME.search(line)
+    assert checker.name_form(line, checker.QUOTED_HTML, hide_elements=True) == "DVAA"
+    assert stated_name_form(checker, line, quoted=True, hide_elements=True) == "DVAA"
+    assert checker.name_form(line, checker.QUOTED_HTML) == "DVxAA"
+    assert not checker.holds(checker.name_form(line, hide_elements=True), "DVAA")
+    assert checker.names(line, "DVAA")
+
+
 TAG_NAME = string.ascii_letters + string.digits + "-"
+
+# The six characters at which a browser ends a tag name, the ones README states end a tag
+# name in the HTML block reading and in the element rule of every reading: U+00A0, U+3000
+# and the other white space Python's \s matches end none.
+TAG_NAME_ENDS = "\t\n\f />"
 
 
 def ascii_letter_at(text, i):
@@ -1983,7 +2304,7 @@ def stated_html_end(line, i, any_space=True, html_block=False, quoted=False):
     if not ascii_letter_at(line, j):
         return None
     j += 1
-    while j < len(line) and (line[j] not in "\t\n\f />" if html_block
+    while j < len(line) and (line[j] not in TAG_NAME_ENDS if html_block
                              else line[j] in TAG_NAME):
         j += 1
     if j < len(line) and line[j] == ">":
@@ -1997,6 +2318,24 @@ def stated_html_end(line, i, any_space=True, html_block=False, quoted=False):
             close = line.find(line[k], k + 1) if quoted and line[k] in "\"'" else -1
             k = close + 1 if close >= 0 else k + 1
     return None
+
+
+def stated_numeric_end(line, i):
+    """Where the numeric character reference a browser reads at the "&" at line[i] in an
+    HTML block ends, as the line is written, or None: "&#" and the decimal digits after it
+    or "&#x" or "&#X" and the hexadecimal digits after it run over every such digit and over
+    a ";" directly after them, and need one digit or more."""
+    if not line.startswith("&#", i):
+        return None
+    j, digits = i + 2, string.digits
+    if line[j:j + 1] in ("x", "X"):
+        j, digits = j + 1, string.hexdigits
+    first = j
+    while j < len(line) and line[j] in digits:
+        j += 1
+    if j == first:
+        return None
+    return j + 1 if line[j:j + 1] == ";" else j
 
 
 def stated_reference_end(text, i):
@@ -2065,18 +2404,28 @@ def stated_defined_labels(text):
 
 
 def stated_name_form(checker, line, any_space=True, labels=None, html_block=False,
-                     quoted=False):
+                     quoted=False, references=False, hide_elements=False):
     """`line` read by the three steps README states, as a plain scan rather than with the
     checker's patterns, with `any_space` false as in the second reading, with `labels` the
     labels the page defines, or None for the reading that removes no label, with
-    `html_block` true as in the HTML block reading, and with `quoted` true as in the reading
-    that passes over quoted attribute values. A reference is decoded by html.unescape, as
-    in the checker, and a decoded character that fails a line is dropped."""
+    `html_block` true as in the HTML block readings, with `quoted` true as in the reading
+    that passes over quoted attribute values, with `references` true, beside
+    `html_block`, as in the HTML block reading that decodes each numeric reference where it
+    stands as written, with or without a closing ";" and whatever its number of digits, and
+    with `hide_elements` true as in the readings that remove the text of style, script and
+    template elements. A reference is decoded by html.unescape, as in the checker, and a
+    decoded character that fails a line is dropped."""
+    def shown(reference):
+        return [c for c in html.unescape(reference) if not checker.hiding_kind(c)]
+
     # First, going along the line, its HTML is removed wherever it stands, the character a
     # backslash escapes and the text of each code span are kept as text, each pair marked,
-    # and a "]" goes with the link label after it where the label is blank or defined.
+    # and a "]" goes with the link label after it where the label is blank or defined; with
+    # `references`, what a numeric reference shows, decoded where it stands, is kept as text
+    # too.
     pairs = stated_first_step(line, any_space, labels=labels, html_block=html_block,
-                              quoted=quoted)[0]
+                              quoted=quoted, shown=shown if references else None,
+                              hide_elements=hide_elements)[0]
     # Second, going along what remains, each "]" followed by "(" goes with the text after it
     # to the first ")" if no further "(" comes first, then each "!" directly before a "[",
     # and then the Markdown characters, none of them kept as text.
@@ -2109,7 +2458,7 @@ def stated_name_form(checker, line, any_space=True, labels=None, html_block=Fals
             run = "".join(c for c, _ in kept[i:j])
             end = stated_reference_end(run, 0)
             if end is not None:
-                text.extend(c for c in html.unescape(run[:end]) if not checker.hiding_kind(c))
+                text.extend(shown(run[:end]))
                 i += end
                 continue
         text.append(kept[i][0])
@@ -2144,14 +2493,40 @@ def stated_run_end(line, i):
     return i
 
 
+def stated_tag(line, i):
+    """(closing, name) for the tag README states at the "<" at line[i], `closing` whether it
+    starts "</" and `name` its name with each ASCII capital letter written small, or None
+    where no tag starts there. The name runs from its first letter to the first of
+    TAG_NAME_ENDS, as a browser reads a tag name and as `stated_html_end` reads one in the
+    HTML block reading, in every reading."""
+    j = i + 2 if line.startswith("</", i) else i + 1
+    if not ascii_letter_at(line, j):
+        return None
+    k = j + 1
+    while k < len(line) and line[k] not in TAG_NAME_ENDS:
+        k += 1
+    name = "".join(chr(ord(c) + 32) if "A" <= c <= "Z" else c for c in line[j:k])
+    return j == i + 2, name
+
+
 def stated_first_step(line, any_space=True, spans=True, labels=None, html_block=False,
-                      quoted=False):
+                      quoted=False, shown=None, hide_elements=False):
     """(pairs, open): `line` after the first step README states, each character with
     whether it is kept as text, and whether the lines after it read no code span. A "]"
     directly followed by a link label that is blank or in `labels` goes with the label,
     which is not read further; with `labels` None no label goes. HTML is removed as
-    `stated_html_end` reads it with `any_space`, `html_block` and `quoted`."""
+    `stated_html_end` reads it with `any_space`, `html_block` and `quoted`. With `shown`,
+    which gives the characters a reference shows, each numeric reference
+    `stated_numeric_end` reads at an "&" reached here, where it stands as written, goes with
+    those characters, each kept as text. With `hide_elements` true, what stands from a
+    start tag that opens a style, script or template element while none is open to the
+    end of the end tag that closes it, or to the end of the line where none does, goes
+    too: a start tag opens one unless a style or script element is open, and an end tag
+    closes the one opened last where it has its name."""
     out, i, reading, unmatched = [], 0, spans, False
+    # The style, script and template elements open, the last opened at the end, and how
+    # many pairs `out` held where the first of them opened.
+    open_elements, hidden_from = [], 0
     while i < len(line):
         c = line[i]
         if c == "<":
@@ -2159,6 +2534,18 @@ def stated_first_step(line, any_space=True, spans=True, labels=None, html_block=
                 reading = False
             end = stated_html_end(line, i, any_space, html_block, quoted)
             if end is not None:
+                tag = stated_tag(line, i) if hide_elements else None
+                if tag is not None:
+                    closing, name = tag
+                    if closing and open_elements[-1:] == [name]:
+                        open_elements.pop()
+                        if not open_elements:
+                            del out[hidden_from:]
+                    elif (not closing and name in ("style", "script", "template")
+                          and open_elements[-1:] not in (["style"], ["script"])):
+                        if not open_elements:
+                            hidden_from = len(out)
+                        open_elements.append(name)
                 i = end
                 continue
         elif c == "\\" and line[i + 1:i + 2] != "" and line[i + 1] in string.punctuation:
@@ -2206,24 +2593,35 @@ def stated_first_step(line, any_space=True, spans=True, labels=None, html_block=
                                         or stated_label_key(line[i + 2:end - 1]) in labels):
                     i = end
                     continue
+        elif c == "&" and shown is not None:
+            end = stated_numeric_end(line, i)
+            if end is not None:
+                out.extend((s, True) for s in shown(line[i:end]))
+                i = end
+                continue
         out.append((c, False))
         i += 1
+    if open_elements:
+        del out[hidden_from:]
     return out, not reading or unmatched
 
 
 # The generated lines are made of characters the first two steps act on, among them the
 # backtick, the backslash, "|" and "'" that decide where code spans are read, and, for two
 # pieces in five, of longer pieces: the openings and closes of HTML, character references,
-# white space other than a space, and characters NFKC or the confusables read as A, D or V
-# or leave beside them. Cases above pin orders of steps on their own: removing each "!"
-# before the link spans rather than after them ("exclamation mark before a link span"),
-# and in the second reading letting only a space and "/" end a tag name ("tab after a tag
-# name in the second reading") or only a space and a tab ("slash after a tag name in the
-# second reading").
+# among them numeric ones that only the HTML block reading decodes, with no closing ";" or
+# more digits than CommonMark reads, and ones whose digits a tag, a Markdown character or
+# a letter ends as written, white space other than a space, and characters NFKC or
+# the confusables read as A, D or V or leave beside them. Cases above pin orders of steps on
+# their own: removing each "!" before the link spans rather than after them ("exclamation
+# mark before a link span"), and in the second reading letting only a space and "/" end a
+# tag name ("tab after a tag name in the second reading") or only a space and a tab ("slash
+# after a tag name in the second reading").
 MARKUP_CHARACTERS = "[]()DVAx \"*_~`\\<>|'"
 PIECES = [
     *"/-!?=1&#;\t", "<x", "</A", "<!--", "-->", "<?", "?>", "<![CDATA[", "]]>", "<!",
     "&#68;", "&#x41;", "&#8203;", "&DD;", "&amp;", "&ast;", "&lowbar;",
+    "&#86", "&#x41", "&#X44", "&#00000065;", "&#x0000056;", "&#x301", "&#x3", "&#6",
     "\N{NO-BREAK SPACE}", "\N{IDEOGRAPHIC SPACE}", "\N{COMBINING ACUTE ACCENT}",
     "\N{LATIN CAPITAL LETTER A WITH ACUTE}", "\N{CYRILLIC CAPITAL LETTER A}",
     "\N{FULLWIDTH LATIN CAPITAL LETTER A}", "\N{LATIN CAPITAL LETTER AV}",
@@ -2249,9 +2647,12 @@ def test_the_stated_steps_read_every_generated_line_as_the_checker_does():
     # line as the first does. A line
     # where "/" or white space after a tag name is followed by a quote before any "<" or ">"
     # is also read with each quoted attribute value passed over whole; on any other line
-    # that way reads the line as the first does. A line holding "][" is also read with the
-    # labels in STATED_LABELS removed, the first way and, where they apply, the HTML block
-    # way and the quoted value way.
+    # that way reads the line as the first does. A line where "&" stands directly before "#"
+    # is also read the HTML block way with each numeric reference decoded where it stands as
+    # written, with or without a closing ";" and whatever its number of digits; on any other
+    # line that way reads the line as the HTML block way does. A line holding "][" is also
+    # read with the labels in STATED_LABELS removed, the first way and, where they apply,
+    # the HTML block ways and the quoted value way.
     checker = load_checker()
     rng = random.Random(80)
     for _ in range(STATED_LINES):
@@ -2272,6 +2673,13 @@ def test_the_stated_steps_read_every_generated_line_as_the_checker_does():
             assert checker.name_form(line, checker.QUOTED_HTML) == quoted, ascii(line)
         else:
             assert quoted == plain, ascii(line)
+        decoded = stated_name_form(checker, line, html_block=True, references=True)
+        if "&#" in line:
+            assert (checker.name_form(line, checker.HtmlBlockHtml(),
+                                      references=checker.HTML_BLOCK_REFERENCE)
+                    == decoded), ascii(line)
+        else:
+            assert decoded == block, ascii(line)
         if "][" in line:
             assert (checker.name_form(line, labels=STATED_LABELS)
                     == stated_name_form(checker, line, labels=STATED_LABELS)), ascii(line)
@@ -2283,6 +2691,12 @@ def test_the_stated_steps_read_every_generated_line_as_the_checker_does():
             if checker.QUOTE_AFTER_TAG_NAME.search(line):
                 stated = stated_name_form(checker, line, labels=STATED_LABELS, quoted=True)
                 assert (checker.name_form(line, checker.QUOTED_HTML, labels=STATED_LABELS)
+                        == stated), ascii(line)
+            if "&#" in line:
+                stated = stated_name_form(checker, line, labels=STATED_LABELS,
+                                          html_block=True, references=True)
+                assert (checker.name_form(line, checker.HtmlBlockHtml(), labels=STATED_LABELS,
+                                          references=checker.HTML_BLOCK_REFERENCE)
                         == stated), ascii(line)
 
 
@@ -2365,6 +2779,109 @@ def test_the_stated_quoted_value_reading_reads_every_generated_line_as_the_check
             assert (checker.step_one(line, checker.QUOTED_HTML)
                     == checker.step_one(line)), ascii(line)
     assert differing >= 500, differing
+
+
+# The pieces of the lines the element rule is read on: start and end tags of the three
+# elements, in lower case and with capitals, with a space or "/" after the name, with
+# U+00A0 or U+3000 after it, which a browser does not end a tag name at, with no ">", or
+# with an attribute value opened by a quote, the tags of another element, a tag name the
+# HTML block reading runs on past "\", the opening and close of a comment, and the
+# characters that decide where code spans, escapes, link spans and link labels start and
+# end.
+ELEMENT_PIECES = [
+    *"DVAx `\\<>/'\"|[]()!*&#;\t", "<style>", "</style>", "<script>", "</script>",
+    "<template>", "</template>", "<STYLE ", "</Script", "<Template/", "<style",
+    "</template ", "<script\N{NO-BREAK SPACE}", "</Style\N{IDEOGRAPHIC SPACE}", "<b>", "</b>",
+    "<style\\", "<!--", "-->", "][", "\N{NO-BREAK SPACE}", "\N{IDEOGRAPHIC SPACE}",
+    '<style x="',
+]
+ELEMENT_LINES_GENERATED = 100_000
+
+
+class RecordedHtml:
+    """A raw HTML pattern that records each place it is asked to match at."""
+
+    def __init__(self, pattern):
+        self.pattern, self.places = pattern, []
+
+    def match(self, text, pos):
+        self.places.append(pos)
+        return self.pattern.match(text, pos)
+
+
+def test_the_stated_element_rule_reads_every_generated_line_as_the_checker_does():
+    # The element rule is stated in words on the cross-framework mapping page and in the
+    # script's description, and the checker reads it with its own tag pattern; a clause that
+    # drifted from them, such as a template opening inside a style element or an end tag
+    # closing an element other than the one opened last, would leave the cases above
+    # passing. Each line is read with the elements' text removed the first way and, where
+    # they apply, the second way, the HTML block way, with one HtmlBlockHtml serving the
+    # readings with and without the text removed, the way that passes over quoted attribute
+    # values, and with the labels in STATED_LABELS removed. Removing an element's text
+    # passes over no place on the line: `open` and the places the raw HTML is matched at do
+    # not turn on it, and a line where no "<" is followed by the name of such an element
+    # reads alike either way.
+    checker = load_checker()
+    rng = random.Random(172)
+    for _ in range(ELEMENT_LINES_GENERATED):
+        line = "".join(rng.choice(ELEMENT_PIECES) for _ in range(rng.randint(1, 16)))
+        hidden = stated_name_form(checker, line, hide_elements=True)
+        assert checker.name_form(line, hide_elements=True) == hidden, ascii(line)
+        kept, removed = RecordedHtml(checker.RAW_HTML), RecordedHtml(checker.RAW_HTML)
+        assert (checker.step_one(line, kept)[1]
+                == checker.step_one(line, removed, hide_elements=True)[1]), ascii(line)
+        assert kept.places == removed.places, ascii(line)
+        if not checker.HIDDEN_ELEMENT_START.search(line):
+            assert hidden == stated_name_form(checker, line), ascii(line)
+        if any(c.isspace() and c not in " \t" for c in line):
+            assert (checker.name_form(line, checker.SPACE_OR_TAB_HTML, hide_elements=True)
+                    == stated_name_form(checker, line, any_space=False,
+                                        hide_elements=True)), ascii(line)
+        if checker.OTHER_CHARACTER_IN_TAG_NAME.search(line):
+            # One HtmlBlockHtml reads the line with and without the elements' text removed
+            # in turn, as `names` reads it.
+            reading = checker.HtmlBlockHtml()
+            for hide in (True, False, True):
+                stated = stated_name_form(checker, line, html_block=True, hide_elements=hide)
+                assert (checker.name_form(line, reading, hide_elements=hide)
+                        == stated), ascii(line)
+        if checker.QUOTE_AFTER_TAG_NAME.search(line):
+            assert (checker.name_form(line, checker.QUOTED_HTML, hide_elements=True)
+                    == stated_name_form(checker, line, quoted=True,
+                                        hide_elements=True)), ascii(line)
+        if "][" in line:
+            assert (checker.name_form(line, labels=STATED_LABELS, hide_elements=True)
+                    == stated_name_form(checker, line, labels=STATED_LABELS,
+                                        hide_elements=True)), ascii(line)
+
+
+# Lines of 50,000 elements: templates opened one inside another and then closed, style
+# elements one after another, and start tags inside one style element that no end tag
+# closes. The text of an element is removed once, when the element that opened while none
+# was open closes or the line ends. Removed by re.sub with a pattern from a start tag to
+# the first end tag after it, which is tried at each start tag and reads on to the end of
+# the line from each where no end tag follows, the last line took about 54 s on Python
+# 3.14, and the same line of 10,000 start tags about 1.7 s.
+ELEMENT_RUNS = 50_000
+LONG_ELEMENT_LINES = [
+    ("templates in templates",
+     "DV" + "<template>" * ELEMENT_RUNS + "x" + "</template>" * ELEMENT_RUNS + "AA", "DVAA"),
+    ("style elements one after another", "DV" + "<style>x</style>" * ELEMENT_RUNS + "AA",
+     "DVAA"),
+    ("start tags in a style element no end tag closes",
+     "DV" + "<style>x" * ELEMENT_RUNS + "AA", "DV"),
+]
+
+
+@pytest.mark.parametrize("line,form", [(text, form) for _, text, form in LONG_ELEMENT_LINES],
+                         ids=[case for case, _, _ in LONG_ELEMENT_LINES])
+def test_the_element_reading_reads_a_long_line_in_linear_time(line, form):
+    checker = load_checker()
+    start = time.perf_counter()
+    read = checker.name_form(line, hide_elements=True)
+    seconds = time.perf_counter() - start
+    assert read == form
+    assert seconds < 3, f"{seconds:.2f} s"
 
 
 def test_nfkc_gives_what_unicodedata_normalize_gives():
@@ -2501,6 +3018,12 @@ def test_a_mark_after_markup_or_written_as_a_reference_is_put_apart():
                      "DVA\N{CYRILLIC CAPITAL LETTER A}\N{COMBINING ACUTE ACCENT}",
                      "DVAA&#65;"):
         assert checker.detached(attached) == attached
+    # In the HTML block reading a reference with no closing ";" is a reference too, and one
+    # to a mark is put apart; as CommonMark reads references, the line holds none, and
+    # nothing is put apart.
+    assert (checker.detached("DVA&#65&#x301", checker.HTML_BLOCK_REFERENCE)
+            == "DVA&#65" + checker.BREAK + "&#x301")
+    assert checker.detached("DVA&#65&#x301") == "DVA&#65&#x301"
     # No ASCII character is a combining mark, so none after the name needs a lookup.
     assert not any(checker.is_mark(code) for code in range(128))
 
