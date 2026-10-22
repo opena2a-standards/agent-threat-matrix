@@ -86,8 +86,14 @@ name, such as \\, < or U+00A0, the line is also read as a browser reads a tag in
 block, with a name that is an ASCII letter followed by any characters other than a tab,
 line feed, form feed, space, / and >, the six characters at which a browser ends a tag
 name, so that U+00A0 and U+3000 IDEOGRAPHIC SPACE do not end one: "DV<x\\>AA",
-"D<D\\\\</b>VAA" and "DV<x" U+00A0 "<y>AA" name DVAA. The line names DVAA when any
-reading does. On the way, as
+"D<D\\\\</b>VAA" and "DV<x" U+00A0 "<y>AA" name DVAA. Where / or white space follows a tag
+name and a " or ' follows that before any < or >, the line is also read with each " or '
+in a tag after that / or white space passed over whole with the text up to the next such
+quote on the line, as an attribute value in quotes, which CommonMark and a browser read
+past any < or > it holds: a tag then runs to the first > that stands in no such value if
+no < that stands in none comes first, so "DV<b x="<">AA" and "DV<b title='>'>AA" name
+DVAA. A quote that no such quote follows on the line is read there as any other
+character. The line names DVAA when any reading does. On the way, as
 CommonMark reads them, the character a \\ escapes and
 the text of a code span are kept as text, which no later step reads as markup, HTML, a
 link span or a character reference, and the \\ and the backticks around the code span are
@@ -326,11 +332,13 @@ UNASSIGNED_IGNORABLES = frozenset(
 # HTML only when its close follows, on this line or a later one, so it shows "DV<!-- AA"
 # or "DV<!X AA" as text when no line closes it. The tag alternative does not read
 # attributes, so it also matches '<b x=")AA>' and '</b ")AA>', which CommonMark shows as
-# text. White space is what \s matches: a space, a tab or any other character Unicode
-# lists as white space, such as U+00A0 NO-BREAK SPACE, which CommonMark does not take
-# inside a tag. An autolink such as <https://example.org> is not matched and stays. A tag
-# ends at the first ">" before any "<", so a failed match scans no further than the next
-# "<" and the pattern reads a line in linear time.
+# text, while it ends a tag at a ">" in a quoted attribute value and finds no tag where a
+# "<" in one comes first, as in '<b x="<">', which QUOTED_HTML reads as a tag. White space
+# is what \s matches: a space, a tab or any other character Unicode lists as white space,
+# such as U+00A0 NO-BREAK SPACE, which CommonMark does not take inside a tag. An autolink
+# such as <https://example.org> is not matched and stays. A tag ends at the first ">"
+# before any "<", so a failed match scans no further than the next "<" and the pattern
+# reads a line in linear time.
 RAW_HTML = re.compile(
     r"<!--.*?(?:-->|$)|<\?.*?(?:\?>|$)|<!\[CDATA\[.*?(?:\]\]>|$)|<![A-Za-z][^>]*(?:>|$)"
     r"|</?[A-Za-z][A-Za-z0-9-]*(?:[\s/][^<>]*)?>"
@@ -395,6 +403,23 @@ class HtmlBlockHtml:
             self.text, self.start = text, pos
             self.name_end = HTML_BLOCK_TAG_NAME.match(text, letter + 1).end()
         return found
+
+
+# RAW_HTML with each '"' or "'" in a tag after the "/" or white space that follows its name
+# passed over whole with the text up to the next such quote, as an attribute value in
+# quotes, which CommonMark and a browser read past any "<" or ">" it holds: '<b x="<">' and
+# "<b title='>'>" are tags, so 'DV<b x="<">AA' and "DV<b title='>'>AA" show "DVAA". A quote
+# that no such quote follows on the line is read as any other character, so '<b x=")AA>' is
+# removed as RAW_HTML removes it. A quote is read so wherever it stands in a tag, not only
+# after an "=" as CommonMark reads a value: read only there, a tag that starts inside a
+# quoted value of another can fall into step with it and read the rest of the line again,
+# and a line of 120,010 characters built so took about 17 s.
+QUOTED_HTML = re.compile(RAW_HTML.pattern.replace(
+    r"[\s/][^<>]*", r"""[\s/](?:[^<>"']|"[^"]*"|'[^']*'|"(?![^"]*")|'(?![^']*'))*"""))
+
+# A tag name followed by "/" or white space and then, before any "<" or ">", by a quote:
+# only on a line that holds one do RAW_HTML and QUOTED_HTML remove different text.
+QUOTE_AFTER_TAG_NAME = re.compile(r"""</?[A-Za-z][A-Za-z0-9-]*[\s/][^<>"']*["']""")
 
 # A "]" followed by "(" with the text after it to the first ")" if no further "(" comes
 # first, which the second step removes whether or not they make a link: "[DV](url)AA" shows
@@ -936,12 +961,14 @@ def names(stripped, name, hiding=False, spans=True, labels=None):
     tab, with `SPACE_OR_TAB_HTML` too, and where a tag name is followed by a character
     other than an ASCII letter, digit, hyphen, tab, line feed, form feed, space, "/" or ">",
     as a browser reads a tag in an HTML block too, with `HtmlBlockHtml`: "DV<x\\>AA",
-    "D<D\\\\</b>VAA" and "DV<x" U+00A0 "<y>AA" name DVAA. Each name form removes a "]"
-    directly followed by a
-    link label that is blank or in `labels`, the labels the page holding the line defines,
-    with that label; where a "]" stands directly before a "[", the line is also read with no
-    label removed, as it is with `labels` None, in each of those readings, one
-    `HtmlBlockHtml` serving both label readings: on a page that defines DV,
+    "D<D\\\\</b>VAA" and "DV<x" U+00A0 "<y>AA" name DVAA; and where "/" or white space
+    after a tag name is followed by a quote before any "<" or ">", with `QUOTED_HTML` too,
+    which passes over a quoted attribute value whole: 'DV<b x="<">AA' and
+    "DV<b title='>'>AA" name DVAA. Each name form removes a "]"
+    directly followed by a link label that is blank or in `labels`, the labels the page
+    holding the line defines, with that label; where a "]" stands directly before a "[",
+    the line is also read with no label removed, as it is with `labels` None, in each of
+    those readings, one `HtmlBlockHtml` serving both label readings: on a page that defines DV,
     "[x][DV](url)A<y\\>A <q\\" names DVAA only read with no label removed and as a browser
     reads "<y\\>" in an HTML block, after the reading that removes DV has held "<q\\", a tag
     that finds no ">". `defined_labels` also counts a text that
@@ -974,6 +1001,8 @@ def names(stripped, name, hiding=False, spans=True, labels=None):
         # gives what HTML_BLOCK_HTML gives in every reading, whichever "<" a reading passes
         # over.
         readings.append(HtmlBlockHtml())
+    if QUOTE_AFTER_TAG_NAME.search(stripped):
+        readings.append(QUOTED_HTML)
     # Only a "]" directly before a "[" can be removed with a label, so a line without one
     # reads alike either way.
     removals = [None] if labels is None or "][" not in stripped else [labels, None]
