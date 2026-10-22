@@ -128,10 +128,16 @@ follows it are read on. A page defines a label where, once such characters are r
 holds a [ that no \\ escapes followed by that label and ]:, two labels being the same when
 they are after Unicode case folding, with white space at either end removed and each run
 of white space inside read as one space. Where a ] is so directly followed by a [, the
-line is also read with no label removed, and it names DVAA when any of its readings does.
-So "[x][DV](url)AA", which CommonMark shows as "[x]DVAA" where the page does not define the
-label DV, names DVAA, while "[DV][dvaa]AA" names DVAA only where the page defines the label
-dvaa. Second, going along what remains, each ] followed by ( is removed with the text after
+line is also read with no label removed and, where two or three labels the page defines
+stand directly after a ] on it, with each other mix of them removed and kept, and it
+names DVAA when any of its readings does; a line holding four or more such labels is read
+with all of them removed and with none only. A page holding a definition-like text that
+CommonMark does not read as a definition, such as one in a fenced code block, defines the
+label here too. So "[x][DV](url)AA", which CommonMark shows as "[x]DVAA" where the page
+does not define the label DV, names DVAA, as does "[x][DV](u)[A][t]A" on a page that
+defines t, with DV only in a fenced code block, which CommonMark shows as "[x]DVAA", while
+"[DV][dvaa]AA" names DVAA only where the page defines the label dvaa. Second, going along
+what remains, each ] followed by ( is removed with the text after
 it to the first ) if no further ( comes first, whether or not they make a link, then each
 ! directly before a [, and then the Markdown characters * _ ~ ` [ ]. Third, its character
 references are
@@ -209,6 +215,7 @@ present, is an array of objects with a string ``id``, ``category`` and ``descrip
 import argparse
 import bisect
 import html
+import itertools
 import json
 import pathlib
 import re
@@ -387,7 +394,7 @@ class HtmlBlockHtml:
     each tag before that one. Whether a tag finds a ">" turns on the line alone, so this
     holds also for readings that pass over different parts of the line, as the reading that
     removes a link label passes over the label and the reading that removes none does not:
-    `names` reads a line with one instance in both."""
+    `names` reads a line with one instance in each of its label readings."""
 
     def __init__(self):
         self.text, self.start, self.name_end = None, -1, -1
@@ -431,6 +438,11 @@ PAREN_SPAN = re.compile(r"\]\([^()]*\)")
 # holds a character in LINK_UNSURE, the first step stops reading code spans. Whether a "]"
 # followed by "[" is removed with the label after it is read apart from this (`label_end`).
 LINK_TARGET = re.compile(PAREN_SPAN.pattern + r"|\]\[[^\[\]]*\]")
+
+# The most labels the page defines, each directly after a "]", that a line can hold for
+# `label_removals` to read it with every mix of them removed and kept, which is at most
+# 2 to the power of this many readings of the line.
+MIXED_LABELS = 3
 
 # A "!" directly before a "[", removed so that an image reads as its alternative text:
 # "DV![](x.png)AA" names DVAA, while "DV!AA" does not.
@@ -674,7 +686,8 @@ def span_lines(lines):
     such a line could close on a later line of its paragraph. A line that carries a
     character `hiding_kind` names reads no code span, which `names` sees to, and so leaves
     the lines after it with none read too. Each line is read with no link label removed,
-    which leaves code spans unread wherever removing the labels the page defines would."""
+    which leaves code spans unread wherever removing any of the labels the page defines
+    would."""
     reads, open_ = [], False
     for line, stripped, hidden in lines:
         if not line.strip(" \t"):
@@ -775,9 +788,10 @@ def defined_labels(text):
     `label_end` reads one, that a "[" no backslash escapes opens and ":" directly follows,
     such as "dvaa" in "[DVAA]: https://example.org". A blank label defines nothing. A
     definition-like text that CommonMark does not read as one, such as one in a fenced code
-    block, is counted too, which `names` allows for by also reading each line with no label
-    removed. Each "[" scans only up to the first "[" or "]" after it that no backslash
-    escapes, and a label found is passed over whole, so a page is read in linear time."""
+    block, is counted too, which `names` allows for by also reading each line with the
+    removals `label_removals` gives. Each "[" scans only up to the first "[" or "]" after it
+    that no backslash escapes, and a label found is passed over whole, so a page is read in
+    linear time."""
     keys = set()
     i = 0
     while i < len(text):
@@ -795,6 +809,35 @@ def defined_labels(text):
                 continue
         i += 1
     return frozenset(keys)
+
+
+def label_removals(stripped, labels):
+    """The `labels` arguments `names` reads line `stripped` with, `labels` being the labels
+    the page holding it defines (`defined_labels`): `labels`, then None, which removes no
+    label, and, where two to `MIXED_LABELS` of those labels stand directly after a "]" on
+    the line, each other set of them that holds at least one, so that every mix of them
+    removed and kept is read. `defined_labels` also counts a text that only looks like a
+    definition, so of two labels on a line CommonMark can remove one and keep the other: on
+    a page that defines t, with DV only in a fenced code block, "[x][DV](u)[A][t]A" shows
+    "[x]DVAA", and of these readings only the one that removes t alone names DVAA there. A
+    line holding more such labels is read with all of them removed and with none only: each
+    reading reads the whole line, and k labels have 2 to the power k mixes. Each "[" after
+    a "]" scans its label only up to the first "[" or "]" after it that no backslash
+    escapes, as `label_end` does."""
+    keys = {}
+    i = stripped.find("][")
+    while i >= 0:
+        end = label_end(stripped, i + 1)
+        if end is not None:
+            key = label_key(stripped[i + 2:end - 1])
+            if key in labels:
+                keys[key] = None
+        i = stripped.find("][", i + 1)
+    removals = [labels, None]
+    if 1 < len(keys) <= MIXED_LABELS:
+        for size in range(1, len(keys)):
+            removals.extend(map(frozenset, itertools.combinations(keys, size)))
+    return removals
 
 
 def step_one(stripped, raw_html=RAW_HTML, spans=True, labels=None):
@@ -967,20 +1010,22 @@ def names(stripped, name, hiding=False, spans=True, labels=None):
     "DV<b title='>'>AA" name DVAA. Each name form removes a "]"
     directly followed by a link label that is blank or in `labels`, the labels the page
     holding the line defines, with that label; where a "]" stands directly before a "[",
-    the line is also read with no label removed, as it is with `labels` None, in each of
-    those readings, one `HtmlBlockHtml` serving both label readings: on a page that defines DV,
+    the line is also read with no label removed, as it is with `labels` None, and with the
+    other removals `label_removals` gives, in each of those readings, one `HtmlBlockHtml`
+    serving every label reading: on a page that defines DV,
     "[x][DV](url)A<y\\>A <q\\" names DVAA only read with no label removed and as a browser
     reads "<y\\>" in an HTML block, after the reading that removes DV has held "<q\\", a tag
     that finds no ">". `defined_labels` also counts a text that
     only looks like a definition, so "[x][DV](url)AA", which shows "[x]DVAA" unless the page
     defines DV, names DVAA by the reading that removes no label even with DV in `labels`,
-    while "[DV][dvaa]AA" names DVAA only with dvaa in `labels`. The name form reads no code
-    span with `spans` false, as `span_lines` gives for a line after one that can leave a
-    code span, HTML or a link span open, nor with `hiding` true. Where a name form holds
-    `name` only with combining marks directly after it that NFKC joins to its last letter,
-    or only once its letters are decomposed, the name form of the line `detached` is read
-    too, so a mark counts only where it is written as itself directly after a letter or
-    another mark: "DVAA" U+0301 does not name DVAA, while "DV**AA**" U+0301 and
+    "[x][DV](u)[A][t]A" names DVAA by the reading that removes t alone with dv and t in
+    `labels`, while "[DV][dvaa]AA" names DVAA only with dvaa in `labels`. The name form
+    reads no code span with `spans` false, as `span_lines` gives for a line after one that
+    can leave a code span, HTML or a link span open, nor with `hiding` true. Where a name
+    form holds `name` only with combining marks directly after it that NFKC joins to its
+    last letter, or only once its letters are decomposed, the name form of the line
+    `detached` is read too, so a mark counts only where it is written as itself directly
+    after a letter or another mark: "DVAA" U+0301 does not name DVAA, while "DV**AA**" U+0301 and
     "DV**AA&#x301;**" do, and "DVAA" U+0332, which NFKC leaves apart from the A, names DVAA.
     "DV" U+200B "AA", "DV&#8203;AA", "**DV**AA", "DV<!-- -->AA", "DVA" U+0410 and the
     fullwidth letters each name DVAA; "DVAA" U+0301 does not. On a line that carried such a
@@ -1005,7 +1050,8 @@ def names(stripped, name, hiding=False, spans=True, labels=None):
         readings.append(QUOTED_HTML)
     # Only a "]" directly before a "[" can be removed with a label, so a line without one
     # reads alike either way.
-    removals = [None] if labels is None or "][" not in stripped else [labels, None]
+    removals = ([None] if labels is None or "][" not in stripped
+                else label_removals(stripped, labels))
     for raw_html in readings:
         for removal in removals:
             form = name_form(stripped, raw_html, spans, removal)

@@ -1526,7 +1526,11 @@ def test_the_quoted_value_reading_reads_a_long_line_in_linear_time(line):
 # label the page defines, in another letter case too, and a blank label go with the "]"
 # before them, also after a label the page does not define on the same line; and as a
 # definition-like line in a fenced code block counts as a definition, the line is also read
-# with no label removed.
+# with no label removed and, holding two or three labels the page defines, with each mix of
+# them removed and kept. With t defined and
+# DV only in a fenced code block, CommonMark shows "[x][DV](u)[A][t]A" as "[x]DVAA", DV
+# linking to u and A to t's destination: read with both labels removed it gave "x(u)AA",
+# and with none "xDVAtA", and the line passed with exit 0.
 DEFINITION = "[d]: https://example.org"
 LABEL_LINES = [
     ("label the page does not define", "[x][DV](y)AA", ""),
@@ -1540,6 +1544,8 @@ LABEL_LINES = [
     ("label the page defines after one it does not", "[q][DV](y)[A][d]A", DEFINITION),
     ("definition-like line in a fenced code block", "[x][DV](y)AA",
      "```\n[DV]: https://example.org\n```"),
+    ("label the page defines beside one only a fenced code block defines",
+     "[x][DV](u)[A][t]A", "[t]: https://example.org\n\n```\n[DV]: https://example.org\n```"),
 ]
 
 
@@ -1566,6 +1572,59 @@ def test_a_link_label_leaves_the_name_dvaa_read_as_commonmark_shows_it(written, 
             assert failure in r.stderr, r.stderr
     finally:
         shutil.rmtree(td)
+
+
+def mixed_label_line(letters, removed):
+    """A line whose name form holds `letters` read with the labels in `removed` removed, of
+    the labels `letters` read as, each case folded: a letter whose label is removed is
+    written "[D][d]", or "[*][d]D" for the last letter, which reads "D" with that label
+    removed and "Dd", or "dD", with it kept, and any other "[*][D](u)", which reads "D" with
+    the label kept and "(u)" with it removed."""
+    segments = []
+    for i, c in enumerate(letters):
+        key = c.casefold()
+        if key not in removed:
+            segments.append(f"[*][{c}](u)")
+        elif i < len(letters) - 1:
+            segments.append(f"[{c}][{key}]")
+        else:
+            segments.append(f"[*][{key}]{c}")
+    return "".join(segments)
+
+
+def subsets(keys):
+    return [frozenset(k for i, k in enumerate(keys) if mask >> i & 1)
+            for mask in range(1 << len(keys))]
+
+
+def test_a_line_with_three_labels_is_read_with_each_mix_removed_and_kept():
+    # The page defines d, v and a, as `defined_labels` reads a page, and the line shows DVAA
+    # where CommonMark finds a definition for exactly the labels removed, the others standing
+    # only in a code block. Read with all three removed and with none, only two of the eight
+    # lines named DVAA.
+    checker = load_checker()
+    labels = frozenset("dva")
+    for removed in subsets("dva"):
+        line = mixed_label_line("DVA", removed) + "A"
+        assert checker.name_form(line, labels=removed) == "DVAA", line
+        assert checker.names(line, "DVAA", labels=labels), line
+        # A reading that removes some of the labels leaves code spans read wherever the
+        # reading that removes none does, the reading span_lines takes.
+        assert not checker.step_one(line, labels=removed)[1] or checker.step_one(line)[1]
+
+
+def test_a_line_with_four_labels_is_read_with_all_removed_and_with_none_only():
+    # U+FF21 FULLWIDTH LATIN CAPITAL LETTER A reads as A and case folds to a label of its own.
+    # Every mix of four labels would be 16 readings of the line, each reading all of it.
+    checker = load_checker()
+    letters = "DVA\N{FULLWIDTH LATIN CAPITAL LETTER A}"
+    keys = [c.casefold() for c in letters]
+    labels = frozenset(keys)
+    assert checker.MIXED_LABELS == 3
+    for removed in subsets(keys):
+        line = mixed_label_line(letters, removed)
+        assert checker.name_form(line, labels=removed) == "DVAA", line
+        assert checker.names(line, "DVAA", labels=labels) == (len(removed) in (0, 4)), line
 
 
 def test_a_definition_on_another_page_defines_no_label_on_this_one():
@@ -2411,6 +2470,23 @@ def test_link_labels_and_definitions_are_read_in_linear_time(read, result):
     got = read(checker)
     seconds = time.perf_counter() - start
     assert got == result
+    assert seconds < 1, f"{seconds:.2f} s"
+
+
+def test_a_line_of_many_labels_the_page_defines_is_read_in_linear_time():
+    # Read with each label removed on its own and kept on its own, a line of 8,895
+    # characters holding 1,000 labels the page defines took about 3.5 s, as each of its
+    # readings reads the whole line. A line holding more than MIXED_LABELS of them is
+    # read with all removed and with none only: this line of 98,895 characters holding
+    # 10,000 such labels took about 0.05 s.
+    checker = load_checker()
+    keys = [f"k{i}" for i in range(10_000)]
+    line = "[q" + "".join(f"][{key}][y" for key in keys) + "]AA"
+    start = time.perf_counter()
+    named = checker.names(line, "DVAA", labels=frozenset(keys))
+    seconds = time.perf_counter() - start
+    assert not named
+    assert len(checker.label_removals(line, frozenset(keys))) == 2
     assert seconds < 1, f"{seconds:.2f} s"
 
 
