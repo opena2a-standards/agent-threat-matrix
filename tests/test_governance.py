@@ -14,6 +14,11 @@ each property that reads it: GOVERNANCE.md (G1), README.md and CONTRIBUTING.md (
 for CONTRIBUTING.md, which GOVERNANCE.md links with a fragment), CODEOWNERS (G5) and a page
 GOVERNANCE.md links with two fragments (G6, in one line).
 
+No line in a fenced code block of GOVERNANCE.md names `/branches/<branch>/protection` or a
+path under it, the GitHub endpoints that need the repository's administration permission.
+The Review routing section gives the command that reads the required status checks from
+the branch endpoint, and its prose names the protection endpoint and that permission.
+
 The arguments are read by a parser: --help and -h print the usage and exit 0, also beside an
 option the script does not know, and such an option, such as --bogus, or a second argument
 prints the usage and exits 2; neither run checks anything. A root argument that names no
@@ -22,6 +27,7 @@ checked, named by G1 when the page there is missing or is not valid UTF-8.
 """
 
 import importlib.util
+import re
 import shutil
 import subprocess
 import tempfile
@@ -289,6 +295,46 @@ def test_the_crosswalk_files_are_classified_with_the_check_that_guards_them():
     crosswalks = ROOT / "crosswalks"
     shipped = {p.relative_to(ROOT).as_posix() for p in [*crosswalks.glob("*.md"), *crosswalks.glob("*.json")]}
     assert shipped and shipped <= _paths_in(section), sorted(shipped - _paths_in(section))
+
+
+def fenced_lines(text: str) -> list:
+    """The lines inside the fenced code blocks of a Markdown text, stripped, blank lines left
+    out. A fence opens and closes as CHK.prose_lines reads it."""
+    lines, fence = [], None
+    for line in text.splitlines():
+        m = CHK.FENCE_RE.match(line)
+        if fence:
+            if m and m.group(1)[0] == fence[0] and len(m.group(1)) >= len(fence):
+                fence = None
+            elif line.strip():
+                lines.append(line.strip())
+        elif m:
+            fence = m.group(1)
+    return lines
+
+
+# Each endpoint in GitHub's REST reference for protected branches is at or under
+# repos/{owner}/{repo}/branches/{branch}/protection, and each needs the repository's
+# administration permission. GET repos/{owner}/{repo}/branches/{branch} needs read access
+# to the contents, answers a public repository without authentication, and returns the
+# required status checks in its `protection` object.
+PROTECTION_ENDPOINT_RE = re.compile(r"/branches/\S+/protection\b")
+READABLE_COMMAND = "gh api repos/opena2a-standards/agent-threat-matrix/branches/main --jq .protection"
+
+
+def test_review_routing_gives_a_command_a_reader_without_admin_access_can_run():
+    # The section gave `gh api .../branches/main/protection` for reading the branch
+    # protection. GitHub answers that endpoint with 401 to a request without authentication
+    # and serves it only with the repository's administration permission, so a reader
+    # without that access could not check the status check the section names.
+    text = (ROOT / PAGE).read_text(encoding="utf-8")
+    needs_admin = [line for line in fenced_lines(text) if PROTECTION_ENDPOINT_RE.search(line)]
+    assert needs_admin == [], needs_admin
+    routing = CHK.section(text, "## Review routing")
+    assert fenced_lines(routing) == [READABLE_COMMAND], routing
+    prose = " ".join(" ".join(CHK.prose_lines(routing)).split())
+    assert "`repos/opena2a-standards/agent-threat-matrix/branches/main/protection`" in prose, prose
+    assert "administration permission" in prose, prose
 
 
 def test_heading_slug_follows_the_fragment_rule():

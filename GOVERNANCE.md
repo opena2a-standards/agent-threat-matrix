@@ -189,12 +189,21 @@ changes nothing under `.github/`; a pull request that changes a file there needs
 approving review on its current head commit from one of the accounts named in the
 `approvers` line of `.github/workflows/gate-file-approval.yml`: the GitHub user
 `thebenignhacker`, or `benign-gate-reviewer[bot]`, the bot account of the gate-reviewer
-GitHub App. The check counts an approval from either account the same way. Read the
-current branch protection with:
+GitHub App. The check counts an approval from either account the same way. A reader
+without administration access to this repository can read the required status checks
+with:
 
 ```sh
-gh api repos/opena2a-standards/agent-threat-matrix/branches/main/protection
+gh api repos/opena2a-standards/agent-threat-matrix/branches/main --jq .protection
 ```
+
+The same endpoint answers a request without authentication, at
+`https://api.github.com/repos/opena2a-standards/agent-threat-matrix/branches/main`. The
+`protection` object it returns names the required status checks and does not say whether
+a review is required. The review settings are read from
+`repos/opena2a-standards/agent-threat-matrix/branches/main/protection`, which needs the
+repository's administration permission; GitHub answers a request to it without
+authentication with 401.
 
 A `.github/CODEOWNERS` file, when this repository carries one, lists the maintainers of
 record against the normative paths above, so that GitHub requests their review on a pull
