@@ -189,7 +189,12 @@ that also defines a and b, which CommonMark shows as "[x]DVAA y z", while "[DV][
 names DVAA only where the page defines the label dvaa. Second, going along
 what remains, each ] followed by ( is removed with the text after
 it to the first ) if no further ( comes first, whether or not they make a link, then each
-! directly before a [, and then the Markdown characters * _ ~ ` [ ]. Third, its character
+! directly before a [, and then the Markdown characters * _ ~ ` [ ]. Each reading is also
+made with no such ] removed with the text after it, as CommonMark shows the ] and the ( as
+text where no [ before them opens a link that the ] closes: so "x](DV**AA**)" and
+"x](DV<style>x</style>AA)", each shown as "x](DVAA)", name DVAA, and so does
+"[x](DV**AA**)", whose link destination CommonMark does not show, as "[x](DVAA)" does as it
+stands. Third, its character
 references are
 decoded, each to the characters it stands for less any such character, so "&#8203;"
 (U+200B) leaves nothing, and it is
@@ -580,7 +585,9 @@ HIDDEN_ELEMENT_START = re.compile(r"<(?:style|script|template)", re.IGNORECASE |
 
 # A "]" followed by "(" with the text after it to the first ")" if no further "(" comes
 # first, which the second step removes whether or not they make a link: "[DV](url)AA" shows
-# "DVAA".
+# "DVAA". Each reading is also made with every such span kept, as CommonMark shows the "]"
+# and the "(" as text where no "[" before them opens a link that the "]" closes:
+# "x](DV**AA**)" shows "x](DVAA)".
 PAREN_SPAN = re.compile(r"\]\([^()]*\)")
 
 # PAREN_SPAN, or a "]" followed by "[" with the text after it to the first "]" if no further
@@ -1212,8 +1219,22 @@ def step_one(stripped, raw_html=RAW_HTML, spans=True, labels=None, references=No
     return "".join(out), not reading or unmatched
 
 
+def later_steps(text, link_spans=True):
+    """`text`, a line as `step_one` leaves it, after the second and third steps `name_form`
+    states: each "](...)" span `PAREN_SPAN` matches removed, whether or not it makes a
+    link, and none with `link_spans` false, then each "!" `IMAGE` matches, and the Markdown
+    characters in `MARKUP`; then the character references decoded, less the characters
+    `hiding_kind` names, and the text brought to NFKC with each character in `CONFUSABLES`
+    read as the letters it resembles."""
+    if link_spans:
+        text = PAREN_SPAN.sub("", text)
+    text = IMAGE.sub("", text).translate(MARKUP)
+    text = REFERENCE.sub(decoded, text)
+    return nfkc(text).translate(CONFUSABLES)
+
+
 def name_form(stripped, raw_html=RAW_HTML, spans=True, labels=None, references=None,
-              hide_elements=False):
+              hide_elements=False, link_spans=True):
     """`stripped` as a name in it reads, by the three steps the module description states:
     `step_one`, which removes the raw HTML `raw_html` matches, `RAW_HTML` unless another is
     given, keeps as text the character each backslash escapes and the text of each code
@@ -1222,20 +1243,19 @@ def name_form(stripped, raw_html=RAW_HTML, spans=True, labels=None, references=N
     that label, and none with `labels` None, and with `hide_elements` true the text of each
     style, script and template element, and with `references`, `HTML_BLOCK_REFERENCE`
     in the HTML block reading, decodes each numeric character reference it matches where it
-    stands as written and keeps what it stands for as text; then each "](...)" span
-    `PAREN_SPAN` matches removed, whether or not it makes a link, then each "!" `IMAGE`
-    matches, and the Markdown characters in `MARKUP`; then the character references decoded,
-    less the characters `hiding_kind` names, and the text brought to NFKC, which brings back
-    what the first step kept as text, with each character in `CONFUSABLES` read as the
-    letters it resembles. The HTML is removed before the "](...)" spans, as HTML can start
-    inside a link destination or title and end after the ")" that closes them, while a link
-    label is read as written, as CommonMark reads one; and the markup is removed before the
-    references are decoded, as a reference to "*" shows a star, while a reference decoded
-    in the first step is kept as text, which shows a star too."""
+    stands as written and keeps what it stands for as text; then, by `later_steps`, each
+    "](...)" span `PAREN_SPAN` matches removed, whether or not it makes a link, and none
+    with `link_spans` false, as in the reading that keeps every such span, then each "!"
+    `IMAGE` matches, and the Markdown characters in `MARKUP`; then the character references
+    decoded, less the characters `hiding_kind` names, and the text brought to NFKC, which
+    brings back what the first step kept as text, with each character in `CONFUSABLES` read
+    as the letters it resembles. The HTML is removed before the "](...)" spans, as HTML can
+    start inside a link destination or title and end after the ")" that closes them, while
+    a link label is read as written, as CommonMark reads one; and the markup is removed
+    before the references are decoded, as a reference to "*" shows a star, while a
+    reference decoded in the first step is kept as text, which shows a star too."""
     text = step_one(stripped, raw_html, spans, labels, references, hide_elements)[0]
-    text = IMAGE.sub("", PAREN_SPAN.sub("", text)).translate(MARKUP)
-    text = REFERENCE.sub(decoded, text)
-    return nfkc(text).translate(CONFUSABLES)
+    return later_steps(text, link_spans)
 
 
 def holds(text, name):
@@ -1324,6 +1344,11 @@ def names(stripped, name, hiding=False, spans=True, labels=None, unsure=frozense
     each of those readings is also made with the text of each such element removed,
     `name_form` with `hide_elements` true, the one `HtmlBlockHtml` serving those readings
     too: "DV<style>x</style>AA" names DVAA, as a browser shows no text of a style element.
+    Each of those readings whose first step leaves a "](...)" span `PAREN_SPAN` matches is
+    also made with every such span kept, `name_form` with `link_spans` false, as CommonMark
+    shows the "]" and the "(" as text where no "[" before them opens a link that the "]"
+    closes: "x](DV**AA**)" and "x](DV<style>x</style>AA)", each shown as "x](DVAA)", name
+    DVAA, while each reading that removes the span reads "x".
     The name form reads no code span with `spans` false, as `span_lines` gives for a line
     after one that can leave a code span, HTML or a link span open, nor with `hiding` true.
     Where a name form holds `name` only with combining marks directly after it that NFKC
@@ -1391,14 +1416,19 @@ def names(stripped, name, hiding=False, spans=True, labels=None, unsure=frozense
     for raw_html, references in readings:
         for removal in removals:
             for hide in hides:
-                form = name_form(stripped, raw_html, spans, removal, references, hide)
-                if found(form):
-                    return True
-                decomposed = unicodedata.normalize("NFKD", form).translate(CONFUSABLES)
-                if name in decomposed and found(name_form(detached(stripped, references),
-                                                          raw_html, spans, removal,
-                                                          references, hide)):
-                    return True
+                first = step_one(stripped, raw_html, spans, removal, references, hide)[0]
+                # Only a "](...)" span the first step leaves can be kept, so a reading
+                # whose first step leaves none reads alike either way; the first step is
+                # taken once for both.
+                for link_spans in [True, False] if PAREN_SPAN.search(first) else [True]:
+                    form = later_steps(first, link_spans)
+                    if found(form):
+                        return True
+                    decomposed = unicodedata.normalize("NFKD", form).translate(CONFUSABLES)
+                    if name in decomposed and found(name_form(detached(stripped, references),
+                                                              raw_html, spans, removal,
+                                                              references, hide, link_spans)):
+                        return True
     return False
 
 
