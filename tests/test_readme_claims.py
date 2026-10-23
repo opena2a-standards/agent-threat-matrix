@@ -73,6 +73,16 @@ README that defines t, a and b, with DV only in a fenced code block,
 wrong figures, as did the line with "`][a]` `][b]`" in place of "[y][a] [z][b]"; each must
 now go red, read with the labels the page defines on a definition line removed and DV kept.
 
+A "]" followed by "(" makes no link either where no "[" before it opens one: CommonMark
+shows "x](DV**AA**) (99 agents, 77 vulnerability categories)", set as its own paragraph
+after README's licence line, as "x](DVAA) (99 agents, 77 vulnerability categories)", and a
+browser shows the line with "DV<style>x</style>AA" in place of "DV**AA**" so too, as it does
+the line with "DV<x\\>AA" there between "<div>" and "</div>". The check removed every
+"](...)" span whether or not it made a link, read "x (99 agents, 77 vulnerability
+categories)" and exited 0 on each line; each must now go red on both figures, read with
+every such span kept, and the plain scan of the stated steps must read generated lines with
+the spans kept as the checker does.
+
 A browser shows no text of a style, script or template element, so "DV<style>x</style>AA
 (99 agents, 77 vulnerability categories)", set as its own paragraph after README's licence
 line, shows "DVAA (99 agents, 77 vulnerability categories)". The check removed the two tags,
@@ -2076,6 +2086,73 @@ def test_one_html_block_reading_reads_a_line_alike_in_each_label_reading():
                                  labels=removal) == form
 
 
+# Lines that show "DVAA" with two wrong figures where a "]" followed by "(" makes no link,
+# as no "[" before it opens one, each set as its own paragraph after README's licence line.
+# CommonMark shows "x](DV**AA**) (99 agents, 77 vulnerability categories)" as "x](DVAA) (99
+# agents, 77 vulnerability categories)", and a browser shows the line with a style element
+# holding text inside the name so too, and the line with a tag named "x\" inside the name
+# between "<div>" and "</div>", in an HTML block. The check removed each "](...)" span
+# whether or not it made a link, read "x (99 agents, 77 vulnerability categories)", found
+# no DVAA and exited 0 on each line.
+UNLINKED_SPAN_LINES = [
+    ("strong emphasis in the name", [f"x](DV**AA**) {FIGURES}"]),
+    ("style element in the name", [f"x](DV<style>x</style>AA) {FIGURES}"]),
+    ("tag a browser reads in an HTML block in the name",
+     ["<div>", f"x](DV<x\\>AA) {FIGURES}", "</div>"]),
+]
+
+
+@pytest.mark.parametrize("lines", [lines for _, lines in UNLINKED_SPAN_LINES],
+                         ids=[case for case, _ in UNLINKED_SPAN_LINES])
+def test_a_name_in_a_link_span_that_makes_no_link_leaves_the_line_read(lines):
+    td = scratch_tree()
+    try:
+        mutate_readme(td, LICENCE, LICENCE + "\n\n" + "\n".join(lines) + "\n\n")
+        number = where_of(td, next(line for line in lines if FIGURES in line))
+        r = run_checker(td)
+        assert r.returncode == 1, r.stdout
+        for failure in (
+            f"{number}: \"99 agents\" does not match related-projects.json "
+            "(DVAA agents: 21)",
+            f"{number}: \"77 vulnerability categories\" does not match "
+            "related-projects.json (DVAA vulnerability categories: 12)",
+        ):
+            assert failure in r.stderr, r.stderr
+    finally:
+        shutil.rmtree(td)
+
+
+def test_each_reading_is_also_made_with_every_link_span_kept():
+    checker = load_checker()
+    # Removing every span leaves "x" of each line; keeping them, the name. The last line
+    # holds a span only once the first step has removed the tags between "]" and "(":
+    # CommonMark shows "x]<b></b>(DV**AA**)" as "x](DVAA)" too.
+    for line, hide in (("x](DV**AA**)", False), ("x](DV<style>x</style>AA)", True),
+                       ("x]<b></b>(DV**AA**)", False)):
+        assert checker.name_form(line, hide_elements=hide) == "x", line
+        for form in (checker.name_form(line, hide_elements=hide, link_spans=False),
+                     stated_name_form(checker, line, hide_elements=hide, link_spans=False)):
+            assert form == "x(DVAA)", (line, form)
+        assert checker.names(line, "DVAA"), line
+    # Read with RAW_HTML, "<x\>" is no tag, and only the HTML block reading with the span
+    # kept holds the name.
+    line = "x](DV<x\\>AA)"
+    assert checker.name_form(line, checker.HtmlBlockHtml()) == "x"
+    assert not checker.holds(checker.name_form(line, link_spans=False), "DVAA")
+    assert checker.name_form(line, checker.HtmlBlockHtml(), link_spans=False) == "x(DVAA)"
+    assert checker.names(line, "DVAA")
+    # Written after "*", the mark counts as none directly after the name, but NFKC joins it
+    # to the A in the form with the span kept: only the line `detached` gives, read with the
+    # span kept, holds the name.
+    line = "x](DV**AA**\N{COMBINING ACUTE ACCENT})"
+    assert not checker.holds(checker.name_form(line, link_spans=False), "DVAA")
+    assert checker.holds(checker.name_form(checker.detached(line), link_spans=False), "DVAA")
+    assert checker.names(line, "DVAA")
+    # A span that makes a link still goes with the reading that removes it.
+    assert checker.name_form("[DV](url)AA") == "DVAA"
+    assert checker.names("[DV](url)AA", "DVAA")
+
+
 # Names the check does not read as DVAA: a reference to "*" or "&" shows that character
 # rather than marking up text, a letter with an accent is not confusable with A, NFKC
 # leaves U+00C1 composed, a comment that no line closes shows as text and runs to the end
@@ -2736,17 +2813,18 @@ def stated_unsure_labels(text):
 
 
 def stated_name_form(checker, line, any_space=True, labels=None, html_block=False,
-                     quoted=False, references=False, hide_elements=False):
+                     quoted=False, references=False, hide_elements=False, link_spans=True):
     """`line` read by the three steps README states, as a plain scan rather than with the
     checker's patterns, with `any_space` false as in the second reading, with `labels` the
     labels the page defines, or None for the reading that removes no label, with
     `html_block` true as in the HTML block readings, with `quoted` true as in the reading
     that passes over quoted attribute values, with `references` true, beside
     `html_block`, as in the HTML block reading that decodes each numeric reference where it
-    stands as written, with or without a closing ";" and whatever its number of digits, and
+    stands as written, with or without a closing ";" and whatever its number of digits,
     with `hide_elements` true as in the readings that remove the text of style, script and
-    template elements. A reference is decoded by html.unescape, as in the checker, and a
-    decoded character that fails a line is dropped."""
+    template elements, and with `link_spans` false as in the readings that remove no "]"
+    with the "(" and the text after it. A reference is decoded by html.unescape, as in the
+    checker, and a decoded character that fails a line is dropped."""
     def shown(reference):
         return [c for c in html.unescape(reference) if not checker.hiding_kind(c)]
 
@@ -2759,14 +2837,15 @@ def stated_name_form(checker, line, any_space=True, labels=None, html_block=Fals
                               quoted=quoted, shown=shown if references else None,
                               hide_elements=hide_elements)[0]
     # Second, going along what remains, each "]" followed by "(" goes with the text after it
-    # to the first ")" if no further "(" comes first, then each "!" directly before a "[",
-    # and then the Markdown characters, none of them kept as text.
+    # to the first ")" if no further "(" comes first, unless `link_spans` is false, then
+    # each "!" directly before a "[", and then the Markdown characters, none of them kept as
+    # text.
     def plain(k, chars):
         return k < len(pairs) and not pairs[k][1] and pairs[k][0] in chars
 
     kept, i = [], 0
     while i < len(pairs):
-        if plain(i, "]") and plain(i + 1, "("):
+        if link_spans and plain(i, "]") and plain(i + 1, "("):
             j = i + 2
             while j < len(pairs) and not plain(j, "()"):
                 j += 1
@@ -2990,7 +3069,10 @@ def test_the_stated_steps_read_every_generated_line_as_the_checker_does():
     # way it adds to does, on another line that the first is not read on, the first reads it
     # as the quoted value way does, and on a line with no "&#" the second reads it as the
     # first. A line holding "][" is also read with the labels in STATED_LABELS removed, the
-    # first way and, where they apply, the HTML block ways and the quoted value way.
+    # first way and, where they apply, the HTML block ways and the quoted value way. A line
+    # holding a "]" and a "(" is also read the first way with no "]" removed with the "("
+    # and the text after it; on any other line the first step leaves no "]" followed by
+    # "(", as it keeps each "]" and "(" it reads as text in a fullwidth form.
     checker = load_checker()
     rng = random.Random(80)
     for _ in range(STATED_LINES):
@@ -2998,6 +3080,9 @@ def test_the_stated_steps_read_every_generated_line_as_the_checker_does():
         plain = stated_name_form(checker, line)
         assert checker.name_form(line) == plain, ascii(line)
         assert checker.step_one(line)[1] == stated_first_step(line)[1], ascii(line)
+        if "]" in line and "(" in line:
+            assert (checker.name_form(line, link_spans=False)
+                    == stated_name_form(checker, line, link_spans=False)), ascii(line)
         if any(c.isspace() and c not in " \t" for c in line):
             assert (checker.name_form(line, checker.SPACE_OR_TAB_HTML)
                     == stated_name_form(checker, line, any_space=False)), ascii(line)
