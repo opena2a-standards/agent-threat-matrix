@@ -82,11 +82,15 @@ Unicode lists as white space (such as U+00A0 NO-BREAK SPACE), to the first > aft
 if no < comes first. Where white space other than a space or tab follows a tag name, the
 line is also read with only a space, a tab or / ending a tag name. Where a character other
 than an ASCII letter, digit, hyphen, tab, line feed, form feed, space, / or > follows a tag
-name, such as \\, < or U+00A0, the line is also read as a browser reads a tag in an HTML
-block, with a name that is an ASCII letter followed by any characters other than a tab,
-line feed, form feed, space, / and >, the six characters at which a browser ends a tag
-name, so that U+00A0 and U+3000 IDEOGRAPHIC SPACE do not end one: "DV<x\\>AA",
-"D<D\\\\</b>VAA" and "DV<x" U+00A0 "<y>AA" name DVAA. Where / or white space follows a tag
+name, such as \\, < or U+00A0, or where a tab, line feed, form feed, space or / follows a
+tag name and a < follows that before any >, the line is also read as a browser reads a tag
+in an HTML block, with a name that is an ASCII letter followed by any characters other
+than a tab, line feed, form feed, space, / and >, the six characters at which a browser
+ends a tag name, so that U+00A0 and U+3000 IDEOGRAPHIC SPACE do not end one, and after the
+name and a tab, line feed, form feed, space or / a tag runs to the first > after it, past
+any <, which a browser reads there as part of an attribute name or value: "DV<x\\>AA",
+"D<D\\\\</b>VAA", "DV<x" U+00A0 "<y>AA", "DV<a <b>AA" and "D<a <b" U+00A0 "D<x\\>VAA"
+name DVAA. Where / or white space follows a tag
 name and a " or ' follows that before any < or >, the line is also read with each " or '
 in a tag after that / or white space passed over whole with the text up to the next such
 quote on the line, as an attribute value in quotes, which CommonMark and a browser read
@@ -94,7 +98,7 @@ past any < or > it holds: a tag then runs to the first > that stands in no such 
 no < that stands in none comes first, so "DV<b x="<">AA" and "DV<b title='>'>AA" name
 DVAA. A quote that no such quote follows on the line is read there as any other
 character. Where & stands directly before #, the line is also read as a browser reads an
-HTML block: its tag names are read as a browser reads them, as above, and each numeric
+HTML block: its tags are read as a browser reads them, as above, and each numeric
 character reference, & and # followed by one or more ASCII digits or by x or X and one or
 more hexadecimal digits, with a ; directly after the last digit where one stands, is
 decoded in the first step where it stands as written, with or without the ; and whatever
@@ -387,21 +391,28 @@ SPACE_OR_TAB_HTML = re.compile(
 # text.
 OTHER_SPACE_AFTER_TAG_NAME = re.compile(r"</?[A-Za-z][A-Za-z0-9-]*[^\S \t]")
 
-# RAW_HTML with a tag name of an ASCII letter followed by any characters other than a tab,
-# line feed, form feed, space, "/" and ">", as a browser reads a tag in an HTML block, where
-# those six characters alone end a tag name: "<x\>" is a tag named "x\", "<D\\</b>" a tag
-# named "d\\<" with an attribute "b", and "<x" U+00A0 "<y>" a tag named "x" U+00A0 "<y", so
-# "DV<x\>AA", "D<D\\</b>VAA" and "DV<x" U+00A0 "<y>AA" between "<div>" and "</div>" show
-# "DVAA". After the name, only a tab, line feed, form feed, space or "/" lets the tag run on
-# to a ">", so a match takes the name to the first of the six: no shorter name is followed
-# by one of them.
-HTML_BLOCK_HTML = re.compile(
-    RAW_HTML.pattern.replace(r"[A-Za-z0-9-]*(?:[\s/]", r"[^\t\n\f />]*(?:[\t\n\f /]"))
+# RAW_HTML with a tag read as a browser reads one in an HTML block: a tag name of an ASCII
+# letter followed by any characters other than a tab, line feed, form feed, space, "/" and
+# ">", where those six characters alone end a tag name, and after the name and a tab, line
+# feed, form feed, space or "/", the text to the first ">", past any "<", which a browser
+# reads there as part of an attribute name or value. "<x\>" is a tag named "x\", "<D\\</b>"
+# a tag named "d\\<" with an attribute "b", "<x" U+00A0 "<y>" a tag named "x" U+00A0 "<y",
+# and "<a <b>" a tag named "a" with an attribute "<b", so "DV<x\>AA", "D<D\\</b>VAA",
+# "DV<x" U+00A0 "<y>AA" and "DV<a <b>AA" between "<div>" and "</div>" show "DVAA". After the
+# name, only a tab, line feed, form feed, space or "/" lets the tag run on to a ">", so a
+# match takes the name to the first of the six: no shorter name is followed by one of them.
+# A tag ends at the first ">" after it, as RAW_HTML ends one, also where that ">" stands in
+# a quoted attribute value, which QUOTED_HTML passes over.
+HTML_BLOCK_HTML = re.compile(RAW_HTML.pattern.replace(
+    r"[A-Za-z0-9-]*(?:[\s/][^<>]*)?>", r"[^\t\n\f />]*(?:[\t\n\f /][^>]*)?>"))
 
 # A tag name followed by a character other than an ASCII letter, digit, hyphen, tab, line
-# feed, form feed, space, "/" or ">", such as "\", "<" or U+00A0 NO-BREAK SPACE: only on a
-# line that holds one do RAW_HTML and HTML_BLOCK_HTML remove different text.
+# feed, form feed, space, "/" or ">", such as "\", "<" or U+00A0 NO-BREAK SPACE, and a tag
+# name followed by a tab, line feed, form feed, space or "/" and then by a "<" before any
+# ">": only on a line that holds one of the two do RAW_HTML and HTML_BLOCK_HTML remove
+# different text.
 OTHER_CHARACTER_IN_TAG_NAME = re.compile(r"</?[A-Za-z][A-Za-z0-9-]*[^A-Za-z0-9\t\n\f />-]")
+LESS_THAN_AFTER_TAG_NAME = re.compile(r"</?[A-Za-z][A-Za-z0-9-]*[\t\n\f /][^<>]*<")
 
 # The tag name HTML_BLOCK_HTML reads from its first letter.
 HTML_BLOCK_TAG_NAME = re.compile(r"[^\t\n\f />]*")
@@ -409,34 +420,29 @@ HTML_BLOCK_TAG_NAME = re.compile(r"[^\t\n\f />]*")
 
 class HtmlBlockHtml:
     """The HTML `HTML_BLOCK_HTML` matches, with `match` as a compiled pattern has it, read
-    over a line in linear time. A tag name there can hold "<", so a tag that finds no ">"
-    can take its name past another "<"; a tag from a "<" and an ASCII letter inside that
-    name has the rest of that name as its own and finds no ">" either, so it is not looked
-    for again. A "</" ends that name at its "/" and is looked for. The last such tag is held
-    as where it starts and where its name ends, and only a "<" between the two is passed
-    over, so one instance gives what the pattern gives however many times it reads a line:
-    a later reading of the line, which starts again from its first character, looks for
-    each tag before that one. Whether a tag finds a ">" turns on the line alone, so this
-    holds also for readings that pass over different parts of the line, as the reading that
-    removes a link label passes over the label and the reading that removes none does not:
-    `names` reads a line with one instance in each of its label readings, and in the
-    readings that remove the text of style, script and template elements, which pass over
-    the same parts as the others."""
+    over a line in linear time. A tag there, from "<" or "</" and an ASCII letter, runs past
+    any "<" in its name and attributes to the first ">" after it, so it finds a ">" exactly
+    where one stands after its "<" on the line: a tag after the last ">" finds none, and
+    looked for from each "<" on a line of "<a", every look would scan to the end of the
+    line. Where the last ">" of the line stands is held for the line last read, and a tag
+    after it is not looked for. That place turns on the line alone, so one instance gives
+    what the pattern gives however many times it reads a line, and also in readings that
+    pass over different parts of the line, as the reading that removes a link label passes
+    over the label and the reading that removes none does not: `names` reads a line with one
+    instance in each of its label readings, and in the readings that remove the text of
+    style, script and template elements."""
 
     def __init__(self):
-        self.text, self.start, self.name_end = None, -1, -1
+        self.text, self.last = None, -1
 
     def match(self, text, pos):
         letter = pos + 2 if text.startswith("</", pos) else pos + 1
-        is_tag = letter < len(text) and text[letter] in string.ascii_letters
-        if (letter == pos + 1 and is_tag and text is self.text
-                and self.start < pos < self.name_end):
-            return None
-        found = HTML_BLOCK_HTML.match(text, pos)
-        if is_tag and not found:
-            self.text, self.start = text, pos
-            self.name_end = HTML_BLOCK_TAG_NAME.match(text, letter + 1).end()
-        return found
+        if letter < len(text) and text[letter] in string.ascii_letters:
+            if text is not self.text:
+                self.text, self.last = text, text.rfind(">")
+            if self.last < pos:
+                return None
+        return HTML_BLOCK_HTML.match(text, pos)
 
 
 # RAW_HTML with each '"' or "'" in a tag after the "/" or white space that follows its name
@@ -1131,8 +1137,10 @@ def names(stripped, name, hiding=False, spans=True, labels=None):
     `RAW_HTML` and, where a tag name is followed by white space other than a space or
     tab, with `SPACE_OR_TAB_HTML` too, and where a tag name is followed by a character
     other than an ASCII letter, digit, hyphen, tab, line feed, form feed, space, "/" or ">",
-    as a browser reads a tag in an HTML block too, with `HtmlBlockHtml`: "DV<x\\>AA",
-    "D<D\\\\</b>VAA" and "DV<x" U+00A0 "<y>AA" name DVAA; and where "/" or white space
+    or by a tab, line feed, form feed, space or "/" and then by a "<" before any ">", as a
+    browser reads a tag in an HTML block too, with `HtmlBlockHtml`: "DV<x\\>AA",
+    "D<D\\\\</b>VAA", "DV<x" U+00A0 "<y>AA", "DV<a <b>AA" and "D<a <b" U+00A0 "D<x\\>VAA"
+    name DVAA; and where "/" or white space
     after a tag name is followed by a quote before any "<" or ">", with `QUOTED_HTML` too,
     which passes over a quoted attribute value whole: 'DV<b x="<">AA' and
     "DV<b title='>'>AA" name DVAA. Where "&" stands directly before "#", it is also read as
@@ -1181,7 +1189,8 @@ def names(stripped, name, hiding=False, spans=True, labels=None):
     # its `detached` form: it gives what HTML_BLOCK_HTML gives in every reading, whichever
     # "<" a reading passes over.
     block_html = HtmlBlockHtml()
-    if OTHER_CHARACTER_IN_TAG_NAME.search(stripped):
+    if (OTHER_CHARACTER_IN_TAG_NAME.search(stripped)
+            or LESS_THAN_AFTER_TAG_NAME.search(stripped)):
         readings.append((block_html, None))
     if QUOTE_AFTER_TAG_NAME.search(stripped):
         readings.append((QUOTED_HTML, None))
