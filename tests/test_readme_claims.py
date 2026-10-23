@@ -61,7 +61,12 @@ line passed with two wrong figures, as did "[x][\\[DV](y)AA"; each must now go r
 are removed with the "]" before them, also after a label the page does not define on the
 same line. The line is also read with no label removed, so a definition-like line in a
 fenced code block, which CommonMark does not read as a definition, leaves the figures read,
-and a definition on another page defines nothing on this one.
+and a definition on another page defines nothing on this one. A line holding four or more
+labels the page defines was read with all of them removed and with none only, so on a
+README that defines t, a and b, with DV only in a fenced code block,
+"[x][DV](u)[A][t]A [y][a] [z][b]", which CommonMark shows as "[x]DVAA y z", passed with two
+wrong figures, as did the line with "`][a]` `][b]`" in place of "[y][a] [z][b]"; each must
+now go red, read with the labels the page defines on a definition line removed and DV kept.
 
 A browser shows no text of a style, script or template element, so "DV<style>x</style>AA
 (99 agents, 77 vulnerability categories)", set as its own paragraph after README's licence
@@ -1768,8 +1773,15 @@ def test_the_quoted_value_reading_reads_a_long_line_in_linear_time(line):
 # them removed and kept. With t defined and
 # DV only in a fenced code block, CommonMark shows "[x][DV](u)[A][t]A" as "[x]DVAA", DV
 # linking to u and A to t's destination: read with both labels removed it gave "x(u)AA",
-# and with none "xDVAtA", and the line passed with exit 0.
+# and with none "xDVAtA", and the line passed with exit 0. With a and b defined too,
+# CommonMark shows "[x][DV](u)[A][t]A [y][a] [z][b]" as "[x]DVAA y z", and with "`][a]`
+# `][b]`" in place of "[y][a] [z][b]" as "[x]DVAA ][a] ][b]": holding four labels the page
+# defines, the "][" in a code span counted too, each line was read with all of them removed
+# and with none only, and passed with exit 0. DV is defined on no definition line, so each
+# is now also read with t, a and b removed and DV kept.
 DEFINITION = "[d]: https://example.org"
+FOUR_DEFINITIONS = ("[t]: https://example.org\n[a]: https://example.org\n"
+                    "[b]: https://example.org\n\n```\n[DV]: https://example.org\n```")
 LABEL_LINES = [
     ("label the page does not define", "[x][DV](y)AA", ""),
     ("link span with no label before it", "[DV](y)AA", ""),
@@ -1784,6 +1796,10 @@ LABEL_LINES = [
      "```\n[DV]: https://example.org\n```"),
     ("label the page defines beside one only a fenced code block defines",
      "[x][DV](u)[A][t]A", "[t]: https://example.org\n\n```\n[DV]: https://example.org\n```"),
+    ("four labels the page defines, one only in a fenced code block",
+     "[x][DV](u)[A][t]A [y][a] [z][b]", FOUR_DEFINITIONS),
+    ("four labels the page defines, two after a ] in a code span",
+     "[x][DV](u)[A][t]A `][a]` `][b]`", FOUR_DEFINITIONS),
 ]
 
 
@@ -1853,7 +1869,8 @@ def test_a_line_with_three_labels_is_read_with_each_mix_removed_and_kept():
 
 def test_a_line_with_four_labels_is_read_with_all_removed_and_with_none_only():
     # U+FF21 FULLWIDTH LATIN CAPITAL LETTER A reads as A and case folds to a label of its own.
-    # Every mix of four labels would be 16 readings of the line, each reading all of it.
+    # Every mix of four labels would be 16 readings of the line, each reading all of it. None
+    # of the four is in `unsure` here.
     checker = load_checker()
     letters = "DVA\N{FULLWIDTH LATIN CAPITAL LETTER A}"
     keys = [c.casefold() for c in letters]
@@ -1863,6 +1880,25 @@ def test_a_line_with_four_labels_is_read_with_all_removed_and_with_none_only():
         line = mixed_label_line(letters, removed)
         assert checker.name_form(line, labels=removed) == "DVAA", line
         assert checker.names(line, "DVAA", labels=labels) == (len(removed) in (0, 4)), line
+
+
+def test_a_line_with_four_labels_is_read_with_each_mix_of_those_defined_on_no_definition_line():
+    # As above, with the labels in `unsure` defined on no definition line, where CommonMark
+    # may read no definition: one to three of them on the line are also read with each mix
+    # of them removed and kept and the other labels removed, while four are read with all
+    # removed and with none only, as with none in `unsure`. Of the 16 lines, those that a
+    # reading removes exactly the labels of name DVAA, for each of the 16 sets in `unsure`.
+    checker = load_checker()
+    letters = "DVA\N{FULLWIDTH LATIN CAPITAL LETTER A}"
+    keys = [c.casefold() for c in letters]
+    labels = frozenset(keys)
+    for unsure in subsets(keys):
+        mixed = 0 < len(unsure) <= checker.MIXED_LABELS
+        for removed in subsets(keys):
+            line = mixed_label_line(letters, removed)
+            read = len(removed) in (0, 4) or mixed and labels - unsure <= removed
+            assert checker.names(line, "DVAA", labels=labels, unsure=unsure) == read, (
+                line, sorted(unsure))
 
 
 def test_a_definition_on_another_page_defines_no_label_on_this_one():
@@ -2193,6 +2229,56 @@ def test_a_page_defines_the_labels_stated(text, labels):
     assert stated_defined_labels(text) == labels
 
 
+# The labels a page defines on no definition line: a definition-like text stands on one
+# where its "[" starts a line, after at most three spaces, outside a fenced code block. A
+# fenced code block runs from a line that, after at most three spaces, starts with three or
+# more backticks with no backtick after them on the line, or three or more tildes, to the
+# first later line that is, after at most three spaces, a run of that character at least as
+# long and nothing but spaces and tabs, or to the end of the page. A label defined on a
+# definition line too is not one of them, and a text that defines nothing gives none.
+UNSURE_DEFINITIONS = [
+    ("definition line", "[t]: x", set()),
+    ("definition line after three spaces", "   [t]: x", set()),
+    ("definition-like text after four spaces", "    [t]: x", {"t"}),
+    ("definition-like text after a tab", "\t[t]: x", {"t"}),
+    ("definition-like text in a code span", "`[t]: x`", {"t"}),
+    ("definition-like text after other text", "see [t]: x", {"t"}),
+    ("definition-like text in a list item", "- [t]: x", {"t"}),
+    ("definition-like text in a block quote", "> [t]: x", {"t"}),
+    ("fenced code block", "```\n[t]: x\n```", {"t"}),
+    ("fenced code block of tildes", "~~~\n[t]: x\n~~~", {"t"}),
+    ("fenced code block after three spaces", "   ```\n[t]: x\n```", {"t"}),
+    ("fenced code block with an info string", "```md\n[t]: x\n```", {"t"}),
+    ("fenced code block that no line closes", "```\n[t]: x", {"t"}),
+    ("definition line after a fenced code block", "```\n```\n[t]: x", set()),
+    ("one label in a fenced code block and on a definition line",
+     "```\n[t]: x\n```\n[t]: x", set()),
+    ("shorter run in a fenced code block", "````\n```\n[t]: x\n````", {"t"}),
+    ("run of the other character in a fenced code block", "```\n~~~\n[t]: x\n```", {"t"}),
+    ("run with text after it in a fenced code block", "```\n``` x\n[t]: x\n```", {"t"}),
+    ("closing run with spaces and a tab after it", "```\n[t]: x\n```  \t\n[a]: x", {"t"}),
+    ("closing run after three spaces", "```\n[t]: x\n   ```\n[a]: x", {"t"}),
+    ("run after four spaces in a fenced code block", "```\n    ```\n[t]: x", {"t"}),
+    ("backtick run with a backtick after it", "```x`\n[t]: x", set()),
+    ("tilde run with a backtick after it", "~~~x`\n[t]: x\n~~~", {"t"}),
+    ("run after four spaces", "    ```\n[t]: x", set()),
+    ("run of two backticks", "``\n[t]: x\n``", set()),
+    ("label across a line break", "[a\nb]: x", set()),
+    ("label across a line break after other text", "x [a\nb]: x", {"a b"}),
+    ("escaped opening bracket", "\\[t]: x", set()),
+    ("label followed by a space", "[t] : x", set()),
+]
+
+
+@pytest.mark.parametrize("text,labels", [(t, l) for _, t, l in UNSURE_DEFINITIONS],
+                         ids=[case for case, _, _ in UNSURE_DEFINITIONS])
+def test_a_page_defines_on_no_definition_line_the_labels_stated(text, labels):
+    checker = load_checker()
+    assert checker.unsure_labels(text) == frozenset(labels)
+    assert checker.unsure_labels(text) <= checker.defined_labels(text)
+    assert stated_unsure_labels(text) == labels
+
+
 # What a line reads as with the text of each style, script and template element removed,
 # the reading `names` adds where a "<" is followed by the name of one. An element runs from
 # its start tag, in any ASCII letter case and with an attribute or a "/", to the end of the
@@ -2451,6 +2537,45 @@ def stated_defined_labels(text):
                 text[start + 1:end - 1]):
             keys.add(stated_label_key(text[start + 1:end - 1]))
     return keys
+
+
+def stated_unsure_labels(text):
+    """The labels page `text` defines on no definition line as README states: those of
+    `stated_defined_labels` whose every definition-like text has its "[" anywhere but at
+    the start of a line, after at most three spaces, outside a fenced code block, the page
+    read line by line with a count of each run rather than the checker's patterns."""
+    starts = set()
+    fence = None  # the character and length of the run that opened the open block
+    offset = 0
+    for line in text.split("\n"):
+        spaces = 0
+        while line[spaces:spaces + 1] == " ":
+            spaces += 1
+        first = line[spaces:spaces + 1]
+        run = 0
+        while first in ("`", "~") and line[spaces + run:spaces + run + 1] == first:
+            run += 1
+        after = line[spaces + run:]
+        fence_line = spaces <= 3 and run >= 3
+        if fence is not None:
+            if (fence_line and first == fence[0] and run >= fence[1]
+                    and all(c in " \t" for c in after)):
+                fence = None
+        elif fence_line and not (first == "`" and "`" in after):
+            fence = (first, run)
+        elif spaces <= 3 and first == "[":
+            starts.add(offset + spaces)
+        offset += len(line) + 1
+    sure, keys = set(), set()
+    for start, c in enumerate(text):
+        run = 0
+        while c == "[" and run < start and text[start - 1 - run] == "\\":
+            run += 1
+        end = stated_label_end(text, start) if c == "[" and not run % 2 else None
+        if end is not None and text[end:end + 1] == ":" and stated_label_key(
+                text[start + 1:end - 1]):
+            (sure if start in starts else keys).add(stated_label_key(text[start + 1:end - 1]))
+    return keys - sure
 
 
 def stated_name_form(checker, line, any_space=True, labels=None, html_block=False,
@@ -2799,6 +2924,31 @@ def test_the_stated_label_rule_reads_every_generated_line_as_the_checker_does():
                         == stated), ascii(line)
 
 
+# Pieces of the pages that the definition line rule reads: line breaks, spaces, a tab and
+# other text before a "[" or a run, runs of backticks and tildes of each length that opens
+# or closes a fenced code block or does neither, brackets, a colon, a backslash and letters.
+DEFINITION_LINE_PIECES = [
+    *"\n\n[]:`~\t\\tax", " ", "   ", "    ", "``", "```", "````", "~~~", "~~~~", "[t]: x",
+    "\n```\n", "\n~~~\n", "\n[a]: x\n",
+]
+DEFINITION_PAGES_GENERATED = 100_000
+
+
+def test_the_stated_definition_line_rule_reads_every_generated_page_as_the_checker_does():
+    # The definition line rule is stated in words in README and the script's description,
+    # and the checker reads it with FENCE and its own scan; a clause that drifted from them,
+    # such as a run shorter than the one that opened a block closing it, or a run after four
+    # spaces opening one, would leave the cases above passing. Of the labels a page defines,
+    # those it defines on no definition line are a part.
+    checker = load_checker()
+    rng = random.Random(180)
+    for _ in range(DEFINITION_PAGES_GENERATED):
+        page = "".join(rng.choice(DEFINITION_LINE_PIECES) for _ in range(rng.randint(1, 24)))
+        unsure = checker.unsure_labels(page)
+        assert unsure == stated_unsure_labels(page), ascii(page)
+        assert unsure <= checker.defined_labels(page), ascii(page)
+
+
 # Pieces of lines that hold a tag with a quote after its name far more often than the lines
 # above do: a tag name followed by a space, a tab, "/" or U+00A0, the quotes, "=", "<" and
 # ">", "DV" and "AA", and the characters that decide where code spans and link spans end.
@@ -3056,6 +3206,23 @@ def test_a_line_of_many_labels_the_page_defines_is_read_in_linear_time():
     seconds = time.perf_counter() - start
     assert not named
     assert len(checker.label_removals(line, frozenset(keys))) == 2
+    assert seconds < 1, f"{seconds:.2f} s"
+
+
+@pytest.mark.parametrize("page,unsure", [
+    # A fenced code block of 100,000 definitions, 700,004 characters.
+    ("```\n" + "[d]: x\n" * LABEL_RUNS, {"d"}),
+    # A block that 100,000 shorter runs leave open, 400,011 characters.
+    ("````\n" + "```\n" * LABEL_RUNS + "[d]: x", {"d"}),
+], ids=["a fenced code block of definitions", "a fenced code block of shorter runs"])
+def test_definition_lines_are_read_in_linear_time(page, unsure):
+    # Each line of a page is read once for the definition line rule, and the page once for
+    # its definition-like texts, so each of these pages is read in under a second.
+    checker = load_checker()
+    start = time.perf_counter()
+    got = checker.unsure_labels(page)
+    seconds = time.perf_counter() - start
+    assert got == frozenset(unsure)
     assert seconds < 1, f"{seconds:.2f} s"
 
 
