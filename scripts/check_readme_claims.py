@@ -108,7 +108,17 @@ after them that is not such a digit in the line as written, such as < or *, so
 "&#x30<b>D<x\\>VAA" reads "0DVAA" and names DVAA, as do "DVA&#65", "DVA&#x41" and
 "DVA&#00000065;", where CommonMark reads a reference only with the ; and at most seven
 decimal or six hexadecimal digits and shows each of the three as written in a paragraph.
-No such reference starts inside HTML or a code span, or at an escaped &. Each of these
+No such reference starts inside HTML or a code span, or at an escaped &. Where a " or '
+stands on a line read either of these two ways as a browser reads an HTML block, it is
+also read that way with each " or ' in a tag after the tab, line feed, form feed, space or
+/ that ends its name passed over whole with the text up to the next such quote on the
+line, as above, and the tag then running past any < to the first > that stands in no such
+value, as a browser reads a tag name, a quoted value, a < in a tag and a reference at once
+there. A line read with quoted values passed over is also read the first of those two
+ways with them passed over, as a < that stands in no such value can follow one:
+"DV<b x=">" <c>AA", a tag b holding the value > with an attribute <c, names DVAA, as do
+"DV<x\\ y=">">AA", a tag named "x\\" holding the value ">", "DV<a <b x=">">AA" and
+"DV<b x='>'>A&#65". Each of these
 readings is also made with the text of each style, script and
 template element removed, as a browser shows none of it: going along the line, a start
 tag removed as above whose name is style, script or template opens that element unless a
@@ -471,6 +481,76 @@ QUOTED_HTML = re.compile(RAW_HTML.pattern.replace(
 # A tag name followed by "/" or white space and then, before any "<" or ">", by a quote:
 # only on a line that holds one do RAW_HTML and QUOTED_HTML remove different text.
 QUOTE_AFTER_TAG_NAME = re.compile(r"""</?[A-Za-z][A-Za-z0-9-]*[\s/][^<>"']*["']""")
+
+# QUOTED_HTML with a tag read as HTML_BLOCK_HTML reads one, as a browser reads a tag in an
+# HTML block, where it reads the tag name, each quoted attribute value and each "<" after
+# the name at once: each '"' or "'" in a tag after the tab, line feed, form feed, space or
+# "/" that ends its name is passed over whole with the text up to the next such quote on
+# the line, and the tag runs past any "<" to the first ">" that stands in no such value, so
+# 'DV<x\ y=">">AA' and 'DV<b x=">" <c>AA' between "<div>" and "</div>" show "DVAA", the
+# first a tag named "x\" holding the value ">", the second a tag "b" holding it with an
+# attribute "<c" after it. Only on a line holding a quote does it remove other text than
+# HTML_BLOCK_HTML.
+HTML_BLOCK_QUOTED_HTML = re.compile(QUOTED_HTML.pattern.replace(
+    r"""[A-Za-z0-9-]*(?:[\s/](?:[^<>"']""", r"""[^\t\n\f />]*(?:[\t\n\f /](?:[^>"']"""))
+
+
+class HtmlBlockQuotedHtml:
+    """The HTML `HTML_BLOCK_QUOTED_HTML` matches, with `match` as a compiled pattern has it,
+    read over a line in linear time. A tag name there can hold a quote, which opens no value
+    there, so a tag that starts inside a quoted value of another can fall into step with it
+    at that quote and read on with it to the same place: tried at each "<" of 'DV<a x="'
+    followed by '<a" x="' 20,000 times and "AA", the pattern reads on to the end of the line
+    from each, as it does from each "<" of "DV" followed by '<a x=">" ' many times and "AA",
+    where a tag runs past each "<" after its name and a space and no ">" stands in no
+    value. For each line it reads, an instance notes once, going back from the end, where
+    a tag name from each place ends, at the first tab, line feed, form feed, space, "/" or
+    ">", and where the text of a tag from each place stops, at the first ">" that stands in
+    no quoted value, past any "<", or at the end of the line. A tag from "<" or "</" and an
+    ASCII letter then ends at the ">" that ends its name, or at the ">" where the text after
+    the tab, line feed, form feed, space or "/" that ends its name stops, and is none where
+    that text runs to the end of the line, each found in constant time; the pattern is
+    matched only over a tag so found, from its "<" to its ">", where it gives what it gives
+    over the whole line. Any other "<" is read with the pattern itself, which matches a
+    comment, processing instruction, CDATA section or declaration there, to its close or to
+    the end of the line, or nothing."""
+
+    def __init__(self):
+        self.text, self.name_ends, self.stops = None, [], []
+
+    def read(self, text):
+        """Note, for each place in `text` and its end, where a tag name from there ends and
+        where the text of a tag from there stops."""
+        n = len(text)
+        name_ends, stops = [n] * (n + 1), [n] * (n + 1)
+        # The next '"' and the next "'" after the place read, or n where none follows.
+        after = {'"': n, "'": n}
+        for k in range(n - 1, -1, -1):
+            c = text[k]
+            name_ends[k] = k if c in "\t\n\f />" else name_ends[k + 1]
+            if c == ">":
+                stops[k] = k
+            elif c in after and after[c] < n:
+                stops[k] = stops[after[c] + 1]
+            else:
+                stops[k] = stops[k + 1]
+            if c in after:
+                after[c] = k
+        self.text, self.name_ends, self.stops = text, name_ends, stops
+
+    def match(self, text, pos):
+        letter = pos + 2 if text.startswith("</", pos) else pos + 1
+        if not (text.startswith("<", pos) and letter < len(text)
+                and text[letter] in string.ascii_letters):
+            return HTML_BLOCK_QUOTED_HTML.match(text, pos)
+        if text is not self.text:
+            self.read(text)
+        end = self.name_ends[letter + 1]
+        if end < len(text) and text[end] != ">":
+            end = self.stops[end + 1]
+        if end == len(text):
+            return None
+        return HTML_BLOCK_QUOTED_HTML.match(text, pos, end + 1)
 
 # The elements a browser shows no text of, named in lower case: a style or script element
 # holds raw text, which runs to an end tag of its name, and the content of a template
@@ -1217,14 +1297,20 @@ def names(stripped, name, hiding=False, spans=True, labels=None, unsure=frozense
     "DV<b title='>'>AA" name DVAA. Where "&" stands directly before "#", it is also read as
     a browser reads an HTML block, with `HtmlBlockHtml` and each numeric character reference
     `HTML_BLOCK_REFERENCE` matches decoded where it stands as written: "DVA&#65", "DVA&#x41"
-    and "&#x30<b>D<x\\>VAA" name DVAA, the last as "0DVAA". Each name form removes a "]"
-    directly followed by a link label that is blank or in `labels`, the labels the page
-    holding the line defines, with that label; where a "]" stands directly before a "[",
-    the line is also read with no label removed, as it is with `labels` None, and with the
-    other removals `label_removals` gives, `unsure` being the labels the page defines only
-    in definition-like texts CommonMark may not read as definitions (`unsure_labels`), in
-    each of those readings, one `HtmlBlockHtml` serving every label reading: on a page that
-    defines DV,
+    and "&#x30<b>D<x\\>VAA" name DVAA, the last as "0DVAA". Where a quote stands on the
+    line, each of these two HTML block readings is also made with `HtmlBlockQuotedHtml` in
+    place of `HtmlBlockHtml`, which passes over a quoted attribute value whole, as
+    `QUOTED_HTML` does, after the tab, line feed, form feed, space or "/" that ends a tag
+    name read as a browser reads one, and reads the tag on past any "<" to the first ">"
+    that stands in no such value; the first of the two is also made where `QUOTED_HTML`
+    is: 'DV<x\\ y=">">AA', 'DV<b x=">" <c>AA' and "DV<b x='>'>A&#65" name DVAA.
+    Each name form removes a "]" directly followed by a link label that is blank or in
+    `labels`, the labels the page holding the line defines, with that label; where a "]"
+    stands directly before a "[", the line is also read with no label removed, as it is
+    with `labels` None, and with the other removals `label_removals` gives, `unsure` being
+    the labels the page defines only in definition-like texts CommonMark may not read as
+    definitions (`unsure_labels`), in each of those readings, one `HtmlBlockHtml` serving
+    every label reading: on a page that defines DV,
     "[x][DV](url)A<y\\>A <q\\" names DVAA only read with no label removed and as a browser
     reads "<y\\>" in an HTML block, after the reading that removes DV has held "<q\\", a tag
     that finds no ">". `defined_labels` also counts a text that
@@ -1264,11 +1350,28 @@ def names(stripped, name, hiding=False, spans=True, labels=None, unsure=frozense
     # its `detached` form: it gives what HTML_BLOCK_HTML gives in every reading, whichever
     # "<" a reading passes over.
     block_html = HtmlBlockHtml()
-    if (OTHER_CHARACTER_IN_TAG_NAME.search(stripped)
-            or LESS_THAN_AFTER_TAG_NAME.search(stripped)):
+    # A browser reads a quoted attribute value in an HTML block together with the tag name,
+    # the "<" after it and the numeric character references it reads there, so each HTML
+    # block reading is also made with HtmlBlockQuotedHtml, which reads a line holding no
+    # quote as HtmlBlockHtml does, and so is the reading that passes over quoted values:
+    # there a "<" that stands in no quoted value can follow one, as in 'DV<b x=">" <c>AA',
+    # where LESS_THAN_AFTER_TAG_NAME finds no "<" before the ">" in the value. On a line
+    # that none of OTHER_CHARACTER_IN_TAG_NAME, LESS_THAN_AFTER_TAG_NAME and
+    # QUOTE_AFTER_TAG_NAME matches, each tag name ends where a browser ends one, and the
+    # first of "<", ">" and a quote after a tag name and a tab, line feed, form feed, space
+    # or "/" is a ">" or none, so HtmlBlockQuotedHtml removes what QUOTED_HTML and RAW_HTML
+    # do. One instance serves each such reading, as HtmlBlockHtml does.
+    quoted = '"' in stripped or "'" in stripped
+    block_quoted_html = HtmlBlockQuotedHtml()
+    block = (OTHER_CHARACTER_IN_TAG_NAME.search(stripped)
+             or LESS_THAN_AFTER_TAG_NAME.search(stripped))
+    if block:
         readings.append((block_html, None))
     if QUOTE_AFTER_TAG_NAME.search(stripped):
         readings.append((QUOTED_HTML, None))
+        readings.append((block_quoted_html, None))
+    elif block and quoted:
+        readings.append((block_quoted_html, None))
     # A numeric character reference stands as written only where "&" is directly followed
     # by "#", and on any other line the reading with HTML_BLOCK_REFERENCE reads the line as
     # the HTML block reading above does. That reading stays: it leaves a reference with no
@@ -1276,6 +1379,8 @@ def names(stripped, name, hiding=False, spans=True, labels=None, unsure=frozense
     # "&#x3DV<x\>AA" names DVAA there, where this one decodes "&#x3D".
     if "&#" in stripped:
         readings.append((block_html, HTML_BLOCK_REFERENCE))
+        if quoted:
+            readings.append((block_quoted_html, HTML_BLOCK_REFERENCE))
     # Only a "]" directly before a "[" can be removed with a label, so a line without one
     # reads alike either way.
     removals = ([None] if labels is None or "][" not in stripped

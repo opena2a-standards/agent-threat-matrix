@@ -43,7 +43,12 @@ more digits than CommonMark reads, written inside the name in an HTML block, as 
 "DVA&#65", leaves the name showing "DVAA" too, as a browser decodes it there where it stands
 as written, before it reads any tag, so "&#x30<b>D<x\\>VAA" shows "0DVAA": each such line
 must go red on both figures, and each line the check read as naming DVAA before must still
-go red. Written with a combining mark directly after it, or with
+go red. A browser applies these rules at once in an HTML block, so 'DV<x\\ y=">">AA', a tag
+named "x\\" holding the value ">", 'DV<b x=">" <c>AA', a tag "b" holding it with an
+attribute "<c", and "DV<b x='>'>A&#65" show "DVAA" there too, while each reading of the
+check applied one of them alone, found no DVAA and exited 0: each must now go red on both
+figures, and a line where a tag name holds a quote must still be read in linear time.
+Written with a combining mark directly after it, or with
 a "!" inside it that does not stand before a "[", the name does not name DVAA; on a line
 that also carries a character that fails it, a mark directly after the name leaves the
 line naming DVAA, and the line goes red. The three steps README states for reading the
@@ -1760,6 +1765,107 @@ def test_the_quoted_value_reading_reads_a_long_line_in_linear_time(line):
     assert seconds < 3, f"{seconds:.2f} s"
 
 
+# DVAA written in an HTML block with a tag whose quoted attribute value holds ">" on a line
+# that also needs another rule a browser applies there: a tag name read as a browser reads
+# one, "x\", 'x"y' or "x<y", a "<" after a tag name and a space, before or after the value,
+# which a browser reads as part of an attribute name, or a numeric character reference with
+# no closing ";". A browser applies them at once there, so each line shows "DVAA (99 agents,
+# 77 vulnerability categories)"; Python 3.14's html.parser reads each tag as one, with the
+# value whole. Each reading of the check applied one of these rules alone: the HTML block
+# reading ended the tag at the ">" in the value, the reading that passes over quoted values
+# read no tag at a "<" whose name a browser reads past "\", '"' or "<", or where a "<" that
+# stands in no value came before the ">" that ends the tag, and in the last line the reading
+# that decodes "&#65" ended the tag at the ">" in its value, while the reading that passes
+# over it left "&#65" as written. The check found no DVAA on any of these lines and exited
+# 0. A quoted value holding "<" alone needs no other rule there: the HTML block reading
+# reads "DV<x\ y='<'>AA" past the "<".
+HTML_BLOCK_QUOTED_NAMES = [
+    ("tag name with a backslash and a quoted value holding >", 'DV<x\\ y=">">AA'),
+    ("tag name with a quote and a quoted value holding >", 'DV<x"y z=">">AA'),
+    ("tag name with a < and a quoted value holding >", 'DV<x<y z=">">AA'),
+    ("< after a tag name and a space, then a quoted value holding >", 'DV<a <b x=">">AA'),
+    ("quoted value holding > followed by a space and a <", 'DV<b x=">" <c>AA'),
+    ("quoted value holding > before a reference with no closing ;", "DV<b x='>'>A&#65"),
+]
+
+
+@pytest.mark.parametrize("written", [w for _, w in HTML_BLOCK_QUOTED_NAMES],
+                         ids=[case for case, _ in HTML_BLOCK_QUOTED_NAMES])
+def test_a_name_in_an_html_block_needing_a_quoted_value_and_another_rule_leaves_the_line_read(
+        written):
+    td = scratch_tree()
+    try:
+        figures = f"{written} (99 agents, 77 vulnerability categories)"
+        mutate_readme(td, LICENSE_LINE, f"{LICENSE_LINE}\n<div>\n{figures}\n</div>\n")
+        line = where_of(td, figures)
+        r = run_checker(td)
+        assert r.returncode == 1, r.stdout
+        for failure in (
+            f"{line}: \"99 agents\" does not match related-projects.json "
+            "(DVAA agents: 21)",
+            f"{line}: \"77 vulnerability categories\" does not match "
+            "related-projects.json (DVAA vulnerability categories: 12)",
+        ):
+            assert failure in r.stderr, r.stderr
+    finally:
+        shutil.rmtree(td)
+
+
+def test_only_an_html_block_reading_with_quoted_values_passed_over_names_these_lines():
+    # No reading the check made before names DVAA on these lines; each HTML block reading
+    # made with quoted values passed over does, and `names` makes it where a quote stands on
+    # a line read as a browser reads an HTML block or with quoted values passed over.
+    checker = load_checker()
+    for _, written in HTML_BLOCK_QUOTED_NAMES:
+        for reading, references in ((checker.RAW_HTML, None), (checker.SPACE_OR_TAB_HTML, None),
+                                    (checker.HtmlBlockHtml(), None), (checker.QUOTED_HTML, None),
+                                    (checker.HtmlBlockHtml(), checker.HTML_BLOCK_REFERENCE)):
+            assert not checker.holds(checker.name_form(written, reading, references=references),
+                                     "DVAA"), (written, reading)
+        assert checker.name_form(written, checker.HtmlBlockQuotedHtml(),
+                                 references=checker.HTML_BLOCK_REFERENCE) == "DVAA", written
+        if "&#" not in written:
+            assert block_quoted_read(checker, written), written
+            assert checker.name_form(written, checker.HtmlBlockQuotedHtml()) == "DVAA", written
+        assert checker.names(written, "DVAA"), written
+    # On 'DV<b x=">" <c>AA' no tag name is followed by another character, nor by a space and
+    # a "<" before any ">": the reading is made there as the line is read with quoted values
+    # passed over.
+    written = 'DV<b x=">" <c>AA'
+    assert not block_read(checker, written)
+    assert checker.QUOTE_AFTER_TAG_NAME.search(written)
+    # Where a quoted value holds "<" alone, the HTML block reading already reads the tag past
+    # it.
+    assert checker.name_form("DV<x\\ y='<'>AA", checker.HtmlBlockHtml()) == "DVAA"
+
+
+@pytest.mark.parametrize("line", [
+    'DV<a x="' + '<a" x="' * 20_000 + "AA",
+    "DV<a x='" + "<a' x='" * 20_000 + "A&#65",
+    "DV" + '<a x=">" ' * 30_000 + "AA",
+    "DV" + '<a x=">" ' * 30_000 + ">AA",
+], ids=["double quotes", "single quotes and a reference", "values holding > and no other >",
+        "values holding > and a > at the end"])
+def test_the_html_block_quoted_reading_reads_a_long_line_in_linear_time(line):
+    # A tag name read as a browser reads one can hold a quote, which opens no value there. On
+    # the first two lines the name of each tag after the first ends in the quote that closes
+    # the value the tag before it opened, so it falls into step with that tag there and reads
+    # on with it to the end of the line: step_one with HTML_BLOCK_QUOTED_HTML read the first
+    # line, of 140,010 characters, in about 30 s on Python 3.14. HtmlBlockQuotedHtml notes
+    # once where each tag name ends and where the text of each tag stops. A tag runs past
+    # each "<" after its name and a space, so on the third line the pattern reads on from
+    # each "<" to the end of the line and finds no ">" that stands in no value, and on the
+    # last the tag from the first "<" runs to the ">" at the end.
+    checker = load_checker()
+    assert block_quoted_read(checker, line)
+    start = time.perf_counter()
+    checker.names(line, "DVAA")
+    for references in (None, checker.HTML_BLOCK_REFERENCE):
+        checker.name_form(line, checker.HtmlBlockQuotedHtml(), references=references)
+    seconds = time.perf_counter() - start
+    assert seconds < 3, f"{seconds:.2f} s"
+
+
 # Lines that show "DVAA" with two wrong figures where a "]" stands directly before a "[",
 # each set as its own paragraph after README's licence line, with the text the case gives
 # added at the end of README.md. Where README.md defines no label DV, "[x]" in
@@ -2158,6 +2264,48 @@ def test_the_quoted_value_reading_reads_a_line_as_stated(text, form):
     assert stated_name_form(checker, text, quoted=True) == form
 
 
+# What a line reads as in the HTML block readings made with quoted values passed over, where
+# a quote stands on a line read as a browser reads an HTML block or with quoted values passed
+# over, each with whether it is the one that decodes numeric references where they stand as
+# written: a tag name runs from its first letter to the first tab, line feed, form feed,
+# space, "/" or ">", over a quote, a "<" or U+00A0 too, and after the one of those that ends
+# it each quote is passed over whole with the text up to the next such quote, as in the
+# reading that passes over quoted values, and the tag runs past any "<" to the first ">"
+# that stands in no such value, as in the HTML block reading; a reference in a quoted value
+# goes with the tag, and the digits of one before a tag end at its "<".
+HTML_BLOCK_QUOTED_FORMS = [
+    ("tag name with a backslash", 'DV<x\\ y=">">AA', False, "DVAA"),
+    ("tag name with a quote", 'DV<x"y z=">">AA', False, "DVAA"),
+    ("tag name with a <", 'DV<x<y z=">">AA', False, "DVAA"),
+    ("tag name with U+00A0", 'DV<x\N{NO-BREAK SPACE}y z="<">AA', False, "DVAA"),
+    ("value after / after a tag name", 'DV<x\\/y="<">AA', False, "DVAA"),
+    ("quote with no = before it", 'DV<x\\ "<">AA', False, "DVAA"),
+    ("value in a closing tag", 'DV</x\\ y=">">AA', False, "DVAA"),
+    ("text in the tag after a value", "DV<x\\ y='>AA' z>", False, "DV"),
+    ("quote that does not close", 'DV<x\\ y=")AA>', False, "DV"),
+    ("< in no value", "DV<x\\ y='<'<AA>", False, "DV"),
+    ("< after a tag name and a space, before a value", 'DV<a <b x=">">AA', False, "DVAA"),
+    ("< after a value and a space", 'DV<b x=">" <c>AA', False, "DVAA"),
+    ("< in no value with no > after it in none", "DV<x\\ y='>'<AA", False,
+     "DV<x\\ y='>'<AA"),
+    ("reference after a tag with a quoted value", "DV<b x='>'>A&#65", True, "DVAA"),
+    ("reference in a quoted value", "DV<b x='>A&#65'>A", True, "DVA"),
+    ("reference ended by a tag with a quoted value", "&#x30<b x='>'>D<x\\ y=\">\">VAA", True,
+     "0DVAA"),
+]
+
+
+@pytest.mark.parametrize("text,references,form",
+                         [(t, r, f) for _, t, r, f in HTML_BLOCK_QUOTED_FORMS],
+                         ids=[case for case, _, _, _ in HTML_BLOCK_QUOTED_FORMS])
+def test_the_html_block_quoted_readings_read_a_line_as_stated(text, references, form):
+    checker = load_checker()
+    reference = checker.HTML_BLOCK_REFERENCE if references else None
+    assert checker.name_form(text, checker.HtmlBlockQuotedHtml(), references=reference) == form
+    assert stated_name_form(checker, text, html_block=True, quoted=True,
+                            references=references) == form
+
+
 # What a line reads as where a "]" stands directly before a "[", read with the labels the
 # page defines, each written as the check compares it, or with None, the reading that
 # removes no label. The label after the "]" goes with it where the page defines it, in any
@@ -2413,6 +2561,15 @@ def block_read(checker, line):
     ">"."""
     return bool(checker.OTHER_CHARACTER_IN_TAG_NAME.search(line)
                 or checker.LESS_THAN_AFTER_TAG_NAME.search(line))
+
+
+def block_quoted_read(checker, line):
+    """Whether `names` also reads `line` the HTML block way with quoted values passed over,
+    with no numeric reference decoded: where a quote stands on a line it reads the HTML
+    block way, and where "/" or white space after a tag name is followed by a quote before
+    any "<" or ">"."""
+    return bool(checker.QUOTE_AFTER_TAG_NAME.search(line)
+                or (block_read(checker, line) and ('"' in line or "'" in line)))
 
 
 def stated_html_end(line, i, any_space=True, html_block=False, quoted=False):
@@ -2826,9 +2983,14 @@ def test_the_stated_steps_read_every_generated_line_as_the_checker_does():
     # that way reads the line as the first does. A line where "&" stands directly before "#"
     # is also read the HTML block way with each numeric reference decoded where it stands as
     # written, with or without a closing ";" and whatever its number of digits; on any other
-    # line that way reads the line as the HTML block way does. A line holding "][" is also
-    # read with the labels in STATED_LABELS removed, the first way and, where they apply,
-    # the HTML block ways and the quoted value way.
+    # line that way reads the line as the HTML block way does. A line holding a quote that
+    # is read either HTML block way is also read that way with each quoted attribute value
+    # passed over whole, and a line read the quoted value way is also read the first of
+    # these new ways; on a line with no quote each of them reads the line as the HTML block
+    # way it adds to does, on another line that the first is not read on, the first reads it
+    # as the quoted value way does, and on a line with no "&#" the second reads it as the
+    # first. A line holding "][" is also read with the labels in STATED_LABELS removed, the
+    # first way and, where they apply, the HTML block ways and the quoted value way.
     checker = load_checker()
     rng = random.Random(80)
     for _ in range(STATED_LINES):
@@ -2856,6 +3018,23 @@ def test_the_stated_steps_read_every_generated_line_as_the_checker_does():
                     == decoded), ascii(line)
         else:
             assert decoded == block, ascii(line)
+        block_quoted = stated_name_form(checker, line, html_block=True, quoted=True)
+        decoded_quoted = stated_name_form(checker, line, html_block=True, quoted=True,
+                                          references=True)
+        quote = '"' in line or "'" in line
+        if not quote:
+            assert block_quoted == block and decoded_quoted == decoded, ascii(line)
+        elif block_quoted_read(checker, line):
+            assert (checker.name_form(line, checker.HtmlBlockQuotedHtml())
+                    == block_quoted), ascii(line)
+        else:
+            assert block_quoted == quoted, ascii(line)
+        if quote and "&#" in line:
+            assert (checker.name_form(line, checker.HtmlBlockQuotedHtml(),
+                                      references=checker.HTML_BLOCK_REFERENCE)
+                    == decoded_quoted), ascii(line)
+        elif quote:
+            assert decoded_quoted == block_quoted, ascii(line)
         if "][" in line:
             assert (checker.name_form(line, labels=STATED_LABELS)
                     == stated_name_form(checker, line, labels=STATED_LABELS)), ascii(line)
@@ -2872,6 +3051,18 @@ def test_the_stated_steps_read_every_generated_line_as_the_checker_does():
                 stated = stated_name_form(checker, line, labels=STATED_LABELS,
                                           html_block=True, references=True)
                 assert (checker.name_form(line, checker.HtmlBlockHtml(), labels=STATED_LABELS,
+                                          references=checker.HTML_BLOCK_REFERENCE)
+                        == stated), ascii(line)
+            if block_quoted_read(checker, line):
+                stated = stated_name_form(checker, line, labels=STATED_LABELS,
+                                          html_block=True, quoted=True)
+                assert (checker.name_form(line, checker.HtmlBlockQuotedHtml(),
+                                          labels=STATED_LABELS) == stated), ascii(line)
+            if quote and "&#" in line:
+                stated = stated_name_form(checker, line, labels=STATED_LABELS,
+                                          html_block=True, quoted=True, references=True)
+                assert (checker.name_form(line, checker.HtmlBlockQuotedHtml(),
+                                          labels=STATED_LABELS,
                                           references=checker.HTML_BLOCK_REFERENCE)
                         == stated), ascii(line)
 
@@ -2899,7 +3090,10 @@ def test_the_stated_label_rule_reads_every_generated_line_as_the_checker_does():
     # "/" and then by a "<" before any ">", is read the HTML block way too, with one
     # HtmlBlockHtml in each label reading in turn, as `names` reads it, and
     # a line where "/" or white space after a tag name is followed by a quote before any "<"
-    # or ">" is read the quoted value way in each label reading.
+    # or ">" is read the quoted value way in each label reading. Such a line holding "'", the
+    # one quote among the pieces, and a line read the quoted value way, is also read the
+    # HTML block way with quoted values passed over, with one HtmlBlockQuotedHtml in each
+    # label reading in turn.
     checker = load_checker()
     rng = random.Random(152)
     for _ in range(LABEL_LINES_GENERATED):
@@ -2922,6 +3116,12 @@ def test_the_stated_label_rule_reads_every_generated_line_as_the_checker_does():
                 stated = stated_name_form(checker, line, labels=labels, quoted=True)
                 assert (checker.name_form(line, checker.QUOTED_HTML, labels=labels)
                         == stated), ascii(line)
+        if block_quoted_read(checker, line):
+            reading = checker.HtmlBlockQuotedHtml()
+            for labels in (STATED_LABELS, None, STATED_LABELS):
+                stated = stated_name_form(checker, line, labels=labels, html_block=True,
+                                          quoted=True)
+                assert checker.name_form(line, reading, labels=labels) == stated, ascii(line)
 
 
 # Pieces of the pages that the definition line rule reads: line breaks, spaces, a tab and
@@ -2983,6 +3183,90 @@ def test_the_stated_quoted_value_reading_reads_every_generated_line_as_the_check
     assert differing >= 500, differing
 
 
+# Pieces of lines that hold, far more often than the lines above do, a tag name a browser
+# reads past a character CommonMark ends one at, "\", a quote, "<" or U+00A0, beside quoted
+# values, among them whole values holding ">" or "<", with numeric references with and
+# without a closing ";", "DV" and "AA", and the characters that decide where code spans and
+# link spans end.
+BLOCK_QUOTED_PIECES = [
+    *"<>= \"'/\t", "<x ", "<x\\ ", '<x"', "<x'", "<x<", "</A\\\t", "<x\N{NO-BREAK SPACE}",
+    '">"', "'<'", "DV", "AA", "&#65", "&#x41;", "`", "*", "\\", "](", ")", "[", "][",
+]
+BLOCK_QUOTED_LINES = 100_000
+
+
+def test_the_stated_html_block_quoted_readings_read_every_generated_line_as_the_checker_does():
+    # At each place on a line, HtmlBlockQuotedHtml must match what HTML_BLOCK_QUOTED_HTML
+    # matches there, and the HTML block readings made with it must read the line as the
+    # plain scan that reads a tag name as a browser does and passes over quoted values does,
+    # with and without numeric references decoded where they stand. One instance reads every
+    # line, and at least 500 of the lines must read differently from both the HTML block
+    # reading and the quoted value reading, so the comparison keeps meeting tags that only
+    # the two rules at once read as a browser does.
+    checker = load_checker()
+    rng = random.Random(183)
+    reading = checker.HtmlBlockQuotedHtml()
+    differing = 0
+    for _ in range(BLOCK_QUOTED_LINES):
+        line = "".join(rng.choice(BLOCK_QUOTED_PIECES) for _ in range(rng.randint(1, 16)))
+        for pos in range(len(line)):
+            found = reading.match(line, pos)
+            expected = checker.HTML_BLOCK_QUOTED_HTML.match(line, pos)
+            assert ((found and found.span())
+                    == (expected and expected.span())), (ascii(line), pos)
+        for references in (False, True):
+            form = checker.name_form(
+                line, reading, references=checker.HTML_BLOCK_REFERENCE if references else None)
+            assert form == stated_name_form(checker, line, html_block=True, quoted=True,
+                                            references=references), ascii(line)
+        form = checker.name_form(line, reading)
+        differing += (form != checker.name_form(line, checker.HtmlBlockHtml())
+                      and form != checker.name_form(line, checker.QUOTED_HTML))
+    assert differing >= 500, differing
+
+
+# Pieces of lines that hold, far more often than the lines above do, a tag whose name ends
+# where CommonMark ends one, at a space or "/", with quoted values holding ">", a "<" after
+# such a value, "DV" and "AA", and the characters that decide where code spans and link
+# spans end.
+PLAIN_NAME_QUOTED_PIECES = [
+    *"<>= \"'/\t", "<x ", "</b ", "<x/", '">"', "'>'", "DV", "AA", "`", "*", "\\", "](", ")",
+    "[", "][",
+]
+PLAIN_NAME_QUOTED_LINES = 100_000
+
+
+def test_a_line_read_with_quoted_values_passed_over_is_read_the_html_block_way_with_them_too():
+    # Where no tag name is followed by a character a browser reads on past, nor by white
+    # space or "/" and a "<" before any ">", a "<" that stands in no quoted value can still
+    # follow a value in a tag, as in 'DV<b x=">" <c>AA', where only the HTML block reading
+    # made with quoted values passed over reads the tag on past it. `names` makes that
+    # reading on each line it reads with quoted values passed over, and there the reading
+    # must read the line as the plain scan does. On a line it does not make it on, the
+    # reading must remove what the reading that passes over quoted values removes, or on a
+    # line with no quote what the HTML block reading removes. At least 500 of the lines must
+    # be read so only because the reading that passes over quoted values is made on them,
+    # and read differently from it.
+    checker = load_checker()
+    rng = random.Random(184)
+    reading = checker.HtmlBlockQuotedHtml()
+    needed = 0
+    for _ in range(PLAIN_NAME_QUOTED_LINES):
+        line = "".join(rng.choice(PLAIN_NAME_QUOTED_PIECES)
+                       for _ in range(rng.randint(1, 16)))
+        form = checker.name_form(line, reading)
+        if block_quoted_read(checker, line):
+            assert form == stated_name_form(checker, line, html_block=True,
+                                            quoted=True), ascii(line)
+            needed += (not block_read(checker, line)
+                       and form != checker.name_form(line, checker.QUOTED_HTML))
+        elif '"' in line or "'" in line:
+            assert form == checker.name_form(line, checker.QUOTED_HTML), ascii(line)
+        else:
+            assert form == checker.name_form(line, checker.HtmlBlockHtml()), ascii(line)
+    assert needed >= 500, needed
+
+
 # The pieces of the lines the element rule is read on: start and end tags of the three
 # elements, in lower case and with capitals, with a space or "/" after the name, with
 # U+00A0 or U+3000 after it, which a browser does not end a tag name at, with no ">", or
@@ -3019,7 +3303,8 @@ def test_the_stated_element_rule_reads_every_generated_line_as_the_checker_does(
     # passing. Each line is read with the elements' text removed the first way and, where
     # they apply, the second way, the HTML block way, with one HtmlBlockHtml serving the
     # readings with and without the text removed, the way that passes over quoted attribute
-    # values, and with the labels in STATED_LABELS removed. Removing an element's text
+    # values, the HTML block ways that pass over them, with one HtmlBlockQuotedHtml serving
+    # those readings, and with the labels in STATED_LABELS removed. Removing an element's text
     # passes over no place on the line: `open` and the places the raw HTML is matched at do
     # not turn on it, and a line where no "<" is followed by the name of such an element
     # reads alike either way.
@@ -3051,6 +3336,17 @@ def test_the_stated_element_rule_reads_every_generated_line_as_the_checker_does(
             assert (checker.name_form(line, checker.QUOTED_HTML, hide_elements=True)
                     == stated_name_form(checker, line, quoted=True,
                                         hide_elements=True)), ascii(line)
+        if '"' in line or "'" in line:
+            # One HtmlBlockQuotedHtml reads the line with and without the elements' text
+            # removed, and with numeric references decoded where they stand, in turn.
+            reading = checker.HtmlBlockQuotedHtml()
+            for hide, references in ((True, False), (False, True), (True, True)):
+                stated = stated_name_form(checker, line, html_block=True, quoted=True,
+                                          references=references, hide_elements=hide)
+                assert (checker.name_form(
+                    line, reading, hide_elements=hide,
+                    references=checker.HTML_BLOCK_REFERENCE if references else None)
+                        == stated), ascii(line)
         if "][" in line:
             assert (checker.name_form(line, labels=STATED_LABELS, hide_elements=True)
                     == stated_name_form(checker, line, labels=STATED_LABELS,
