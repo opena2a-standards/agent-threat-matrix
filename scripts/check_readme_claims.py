@@ -127,9 +127,15 @@ opened last where it has that element's name, each name read in any ASCII letter
 whichever reading removed the tag, as the HTML block reading reads a tag name, to the
 first tab, line feed, form feed, space, / or >; where a start tag opens an element while
 none is open, what stands from that start tag to the end of the end tag that closes the
-element, or to the end of the line where none does, is removed. So "DV<style>x</style>AA",
-"DV<script>x</script>AA", "DV<template>x</template>AA" and
-"DV<template><template></template>x</template>AA" name DVAA, while
+element, or to the end of the line where none does, is removed. A browser reads the opening
+of a comment, processing instruction, CDATA section or declaration in a style or script
+element as text of the element, so while one is open, such HTML is removed only up to the
+first </ after its opening that is followed by the element's name, in any ASCII letter
+case, and a tab, line feed, form feed, space, / or >, where it does not close before that
+</, and the line is read on from that </. So "DV<style>x</style>AA",
+"DV<script>x</script>AA", "DV<template>x</template>AA",
+"DV<template><template></template>x</template>AA", "DV<style><!--</style>AA-->" and
+"DV<script><?</script>AA?>" name DVAA, while
 "DV<style>x</script>AA", "DV<style" U+00A0 ">x</style>AA" and "DV<style>x</style" U+00A0
 ">AA" do not. The line names DVAA when any reading does. On the way, as
 CommonMark reads them, the character a \\ escapes and
@@ -147,13 +153,14 @@ after it could be read another way, and each backtick from there is removed with
 Markdown characters in the second step: a code span whose text holds a |, which starts
 another cell in a table row, or a < or &, which a browser reads in an HTML block as the
 start of a tag or a character reference; a < at which HTML starts, read with any white
-space ending a tag name, that holds a backtick, ' or ", or that runs to the end of the
-line with no close; any other < followed by an ASCII character other than a space or tab,
-when no > follows it or a backtick, ' or " stands between it and the first > after it;
-and a ] followed by ( or [ when no ) or ] follows it with no further ( or [ first, or
-when a backtick, ', ", \\ or < stands between them. No code span is read on a line that
-carries one of the characters above, nor on the lines after a line on which, read with no
-link label removed as below, code spans are not read or stop being read, or that holds a
+space ending a tag name, that holds a backtick, ' or ", or that runs with no close to the
+end of the line, or to the </ it is removed up to in a style or script element as above;
+any other < followed by an ASCII character other than a space or tab, when no > follows it
+or a backtick, ' or " stands between it and the first > after it; and a ] followed by ( or
+[ when no ) or ] follows it with no further ( or [ first, or when a backtick, ', ", \\ or <
+stands between them. No code span is read on a line that carries one of the characters
+above, nor on the lines after a line on which, read with no link label removed as below and
+the text of no element removed, code spans are not read or stop being read, or that holds a
 run of backticks that no run closes, up to a blank line (empty or of spaces and tabs
 only): a code span, HTML or link span still open at the end of that line could close on
 one of them. Going along the line, where a ] that no \\ escapes and that stands in no code
@@ -568,6 +575,14 @@ HIDDEN_ELEMENTS = frozenset({"style", "script", "template"})
 # template.
 RAW_TEXT_ELEMENTS = frozenset({"style", "script"})
 
+# For each element of RAW_TEXT_ELEMENTS, "</" followed by its name, in any ASCII letter case,
+# and a tab, line feed, form feed, space, "/" or ">". A comment, processing instruction, CDATA
+# section or declaration that opens in such an element is read only up to the first of these
+# after its opening where it does not close before it (`step_one`): a browser reads its
+# opening as text of the element, so "DV<style><!--</style>AA-->" shows "DVAA-->".
+RAW_TEXT_END = {name: re.compile(f"</{name}(?=[\\t\\n\\f />])", re.IGNORECASE | re.ASCII)
+                for name in RAW_TEXT_ELEMENTS}
+
 # "<" or "</" and the name of a tag that RAW_HTML, SPACE_OR_TAB_HTML, HTML_BLOCK_HTML or
 # QUOTED_HTML matches, read whichever pattern matched the tag as HTML_BLOCK_HTML reads a tag
 # name, with HTML_BLOCK_TAG_NAME after its first letter: an ASCII letter followed by any
@@ -936,8 +951,9 @@ def nfkc(text):
 
 def unclosed(found):
     """Whether `found`, HTML `RAW_HTML` matches, is a comment, processing instruction, CDATA
-    section or declaration that runs to the end of the line because no close follows its
-    opening. "<!-->" ends in "-->", but no close follows its opening "<!--"."""
+    section or declaration that runs to the end of the line, or of the part of the line
+    `step_one` matches it in, because no close follows its opening there. "<!-->" ends in
+    "-->", but no close follows its opening "<!--"."""
     for opening, close in HTML_CLOSES:
         if found.startswith(opening):
             return not (found.endswith(close) and len(found) >= len(opening) + len(close))
@@ -1111,16 +1127,24 @@ def step_one(stripped, raw_html=RAW_HTML, spans=True, labels=None, references=No
     tab, line feed, form feed, space, "/" or ">" whatever `raw_html` is, as `HTML_BLOCK_HTML`
     and a browser end a tag name: a start tag opens such an element unless one in
     `RAW_TEXT_ELEMENTS` is open, and an end tag closes the element opened last where it has
-    that element's name. Removing the text of an element passes over no place on the line,
-    so `open`, and the places `raw_html` is asked to match at, are the same whether or not
-    `hide_elements` is true.
+    that element's name. While an element in `RAW_TEXT_ELEMENTS` is open, a comment,
+    processing instruction, CDATA section or declaration, which every `raw_html` matches as
+    `RAW_HTML` does, is matched with `RAW_HTML` with the line ending at the first "</" after
+    its opening that `RAW_TEXT_END` finds for that element, so where it does not close before
+    that "</" it runs to it, and the line is read on from there: "DV<style><!--</style>AA-->"
+    reads "DVAA-->". Code spans stop being read where it is so cut short, as at one that runs
+    to the end of the line. On a line holding no "<!" or "<?", removing the text of an
+    element passes over no place on the line, so `open`, and the places `raw_html` is asked
+    to match at, are the same whether or not `hide_elements` is true.
 
     Each closing run is looked up in the runs of its length, in order, past the ones already
     passed, a "<" that starts no HTML looks for the first ">" after it once for all the "<"
     before that ">", and a link label is scanned only up to the first "[" or "]" after its
-    "[" that no backslash escapes, where the next one can start; the text of an element is
-    removed once, when the element that opened while none was open closes or the line ends:
-    a line is read in linear time."""
+    "[" that no backslash escapes, where the next one can start; the "</" `RAW_TEXT_END` finds
+    for an element is looked for again only once the line is read past it, and a comment,
+    processing instruction, CDATA section or declaration read up to it is matched no further;
+    the text of an element is removed once, when the element that opened while none was open
+    closes or the line ends: a line is read in linear time."""
     runs = {}
     for run in BACKTICKS.finditer(stripped):
         runs.setdefault(len(run.group()), []).append(run.start())
@@ -1133,12 +1157,27 @@ def step_one(stripped, raw_html=RAW_HTML, spans=True, labels=None, references=No
     # The elements in HIDDEN_ELEMENTS open here, the one opened last at the end, and the
     # length `out` had where the first of them opened.
     elements, hidden_from = [], 0
+    # For each element of RAW_TEXT_ELEMENTS, where the first "</" that RAW_TEXT_END finds for
+    # it, at or after the place it was last looked for from, stands, or n where none does: it
+    # is looked for again only once the line is read past it.
+    raw_text_ends = {}
     i, n = 0, len(stripped)
     while i < n:
         c = stripped[i]
         if c == "<":
+            # Where the line is read as ending for the HTML that starts here: at the first end
+            # tag after it of the style or script element open here, where a comment,
+            # processing instruction, CDATA section or declaration starts, and at its end
+            # anywhere else.
+            stop = n
+            if (elements and elements[-1] in RAW_TEXT_ELEMENTS
+                    and stripped.startswith(("<!", "<?"), i)):
+                stop = raw_text_ends.get(elements[-1], -1)
+                if stop < i:
+                    ahead = RAW_TEXT_END[elements[-1]].search(stripped, i)
+                    stop = raw_text_ends[elements[-1]] = ahead.start() if ahead else n
             if reading:
-                found = RAW_HTML.match(stripped, i)
+                found = RAW_HTML.match(stripped, i, stop)
                 if found:
                     reading = not (unclosed(found.group())
                                    or any(h in HTML_UNSURE for h in found.group()))
@@ -1148,7 +1187,10 @@ def step_one(stripped, raw_html=RAW_HTML, spans=True, labels=None, references=No
                         if end < 0 or any(h in HTML_UNSURE for h in stripped[i + 1:end]):
                             reading = False
                         clear_to = end
-            found = raw_html.match(stripped, i)
+            # Every raw_html matches a comment, processing instruction, CDATA section or
+            # declaration as RAW_HTML does.
+            found = (raw_html.match(stripped, i) if stop == n
+                     else RAW_HTML.match(stripped, i, stop))
             if found:
                 tag = TAG_START.match(found.group()) if hide_elements else None
                 if tag and tag.group(2).isascii():

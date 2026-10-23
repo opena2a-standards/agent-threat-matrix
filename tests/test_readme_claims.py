@@ -93,8 +93,15 @@ tag name ends where a browser and the HTML block reading end one, at a tab, line
 feed, space, "/" or ">", and at no other character Python's \\s matches, so that U+00A0 or
 U+3000 after the name of an element opens or closes none in any reading, the plain scan of
 the stated steps reads the element rule as the checker does on 100,000 generated lines,
-the reading that passes over quoted attribute values among them, and each of three lines
-of 50,000 elements is read with their text removed in under 3 seconds.
+the reading that passes over quoted attribute values among them, and each of five lines
+of 50,000 elements or comments is read with their text removed in under 3 seconds.
+
+A comment, processing instruction or CDATA section that opens in a style or script element
+and closes after the element's end tag, as in "DV<style><!--</style>AA (99 agents, 77
+vulnerability categories)-->", and a comment there that does not close, was read past the
+end tag, so the element ran on to the end of the line: each such line exited 0, as its own
+paragraph and between "<div>" and "</div>". Each must now go red on both figures, while a
+comment that closes inside the element still does.
 
 The matrix version the README states under the title and in the framework citation is read
 against matrix.json, and a month and year on either line against the CHANGELOG.md heading
@@ -1718,6 +1725,53 @@ QUOTED_VALUE_LINES = [
 ]
 
 
+# DVAA split by a style or script element whose text opens a comment, processing instruction
+# or CDATA section that closes after the element's end tag, or a comment that does not
+# close, set after README's licence line as its own paragraph and between "<div>" and
+# "</div>". markdown-it-py 4.0.0 renders each line in both places to HTML that Python 3.14's
+# html.parser reads as "DVAA (99 agents, 77 vulnerability categories)" and the close: the
+# opening is text of the element, which its end tag ends. The check read each such HTML to
+# its close or to the end of the line, past the end tag, so the element ran on to the end of
+# the line, and it exited 0 on the first six lines in both places. The last line, whose
+# comment closes inside the element, exited 1 and still does.
+RAW_TEXT_NAMES = [
+    ("comment in a style element", "DV<style><!--</style>AA", "-->"),
+    ("comment in a script element", "DV<script><!--</script>AA", "-->"),
+    ("processing instruction in a style element", "DV<style><?</style>AA", "?>"),
+    ("processing instruction in a script element", "DV<script><?</script>AA", "?>"),
+    ("CDATA section in a style element", "DV<style><![CDATA[</style>AA", "]]>"),
+    ("comment with no close in a script element", "DV<script><!--</script>AA", ""),
+    ("comment closed in a style element", "DV<style><!-- --></style>AA", ""),
+]
+RAW_TEXT_LINES = [
+    (f"{case} as its own paragraph", [f"{written} {FIGURES}{close}"])
+    for case, written, close in RAW_TEXT_NAMES
+] + [
+    (f"{case} in an HTML block", ["<div>", f"{written} {FIGURES}{close}", "</div>"])
+    for case, written, close in RAW_TEXT_NAMES
+]
+
+
+@pytest.mark.parametrize("lines", [lines for _, lines in RAW_TEXT_LINES],
+                         ids=[case for case, _ in RAW_TEXT_LINES])
+def test_html_opened_in_a_style_or_script_element_leaves_its_end_tag_read(lines):
+    td = scratch_tree()
+    try:
+        mutate_readme(td, LICENCE, LICENCE + "\n\n" + "\n".join(lines) + "\n\n")
+        number = where_of(td, next(line for line in lines if FIGURES in line))
+        r = run_checker(td)
+        assert r.returncode == 1, r.stdout
+        for failure in (
+            f"{number}: \"99 agents\" does not match related-projects.json "
+            "(DVAA agents: 21)",
+            f"{number}: \"77 vulnerability categories\" does not match "
+            "related-projects.json (DVAA vulnerability categories: 12)",
+        ):
+            assert failure in r.stderr, r.stderr
+    finally:
+        shutil.rmtree(td)
+
+
 @pytest.mark.parametrize("lines", [lines for _, lines in QUOTED_VALUE_LINES],
                          ids=[case for case, _ in QUOTED_VALUE_LINES])
 def test_a_tag_whose_quoted_value_holds_lt_or_gt_leaves_the_name_dvaa_read(lines):
@@ -2513,10 +2567,18 @@ def test_a_page_defines_on_no_definition_line_the_labels_stated(text, labels):
 # element's name. A "<" after a backslash starts no HTML, so it ends no element, and an end
 # tag whose name is followed by U+00A0 or U+3000 closes none: a browser ends a tag name only
 # at a tab, line feed, form feed, space, "/" or ">", so the name runs on past either.
-# Rendered as a CommonMark paragraph and shown in Chromium, each line shows the text of its
-# form but the last, which shows "DV-->AA": a browser ends the raw text of a style element
-# at the first "</style>", here inside what CommonMark reads as a comment, which the first
-# step removes whole. Neither names DVAA.
+# Rendered as a CommonMark paragraph and shown in Chromium, each line down to "end tag in a
+# comment" shows the text of its form: a browser ends the raw text of a style element at the
+# first "</style>", there inside what CommonMark reads as a comment, which the first step
+# removed whole, and the element with it to the end of the line, reading "DV". While a style
+# or script element is open, a comment, processing instruction, CDATA section or
+# declaration is now read only up to the first end tag of the element's name after its
+# opening, where it does not close before it, and the line is read on from there.
+# markdown-it-py 4.0.0 renders each line from "end tag in a comment" on as a CommonMark
+# paragraph that Python 3.14's html.parser reads as the text of its form, "DVAA]]>" for the
+# CDATA section, whose "]]" the second step removes. The last two lines leave an element
+# open to the end of the line: no "</style" follows the first, and a template element holds
+# no raw text, so the comment in the second is read whole.
 ELEMENT_FORMS = [
     ("style element", "DV<style>x</style>AA", "DVAA"),
     ("script element", "DV<script>x</script>AA", "DVAA"),
@@ -2538,7 +2600,21 @@ ELEMENT_FORMS = [
     ("end tag with U+00A0 after the name", "DV<style>x</style\N{NO-BREAK SPACE}>AA", "DV"),
     ("end tag with U+3000 after the name", "DV<script>x</script\N{IDEOGRAPHIC SPACE}>AA",
      "DV"),
-    ("end tag in a comment", "DV<style><!--</style>-->AA", "DV"),
+    ("end tag in a comment", "DV<style><!--</style>-->AA", "DV-->AA"),
+    ("comment closed after the end tag", "DV<style><!--</style>AA-->", "DVAA-->"),
+    ("processing instruction closed after the end tag", "DV<script><?</script>AA?>",
+     "DVAA?>"),
+    ("CDATA section closed after the end tag", "DV<style><![CDATA[</style>AA]]>", "DVAA>"),
+    ("declaration with no > before the end tag", "DV<script><!X</script>AA", "DVAA"),
+    ("comment with no close", "DV<style><!--</style>AA", "DVAA"),
+    ("comment closed before the end tag", "DV<style><!-- --></style>AA", "DVAA"),
+    ("backslash before the end tag in a comment", "DV<style><!--\\</style>AA-->", "DVAA-->"),
+    ("end tag in other letter cases and with a space in a comment",
+     "DV<Style><!--</STYLE >AA-->", "DVAA-->"),
+    ("style element in a template", "DV<template><style><!--</style>-->x</template>AA",
+     "DVAA"),
+    ("end tag of another element in a comment", "DV<style><!--</script>-->AA", "DV"),
+    ("comment in a template element", "DV<template><!--</template>-->AA", "DV"),
 ]
 
 
@@ -2920,6 +2996,20 @@ def stated_tag(line, i):
     return j == i + 2, name
 
 
+def stated_end_tag(line, start, name):
+    """Where the first "</" at or after line[start] stands that is followed by `name`, each
+    ASCII capital letter in it written small, and then by one of TAG_NAME_ENDS, or len(line)
+    where none does: as README states, a comment, processing instruction, CDATA section or
+    declaration that opens in a style or script element named `name` is read up to it."""
+    for k in range(start, len(line) - 1):
+        after = k + 2 + len(name)
+        written = "".join(chr(ord(c) + 32) if "A" <= c <= "Z" else c for c in line[k + 2:after])
+        if (line.startswith("</", k) and written == name and after < len(line)
+                and line[after] in TAG_NAME_ENDS):
+            return k
+    return len(line)
+
+
 def stated_first_step(line, any_space=True, spans=True, labels=None, html_block=False,
                       quoted=False, shown=None, hide_elements=False):
     """(pairs, open): `line` after the first step README states, each character with
@@ -2933,7 +3023,10 @@ def stated_first_step(line, any_space=True, spans=True, labels=None, html_block=
     start tag that opens a style, script or template element while none is open to the
     end of the end tag that closes it, or to the end of the line where none does, goes
     too: a start tag opens one unless a style or script element is open, and an end tag
-    closes the one opened last where it has its name."""
+    closes the one opened last where it has its name. While a style or script element is
+    open, a comment, processing instruction, CDATA section or declaration is read, also
+    where it decides whether code spans stop being read, as on the line ending at the
+    first "</" that `stated_end_tag` finds for that element after its opening."""
     out, i, reading, unmatched = [], 0, spans, False
     # The style, script and template elements open, the last opened at the end, and how
     # many pairs `out` held where the first of them opened.
@@ -2941,9 +3034,13 @@ def stated_first_step(line, any_space=True, spans=True, labels=None, html_block=
     while i < len(line):
         c = line[i]
         if c == "<":
-            if reading and stated_stops_at_lt(line, i):
+            ending = len(line)
+            if (open_elements[-1:] in (["style"], ["script"])
+                    and line.startswith(("<!", "<?"), i) and stated_html_end(line, i)):
+                ending = stated_end_tag(line, i + 1, open_elements[-1])
+            if reading and stated_stops_at_lt(line[:ending], i):
                 reading = False
-            end = stated_html_end(line, i, any_space, html_block, quoted)
+            end = stated_html_end(line[:ending], i, any_space, html_block, quoted)
             if end is not None:
                 tag = stated_tag(line, i) if hide_elements else None
                 if tag is not None:
@@ -3389,20 +3486,25 @@ def test_the_stated_element_rule_reads_every_generated_line_as_the_checker_does(
     # they apply, the second way, the HTML block way, with one HtmlBlockHtml serving the
     # readings with and without the text removed, the way that passes over quoted attribute
     # values, the HTML block ways that pass over them, with one HtmlBlockQuotedHtml serving
-    # those readings, and with the labels in STATED_LABELS removed. Removing an element's text
-    # passes over no place on the line: `open` and the places the raw HTML is matched at do
-    # not turn on it, and a line where no "<" is followed by the name of such an element
-    # reads alike either way.
+    # those readings, and with the labels in STATED_LABELS removed. With the elements' text
+    # removed, `open` is what the plain scan gives, and on a line holding no "<!" or "<?",
+    # where no comment, processing instruction, CDATA section or declaration is read up to
+    # an end tag, removing an element's text passes over no place on the line: `open` and
+    # the places the raw HTML is matched at do not turn on it. A line where no "<" is
+    # followed by the name of such an element reads alike either way.
     checker = load_checker()
     rng = random.Random(172)
     for _ in range(ELEMENT_LINES_GENERATED):
         line = "".join(rng.choice(ELEMENT_PIECES) for _ in range(rng.randint(1, 16)))
         hidden = stated_name_form(checker, line, hide_elements=True)
         assert checker.name_form(line, hide_elements=True) == hidden, ascii(line)
-        kept, removed = RecordedHtml(checker.RAW_HTML), RecordedHtml(checker.RAW_HTML)
-        assert (checker.step_one(line, kept)[1]
-                == checker.step_one(line, removed, hide_elements=True)[1]), ascii(line)
-        assert kept.places == removed.places, ascii(line)
+        assert (checker.step_one(line, hide_elements=True)[1]
+                == stated_first_step(line, hide_elements=True)[1]), ascii(line)
+        if "<!" not in line and "<?" not in line:
+            kept, removed = RecordedHtml(checker.RAW_HTML), RecordedHtml(checker.RAW_HTML)
+            assert (checker.step_one(line, kept)[1]
+                    == checker.step_one(line, removed, hide_elements=True)[1]), ascii(line)
+            assert kept.places == removed.places, ascii(line)
         if not checker.HIDDEN_ELEMENT_START.search(line):
             assert hidden == stated_name_form(checker, line), ascii(line)
         if any(c.isspace() and c not in " \t" for c in line):
@@ -3453,6 +3555,11 @@ LONG_ELEMENT_LINES = [
      "DVAA"),
     ("start tags in a style element no end tag closes",
      "DV" + "<style>x" * ELEMENT_RUNS + "AA", "DV"),
+    # Each comment is read up to the end tag after it, not to the one close at the end.
+    ("comments in style elements closed at the end of the line",
+     "DV" + "<style><!--</style>" * ELEMENT_RUNS + "AA-->", "DVAA-->"),
+    ("comments in a script element before its end tag",
+     "DV<script>" + "<!---->" * ELEMENT_RUNS + "</script>AA", "DVAA"),
 ]
 
 
