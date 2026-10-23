@@ -72,6 +72,11 @@ README that defines t, a and b, with DV only in a fenced code block,
 "[x][DV](u)[A][t]A [y][a] [z][b]", which CommonMark shows as "[x]DVAA y z", passed with two
 wrong figures, as did the line with "`][a]` `][b]`" in place of "[y][a] [z][b]"; each must
 now go red, read with the labels the page defines on a definition line removed and DV kept.
+A definition in a list item or on a block quote line, as "- [t]: x" or "> [t]: x", was
+counted as standing on no definition line, so the first of those lines passed with t, a and
+b defined there; it must go red on such pages too. A table, a plain scan of the stated rule
+over generated pages, and pages read in under a second pin how the definition line rule
+follows block quotes, list items and the fenced code blocks they hold.
 
 A "]" followed by "(" makes no link either where no "[" before it opens one: CommonMark
 shows "x](DV**AA**) (99 agents, 77 vulnerability categories)", set as its own paragraph
@@ -93,8 +98,15 @@ tag name ends where a browser and the HTML block reading end one, at a tab, line
 feed, space, "/" or ">", and at no other character Python's \\s matches, so that U+00A0 or
 U+3000 after the name of an element opens or closes none in any reading, the plain scan of
 the stated steps reads the element rule as the checker does on 100,000 generated lines,
-the reading that passes over quoted attribute values among them, and each of three lines
-of 50,000 elements is read with their text removed in under 3 seconds.
+the reading that passes over quoted attribute values among them, and each of five lines
+of 50,000 elements or comments is read with their text removed in under 3 seconds.
+
+A comment, processing instruction or CDATA section that opens in a style or script element
+and closes after the element's end tag, as in "DV<style><!--</style>AA (99 agents, 77
+vulnerability categories)-->", and a comment there that does not close, was read past the
+end tag, so the element ran on to the end of the line: each such line exited 0, as its own
+paragraph and between "<div>" and "</div>". Each must now go red on both figures, while a
+comment that closes inside the element still does.
 
 The matrix version the README states under the title and in the framework citation is read
 against matrix.json, and a month and year on either line against the CHANGELOG.md heading
@@ -1718,6 +1730,53 @@ QUOTED_VALUE_LINES = [
 ]
 
 
+# DVAA split by a style or script element whose text opens a comment, processing instruction
+# or CDATA section that closes after the element's end tag, or a comment that does not
+# close, set after README's licence line as its own paragraph and between "<div>" and
+# "</div>". markdown-it-py 4.0.0 renders each line in both places to HTML that Python 3.14's
+# html.parser reads as "DVAA (99 agents, 77 vulnerability categories)" and the close: the
+# opening is text of the element, which its end tag ends. The check read each such HTML to
+# its close or to the end of the line, past the end tag, so the element ran on to the end of
+# the line, and it exited 0 on the first six lines in both places. The last line, whose
+# comment closes inside the element, exited 1 and still does.
+RAW_TEXT_NAMES = [
+    ("comment in a style element", "DV<style><!--</style>AA", "-->"),
+    ("comment in a script element", "DV<script><!--</script>AA", "-->"),
+    ("processing instruction in a style element", "DV<style><?</style>AA", "?>"),
+    ("processing instruction in a script element", "DV<script><?</script>AA", "?>"),
+    ("CDATA section in a style element", "DV<style><![CDATA[</style>AA", "]]>"),
+    ("comment with no close in a script element", "DV<script><!--</script>AA", ""),
+    ("comment closed in a style element", "DV<style><!-- --></style>AA", ""),
+]
+RAW_TEXT_LINES = [
+    (f"{case} as its own paragraph", [f"{written} {FIGURES}{close}"])
+    for case, written, close in RAW_TEXT_NAMES
+] + [
+    (f"{case} in an HTML block", ["<div>", f"{written} {FIGURES}{close}", "</div>"])
+    for case, written, close in RAW_TEXT_NAMES
+]
+
+
+@pytest.mark.parametrize("lines", [lines for _, lines in RAW_TEXT_LINES],
+                         ids=[case for case, _ in RAW_TEXT_LINES])
+def test_html_opened_in_a_style_or_script_element_leaves_its_end_tag_read(lines):
+    td = scratch_tree()
+    try:
+        mutate_readme(td, LICENCE, LICENCE + "\n\n" + "\n".join(lines) + "\n\n")
+        number = where_of(td, next(line for line in lines if FIGURES in line))
+        r = run_checker(td)
+        assert r.returncode == 1, r.stdout
+        for failure in (
+            f"{number}: \"99 agents\" does not match related-projects.json "
+            "(DVAA agents: 21)",
+            f"{number}: \"77 vulnerability categories\" does not match "
+            "related-projects.json (DVAA vulnerability categories: 12)",
+        ):
+            assert failure in r.stderr, r.stderr
+    finally:
+        shutil.rmtree(td)
+
+
 @pytest.mark.parametrize("lines", [lines for _, lines in QUOTED_VALUE_LINES],
                          ids=[case for case, _ in QUOTED_VALUE_LINES])
 def test_a_tag_whose_quoted_value_holds_lt_or_gt_leaves_the_name_dvaa_read(lines):
@@ -1894,10 +1953,20 @@ def test_the_html_block_quoted_reading_reads_a_long_line_in_linear_time(line):
 # `][b]`" in place of "[y][a] [z][b]" as "[x]DVAA ][a] ][b]": holding four labels the page
 # defines, the "][" in a code span counted too, each line was read with all of them removed
 # and with none only, and passed with exit 0. DV is defined on no definition line, so each
-# is now also read with t, a and b removed and DV kept.
+# is now also read with t, a and b removed and DV kept. With t, a and b each defined in a
+# list item, as "- [t]: https://example.org", or on a block quote line, as
+# "> [t]: https://example.org", CommonMark reads the three definitions and shows the first
+# of those lines as "[x]DVAA y z" too, while each definition was counted as standing on no
+# definition line, as its "[" stands after the item or quote marker: holding four such
+# labels, the line was read with all of them removed and with none only, and passed with
+# exit 0. A definition in a list item or block quote now stands on a definition line.
 DEFINITION = "[d]: https://example.org"
 FOUR_DEFINITIONS = ("[t]: https://example.org\n[a]: https://example.org\n"
                     "[b]: https://example.org\n\n```\n[DV]: https://example.org\n```")
+LIST_ITEM_DEFINITIONS = ("- [t]: https://example.org\n- [a]: https://example.org\n"
+                         "- [b]: https://example.org\n\n```\n[DV]: https://example.org\n```")
+QUOTE_DEFINITIONS = ("> [t]: https://example.org\n> [a]: https://example.org\n"
+                     "> [b]: https://example.org\n\n```\n[DV]: https://example.org\n```")
 LABEL_LINES = [
     ("label the page does not define", "[x][DV](y)AA", ""),
     ("link span with no label before it", "[DV](y)AA", ""),
@@ -1916,6 +1985,10 @@ LABEL_LINES = [
      "[x][DV](u)[A][t]A [y][a] [z][b]", FOUR_DEFINITIONS),
     ("four labels the page defines, two after a ] in a code span",
      "[x][DV](u)[A][t]A `][a]` `][b]`", FOUR_DEFINITIONS),
+    ("four labels the page defines, three in list items and one only in a fenced code block",
+     "[x][DV](u)[A][t]A [y][a] [z][b]", LIST_ITEM_DEFINITIONS),
+    ("four labels the page defines, three in a block quote and one only in a fenced code block",
+     "[x][DV](u)[A][t]A [y][a] [z][b]", QUOTE_DEFINITIONS),
 ]
 
 
@@ -2455,12 +2528,22 @@ def test_a_page_defines_the_labels_stated(text, labels):
 
 
 # The labels a page defines on no definition line: a definition-like text stands on one
-# where its "[" starts a line, after at most three spaces, outside a fenced code block. A
-# fenced code block runs from a line that, after at most three spaces, starts with three or
-# more backticks with no backtick after them on the line, or three or more tildes, to the
-# first later line that is, after at most three spaces, a run of that character at least as
-# long and nothing but spaces and tabs, or to the end of the page. A label defined on a
-# definition line too is not one of them, and a text that defines nothing gives none.
+# where its "[" starts a line, or the text of the block quotes and list items that hold the
+# line, after at most three spaces, outside a fenced code block, each tab read as the
+# spaces up to the next column that is a multiple of four, as README states the rule. A
+# fenced code block runs from a line that, where the block quotes and list items holding it
+# end and after at most three spaces, starts with three or more backticks with no backtick
+# after them on the line, or three or more tildes, to the first later line that holds its
+# block quotes and list items and is, where they end and after at most three spaces, a run
+# of that character at least as long and nothing but spaces, or to the line that closes one
+# of them, or to the end of the page. A label defined on a definition line too is not one of them, and a
+# text that defines nothing gives none. CommonMark, as markdown-it-py 4.0.0 reads it, reads
+# a definition for each label here that stands on a definition line, and for none that
+# stands on none, but in five cases: in the two named "read with no paragraph", in
+# "backtick run with a backtick after it" and in "run of two backticks" it reads the line
+# as continuing the text before it, and in "block quote marker after four spaces on a later
+# line" it continues the block quote, where the CommonMark specification allows at most
+# three spaces before a block quote marker.
 UNSURE_DEFINITIONS = [
     ("definition line", "[t]: x", set()),
     ("definition line after three spaces", "   [t]: x", set()),
@@ -2468,8 +2551,43 @@ UNSURE_DEFINITIONS = [
     ("definition-like text after a tab", "\t[t]: x", {"t"}),
     ("definition-like text in a code span", "`[t]: x`", {"t"}),
     ("definition-like text after other text", "see [t]: x", {"t"}),
-    ("definition-like text in a list item", "- [t]: x", {"t"}),
-    ("definition-like text in a block quote", "> [t]: x", {"t"}),
+    ("definition line in a list item", "- [t]: x", set()),
+    ("definition line in a block quote", "> [t]: x", set()),
+    ("definition line in a list item of each other bullet", "* [t]: x\n+ [a]: x", set()),
+    ("definition line in an ordered list item", "1. [t]: x\n123456789) [a]: x", set()),
+    ("ordered list marker of ten digits", "1234567890. [t]: x", {"t"}),
+    ("list marker with no space after it", "-[t]: x", {"t"}),
+    ("definition line after a block quote marker with no space", ">[t]: x", set()),
+    ("definition line in nested block quotes and list items", "> - > 1. [t]: x", set()),
+    ("definition line after a list marker and four spaces", "-    [t]: x", set()),
+    ("definition-like text after a list marker and five spaces", "-     [t]: x", {"t"}),
+    ("definition line after a block quote marker and four spaces", ">    [t]: x", set()),
+    ("definition-like text after a block quote marker and five spaces", ">     [t]: x",
+     {"t"}),
+    ("definition line after a marker and a tab", ">\t[t]: x\n-\t[a]: x\n10.\t[b]: x", set()),
+    ("definition-like text after a list marker and two tabs", "-\t\t[t]: x", {"t"}),
+    ("list marker after three spaces", "   - [t]: x", set()),
+    ("list marker after four spaces", "    - [t]: x", {"t"}),
+    ("definition line in a list item after a blank line", "- a\n\n  [t]: x", set()),
+    ("definition line in a list item with a wider marker", "10. a\n\n    [t]: x", set()),
+    ("definition-like text indented four columns past a list item's text",
+     "- a\n\n      [t]: x", {"t"}),
+    ("block quote marker after four spaces on a later line", ">\n    > [t]: x", {"t"}),
+    ("list item opened by a marker alone", "-\n  [t]: x", set()),
+    ("list item opened by a marker alone, closed by a blank line", "-\n\n    [t]: x", {"t"}),
+    ("thematic break of hyphens", "- - -\n    [t]: x", {"t"}),
+    ("thematic break of asterisks", "* * *\n    [t]: x", {"t"}),
+    ("fenced code block in a block quote", "> ```\n> [t]: x\n> ```\n> [a]: x", {"t"}),
+    ("fenced code block that the end of its block quote closes",
+     "> ```\n> [t]: x\n\n[a]: x", {"t"}),
+    ("block quote marker in a fenced code block", "```\n> ```\n[t]: x\n```", {"t"}),
+    ("fenced code block in a list item", "- ```\n  [t]: x\n  ```\n  [a]: x", {"t"}),
+    ("fenced code block that the end of its list item closes",
+     "- ```\n  [t]: x\n[a]: x", {"t"}),
+    ("fenced code block that the next list item closes", "- ```\n- [t]: x", set()),
+    ("list marker in a fenced code block in a block quote", "> ```\n> - [t]: x", {"t"}),
+    ("definition line after a line of text, read with no paragraph", "foo\n[t]: x", set()),
+    ("list item after a line of text, read with no paragraph", "foo\n2. [t]: x", set()),
     ("fenced code block", "```\n[t]: x\n```", {"t"}),
     ("fenced code block of tildes", "~~~\n[t]: x\n~~~", {"t"}),
     ("fenced code block after three spaces", "   ```\n[t]: x\n```", {"t"}),
@@ -2513,10 +2631,18 @@ def test_a_page_defines_on_no_definition_line_the_labels_stated(text, labels):
 # element's name. A "<" after a backslash starts no HTML, so it ends no element, and an end
 # tag whose name is followed by U+00A0 or U+3000 closes none: a browser ends a tag name only
 # at a tab, line feed, form feed, space, "/" or ">", so the name runs on past either.
-# Rendered as a CommonMark paragraph and shown in Chromium, each line shows the text of its
-# form but the last, which shows "DV-->AA": a browser ends the raw text of a style element
-# at the first "</style>", here inside what CommonMark reads as a comment, which the first
-# step removes whole. Neither names DVAA.
+# Rendered as a CommonMark paragraph and shown in Chromium, each line down to "end tag in a
+# comment" shows the text of its form: a browser ends the raw text of a style element at the
+# first "</style>", there inside what CommonMark reads as a comment, which the first step
+# removed whole, and the element with it to the end of the line, reading "DV". While a style
+# or script element is open, a comment, processing instruction, CDATA section or
+# declaration is now read only up to the first end tag of the element's name after its
+# opening, where it does not close before it, and the line is read on from there.
+# markdown-it-py 4.0.0 renders each line from "end tag in a comment" on as a CommonMark
+# paragraph that Python 3.14's html.parser reads as the text of its form, "DVAA]]>" for the
+# CDATA section, whose "]]" the second step removes. The last two lines leave an element
+# open to the end of the line: no "</style" follows the first, and a template element holds
+# no raw text, so the comment in the second is read whole.
 ELEMENT_FORMS = [
     ("style element", "DV<style>x</style>AA", "DVAA"),
     ("script element", "DV<script>x</script>AA", "DVAA"),
@@ -2538,7 +2664,21 @@ ELEMENT_FORMS = [
     ("end tag with U+00A0 after the name", "DV<style>x</style\N{NO-BREAK SPACE}>AA", "DV"),
     ("end tag with U+3000 after the name", "DV<script>x</script\N{IDEOGRAPHIC SPACE}>AA",
      "DV"),
-    ("end tag in a comment", "DV<style><!--</style>-->AA", "DV"),
+    ("end tag in a comment", "DV<style><!--</style>-->AA", "DV-->AA"),
+    ("comment closed after the end tag", "DV<style><!--</style>AA-->", "DVAA-->"),
+    ("processing instruction closed after the end tag", "DV<script><?</script>AA?>",
+     "DVAA?>"),
+    ("CDATA section closed after the end tag", "DV<style><![CDATA[</style>AA]]>", "DVAA>"),
+    ("declaration with no > before the end tag", "DV<script><!X</script>AA", "DVAA"),
+    ("comment with no close", "DV<style><!--</style>AA", "DVAA"),
+    ("comment closed before the end tag", "DV<style><!-- --></style>AA", "DVAA"),
+    ("backslash before the end tag in a comment", "DV<style><!--\\</style>AA-->", "DVAA-->"),
+    ("end tag in other letter cases and with a space in a comment",
+     "DV<Style><!--</STYLE >AA-->", "DVAA-->"),
+    ("style element in a template", "DV<template><style><!--</style>-->x</template>AA",
+     "DVAA"),
+    ("end tag of another element in a comment", "DV<style><!--</script>-->AA", "DV"),
+    ("comment in a template element", "DV<template><!--</template>-->AA", "DV"),
 ]
 
 
@@ -2776,30 +2916,108 @@ def stated_defined_labels(text):
 def stated_unsure_labels(text):
     """The labels page `text` defines on no definition line as README states: those of
     `stated_defined_labels` whose every definition-like text has its "[" anywhere but at
-    the start of a line, after at most three spaces, outside a fenced code block, the page
-    read line by line with a count of each run rather than the checker's patterns."""
+    the start of a line, or of the text of the block quotes and list items that hold the
+    line, after at most three spaces, outside a fenced code block, the page read line by
+    line with a count of each run rather than the checker's patterns."""
     starts = set()
-    fence = None  # the character and length of the run that opened the open block
+    held_open = []  # the open block quotes and list items, outermost first
+    fence = None  # the character and length of the run that opened the open block, and
+    # how many block quotes and list items hold it
+    lone_marker = False  # the last list item opened holds only the line of its marker
     offset = 0
-    for line in text.split("\n"):
-        spaces = 0
-        while line[spaces:spaces + 1] == " ":
-            spaces += 1
-        first = line[spaces:spaces + 1]
-        run = 0
-        while first in ("`", "~") and line[spaces + run:spaces + run + 1] == first:
-            run += 1
-        after = line[spaces + run:]
-        fence_line = spaces <= 3 and run >= 3
-        if fence is not None:
-            if (fence_line and first == fence[0] and run >= fence[1]
-                    and all(c in " \t" for c in after)):
+    for raw in text.split("\n"):
+        # The line with each tab read as the spaces up to the next column that is a
+        # multiple of four, and for each of its columns the offset in `raw` it comes from.
+        line, origin = "", []
+        for i, c in enumerate(raw):
+            width = 4 - len(line) % 4 if c == "\t" else 1
+            line += " " * width if c == "\t" else c
+            origin += [i] * width
+        end = len(line)
+        while end and line[end - 1] == " ":
+            end -= 1
+
+        def text_start(at):
+            while at < end and line[at] == " ":
+                at += 1
+            return at
+
+        pos = held = 0
+        while held < len(held_open):
+            first = text_start(pos)
+            kind = held_open[held]
+            if first >= end:
+                if kind == "quote":  # a blank rest holds no block quote
+                    break
+            elif kind == "quote":
+                if first - pos > 3 or line[first] != ">":
+                    break
+                pos = first + 1
+                if line[pos:pos + 1] == " ":
+                    pos += 1
+            elif first - pos >= kind:
+                pos += kind
+            else:
+                break
+            held += 1
+        first = text_start(pos)
+        alone, lone_marker = lone_marker, False
+        if held < len(held_open):
+            del held_open[held:]
+            if fence is not None and fence[2] > held:
                 fence = None
-        elif fence_line and not (first == "`" and "`" in after):
-            fence = (first, run)
-        elif spaces <= 3 and first == "[":
-            starts.add(offset + spaces)
-        offset += len(line) + 1
+        elif alone and first >= end:
+            held_open.pop()
+        if fence is not None:
+            run = 0
+            while line[first + run:first + run + 1] == fence[0]:
+                run += 1
+            if first - pos <= 3 and run >= fence[1] and first + run >= end:
+                fence = None
+            offset += len(raw) + 1
+            continue
+        while first < end and first - pos <= 3:
+            mark = line[first]
+            rest = line[first:end]
+            if mark in "*-" and rest.count(mark) >= 3 and not rest.replace(mark, "").strip(" "):
+                break  # a thematic break
+            if mark == ">":
+                held_open.append("quote")
+                pos = first + 1
+                if line[pos:pos + 1] == " ":
+                    pos += 1
+            else:
+                digits = 0
+                while line[first + digits:first + digits + 1] in tuple("0123456789"):
+                    digits += 1
+                if mark in "-+*":
+                    after = first + 1
+                elif 1 <= digits <= 9 and line[first + digits:first + digits + 1] in (".", ")"):
+                    after = first + digits + 1
+                else:
+                    break
+                gap = text_start(after) - after
+                if after < end and not gap:
+                    break  # no space after the marker
+                if after >= end or text_start(after) >= end:
+                    lone_marker = True
+                    column = after + 1
+                elif gap <= 4:
+                    column = after + gap
+                else:
+                    column = after + 1
+                held_open.append(column - pos)
+                pos = column
+            first = text_start(pos)
+        if first < end and first - pos <= 3:
+            run = 0
+            while line[first + run:first + run + 1] == line[first] and line[first] in "`~":
+                run += 1
+            if run >= 3 and not (line[first] == "`" and "`" in line[first + run:]):
+                fence = (line[first], run, len(held_open))
+            elif line[first] == "[":
+                starts.add(offset + origin[first])
+        offset += len(raw) + 1
     sure, keys = set(), set()
     for start, c in enumerate(text):
         run = 0
@@ -2920,6 +3138,20 @@ def stated_tag(line, i):
     return j == i + 2, name
 
 
+def stated_end_tag(line, start, name):
+    """Where the first "</" at or after line[start] stands that is followed by `name`, each
+    ASCII capital letter in it written small, and then by one of TAG_NAME_ENDS, or len(line)
+    where none does: as README states, a comment, processing instruction, CDATA section or
+    declaration that opens in a style or script element named `name` is read up to it."""
+    for k in range(start, len(line) - 1):
+        after = k + 2 + len(name)
+        written = "".join(chr(ord(c) + 32) if "A" <= c <= "Z" else c for c in line[k + 2:after])
+        if (line.startswith("</", k) and written == name and after < len(line)
+                and line[after] in TAG_NAME_ENDS):
+            return k
+    return len(line)
+
+
 def stated_first_step(line, any_space=True, spans=True, labels=None, html_block=False,
                       quoted=False, shown=None, hide_elements=False):
     """(pairs, open): `line` after the first step README states, each character with
@@ -2933,7 +3165,10 @@ def stated_first_step(line, any_space=True, spans=True, labels=None, html_block=
     start tag that opens a style, script or template element while none is open to the
     end of the end tag that closes it, or to the end of the line where none does, goes
     too: a start tag opens one unless a style or script element is open, and an end tag
-    closes the one opened last where it has its name."""
+    closes the one opened last where it has its name. While a style or script element is
+    open, a comment, processing instruction, CDATA section or declaration is read, also
+    where it decides whether code spans stop being read, as on the line ending at the
+    first "</" that `stated_end_tag` finds for that element after its opening."""
     out, i, reading, unmatched = [], 0, spans, False
     # The style, script and template elements open, the last opened at the end, and how
     # many pairs `out` held where the first of them opened.
@@ -2941,9 +3176,13 @@ def stated_first_step(line, any_space=True, spans=True, labels=None, html_block=
     while i < len(line):
         c = line[i]
         if c == "<":
-            if reading and stated_stops_at_lt(line, i):
+            ending = len(line)
+            if (open_elements[-1:] in (["style"], ["script"])
+                    and line.startswith(("<!", "<?"), i) and stated_html_end(line, i)):
+                ending = stated_end_tag(line, i + 1, open_elements[-1])
+            if reading and stated_stops_at_lt(line[:ending], i):
                 reading = False
-            end = stated_html_end(line, i, any_space, html_block, quoted)
+            end = stated_html_end(line[:ending], i, any_space, html_block, quoted)
             if end is not None:
                 tag = stated_tag(line, i) if hide_elements else None
                 if tag is not None:
@@ -3211,10 +3450,13 @@ def test_the_stated_label_rule_reads_every_generated_line_as_the_checker_does():
 
 # Pieces of the pages that the definition line rule reads: line breaks, spaces, a tab and
 # other text before a "[" or a run, runs of backticks and tildes of each length that opens
-# or closes a fenced code block or does neither, brackets, a colon, a backslash and letters.
+# or closes a fenced code block or does neither, brackets, a colon, a backslash and letters,
+# block quote and list item markers with and without the spaces after them, a marker of ten
+# digits, and thematic breaks.
 DEFINITION_LINE_PIECES = [
     *"\n\n[]:`~\t\\tax", " ", "   ", "    ", "``", "```", "````", "~~~", "~~~~", "[t]: x",
-    "\n```\n", "\n~~~\n", "\n[a]: x\n",
+    "\n```\n", "\n~~~\n", "\n[a]: x\n", *">-*+", "> ", "- ", "* ", "+ ", "1. ", "2) ",
+    "10. ", "     ", "1234567890. ", "- - -", "* * *", "\n> ```\n", "\n- ```\n",
 ]
 DEFINITION_PAGES_GENERATED = 100_000
 
@@ -3389,20 +3631,25 @@ def test_the_stated_element_rule_reads_every_generated_line_as_the_checker_does(
     # they apply, the second way, the HTML block way, with one HtmlBlockHtml serving the
     # readings with and without the text removed, the way that passes over quoted attribute
     # values, the HTML block ways that pass over them, with one HtmlBlockQuotedHtml serving
-    # those readings, and with the labels in STATED_LABELS removed. Removing an element's text
-    # passes over no place on the line: `open` and the places the raw HTML is matched at do
-    # not turn on it, and a line where no "<" is followed by the name of such an element
-    # reads alike either way.
+    # those readings, and with the labels in STATED_LABELS removed. With the elements' text
+    # removed, `open` is what the plain scan gives, and on a line holding no "<!" or "<?",
+    # where no comment, processing instruction, CDATA section or declaration is read up to
+    # an end tag, removing an element's text passes over no place on the line: `open` and
+    # the places the raw HTML is matched at do not turn on it. A line where no "<" is
+    # followed by the name of such an element reads alike either way.
     checker = load_checker()
     rng = random.Random(172)
     for _ in range(ELEMENT_LINES_GENERATED):
         line = "".join(rng.choice(ELEMENT_PIECES) for _ in range(rng.randint(1, 16)))
         hidden = stated_name_form(checker, line, hide_elements=True)
         assert checker.name_form(line, hide_elements=True) == hidden, ascii(line)
-        kept, removed = RecordedHtml(checker.RAW_HTML), RecordedHtml(checker.RAW_HTML)
-        assert (checker.step_one(line, kept)[1]
-                == checker.step_one(line, removed, hide_elements=True)[1]), ascii(line)
-        assert kept.places == removed.places, ascii(line)
+        assert (checker.step_one(line, hide_elements=True)[1]
+                == stated_first_step(line, hide_elements=True)[1]), ascii(line)
+        if "<!" not in line and "<?" not in line:
+            kept, removed = RecordedHtml(checker.RAW_HTML), RecordedHtml(checker.RAW_HTML)
+            assert (checker.step_one(line, kept)[1]
+                    == checker.step_one(line, removed, hide_elements=True)[1]), ascii(line)
+            assert kept.places == removed.places, ascii(line)
         if not checker.HIDDEN_ELEMENT_START.search(line):
             assert hidden == stated_name_form(checker, line), ascii(line)
         if any(c.isspace() and c not in " \t" for c in line):
@@ -3453,6 +3700,11 @@ LONG_ELEMENT_LINES = [
      "DVAA"),
     ("start tags in a style element no end tag closes",
      "DV" + "<style>x" * ELEMENT_RUNS + "AA", "DV"),
+    # Each comment is read up to the end tag after it, not to the one close at the end.
+    ("comments in style elements closed at the end of the line",
+     "DV" + "<style><!--</style>" * ELEMENT_RUNS + "AA-->", "DVAA-->"),
+    ("comments in a script element before its end tag",
+     "DV<script>" + "<!---->" * ELEMENT_RUNS + "</script>AA", "DVAA"),
 ]
 
 
@@ -3595,10 +3847,20 @@ def test_a_line_of_many_labels_the_page_defines_is_read_in_linear_time():
     ("```\n" + "[d]: x\n" * LABEL_RUNS, {"d"}),
     # A block that 100,000 shorter runs leave open, 400,011 characters.
     ("````\n" + "```\n" * LABEL_RUNS + "[d]: x", {"d"}),
-], ids=["a fenced code block of definitions", "a fenced code block of shorter runs"])
+    # A fenced code block in a block quote of 100,000 definitions, 900,006 characters.
+    ("> ```\n" + "> [d]: x\n" * LABEL_RUNS, {"d"}),
+    # 100,000 nested list items held by 50,000 blank lines, 250,006 characters.
+    ("- * " * (LABEL_RUNS // 2) + "\n" * (LABEL_RUNS // 2) + "[d]: x", set()),
+    # 50,000 nested block quotes, then 50,000 lines that hold the first, 150,007 characters.
+    (">" * (LABEL_RUNS // 2) + "\n>" * (LABEL_RUNS // 2) + "\n[d]: x", set()),
+], ids=["a fenced code block of definitions", "a fenced code block of shorter runs",
+        "a fenced code block of definitions in a block quote",
+        "nested list items held by blank lines", "nested block quotes"])
 def test_definition_lines_are_read_in_linear_time(page, unsure):
-    # Each line of a page is read once for the definition line rule, and the page once for
-    # its definition-like texts, so each of these pages is read in under a second.
+    # Each line of a page is read once for the definition line rule, a line blank after the
+    # markers it holds passing over the list items it holds up to the next block quote in
+    # one step, and the page once for its definition-like texts, so each of these pages is
+    # read in under a second.
     checker = load_checker()
     start = time.perf_counter()
     got = checker.unsure_labels(page)

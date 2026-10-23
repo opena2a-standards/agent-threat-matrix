@@ -127,9 +127,15 @@ opened last where it has that element's name, each name read in any ASCII letter
 whichever reading removed the tag, as the HTML block reading reads a tag name, to the
 first tab, line feed, form feed, space, / or >; where a start tag opens an element while
 none is open, what stands from that start tag to the end of the end tag that closes the
-element, or to the end of the line where none does, is removed. So "DV<style>x</style>AA",
-"DV<script>x</script>AA", "DV<template>x</template>AA" and
-"DV<template><template></template>x</template>AA" name DVAA, while
+element, or to the end of the line where none does, is removed. A browser reads the opening
+of a comment, processing instruction, CDATA section or declaration in a style or script
+element as text of the element, so while one is open, such HTML is removed only up to the
+first </ after its opening that is followed by the element's name, in any ASCII letter
+case, and a tab, line feed, form feed, space, / or >, where it does not close before that
+</, and the line is read on from that </. So "DV<style>x</style>AA",
+"DV<script>x</script>AA", "DV<template>x</template>AA",
+"DV<template><template></template>x</template>AA", "DV<style><!--</style>AA-->" and
+"DV<script><?</script>AA?>" name DVAA, while
 "DV<style>x</script>AA", "DV<style" U+00A0 ">x</style>AA" and "DV<style>x</style" U+00A0
 ">AA" do not. The line names DVAA when any reading does. On the way, as
 CommonMark reads them, the character a \\ escapes and
@@ -147,13 +153,14 @@ after it could be read another way, and each backtick from there is removed with
 Markdown characters in the second step: a code span whose text holds a |, which starts
 another cell in a table row, or a < or &, which a browser reads in an HTML block as the
 start of a tag or a character reference; a < at which HTML starts, read with any white
-space ending a tag name, that holds a backtick, ' or ", or that runs to the end of the
-line with no close; any other < followed by an ASCII character other than a space or tab,
-when no > follows it or a backtick, ' or " stands between it and the first > after it;
-and a ] followed by ( or [ when no ) or ] follows it with no further ( or [ first, or
-when a backtick, ', ", \\ or < stands between them. No code span is read on a line that
-carries one of the characters above, nor on the lines after a line on which, read with no
-link label removed as below, code spans are not read or stop being read, or that holds a
+space ending a tag name, that holds a backtick, ' or ", or that runs with no close to the
+end of the line, or to the </ it is removed up to in a style or script element as above;
+any other < followed by an ASCII character other than a space or tab, when no > follows it
+or a backtick, ' or " stands between it and the first > after it; and a ] followed by ( or
+[ when no ) or ] follows it with no further ( or [ first, or when a backtick, ', ", \\ or <
+stands between them. No code span is read on a line that carries one of the characters
+above, nor on the lines after a line on which, read with no link label removed as below and
+the text of no element removed, code spans are not read or stop being read, or that holds a
 run of backticks that no run closes, up to a blank line (empty or of spaces and tabs
 only): a code span, HTML or link span still open at the end of that line could close on
 one of them. Going along the line, where a ] that no \\ escapes and that stands in no code
@@ -174,19 +181,39 @@ it, with each other mix of them removed and kept, and it names DVAA when any of 
 readings does. A line holding four or more such labels is read with all of them removed
 and with none and, where one to three of them are labels the page defines on no
 definition line, with each other mix of those removed and kept and the others removed. A
-definition-like text stands on a definition line where its [ starts a line, after at most
-three spaces, outside a fenced code block: so "[t]: x" does as a line of its own, also
-after one to three spaces, while "`[t]: x`", "[t]: x" after four spaces or a tab, and
-"[t]: x" on a line in a fenced code block do not. A fenced code block runs from a line
-that, after at most three spaces, starts with a run of three or more backticks with no
-backtick after it on the line, or of three or more tildes, to the first later line that
-is, after at most three spaces, a run of that character at least as long followed by
-nothing but spaces and tabs, or to the end of the page. So "[x][DV](url)AA", which
-CommonMark shows as "[x]DVAA" where the page does not define the label DV, names DVAA, as
-does "[x][DV](u)[A][t]A" on a page that defines t, with DV only in a fenced code block,
-which CommonMark shows as "[x]DVAA", and "[x][DV](u)[A][t]A [y][a] [z][b]" on such a page
-that also defines a and b, which CommonMark shows as "[x]DVAA y z", while "[DV][dvaa]AA"
-names DVAA only where the page defines the label dvaa. Second, going along
+definition-like text stands on a definition line where its [ starts a line, or the text of
+the block quotes and list items that hold the line, after at most three spaces, outside a
+fenced code block: so "[t]: x" does as a line of its own, also after one to three spaces,
+and so do "> [t]: x", "- [t]: x" and "1. [t]: x", while "`[t]: x`", "[t]: x" after four
+spaces or a tab, "[t]: x" after "-" and five spaces, and "[t]: x" on a line in a fenced
+code block do not. The page is read line by line, each tab read as the spaces up to the
+next column that is a multiple of four. A block quote marker is a > after at most three
+spaces, with the space after it if one follows, and a list item marker is a -, + or *, or
+one to nine digits followed by . or ), after at most three spaces and followed by a space
+or the end of the line. A line holds the open block quotes and list items, outermost
+first, while it has, where those before it end on the line, a block quote marker for a
+block quote, and for a list item nothing but spaces or an indent that reaches the item's
+text; the others close, with the block quotes, list items and fenced code block they hold,
+and a list item opened on a line holding nothing after its marker also closes at a blank
+line after it. Unless a fenced code block is open, the line then opens, where those it
+holds end, a block quote at each block quote marker and a list item at each list item
+marker, up to other text or a thematic break: three or more *, or three or more -, with
+nothing else but spaces, after at most three spaces. A list item's text starts after the
+spaces after its marker where one to four do and text follows them, and one column after
+the marker otherwise. A fenced code block runs from a line that, where those it holds end,
+after at most three spaces, starts with a run of three or more backticks with no backtick
+after it on the line, or of three or more tildes, to the first later line that holds its
+block quotes and list items and is, where they end, after at most three spaces, a run of
+that character at least as long followed by nothing but spaces, or to the first line that
+closes one of them, or to the end of the page. No paragraph is read, so "[t]: x" and
+"2. [t]: x" directly after a line of text stand on a definition line, while CommonMark
+reads each as continuing the text. So "[x][DV](url)AA", which CommonMark shows as
+"[x]DVAA" where the page does not define the label DV, names DVAA, as does
+"[x][DV](u)[A][t]A" on a page that defines t, with DV only in a fenced code block, which
+CommonMark shows as "[x]DVAA", and "[x][DV](u)[A][t]A [y][a] [z][b]" on such a page that
+also defines a and b, which CommonMark shows as "[x]DVAA y z", also where t, a and b are
+each defined in a list item or on a block quote line, while "[DV][dvaa]AA" names DVAA
+only where the page defines the label dvaa. Second, going along
 what remains, each ] followed by ( is removed with the text after
 it to the first ) if no further ( comes first, whether or not they make a link, then each
 ! directly before a [, and then the Markdown characters * _ ~ ` [ ]. Each reading is also
@@ -568,6 +595,14 @@ HIDDEN_ELEMENTS = frozenset({"style", "script", "template"})
 # template.
 RAW_TEXT_ELEMENTS = frozenset({"style", "script"})
 
+# For each element of RAW_TEXT_ELEMENTS, "</" followed by its name, in any ASCII letter case,
+# and a tab, line feed, form feed, space, "/" or ">". A comment, processing instruction, CDATA
+# section or declaration that opens in such an element is read only up to the first of these
+# after its opening where it does not close before it (`step_one`): a browser reads its
+# opening as text of the element, so "DV<style><!--</style>AA-->" shows "DVAA-->".
+RAW_TEXT_END = {name: re.compile(f"</{name}(?=[\\t\\n\\f />])", re.IGNORECASE | re.ASCII)
+                for name in RAW_TEXT_ELEMENTS}
+
 # "<" or "</" and the name of a tag that RAW_HTML, SPACE_OR_TAB_HTML, HTML_BLOCK_HTML or
 # QUOTED_HTML matches, read whichever pattern matched the tag as HTML_BLOCK_HTML reads a tag
 # name, with HTML_BLOCK_TAG_NAME after its first letter: an ASCII letter followed by any
@@ -603,12 +638,21 @@ LINK_TARGET = re.compile(PAREN_SPAN.pattern + r"|\]\[[^\[\]]*\]")
 # kept and the others removed.
 MIXED_LABELS = 3
 
-# A line that opens or closes a fenced code block where `unsure_labels` reads one: up to
-# three spaces, a run of three or more backticks or tildes, and the rest of the line. A
-# backtick run opens a block only where the rest of its line holds no backtick, and a run
-# closes the open block only where it is of that block's character, at least as long as
-# the run that opened it, with nothing but spaces and tabs in the rest of its line.
+# Block structure where `definition_starts` reads it, each pattern matched in a line from
+# where the markers of the block quotes and list items that hold it end, with each tab read
+# as the spaces up to the next column that is a multiple of four.
+# A line that opens or closes a fenced code block: up to three spaces, a run of three or
+# more backticks or tildes, and the rest of the line. A backtick run opens a block only
+# where the rest of its line holds no backtick, and a run closes the open block only where
+# it is of that block's character, at least as long as the run that opened it, with
+# nothing but spaces in the rest of its line.
 FENCE = re.compile(r" {0,3}(`{3,}|~{3,})(.*)")
+# A block quote marker: up to three spaces and ">", with the space after it if one follows.
+QUOTE_MARKER = re.compile(r" {0,3}> ?")
+# A list item marker: up to three spaces and "-", "+", "*", or one to nine digits followed
+# by "." or ")", then the spaces after it, of which it needs one unless the line ends there.
+LIST_MARKER = re.compile(r" {0,3}(?:[-+*]|[0-9]{1,9}[.)])( *)")
+SPACES = re.compile(" *")
 
 # A "!" directly before a "[", removed so that an image reads as its alternative text:
 # "DV![](x.png)AA" names DVAA, while "DV!AA" does not.
@@ -936,8 +980,9 @@ def nfkc(text):
 
 def unclosed(found):
     """Whether `found`, HTML `RAW_HTML` matches, is a comment, processing instruction, CDATA
-    section or declaration that runs to the end of the line because no close follows its
-    opening. "<!-->" ends in "-->", but no close follows its opening "<!--"."""
+    section or declaration that runs to the end of the line, or of the part of the line
+    `step_one` matches it in, because no close follows its opening there. "<!-->" ends in
+    "-->", but no close follows its opening "<!--"."""
     for opening, close in HTML_CLOSES:
         if found.startswith(opening):
             return not (found.endswith(close) and len(found) >= len(opening) + len(close))
@@ -1009,32 +1054,128 @@ def defined_labels(text):
     return frozenset(key for _, key in definitions(text))
 
 
+def tab_offset(line, column):
+    """The offset in `line` of the character that `line` with each tab read as the spaces up
+    to the next column that is a multiple of four holds at `column`, where that character
+    is not one of those spaces."""
+    offset = width = 0
+    while width < column:
+        width = (width // 4 + 1) * 4 if line[offset] == "\t" else width + 1
+        offset += 1
+    return offset
+
+
+def definition_starts(text):
+    """The offsets in page `text` of each "[" that stands on a definition line: one that
+    starts a line, or the text of the block quotes and list items that hold the line, after
+    at most three spaces, outside a fenced code block, each tab read as the spaces up to
+    the next column that is a multiple of four, as CommonMark reads a tab there.
+
+    Going down the page, a line holds each open block quote whose ">" it has, after at
+    most three spaces (`QUOTE_MARKER`), and each open list item it is indented to the text
+    of, or is blank after the markers before it; the others close, with the block quotes,
+    list items and fenced code block they hold, and a list item opened on a line holding
+    nothing after its marker also closes at a blank line after it. Unless a fenced code
+    block is open, the line then opens, from where those markers end, a block quote at each
+    ">" and a list item at each `LIST_MARKER` with a space or the end of the line after it,
+    until other text, or a thematic break: three or more "*", or three or more "-", with
+    nothing else but spaces after at most three spaces, which opens no list item. A list
+    item's text starts after the spaces after its marker where one to four do and text
+    follows them, and one column after the marker otherwise, so "-     [t]: x" stands on
+    no definition line, as CommonMark reads it as code. A fenced code block runs from a
+    line that `FENCE` opens where those markers end to the first later line that holds its
+    block quotes and list items and that `FENCE` closes where their markers end, or to the
+    first line that closes one of them, or to the end of the page.
+
+    No paragraph is read, so "[t]: x" stands on a definition line also directly after a
+    line of text, which CommonMark continues with it. Each line is read once, and a line
+    blank after the markers it holds passes over the list items it holds up to the next
+    block quote in one step, found by bisection, rather than one item at a time."""
+    starts = set()
+    # The open block quotes and list items, outermost first: None for a block quote, and
+    # for a list item the columns from where its marker's line starts inside its parent to
+    # its text, by which each line it holds is indented there.
+    containers = []
+    quotes = []  # the indexes in `containers` of the block quotes
+    fence = None  # the run that opened the open fenced code block, and how many hold it
+    blank_item = False  # the innermost container is a list item whose only line is blank
+    offset = 0
+    for raw in text.split("\n"):
+        start, offset = offset, offset + len(raw) + 1
+        line = raw.expandtabs(4)
+        end = len(line.rstrip(" "))
+        pos = held = 0
+        text_at = SPACES.match(line).end()
+        while held < len(containers):
+            if text_at >= end:
+                later = bisect.bisect_left(quotes, held)
+                held = quotes[later] if later < len(quotes) else len(containers)
+                break
+            if containers[held] is None:
+                found = QUOTE_MARKER.match(line, pos)
+                if not found:
+                    break
+                pos = found.end()
+                text_at = SPACES.match(line, pos).end()
+            elif text_at - pos >= containers[held]:
+                pos += containers[held]
+            else:
+                break
+            held += 1
+        was_blank_item, blank_item = blank_item, False
+        if held < len(containers):
+            del containers[held:]
+            del quotes[bisect.bisect_left(quotes, held):]
+            if fence and fence[1] > held:
+                fence = None
+        elif was_blank_item and text_at >= end:
+            containers.pop()
+        if fence:
+            found = FENCE.match(line, pos)
+            if (found and found.group(1)[0] == fence[0][0]
+                    and len(found.group(1)) >= len(fence[0])
+                    and not found.group(2).strip(" ")):
+                fence = None
+            continue
+        # A thematic break runs to the end of the line, so it can only start where the
+        # rest of the line is its character and spaces: from `tail` on.
+        last = line[end - 1:end]
+        tail = len(line[:end].rstrip(last + " ")) if last in ("*", "-") else end
+        while text_at < end and not (text_at - pos <= 3 and text_at >= tail
+                                     and line.count(last, text_at, end) >= 3):
+            found = QUOTE_MARKER.match(line, pos)
+            if found:
+                quotes.append(len(containers))
+                containers.append(None)
+                pos = found.end()
+            else:
+                found = LIST_MARKER.match(line, pos)
+                if not found or not (found.group(1) or found.end() >= end):
+                    break
+                blank_item = found.end() >= end
+                column = found.end()
+                if blank_item or len(found.group(1)) > 4:
+                    column = found.start(1) + 1
+                containers.append(column - pos)
+                pos = column
+            text_at = SPACES.match(line, pos).end()
+        if text_at < end and text_at - pos <= 3:
+            found = FENCE.match(line, pos)
+            if found and not (found.group(1)[0] == "`" and "`" in found.group(2)):
+                fence = (found.group(1), len(containers))
+            elif line[text_at] == "[":
+                starts.add(start + tab_offset(raw, text_at))
+    return starts
+
+
 def unsure_labels(text):
     """The labels page `text` defines (`defined_labels`) only in definition-like texts that
-    CommonMark may not read as definitions: those whose "[" does not start a line, after at
-    most three spaces, outside a fenced code block, as in "`[t]: x`", in "[t]: x" after four
-    spaces or a tab, and in "[t]: x" on a line in a fenced code block. A fenced code block
-    runs from a line that `FENCE` matches, where a backtick run has no backtick after it on
-    the line, to the first later line that `FENCE` matches with a run of that character at
-    least as long and nothing but spaces and tabs after it, or to the end of the page. Each
-    line is read once, and `definitions` reads the page in linear time."""
-    starts = set()
-    fence = None
-    offset = 0
-    for line in text.split("\n"):
-        found = FENCE.match(line)
-        if fence:
-            run = found.group(1) if found else ""
-            if (run[:1] == fence[0] and len(run) >= len(fence)
-                    and not found.group(2).strip(" \t")):
-                fence = None
-        elif found and not (found.group(1)[0] == "`" and "`" in found.group(2)):
-            fence = found.group(1)
-        else:
-            indent = len(line) - len(line.lstrip(" "))
-            if indent <= 3 and line[indent:indent + 1] == "[":
-                starts.add(offset + indent)
-        offset += len(line) + 1
+    CommonMark may not read as definitions: those whose "[" stands on no definition line
+    (`definition_starts`), as in "`[t]: x`", in "[t]: x" after four spaces or a tab, in
+    "[t]: x" on a line in a fenced code block, and in ">     [t]: x", while "[t]: x" stands
+    on one as a line of its own, and so does it in "- [t]: x", "1. [t]: x" and "> [t]: x".
+    `definitions` reads the page in linear time."""
+    starts = definition_starts(text)
     sure, keys = set(), set()
     for start, key in definitions(text):
         (sure if start in starts else keys).add(key)
@@ -1111,16 +1252,24 @@ def step_one(stripped, raw_html=RAW_HTML, spans=True, labels=None, references=No
     tab, line feed, form feed, space, "/" or ">" whatever `raw_html` is, as `HTML_BLOCK_HTML`
     and a browser end a tag name: a start tag opens such an element unless one in
     `RAW_TEXT_ELEMENTS` is open, and an end tag closes the element opened last where it has
-    that element's name. Removing the text of an element passes over no place on the line,
-    so `open`, and the places `raw_html` is asked to match at, are the same whether or not
-    `hide_elements` is true.
+    that element's name. While an element in `RAW_TEXT_ELEMENTS` is open, a comment,
+    processing instruction, CDATA section or declaration, which every `raw_html` matches as
+    `RAW_HTML` does, is matched with `RAW_HTML` with the line ending at the first "</" after
+    its opening that `RAW_TEXT_END` finds for that element, so where it does not close before
+    that "</" it runs to it, and the line is read on from there: "DV<style><!--</style>AA-->"
+    reads "DVAA-->". Code spans stop being read where it is so cut short, as at one that runs
+    to the end of the line. On a line holding no "<!" or "<?", removing the text of an
+    element passes over no place on the line, so `open`, and the places `raw_html` is asked
+    to match at, are the same whether or not `hide_elements` is true.
 
     Each closing run is looked up in the runs of its length, in order, past the ones already
     passed, a "<" that starts no HTML looks for the first ">" after it once for all the "<"
     before that ">", and a link label is scanned only up to the first "[" or "]" after its
-    "[" that no backslash escapes, where the next one can start; the text of an element is
-    removed once, when the element that opened while none was open closes or the line ends:
-    a line is read in linear time."""
+    "[" that no backslash escapes, where the next one can start; the "</" `RAW_TEXT_END` finds
+    for an element is looked for again only once the line is read past it, and a comment,
+    processing instruction, CDATA section or declaration read up to it is matched no further;
+    the text of an element is removed once, when the element that opened while none was open
+    closes or the line ends: a line is read in linear time."""
     runs = {}
     for run in BACKTICKS.finditer(stripped):
         runs.setdefault(len(run.group()), []).append(run.start())
@@ -1133,12 +1282,27 @@ def step_one(stripped, raw_html=RAW_HTML, spans=True, labels=None, references=No
     # The elements in HIDDEN_ELEMENTS open here, the one opened last at the end, and the
     # length `out` had where the first of them opened.
     elements, hidden_from = [], 0
+    # For each element of RAW_TEXT_ELEMENTS, where the first "</" that RAW_TEXT_END finds for
+    # it, at or after the place it was last looked for from, stands, or n where none does: it
+    # is looked for again only once the line is read past it.
+    raw_text_ends = {}
     i, n = 0, len(stripped)
     while i < n:
         c = stripped[i]
         if c == "<":
+            # Where the line is read as ending for the HTML that starts here: at the first end
+            # tag after it of the style or script element open here, where a comment,
+            # processing instruction, CDATA section or declaration starts, and at its end
+            # anywhere else.
+            stop = n
+            if (elements and elements[-1] in RAW_TEXT_ELEMENTS
+                    and stripped.startswith(("<!", "<?"), i)):
+                stop = raw_text_ends.get(elements[-1], -1)
+                if stop < i:
+                    ahead = RAW_TEXT_END[elements[-1]].search(stripped, i)
+                    stop = raw_text_ends[elements[-1]] = ahead.start() if ahead else n
             if reading:
-                found = RAW_HTML.match(stripped, i)
+                found = RAW_HTML.match(stripped, i, stop)
                 if found:
                     reading = not (unclosed(found.group())
                                    or any(h in HTML_UNSURE for h in found.group()))
@@ -1148,7 +1312,10 @@ def step_one(stripped, raw_html=RAW_HTML, spans=True, labels=None, references=No
                         if end < 0 or any(h in HTML_UNSURE for h in stripped[i + 1:end]):
                             reading = False
                         clear_to = end
-            found = raw_html.match(stripped, i)
+            # Every raw_html matches a comment, processing instruction, CDATA section or
+            # declaration as RAW_HTML does.
+            found = (raw_html.match(stripped, i) if stop == n
+                     else RAW_HTML.match(stripped, i, stop))
             if found:
                 tag = TAG_START.match(found.group()) if hide_elements else None
                 if tag and tag.group(2).isascii():
