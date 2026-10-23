@@ -72,6 +72,11 @@ README that defines t, a and b, with DV only in a fenced code block,
 "[x][DV](u)[A][t]A [y][a] [z][b]", which CommonMark shows as "[x]DVAA y z", passed with two
 wrong figures, as did the line with "`][a]` `][b]`" in place of "[y][a] [z][b]"; each must
 now go red, read with the labels the page defines on a definition line removed and DV kept.
+A definition in a list item or on a block quote line, as "- [t]: x" or "> [t]: x", was
+counted as standing on no definition line, so the first of those lines passed with t, a and
+b defined there; it must go red on such pages too. A table, a plain scan of the stated rule
+over generated pages, and pages read in under a second pin how the definition line rule
+follows block quotes, list items and the fenced code blocks they hold.
 
 A "]" followed by "(" makes no link either where no "[" before it opens one: CommonMark
 shows "x](DV**AA**) (99 agents, 77 vulnerability categories)", set as its own paragraph
@@ -1948,10 +1953,20 @@ def test_the_html_block_quoted_reading_reads_a_long_line_in_linear_time(line):
 # `][b]`" in place of "[y][a] [z][b]" as "[x]DVAA ][a] ][b]": holding four labels the page
 # defines, the "][" in a code span counted too, each line was read with all of them removed
 # and with none only, and passed with exit 0. DV is defined on no definition line, so each
-# is now also read with t, a and b removed and DV kept.
+# is now also read with t, a and b removed and DV kept. With t, a and b each defined in a
+# list item, as "- [t]: https://example.org", or on a block quote line, as
+# "> [t]: https://example.org", CommonMark reads the three definitions and shows the first
+# of those lines as "[x]DVAA y z" too, while each definition was counted as standing on no
+# definition line, as its "[" stands after the item or quote marker: holding four such
+# labels, the line was read with all of them removed and with none only, and passed with
+# exit 0. A definition in a list item or block quote now stands on a definition line.
 DEFINITION = "[d]: https://example.org"
 FOUR_DEFINITIONS = ("[t]: https://example.org\n[a]: https://example.org\n"
                     "[b]: https://example.org\n\n```\n[DV]: https://example.org\n```")
+LIST_ITEM_DEFINITIONS = ("- [t]: https://example.org\n- [a]: https://example.org\n"
+                         "- [b]: https://example.org\n\n```\n[DV]: https://example.org\n```")
+QUOTE_DEFINITIONS = ("> [t]: https://example.org\n> [a]: https://example.org\n"
+                     "> [b]: https://example.org\n\n```\n[DV]: https://example.org\n```")
 LABEL_LINES = [
     ("label the page does not define", "[x][DV](y)AA", ""),
     ("link span with no label before it", "[DV](y)AA", ""),
@@ -1970,6 +1985,10 @@ LABEL_LINES = [
      "[x][DV](u)[A][t]A [y][a] [z][b]", FOUR_DEFINITIONS),
     ("four labels the page defines, two after a ] in a code span",
      "[x][DV](u)[A][t]A `][a]` `][b]`", FOUR_DEFINITIONS),
+    ("four labels the page defines, three in list items and one only in a fenced code block",
+     "[x][DV](u)[A][t]A [y][a] [z][b]", LIST_ITEM_DEFINITIONS),
+    ("four labels the page defines, three in a block quote and one only in a fenced code block",
+     "[x][DV](u)[A][t]A [y][a] [z][b]", QUOTE_DEFINITIONS),
 ]
 
 
@@ -2509,12 +2528,22 @@ def test_a_page_defines_the_labels_stated(text, labels):
 
 
 # The labels a page defines on no definition line: a definition-like text stands on one
-# where its "[" starts a line, after at most three spaces, outside a fenced code block. A
-# fenced code block runs from a line that, after at most three spaces, starts with three or
-# more backticks with no backtick after them on the line, or three or more tildes, to the
-# first later line that is, after at most three spaces, a run of that character at least as
-# long and nothing but spaces and tabs, or to the end of the page. A label defined on a
-# definition line too is not one of them, and a text that defines nothing gives none.
+# where its "[" starts a line, or the text of the block quotes and list items that hold the
+# line, after at most three spaces, outside a fenced code block, each tab read as the
+# spaces up to the next column that is a multiple of four, as README states the rule. A
+# fenced code block runs from a line that, where the block quotes and list items holding it
+# end and after at most three spaces, starts with three or more backticks with no backtick
+# after them on the line, or three or more tildes, to the first later line that holds its
+# block quotes and list items and is, where they end and after at most three spaces, a run
+# of that character at least as long and nothing but spaces, or to the line that closes one
+# of them, or to the end of the page. A label defined on a definition line too is not one of them, and a
+# text that defines nothing gives none. CommonMark, as markdown-it-py 4.0.0 reads it, reads
+# a definition for each label here that stands on a definition line, and for none that
+# stands on none, but in five cases: in the two named "read with no paragraph", in
+# "backtick run with a backtick after it" and in "run of two backticks" it reads the line
+# as continuing the text before it, and in "block quote marker after four spaces on a later
+# line" it continues the block quote, where the CommonMark specification allows at most
+# three spaces before a block quote marker.
 UNSURE_DEFINITIONS = [
     ("definition line", "[t]: x", set()),
     ("definition line after three spaces", "   [t]: x", set()),
@@ -2522,8 +2551,43 @@ UNSURE_DEFINITIONS = [
     ("definition-like text after a tab", "\t[t]: x", {"t"}),
     ("definition-like text in a code span", "`[t]: x`", {"t"}),
     ("definition-like text after other text", "see [t]: x", {"t"}),
-    ("definition-like text in a list item", "- [t]: x", {"t"}),
-    ("definition-like text in a block quote", "> [t]: x", {"t"}),
+    ("definition line in a list item", "- [t]: x", set()),
+    ("definition line in a block quote", "> [t]: x", set()),
+    ("definition line in a list item of each other bullet", "* [t]: x\n+ [a]: x", set()),
+    ("definition line in an ordered list item", "1. [t]: x\n123456789) [a]: x", set()),
+    ("ordered list marker of ten digits", "1234567890. [t]: x", {"t"}),
+    ("list marker with no space after it", "-[t]: x", {"t"}),
+    ("definition line after a block quote marker with no space", ">[t]: x", set()),
+    ("definition line in nested block quotes and list items", "> - > 1. [t]: x", set()),
+    ("definition line after a list marker and four spaces", "-    [t]: x", set()),
+    ("definition-like text after a list marker and five spaces", "-     [t]: x", {"t"}),
+    ("definition line after a block quote marker and four spaces", ">    [t]: x", set()),
+    ("definition-like text after a block quote marker and five spaces", ">     [t]: x",
+     {"t"}),
+    ("definition line after a marker and a tab", ">\t[t]: x\n-\t[a]: x\n10.\t[b]: x", set()),
+    ("definition-like text after a list marker and two tabs", "-\t\t[t]: x", {"t"}),
+    ("list marker after three spaces", "   - [t]: x", set()),
+    ("list marker after four spaces", "    - [t]: x", {"t"}),
+    ("definition line in a list item after a blank line", "- a\n\n  [t]: x", set()),
+    ("definition line in a list item with a wider marker", "10. a\n\n    [t]: x", set()),
+    ("definition-like text indented four columns past a list item's text",
+     "- a\n\n      [t]: x", {"t"}),
+    ("block quote marker after four spaces on a later line", ">\n    > [t]: x", {"t"}),
+    ("list item opened by a marker alone", "-\n  [t]: x", set()),
+    ("list item opened by a marker alone, closed by a blank line", "-\n\n    [t]: x", {"t"}),
+    ("thematic break of hyphens", "- - -\n    [t]: x", {"t"}),
+    ("thematic break of asterisks", "* * *\n    [t]: x", {"t"}),
+    ("fenced code block in a block quote", "> ```\n> [t]: x\n> ```\n> [a]: x", {"t"}),
+    ("fenced code block that the end of its block quote closes",
+     "> ```\n> [t]: x\n\n[a]: x", {"t"}),
+    ("block quote marker in a fenced code block", "```\n> ```\n[t]: x\n```", {"t"}),
+    ("fenced code block in a list item", "- ```\n  [t]: x\n  ```\n  [a]: x", {"t"}),
+    ("fenced code block that the end of its list item closes",
+     "- ```\n  [t]: x\n[a]: x", {"t"}),
+    ("fenced code block that the next list item closes", "- ```\n- [t]: x", set()),
+    ("list marker in a fenced code block in a block quote", "> ```\n> - [t]: x", {"t"}),
+    ("definition line after a line of text, read with no paragraph", "foo\n[t]: x", set()),
+    ("list item after a line of text, read with no paragraph", "foo\n2. [t]: x", set()),
     ("fenced code block", "```\n[t]: x\n```", {"t"}),
     ("fenced code block of tildes", "~~~\n[t]: x\n~~~", {"t"}),
     ("fenced code block after three spaces", "   ```\n[t]: x\n```", {"t"}),
@@ -2852,30 +2916,108 @@ def stated_defined_labels(text):
 def stated_unsure_labels(text):
     """The labels page `text` defines on no definition line as README states: those of
     `stated_defined_labels` whose every definition-like text has its "[" anywhere but at
-    the start of a line, after at most three spaces, outside a fenced code block, the page
-    read line by line with a count of each run rather than the checker's patterns."""
+    the start of a line, or of the text of the block quotes and list items that hold the
+    line, after at most three spaces, outside a fenced code block, the page read line by
+    line with a count of each run rather than the checker's patterns."""
     starts = set()
-    fence = None  # the character and length of the run that opened the open block
+    held_open = []  # the open block quotes and list items, outermost first
+    fence = None  # the character and length of the run that opened the open block, and
+    # how many block quotes and list items hold it
+    lone_marker = False  # the last list item opened holds only the line of its marker
     offset = 0
-    for line in text.split("\n"):
-        spaces = 0
-        while line[spaces:spaces + 1] == " ":
-            spaces += 1
-        first = line[spaces:spaces + 1]
-        run = 0
-        while first in ("`", "~") and line[spaces + run:spaces + run + 1] == first:
-            run += 1
-        after = line[spaces + run:]
-        fence_line = spaces <= 3 and run >= 3
-        if fence is not None:
-            if (fence_line and first == fence[0] and run >= fence[1]
-                    and all(c in " \t" for c in after)):
+    for raw in text.split("\n"):
+        # The line with each tab read as the spaces up to the next column that is a
+        # multiple of four, and for each of its columns the offset in `raw` it comes from.
+        line, origin = "", []
+        for i, c in enumerate(raw):
+            width = 4 - len(line) % 4 if c == "\t" else 1
+            line += " " * width if c == "\t" else c
+            origin += [i] * width
+        end = len(line)
+        while end and line[end - 1] == " ":
+            end -= 1
+
+        def text_start(at):
+            while at < end and line[at] == " ":
+                at += 1
+            return at
+
+        pos = held = 0
+        while held < len(held_open):
+            first = text_start(pos)
+            kind = held_open[held]
+            if first >= end:
+                if kind == "quote":  # a blank rest holds no block quote
+                    break
+            elif kind == "quote":
+                if first - pos > 3 or line[first] != ">":
+                    break
+                pos = first + 1
+                if line[pos:pos + 1] == " ":
+                    pos += 1
+            elif first - pos >= kind:
+                pos += kind
+            else:
+                break
+            held += 1
+        first = text_start(pos)
+        alone, lone_marker = lone_marker, False
+        if held < len(held_open):
+            del held_open[held:]
+            if fence is not None and fence[2] > held:
                 fence = None
-        elif fence_line and not (first == "`" and "`" in after):
-            fence = (first, run)
-        elif spaces <= 3 and first == "[":
-            starts.add(offset + spaces)
-        offset += len(line) + 1
+        elif alone and first >= end:
+            held_open.pop()
+        if fence is not None:
+            run = 0
+            while line[first + run:first + run + 1] == fence[0]:
+                run += 1
+            if first - pos <= 3 and run >= fence[1] and first + run >= end:
+                fence = None
+            offset += len(raw) + 1
+            continue
+        while first < end and first - pos <= 3:
+            mark = line[first]
+            rest = line[first:end]
+            if mark in "*-" and rest.count(mark) >= 3 and not rest.replace(mark, "").strip(" "):
+                break  # a thematic break
+            if mark == ">":
+                held_open.append("quote")
+                pos = first + 1
+                if line[pos:pos + 1] == " ":
+                    pos += 1
+            else:
+                digits = 0
+                while line[first + digits:first + digits + 1] in tuple("0123456789"):
+                    digits += 1
+                if mark in "-+*":
+                    after = first + 1
+                elif 1 <= digits <= 9 and line[first + digits:first + digits + 1] in (".", ")"):
+                    after = first + digits + 1
+                else:
+                    break
+                gap = text_start(after) - after
+                if after < end and not gap:
+                    break  # no space after the marker
+                if after >= end or text_start(after) >= end:
+                    lone_marker = True
+                    column = after + 1
+                elif gap <= 4:
+                    column = after + gap
+                else:
+                    column = after + 1
+                held_open.append(column - pos)
+                pos = column
+            first = text_start(pos)
+        if first < end and first - pos <= 3:
+            run = 0
+            while line[first + run:first + run + 1] == line[first] and line[first] in "`~":
+                run += 1
+            if run >= 3 and not (line[first] == "`" and "`" in line[first + run:]):
+                fence = (line[first], run, len(held_open))
+            elif line[first] == "[":
+                starts.add(offset + origin[first])
+        offset += len(raw) + 1
     sure, keys = set(), set()
     for start, c in enumerate(text):
         run = 0
@@ -3308,10 +3450,13 @@ def test_the_stated_label_rule_reads_every_generated_line_as_the_checker_does():
 
 # Pieces of the pages that the definition line rule reads: line breaks, spaces, a tab and
 # other text before a "[" or a run, runs of backticks and tildes of each length that opens
-# or closes a fenced code block or does neither, brackets, a colon, a backslash and letters.
+# or closes a fenced code block or does neither, brackets, a colon, a backslash and letters,
+# block quote and list item markers with and without the spaces after them, a marker of ten
+# digits, and thematic breaks.
 DEFINITION_LINE_PIECES = [
     *"\n\n[]:`~\t\\tax", " ", "   ", "    ", "``", "```", "````", "~~~", "~~~~", "[t]: x",
-    "\n```\n", "\n~~~\n", "\n[a]: x\n",
+    "\n```\n", "\n~~~\n", "\n[a]: x\n", *">-*+", "> ", "- ", "* ", "+ ", "1. ", "2) ",
+    "10. ", "     ", "1234567890. ", "- - -", "* * *", "\n> ```\n", "\n- ```\n",
 ]
 DEFINITION_PAGES_GENERATED = 100_000
 
@@ -3702,10 +3847,20 @@ def test_a_line_of_many_labels_the_page_defines_is_read_in_linear_time():
     ("```\n" + "[d]: x\n" * LABEL_RUNS, {"d"}),
     # A block that 100,000 shorter runs leave open, 400,011 characters.
     ("````\n" + "```\n" * LABEL_RUNS + "[d]: x", {"d"}),
-], ids=["a fenced code block of definitions", "a fenced code block of shorter runs"])
+    # A fenced code block in a block quote of 100,000 definitions, 900,006 characters.
+    ("> ```\n" + "> [d]: x\n" * LABEL_RUNS, {"d"}),
+    # 100,000 nested list items held by 50,000 blank lines, 250,006 characters.
+    ("- * " * (LABEL_RUNS // 2) + "\n" * (LABEL_RUNS // 2) + "[d]: x", set()),
+    # 50,000 nested block quotes, then 50,000 lines that hold the first, 150,007 characters.
+    (">" * (LABEL_RUNS // 2) + "\n>" * (LABEL_RUNS // 2) + "\n[d]: x", set()),
+], ids=["a fenced code block of definitions", "a fenced code block of shorter runs",
+        "a fenced code block of definitions in a block quote",
+        "nested list items held by blank lines", "nested block quotes"])
 def test_definition_lines_are_read_in_linear_time(page, unsure):
-    # Each line of a page is read once for the definition line rule, and the page once for
-    # its definition-like texts, so each of these pages is read in under a second.
+    # Each line of a page is read once for the definition line rule, a line blank after the
+    # markers it holds passing over the list items it holds up to the next block quote in
+    # one step, and the page once for its definition-like texts, so each of these pages is
+    # read in under a second.
     checker = load_checker()
     start = time.perf_counter()
     got = checker.unsure_labels(page)

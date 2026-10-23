@@ -181,19 +181,39 @@ it, with each other mix of them removed and kept, and it names DVAA when any of 
 readings does. A line holding four or more such labels is read with all of them removed
 and with none and, where one to three of them are labels the page defines on no
 definition line, with each other mix of those removed and kept and the others removed. A
-definition-like text stands on a definition line where its [ starts a line, after at most
-three spaces, outside a fenced code block: so "[t]: x" does as a line of its own, also
-after one to three spaces, while "`[t]: x`", "[t]: x" after four spaces or a tab, and
-"[t]: x" on a line in a fenced code block do not. A fenced code block runs from a line
-that, after at most three spaces, starts with a run of three or more backticks with no
-backtick after it on the line, or of three or more tildes, to the first later line that
-is, after at most three spaces, a run of that character at least as long followed by
-nothing but spaces and tabs, or to the end of the page. So "[x][DV](url)AA", which
-CommonMark shows as "[x]DVAA" where the page does not define the label DV, names DVAA, as
-does "[x][DV](u)[A][t]A" on a page that defines t, with DV only in a fenced code block,
-which CommonMark shows as "[x]DVAA", and "[x][DV](u)[A][t]A [y][a] [z][b]" on such a page
-that also defines a and b, which CommonMark shows as "[x]DVAA y z", while "[DV][dvaa]AA"
-names DVAA only where the page defines the label dvaa. Second, going along
+definition-like text stands on a definition line where its [ starts a line, or the text of
+the block quotes and list items that hold the line, after at most three spaces, outside a
+fenced code block: so "[t]: x" does as a line of its own, also after one to three spaces,
+and so do "> [t]: x", "- [t]: x" and "1. [t]: x", while "`[t]: x`", "[t]: x" after four
+spaces or a tab, "[t]: x" after "-" and five spaces, and "[t]: x" on a line in a fenced
+code block do not. The page is read line by line, each tab read as the spaces up to the
+next column that is a multiple of four. A block quote marker is a > after at most three
+spaces, with the space after it if one follows, and a list item marker is a -, + or *, or
+one to nine digits followed by . or ), after at most three spaces and followed by a space
+or the end of the line. A line holds the open block quotes and list items, outermost
+first, while it has, where those before it end on the line, a block quote marker for a
+block quote, and for a list item nothing but spaces or an indent that reaches the item's
+text; the others close, with the block quotes, list items and fenced code block they hold,
+and a list item opened on a line holding nothing after its marker also closes at a blank
+line after it. Unless a fenced code block is open, the line then opens, where those it
+holds end, a block quote at each block quote marker and a list item at each list item
+marker, up to other text or a thematic break: three or more *, or three or more -, with
+nothing else but spaces, after at most three spaces. A list item's text starts after the
+spaces after its marker where one to four do and text follows them, and one column after
+the marker otherwise. A fenced code block runs from a line that, where those it holds end,
+after at most three spaces, starts with a run of three or more backticks with no backtick
+after it on the line, or of three or more tildes, to the first later line that holds its
+block quotes and list items and is, where they end, after at most three spaces, a run of
+that character at least as long followed by nothing but spaces, or to the first line that
+closes one of them, or to the end of the page. No paragraph is read, so "[t]: x" and
+"2. [t]: x" directly after a line of text stand on a definition line, while CommonMark
+reads each as continuing the text. So "[x][DV](url)AA", which CommonMark shows as
+"[x]DVAA" where the page does not define the label DV, names DVAA, as does
+"[x][DV](u)[A][t]A" on a page that defines t, with DV only in a fenced code block, which
+CommonMark shows as "[x]DVAA", and "[x][DV](u)[A][t]A [y][a] [z][b]" on such a page that
+also defines a and b, which CommonMark shows as "[x]DVAA y z", also where t, a and b are
+each defined in a list item or on a block quote line, while "[DV][dvaa]AA" names DVAA
+only where the page defines the label dvaa. Second, going along
 what remains, each ] followed by ( is removed with the text after
 it to the first ) if no further ( comes first, whether or not they make a link, then each
 ! directly before a [, and then the Markdown characters * _ ~ ` [ ]. Each reading is also
@@ -618,12 +638,21 @@ LINK_TARGET = re.compile(PAREN_SPAN.pattern + r"|\]\[[^\[\]]*\]")
 # kept and the others removed.
 MIXED_LABELS = 3
 
-# A line that opens or closes a fenced code block where `unsure_labels` reads one: up to
-# three spaces, a run of three or more backticks or tildes, and the rest of the line. A
-# backtick run opens a block only where the rest of its line holds no backtick, and a run
-# closes the open block only where it is of that block's character, at least as long as
-# the run that opened it, with nothing but spaces and tabs in the rest of its line.
+# Block structure where `definition_starts` reads it, each pattern matched in a line from
+# where the markers of the block quotes and list items that hold it end, with each tab read
+# as the spaces up to the next column that is a multiple of four.
+# A line that opens or closes a fenced code block: up to three spaces, a run of three or
+# more backticks or tildes, and the rest of the line. A backtick run opens a block only
+# where the rest of its line holds no backtick, and a run closes the open block only where
+# it is of that block's character, at least as long as the run that opened it, with
+# nothing but spaces in the rest of its line.
 FENCE = re.compile(r" {0,3}(`{3,}|~{3,})(.*)")
+# A block quote marker: up to three spaces and ">", with the space after it if one follows.
+QUOTE_MARKER = re.compile(r" {0,3}> ?")
+# A list item marker: up to three spaces and "-", "+", "*", or one to nine digits followed
+# by "." or ")", then the spaces after it, of which it needs one unless the line ends there.
+LIST_MARKER = re.compile(r" {0,3}(?:[-+*]|[0-9]{1,9}[.)])( *)")
+SPACES = re.compile(" *")
 
 # A "!" directly before a "[", removed so that an image reads as its alternative text:
 # "DV![](x.png)AA" names DVAA, while "DV!AA" does not.
@@ -1025,32 +1054,128 @@ def defined_labels(text):
     return frozenset(key for _, key in definitions(text))
 
 
+def tab_offset(line, column):
+    """The offset in `line` of the character that `line` with each tab read as the spaces up
+    to the next column that is a multiple of four holds at `column`, where that character
+    is not one of those spaces."""
+    offset = width = 0
+    while width < column:
+        width = (width // 4 + 1) * 4 if line[offset] == "\t" else width + 1
+        offset += 1
+    return offset
+
+
+def definition_starts(text):
+    """The offsets in page `text` of each "[" that stands on a definition line: one that
+    starts a line, or the text of the block quotes and list items that hold the line, after
+    at most three spaces, outside a fenced code block, each tab read as the spaces up to
+    the next column that is a multiple of four, as CommonMark reads a tab there.
+
+    Going down the page, a line holds each open block quote whose ">" it has, after at
+    most three spaces (`QUOTE_MARKER`), and each open list item it is indented to the text
+    of, or is blank after the markers before it; the others close, with the block quotes,
+    list items and fenced code block they hold, and a list item opened on a line holding
+    nothing after its marker also closes at a blank line after it. Unless a fenced code
+    block is open, the line then opens, from where those markers end, a block quote at each
+    ">" and a list item at each `LIST_MARKER` with a space or the end of the line after it,
+    until other text, or a thematic break: three or more "*", or three or more "-", with
+    nothing else but spaces after at most three spaces, which opens no list item. A list
+    item's text starts after the spaces after its marker where one to four do and text
+    follows them, and one column after the marker otherwise, so "-     [t]: x" stands on
+    no definition line, as CommonMark reads it as code. A fenced code block runs from a
+    line that `FENCE` opens where those markers end to the first later line that holds its
+    block quotes and list items and that `FENCE` closes where their markers end, or to the
+    first line that closes one of them, or to the end of the page.
+
+    No paragraph is read, so "[t]: x" stands on a definition line also directly after a
+    line of text, which CommonMark continues with it. Each line is read once, and a line
+    blank after the markers it holds passes over the list items it holds up to the next
+    block quote in one step, found by bisection, rather than one item at a time."""
+    starts = set()
+    # The open block quotes and list items, outermost first: None for a block quote, and
+    # for a list item the columns from where its marker's line starts inside its parent to
+    # its text, by which each line it holds is indented there.
+    containers = []
+    quotes = []  # the indexes in `containers` of the block quotes
+    fence = None  # the run that opened the open fenced code block, and how many hold it
+    blank_item = False  # the innermost container is a list item whose only line is blank
+    offset = 0
+    for raw in text.split("\n"):
+        start, offset = offset, offset + len(raw) + 1
+        line = raw.expandtabs(4)
+        end = len(line.rstrip(" "))
+        pos = held = 0
+        text_at = SPACES.match(line).end()
+        while held < len(containers):
+            if text_at >= end:
+                later = bisect.bisect_left(quotes, held)
+                held = quotes[later] if later < len(quotes) else len(containers)
+                break
+            if containers[held] is None:
+                found = QUOTE_MARKER.match(line, pos)
+                if not found:
+                    break
+                pos = found.end()
+                text_at = SPACES.match(line, pos).end()
+            elif text_at - pos >= containers[held]:
+                pos += containers[held]
+            else:
+                break
+            held += 1
+        was_blank_item, blank_item = blank_item, False
+        if held < len(containers):
+            del containers[held:]
+            del quotes[bisect.bisect_left(quotes, held):]
+            if fence and fence[1] > held:
+                fence = None
+        elif was_blank_item and text_at >= end:
+            containers.pop()
+        if fence:
+            found = FENCE.match(line, pos)
+            if (found and found.group(1)[0] == fence[0][0]
+                    and len(found.group(1)) >= len(fence[0])
+                    and not found.group(2).strip(" ")):
+                fence = None
+            continue
+        # A thematic break runs to the end of the line, so it can only start where the
+        # rest of the line is its character and spaces: from `tail` on.
+        last = line[end - 1:end]
+        tail = len(line[:end].rstrip(last + " ")) if last in ("*", "-") else end
+        while text_at < end and not (text_at - pos <= 3 and text_at >= tail
+                                     and line.count(last, text_at, end) >= 3):
+            found = QUOTE_MARKER.match(line, pos)
+            if found:
+                quotes.append(len(containers))
+                containers.append(None)
+                pos = found.end()
+            else:
+                found = LIST_MARKER.match(line, pos)
+                if not found or not (found.group(1) or found.end() >= end):
+                    break
+                blank_item = found.end() >= end
+                column = found.end()
+                if blank_item or len(found.group(1)) > 4:
+                    column = found.start(1) + 1
+                containers.append(column - pos)
+                pos = column
+            text_at = SPACES.match(line, pos).end()
+        if text_at < end and text_at - pos <= 3:
+            found = FENCE.match(line, pos)
+            if found and not (found.group(1)[0] == "`" and "`" in found.group(2)):
+                fence = (found.group(1), len(containers))
+            elif line[text_at] == "[":
+                starts.add(start + tab_offset(raw, text_at))
+    return starts
+
+
 def unsure_labels(text):
     """The labels page `text` defines (`defined_labels`) only in definition-like texts that
-    CommonMark may not read as definitions: those whose "[" does not start a line, after at
-    most three spaces, outside a fenced code block, as in "`[t]: x`", in "[t]: x" after four
-    spaces or a tab, and in "[t]: x" on a line in a fenced code block. A fenced code block
-    runs from a line that `FENCE` matches, where a backtick run has no backtick after it on
-    the line, to the first later line that `FENCE` matches with a run of that character at
-    least as long and nothing but spaces and tabs after it, or to the end of the page. Each
-    line is read once, and `definitions` reads the page in linear time."""
-    starts = set()
-    fence = None
-    offset = 0
-    for line in text.split("\n"):
-        found = FENCE.match(line)
-        if fence:
-            run = found.group(1) if found else ""
-            if (run[:1] == fence[0] and len(run) >= len(fence)
-                    and not found.group(2).strip(" \t")):
-                fence = None
-        elif found and not (found.group(1)[0] == "`" and "`" in found.group(2)):
-            fence = found.group(1)
-        else:
-            indent = len(line) - len(line.lstrip(" "))
-            if indent <= 3 and line[indent:indent + 1] == "[":
-                starts.add(offset + indent)
-        offset += len(line) + 1
+    CommonMark may not read as definitions: those whose "[" stands on no definition line
+    (`definition_starts`), as in "`[t]: x`", in "[t]: x" after four spaces or a tab, in
+    "[t]: x" on a line in a fenced code block, and in ">     [t]: x", while "[t]: x" stands
+    on one as a line of its own, and so does it in "- [t]: x", "1. [t]: x" and "> [t]: x".
+    `definitions` reads the page in linear time."""
+    starts = definition_starts(text)
     sure, keys = set(), set()
     for start, key in definitions(text):
         (sure if start in starts else keys).add(key)
