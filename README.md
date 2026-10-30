@@ -36,6 +36,15 @@ The tactics, in kill chain order:
 
 The live API at `https://api.oa2a.org/api/v1/threat-matrix` still labels the matrix 1.1 while this repository is at 1.2; the technique and tactic counts agree.
 
+## Who this is for
+
+- **Security leaders and CISOs**: what can go wrong with an agent you ship, and how to compare one vendor's detection claim with another's.
+- **IAM professionals and identity architects**: the attacks on agent credentials and on trust between agents, and the controls that answer them.
+- **Platform and security engineers, and implementers**: what to collect to see each technique, and which ids and fields stay stable.
+- **GRC, audit and compliance readers, and standards reviewers**: the control and evidence tier behind each technique, and how the matrix relates to existing catalogs.
+
+[Use cases](docs/use-cases.md) gives each reader's question and where the matrix answers it.
+
 ## How to Use This Framework
 
 ### For Red Teams
