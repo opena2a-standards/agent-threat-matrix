@@ -26,12 +26,14 @@ MISSING = "C5 technique-overlap-index.md: the generated block markers are missin
 
 
 def scratch_tree() -> Path:
-    """A copy of the script, matrix.json and cross-references/, the files the script reads."""
+    """A copy of the script, matrix.json, cross-references/ and crosswalks/, the files the
+    script reads."""
     td = Path(tempfile.mkdtemp(prefix="crossref-fix-"))
     (td / "scripts").mkdir()
     shutil.copy(ROOT / SCRIPT, td / SCRIPT)
     shutil.copy(ROOT / "matrix.json", td / "matrix.json")
     shutil.copytree(ROOT / "cross-references", td / "cross-references")
+    shutil.copytree(ROOT / "crosswalks", td / "crosswalks")
     return td
 
 

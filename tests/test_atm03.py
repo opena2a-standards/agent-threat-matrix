@@ -180,7 +180,7 @@ def _ac2_checker_passes_on_tree():
 def _ac2_stdlib_only():
     src = (ROOT / "scripts" / "check_cross_references.py").read_text()
     imports = set(re.findall(r"^(?:import|from)\s+([a-zA-Z_][\w]*)", src, re.M))
-    stdlib = {"json", "re", "sys", "pathlib"}
+    stdlib = {"hashlib", "json", "re", "sys", "pathlib"}
     assert imports <= stdlib, f"non-stdlib imports: {imports - stdlib}"
 
 

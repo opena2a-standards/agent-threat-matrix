@@ -1,0 +1,746 @@
+{
+  "releases": {
+    "attack": "20.0",
+    "atlas": "2026.09"
+  },
+  "entries": [
+    {
+      "technique": "T-1001",
+      "field": "atlasMapping",
+      "id": "AML.T0006.002",
+      "relationship": "closeMatch",
+      "noteSha256": "3214b79ac8f0641625ce365bf099bfa1e97f38d72697fe41eac44b13fc4a2c72",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-1001",
+      "field": "attackMapping",
+      "id": "T1595",
+      "relationship": "broadMatch",
+      "noteSha256": "10325d927232d11d7006d5962ea0ffb7b9338aa9a4f73f4cc4ac2af67e097390",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-1002",
+      "field": "atlasMapping",
+      "id": "AML.T0084.001",
+      "relationship": "closeMatch",
+      "noteSha256": "e34f0b424e2f6c2c86d8d27c1526ec843c4bc4e50fd3601993a5d2d103081d54",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-1003",
+      "field": "atlasMapping",
+      "id": "AML.T0056",
+      "relationship": "relatedMatch",
+      "noteSha256": "44fb2dd9599f65ff82676e5b1ae0e589ff06d32d09a97a70f30dc30a0a91d4e8",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-1003",
+      "field": "atlasMapping",
+      "id": "AML.T0069.002",
+      "relationship": "closeMatch",
+      "noteSha256": "ac342abf9d0d2c5b7a7b63695b2691430e24d56b3d237fa1d3039a319814c264",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-1004",
+      "field": "atlasMapping",
+      "id": "AML.T0069",
+      "relationship": "relatedMatch",
+      "noteSha256": "82d99fcf2fb5680366a4360bc5dd3a9f10188393fda47a2a17f184e892472e8b",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-1005",
+      "field": "atlasMapping",
+      "id": "AML.T0133",
+      "relationship": "closeMatch",
+      "noteSha256": "fc7208b44e3c55589da59217f7804fe6598ccf49a05ed2ad8c02d8429c4d8dfe",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-1006",
+      "field": "atlasMapping",
+      "id": "AML.T0006.002",
+      "relationship": "relatedMatch",
+      "noteSha256": "37d1154bff328984df0be59a7687b3f058c9a77ee794a7ec27ff6cb511523bf6",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-2001",
+      "field": "atlasMapping",
+      "id": "AML.T0051.000",
+      "relationship": "closeMatch",
+      "noteSha256": "ac063f5a986bf8c0643682a2c8cfb02d507f717772ab3f173415d71a7ac5eb1e",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-2001",
+      "field": "attackMapping",
+      "id": "T1699",
+      "relationship": "closeMatch",
+      "noteSha256": "55193b9a92f6060391f9f8846d42c2b9821a6b4fbc00bd172090ed9ace4dc1e0",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-2002",
+      "field": "atlasMapping",
+      "id": "AML.T0051.001",
+      "relationship": "closeMatch",
+      "noteSha256": "c3386db304f90ec98a901b77935a60d92e0792d1eb20e7d5f112bbdecec3bf17",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-2002",
+      "field": "attackMapping",
+      "id": "T1698",
+      "relationship": "closeMatch",
+      "noteSha256": "733674d85d066e6c5a4d2898d8870fc8a89a5e3adaa019b0d16876d8c44de653",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-2003",
+      "field": "atlasMapping",
+      "id": "AML.T0054",
+      "relationship": "broadMatch",
+      "noteSha256": "fdb7f720334da7e2af8e77ccc7bde1e361148dbf779c3f4bf7fb56277f4782e1",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-2003",
+      "field": "attackMapping",
+      "id": "T1699",
+      "relationship": "relatedMatch",
+      "noteSha256": "fc9419fca1acbc4de280154b993800b155bd2b645e02ad0593329177a9eae8fe",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-2004",
+      "field": "atlasMapping",
+      "id": "AML.T0054",
+      "relationship": "broadMatch",
+      "noteSha256": "eb09482805589e27243808c27815b969e1f220267ed4e98efe27729c1bae069b",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-2005",
+      "field": "atlasMapping",
+      "id": "AML.T0110.000",
+      "relationship": "closeMatch",
+      "noteSha256": "0cd5812882d23438f65aec7e722e1e019d310d800d77090c06b14180c8a706c5",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-2006",
+      "field": "atlasMapping",
+      "id": "AML.T0068",
+      "relationship": "closeMatch",
+      "noteSha256": "04efe27e5360cd9d4034573b8bcbfe6890353d498bf9b37eb86d551d81de9407",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-2006",
+      "field": "attackMapping",
+      "id": "T1027.018",
+      "relationship": "closeMatch",
+      "noteSha256": "918be2df6b6c098bbedf9fbaa9c0f2d8e6c7fc5dec17699ac9622bafc801964a",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-2007",
+      "field": "atlasMapping",
+      "id": "AML.T0054",
+      "relationship": "broadMatch",
+      "noteSha256": "223db1b68d4f49e7a538ce6c9ae541d51021ffb971d0726d3b9224d63056485c",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-2008",
+      "field": "atlasMapping",
+      "id": "AML.T0051.000",
+      "relationship": "broadMatch",
+      "noteSha256": "2be4720cd1e614244fd865dbf371ef043ca83f10798bf06262ef9b7f824e0c54",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-2008",
+      "field": "attackMapping",
+      "id": "T1699",
+      "relationship": "broadMatch",
+      "noteSha256": "ea11ff7f2e84affa8e5f7f3daf048837e72408733aa769ea76e4f58f7d6c545a",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-2009",
+      "field": "atlasMapping",
+      "id": "AML.T0123",
+      "relationship": "relatedMatch",
+      "noteSha256": "9c4807f5bc5d9c7ff542a57ebba79669b585a26550663f970631343477b9c6ec",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-3001",
+      "field": "atlasMapping",
+      "id": "AML.T0083",
+      "relationship": "closeMatch",
+      "noteSha256": "8b3326162e364570036925f9ebd5ef003320016bbc9b6928cc4845ecfca5128f",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-3001",
+      "field": "attackMapping",
+      "id": "T1552",
+      "relationship": "broadMatch",
+      "noteSha256": "c9f7bd91ed90bd58e148435282da97516d9506a120c782eaed0fd59db2114252",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-3002",
+      "field": "atlasMapping",
+      "id": "AML.T0083",
+      "relationship": "closeMatch",
+      "noteSha256": "5866fa3d922625eec4f8058abaa8403e6f0163df51153e82830833b76e489c8d",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-3002",
+      "field": "attackMapping",
+      "id": "T1552",
+      "relationship": "broadMatch",
+      "noteSha256": "9842239ee06abfb77f8c04cdbae43039cc0e72c678580543ba2ccc0dd894b265",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-3003",
+      "field": "atlasMapping",
+      "id": "AML.T0098",
+      "relationship": "closeMatch",
+      "noteSha256": "3675761354abfee467ec85c2472393a366e5bf388e306b19bdf6ab7d98600d69",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-3004",
+      "field": "atlasMapping",
+      "id": "AML.T0055",
+      "relationship": "broadMatch",
+      "noteSha256": "22e2704cf815d1f5ff864eb4a18f97dd5c99d25f1953f9e00928f6da9f16c92a",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-3004",
+      "field": "attackMapping",
+      "id": "T1552",
+      "relationship": "broadMatch",
+      "noteSha256": "19a5123ac713ac6dc5268e834f61a6b44e23bd74036b11baed4cbbb8bf00a134",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-3005",
+      "field": "atlasMapping",
+      "id": "AML.T0083",
+      "relationship": "closeMatch",
+      "noteSha256": "4547717f6efcb5d025e0cdf67417876b2cd6ba5bcbee11460199a0c66fb38025",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-3005",
+      "field": "attackMapping",
+      "id": "T1552.001",
+      "relationship": "closeMatch",
+      "noteSha256": "9367e53d257bf0c16abfe5d9c19f6533228953673033d55d46b07a7cc43cb901",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-3006",
+      "field": "atlasMapping",
+      "id": "AML.T0057",
+      "relationship": "closeMatch",
+      "noteSha256": "633852fa21a42778baeef69b43c314a7155e88103115f8dc2a7bc1f899b75cd5",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-4001",
+      "field": "atlasMapping",
+      "id": "AML.T0053",
+      "relationship": "relatedMatch",
+      "noteSha256": "33cf3fde1c97b943e39eb753dfc67ea275ce8a78bd65a3e4979f90534ae0b71c",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-4002",
+      "field": "atlasMapping",
+      "id": "AML.T0051.000",
+      "relationship": "relatedMatch",
+      "noteSha256": "7ed41c37ede99d5599f4dd38ae3a1acff75e6a33d9b3632a004e30ad1afba8a8",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-4003",
+      "field": "atlasMapping",
+      "id": "AML.T0053",
+      "relationship": "relatedMatch",
+      "noteSha256": "7e1cccca7ba6d26d10d1a40fbb704c14c8615c64b4db744713139dd2e819264d",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-4004",
+      "field": "attackMapping",
+      "id": "T1548.005",
+      "relationship": "relatedMatch",
+      "noteSha256": "7688a185ad086d7126d40ee5b064b1ce81b22aa6d8e841ed15735bf2c468e5a3",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-4005",
+      "field": "atlasMapping",
+      "id": "AML.T0068",
+      "relationship": "relatedMatch",
+      "noteSha256": "9e8a6daecee74fe4cb24e4436d620fa24532a928745fe0b2ec61b4413fe6c0fc",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-4005",
+      "field": "attackMapping",
+      "id": "T1027.018",
+      "relationship": "relatedMatch",
+      "noteSha256": "aad97b5fe9fd90857deb7d04cd3edc0c177e43ce13c0ea4f63545a7271096943",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-4006",
+      "field": "atlasMapping",
+      "id": "AML.T0054",
+      "relationship": "broadMatch",
+      "noteSha256": "7c973371ab79a595b0107ce8899c5699a3822452f36a5602377ee12b5219deaf",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-4007",
+      "field": "atlasMapping",
+      "id": "AML.T0110",
+      "relationship": "broadMatch",
+      "noteSha256": "af1a975ba8b90eef55f9d762545a4eb8aea27e84d1546234cfc24a2da64bab15",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-4007",
+      "field": "attackMapping",
+      "id": "T1036.005",
+      "relationship": "relatedMatch",
+      "noteSha256": "419edf052aff23c4375594dc10c0298445b6afb7c02c7a108f6f11faddfe7f8a",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-5001",
+      "field": "atlasMapping",
+      "id": "AML.T0053",
+      "relationship": "broadMatch",
+      "noteSha256": "071ab77176d060eb969f5cb3cc41efdaf898bf699cab9aa5436ea6b0c392bb61",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-5002",
+      "field": "atlasMapping",
+      "id": "AML.T0053",
+      "relationship": "relatedMatch",
+      "noteSha256": "4b0065cd4d89dc867d4b297e8fe9207f9a11aa1a543d959464a3b098201b5a47",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-5003",
+      "field": "atlasMapping",
+      "id": "AML.T0053",
+      "relationship": "relatedMatch",
+      "noteSha256": "2b0765d24877b6945eb4473d797d630fdf569c57b368c7c8b0376556514cef7d",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-5004",
+      "field": "atlasMapping",
+      "id": "AML.T0012",
+      "relationship": "broadMatch",
+      "noteSha256": "67480bc77bc01e114839f867e0ccc677b3e37f7f1ebb93cb443adcc96d34a40c",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-5004",
+      "field": "attackMapping",
+      "id": "T1078",
+      "relationship": "broadMatch",
+      "noteSha256": "9187c2288e175338d7a66e03f649d014120cd469ba69dfc4b6f089639cfa0955",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-5005",
+      "field": "atlasMapping",
+      "id": "AML.T0053",
+      "relationship": "relatedMatch",
+      "noteSha256": "bf39520f4c37d14c09ae6fe4c03ea64cc500a79263c39649be8370394bb5413e",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-5006",
+      "field": "atlasMapping",
+      "id": "AML.T0075",
+      "relationship": "relatedMatch",
+      "noteSha256": "4e8a6a0a30d65286e8c1de76b4af7a2efcd2ff9b45dfede5a097a288edc1ad98",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-5006",
+      "field": "attackMapping",
+      "id": "T1046",
+      "relationship": "closeMatch",
+      "noteSha256": "72d1fd902498e91cf5c4253e66c96a3df0e1d232cc4bb8ec62bf073a80515259",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-6001",
+      "field": "atlasMapping",
+      "id": "AML.T0080.000",
+      "relationship": "closeMatch",
+      "noteSha256": "470dd866d811db43a4fc94285c442964764cbc4fad43e0ae80c26d68cff521bc",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-6002",
+      "field": "atlasMapping",
+      "id": "AML.T0061",
+      "relationship": "closeMatch",
+      "noteSha256": "44aa2f773400cb9ad408cf8b20ff4fd3dc88409cdf61513d0e0f8556ae884b72",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-6002",
+      "field": "atlasMapping",
+      "id": "AML.T0080.000",
+      "relationship": "broadMatch",
+      "noteSha256": "d0d2d0bc1132cf5219952dc72102ac56e0d5b878aa644ab14c6d01e2aeab5cf8",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-6003",
+      "field": "atlasMapping",
+      "id": "AML.T0081",
+      "relationship": "closeMatch",
+      "noteSha256": "73ebb20f5fbbb233a25770e1ea4a8c9c2ec0a4debca238019ea20651256bf592",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-6004",
+      "field": "atlasMapping",
+      "id": "AML.T0110",
+      "relationship": "broadMatch",
+      "noteSha256": "ef765c93f3b8969a83cdebf3ab762fb0f4696b8e72ca409e115f4443ff02c854",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-6004",
+      "field": "attackMapping",
+      "id": "T1176",
+      "relationship": "broadMatch",
+      "noteSha256": "63eed7b561c0c67941b108097c16e9c94e63c707e9206c5ae27cc19558049740",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-6005",
+      "field": "attackMapping",
+      "id": "T1053",
+      "relationship": "broadMatch",
+      "noteSha256": "4f7cb5701d48ccbd6cd8e495336206ecd86664f16f8d9bc4e264b64fd8c47dd8",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-6006",
+      "field": "atlasMapping",
+      "id": "AML.T0110",
+      "relationship": "relatedMatch",
+      "noteSha256": "43b5fbfc5b3ef35bc5a3a4085588479c46dd331fe29813c3866674e4a2582b94",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-6007",
+      "field": "atlasMapping",
+      "id": "AML.T0080",
+      "relationship": "closeMatch",
+      "noteSha256": "312de530f57e8a489416f82dd9cb4c9d9bfa6012e85ecc14c8fc911b89023f80",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-7001",
+      "field": "atlasMapping",
+      "id": "AML.T0037",
+      "relationship": "closeMatch",
+      "noteSha256": "2fa644e5ac8a83ddff98ab34ed0e70c78dd656e75d7918f498682f93b7a8d0bd",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-7001",
+      "field": "attackMapping",
+      "id": "T1083",
+      "relationship": "closeMatch",
+      "noteSha256": "468a00e7c13901c74688f4f387623b24102fc09f910948d27554ca83182f98f2",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-7002",
+      "field": "atlasMapping",
+      "id": "AML.T0085",
+      "relationship": "relatedMatch",
+      "noteSha256": "fa434c372ce9733ef0679e16295205bad48114cf3ca04a5dfa531ee5319c3722",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-7002",
+      "field": "attackMapping",
+      "id": "T1213.006",
+      "relationship": "closeMatch",
+      "noteSha256": "79f692c16be293448a887fc8006684ca174363391177e576c938dc201df86796",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-7003",
+      "field": "atlasMapping",
+      "id": "AML.T0085.001",
+      "relationship": "closeMatch",
+      "noteSha256": "f11429aee2c8a88eb311a9fff9ad5c1508f18e8cb4fd50f32c5be8826e8b48ce",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-7003",
+      "field": "attackMapping",
+      "id": "T1119",
+      "relationship": "relatedMatch",
+      "noteSha256": "62d49d3a9548a15e066c329b0eb5259a5c1333b66dfcee70cccfb226a47ca7f1",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-7004",
+      "field": "atlasMapping",
+      "id": "AML.T0085",
+      "relationship": "relatedMatch",
+      "noteSha256": "060196c061a18d908e76c65fd5922a4ce3871236c485be7beba51b1af6a6ddd5",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-7005",
+      "field": "atlasMapping",
+      "id": "AML.T0037",
+      "relationship": "closeMatch",
+      "noteSha256": "73b576f03b1428683fa34de9958e9947f4bbc899aa1b6c6479d064c5101aebe3",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-7005",
+      "field": "attackMapping",
+      "id": "T1552.001",
+      "relationship": "relatedMatch",
+      "noteSha256": "ece037afe774b4513cd8bd7e8dfcd6e769b975f3f34e2029a218e7dbab5c0888",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-7006",
+      "field": "atlasMapping",
+      "id": "AML.T0057",
+      "relationship": "relatedMatch",
+      "noteSha256": "5932251ef6a0bc666d052ae1d0341ff24006960d314125fd4023ad772514edee",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-7006",
+      "field": "atlasMapping",
+      "id": "AML.T0085.000",
+      "relationship": "closeMatch",
+      "noteSha256": "1fbb1362d57c66195161e115515c6768f363b727f0bdfe0f97592e30b4e6c559",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-7007",
+      "field": "atlasMapping",
+      "id": "AML.T0123",
+      "relationship": "relatedMatch",
+      "noteSha256": "a4c5ab1c15207b7820631d38ef03c0e603fe3f0a691f4e00f0e5c34bed39df60",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-8001",
+      "field": "atlasMapping",
+      "id": "AML.T0086",
+      "relationship": "closeMatch",
+      "noteSha256": "a7d81adc0ba522993f9dcc362ee4b652dc1087dff9cd51d525be329ea23e85ee",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-8001",
+      "field": "attackMapping",
+      "id": "T1700",
+      "relationship": "closeMatch",
+      "noteSha256": "b071087669aef80dcd5c790e0d130df508bb7fa492885b056d6f117b4b660bd0",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-8002",
+      "field": "atlasMapping",
+      "id": "AML.T0086",
+      "relationship": "closeMatch",
+      "noteSha256": "8e669cf0fb6eafa30c9ad18cf52adf35a2f05e04be1e76451f53a4ea2854605a",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-8002",
+      "field": "attackMapping",
+      "id": "T1700",
+      "relationship": "closeMatch",
+      "noteSha256": "2e1a1b4dffb7a45b6634660e7d81842e4592874502929b4ec1f2096cf5d63707",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-8003",
+      "field": "atlasMapping",
+      "id": "AML.T0025",
+      "relationship": "broadMatch",
+      "noteSha256": "4853e42f3325f86e2e8ecba9bec43d31af25a63fa637f4fff17fa4c9c1be6ea4",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-8003",
+      "field": "attackMapping",
+      "id": "T1048",
+      "relationship": "closeMatch",
+      "noteSha256": "b5a404f49d7fc8422474b9ed0a5245d95656391dd6abba02fa1cd0a5c2dc38d6",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-8004",
+      "field": "atlasMapping",
+      "id": "AML.T0086",
+      "relationship": "closeMatch",
+      "noteSha256": "3619a785c8f61fe01c5fa2d3caef6aec22c7c032801d83aea194a1b116a285e0",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-8004",
+      "field": "attackMapping",
+      "id": "T1700",
+      "relationship": "closeMatch",
+      "noteSha256": "70863fe1cab23bfac8459f1ff6a30a472b65c5f7fea9b4708285efe339916e9c",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-8005",
+      "field": "atlasMapping",
+      "id": "AML.T0057",
+      "relationship": "closeMatch",
+      "noteSha256": "6e194a9338b9924225042718470f6e5776003aff1107c4dece84960dab12b036",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-8006",
+      "field": "atlasMapping",
+      "id": "AML.T0086",
+      "relationship": "closeMatch",
+      "noteSha256": "b126004679d487dd13d6148f461263f98bcf49f62921bf256520726d1aa51bf0",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-8006",
+      "field": "attackMapping",
+      "id": "T1567.004",
+      "relationship": "closeMatch",
+      "noteSha256": "833fa714a57df651563ff383aa20ed81dd2e13fcb66bfe73d8b445b72ef240b7",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-9001",
+      "field": "atlasMapping",
+      "id": "AML.T0101",
+      "relationship": "narrowMatch",
+      "noteSha256": "390d371a61e990c27bad309681f798876d4ab97efaf5eb37cc8a7ec751361600",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-9001",
+      "field": "attackMapping",
+      "id": "T1565",
+      "relationship": "closeMatch",
+      "noteSha256": "4e071e2b356102bfb437910186031afc450da4d6f83227b560cf503475ee533d",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-9002",
+      "field": "atlasMapping",
+      "id": "AML.T0029",
+      "relationship": "closeMatch",
+      "noteSha256": "f942d3ef7a6b5694a3c0f816826f274ad4199df226c5699545773571a4062c47",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-9002",
+      "field": "attackMapping",
+      "id": "T1499",
+      "relationship": "closeMatch",
+      "noteSha256": "a954bebe571aea73c66e9e2a9596368eba3b3e4dcc9a419c334e1f3dc35668a7",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-9003",
+      "field": "atlasMapping",
+      "id": "AML.T0112",
+      "relationship": "relatedMatch",
+      "noteSha256": "aba7a91f2a5a47fa9339fbb1240fb3cb463653d097aa446ac331296a1c4792f3",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-9003",
+      "field": "attackMapping",
+      "id": "T1059",
+      "relationship": "relatedMatch",
+      "noteSha256": "01f574bc8734d0b32999a31e468a5ed3abed5a88018dc7c6c098d56d2f0e1e86",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-9005",
+      "field": "atlasMapping",
+      "id": "AML.T0048.001",
+      "relationship": "closeMatch",
+      "noteSha256": "e24ec2ee88a0e82156e444c38bdaba39cfe1c57f3b410f77f71ed54a7ab69a69",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-9006",
+      "field": "atlasMapping",
+      "id": "AML.T0010.005",
+      "relationship": "closeMatch",
+      "noteSha256": "ebea9d8ddd22d4d763f287fc83784ff6c8c255d1a7a87992dfc3983c7ab96349",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-9006",
+      "field": "attackMapping",
+      "id": "T1195.001",
+      "relationship": "closeMatch",
+      "noteSha256": "a57fea5cb2cc32a29385d0db679ce4aaa31d0364edb9ddb523abb175a4a9b7aa",
+      "reviewed": "2026-10-27"
+    }
+  ],
+  "withdrawn": [
+    {
+      "technique": "T-5005",
+      "field": "attackMapping",
+      "id": "T1210",
+      "reviewed": "2026-10-27"
+    },
+    {
+      "technique": "T-6007",
+      "field": "atlasMapping",
+      "id": "AML.T0121",
+      "reviewed": "2026-10-27"
+    }
+  ],
+  "unmapped": [
+    "T-1007",
+    "T-9004"
+  ]
+}

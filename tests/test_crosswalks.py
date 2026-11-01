@@ -13,15 +13,43 @@ read that release from the snapshots rather than naming it, so refreshing the sn
 against a newer release does not edit them. Before the crosswalks were authored the matrix
 held no mapping and these files did not exist, so the run was red; it is green once every
 entry resolves.
+
+crosswalks/review.json is the entry-review record: one row per admitted entry, giving its
+relation and the sha256 of its note, the entries withdrawn on review, and the techniques left
+unmapped. scripts/check_cross_references.py (C9), which CI runs, holds matrix.json to it. The
+tests below run that check on the shipped files, and on copies that each break one clause: an
+entry with no row, a row twice, an entry twice, a changed relation, an edited note, a stale
+row, a withdrawn entry restored, an unmapped list and a release that differ. Until the
+reviewed corrections were applied to matrix.json the check reported 29 problems on it, so the
+first of them was red.
 """
 
+import copy
+import hashlib
+import importlib.util
 import json
 import re
+import subprocess
+import sys
+import tempfile
 from pathlib import Path
+
+import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
 CROSSWALKS = ROOT / "crosswalks"
 FIXTURES = Path(__file__).resolve().parent / "fixtures" / "crosswalks"
+CHECKER = ROOT / "scripts" / "check_cross_references.py"
+
+
+def _load_checker():
+    spec = importlib.util.spec_from_file_location("check_cross_references", CHECKER)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+CHK = _load_checker()
 
 RELATIONS = {"exactMatch", "closeMatch", "broadMatch", "narrowMatch", "relatedMatch"}
 
@@ -178,3 +206,192 @@ def test_notes_that_name_another_release_than_the_snapshot_are_reported():
         {"id": "T1595", "relationship": "broadMatch", "note": "ATT&CK 21.0 Active Scanning"}]}]
     assert stale_releases(techniques, "attackMapping", "ATT&CK", "20.0") == ["21.0"]
     assert stale_releases(techniques, "attackMapping", "ATT&CK", "21.0") == []
+
+
+# The entry-review record and the check that holds matrix.json to it.
+
+REVIEW = CROSSWALKS / "review.json"
+ROW_KEYS = ["technique", "field", "id", "relationship", "noteSha256", "reviewed"]
+WITHDRAWN_KEYS = ["technique", "field", "id", "reviewed"]
+
+
+def review_record() -> dict:
+    return _load(REVIEW)
+
+
+def snapshot_releases() -> dict:
+    return {"attack": attack_release()["release"], "atlas": atlas_release()["release"]}
+
+
+def review(techniques: list, record: dict = None, releases: dict = None) -> list:
+    """The C9 problems of `techniques` against the shipped record and snapshots, or against
+    the `record` and `releases` given in their place."""
+    return CHK.review_problems(techniques,
+                               review_record() if record is None else record,
+                               snapshot_releases() if releases is None else releases)
+
+
+def technique(techniques: list, tid: str) -> dict:
+    return next(t for t in techniques if t["id"] == tid)
+
+
+def first_with(techniques: list, *fields: str) -> dict:
+    """The first technique that carries an entry in each of `fields`."""
+    return next(t for t in techniques if all(t.get(field) for field in fields))
+
+
+def sha256(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def test_the_review_record_covers_every_crosswalk_entry():
+    # Red until the reviewed corrections reached matrix.json: 16 relations and 3 notes that
+    # differed, 2 withdrawn entries present with no row, 5 admitted entries absent, and an
+    # unmapped list of 7 techniques where the review leaves 2.
+    assert review(matrix()["techniques"]) == []
+
+
+def test_an_entry_with_no_review_row_is_reported():
+    techniques = copy.deepcopy(matrix()["techniques"])
+    t = first_with(techniques, "attackMapping", "atlasMapping")
+    taken = {e["id"] for e in t["attackMapping"]}
+    eid = next(i for i in ("T1059", "T1078", "T1595") if i not in taken)
+    t["attackMapping"].append({"id": eid, "relationship": "relatedMatch",
+                               "note": f"ATT&CK {attack_release()['release']} an entry no review read"})
+    assert review(techniques) == [
+        f"C9 {t['id']} attackMapping {eid} has no review row in crosswalks/review.json"]
+
+
+def test_a_changed_relation_is_reported():
+    techniques = copy.deepcopy(matrix()["techniques"])
+    t = first_with(techniques, "atlasMapping")
+    entry = t["atlasMapping"][0]
+    was = entry["relationship"]
+    entry["relationship"] = "exactMatch" if was != "exactMatch" else "relatedMatch"
+    assert review(techniques) == [
+        f"C9 {t['id']} atlasMapping {entry['id']}: relationship {entry['relationship']} "
+        f"differs from the reviewed {was}"]
+
+
+def test_a_withdrawn_entry_restored_is_reported():
+    techniques = copy.deepcopy(matrix()["techniques"])
+    # The entry as it stood before the review withdrew it, and the field with it.
+    technique(techniques, "T-5005").setdefault("attackMapping", []).append(
+        {"id": "T1210", "relationship": "relatedMatch",
+         "note": "ATT&CK 20.0 Exploitation of Remote Services: reaching database-level access "
+                 "from the agent's SQL tool"})
+    assert review(techniques) == [
+        "C9 T-5005 attackMapping T1210 has no review row in crosswalks/review.json",
+        "C9 T-5005 attackMapping T1210 was withdrawn on review and is present in matrix.json",
+    ]
+
+
+def test_an_edited_note_is_reported():
+    techniques = copy.deepcopy(matrix()["techniques"])
+    t = first_with(techniques, "atlasMapping")
+    entry = t["atlasMapping"][0]
+    reviewed = sha256(entry["note"])
+    entry["note"] += " and one more claim"
+    assert review(techniques) == [
+        f"C9 {t['id']} atlasMapping {entry['id']}: note differs from its review row "
+        f"(sha256 {sha256(entry['note'])}; the row records {reviewed})"]
+
+
+def test_an_entry_whose_note_is_removed_is_reported():
+    # The schema requires only id and relationship, so a note can go; its row still records
+    # the note the review read.
+    techniques = copy.deepcopy(matrix()["techniques"])
+    t = first_with(techniques, "attackMapping")
+    entry = t["attackMapping"][0]
+    reviewed = sha256(entry.pop("note"))
+    assert review(techniques) == [
+        f"C9 {t['id']} attackMapping {entry['id']}: note differs from its review row "
+        f"(the entry has no note; the row records {reviewed})"]
+
+
+def test_a_review_row_with_no_entry_is_reported():
+    techniques = copy.deepcopy(matrix()["techniques"])
+    t = first_with(techniques, "attackMapping", "atlasMapping")
+    gone = t.pop("attackMapping")
+    assert review(techniques) == [
+        f"C9 {t['id']} attackMapping {e['id']} is reviewed but absent from matrix.json"
+        for e in sorted(gone, key=lambda e: e["id"])]
+
+
+def test_an_entry_with_two_review_rows_is_reported():
+    record = review_record()
+    row = record["entries"][0]
+    record["entries"].insert(1, dict(row))
+    assert review(matrix()["techniques"], record) == [
+        f"C9 {row['technique']} {row['field']} {row['id']} has 2 review rows in "
+        f"crosswalks/review.json, not one"]
+
+
+def test_an_entry_present_twice_is_reported():
+    techniques = copy.deepcopy(matrix()["techniques"])
+    t = first_with(techniques, "atlasMapping")
+    t["atlasMapping"].append(dict(t["atlasMapping"][0]))
+    assert review(techniques) == [
+        f"C9 {t['id']} atlasMapping {t['atlasMapping'][0]['id']} appears 2 times in "
+        f"matrix.json; its review row admits one entry"]
+
+
+def test_an_unmapped_list_that_differs_is_reported():
+    record = review_record()
+    listed = record["unmapped"]
+    record["unmapped"] = listed[1:]
+    assert review(matrix()["techniques"], record) == [
+        f"C9 crosswalks/review.json lists as unmapped {', '.join(listed[1:]) or 'none'}; the "
+        f"techniques carrying no mapping are {', '.join(listed) or 'none'}"]
+
+
+def test_a_release_other_than_the_snapshot_records_is_reported():
+    record = review_record()
+    newer = dict(snapshot_releases(), attack="99.0")
+    assert review(matrix()["techniques"], record, newer) == [
+        f"C9 crosswalks/review.json records ATT&CK {record['releases']['attack']}; "
+        f"crosswalks/attack-release.json records 99.0"]
+
+
+def test_the_review_record_keeps_its_published_form():
+    # Sorted rows of fixed keys, written as json.dumps(indent=2, ensure_ascii=False) and a
+    # newline, so the file's sha256 is a stable reference to the review it records.
+    text = REVIEW.read_text(encoding="utf-8")
+    record = json.loads(text)
+    assert text == json.dumps(record, indent=2, ensure_ascii=False) + "\n"
+    assert list(record) == ["releases", "entries", "withdrawn", "unmapped"]
+    assert list(record["releases"]) == ["attack", "atlas"]
+    for key, keys in (("entries", ROW_KEYS), ("withdrawn", WITHDRAWN_KEYS)):
+        rows = record[key]
+        assert all(list(row) == keys for row in rows), f"a {key} row has keys other than {keys}"
+        order = [(row["technique"], row["field"], row["id"]) for row in rows]
+        assert order == sorted(order), f"the {key} rows are not sorted by technique, field and id"
+    assert record["unmapped"] == sorted(record["unmapped"])
+
+
+@pytest.mark.parametrize("content, line", [
+    (None, "C9 crosswalks/review.json is missing or does not parse: no such file"),
+    ("{", "C9 crosswalks/review.json is missing or does not parse: Expecting"),
+    ("[]", "C9 crosswalks/review.json parses but has the wrong shape: the top level is an "
+           "array, not an object"),
+    ('{"releases": {"attack": "20.0", "atlas": "2026.09"}, "entries": [{"technique": "T-1001"}], '
+     '"withdrawn": [], "unmapped": []}',
+     "C9 crosswalks/review.json parses but has the wrong shape: entries[0] has no field"),
+], ids=["missing", "not JSON", "an array", "a row with one key"])
+def test_a_review_record_that_cannot_be_read_is_reported_in_one_line(content, line):
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        (root / "crosswalks").mkdir()
+        for name in ("attack-release.json", "atlas-release.json"):
+            (root / "crosswalks" / name).write_bytes((CROSSWALKS / name).read_bytes())
+        if content is not None:
+            (root / "crosswalks" / "review.json").write_text(content, encoding="utf-8")
+        failures = CHK.check_crosswalk_review(root, matrix()["techniques"])
+    assert len(failures) == 1 and failures[0].startswith(line), failures
+
+
+def test_the_checker_reports_the_crosswalk_review_clean():
+    proc = subprocess.run([sys.executable, str(CHECKER)], capture_output=True, text=True,
+                          timeout=120)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert "OK: crosswalk review clean" in proc.stdout, proc.stdout

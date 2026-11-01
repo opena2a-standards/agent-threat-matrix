@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
-"""Enforce the technique overlap partition in cross-references/ against matrix.json.
+"""Enforce the technique overlap partition in cross-references/ against matrix.json, and
+hold the technique-level crosswalk entries in matrix.json to their entry-review record.
 
 matrix.json is canonical for what the Agent Threat Matrix contains. The three files
 under cross-references/ are an analyst reading of two external frameworks against it.
 This checker keeps that reading honest and keeps every count on the published pages
-derived rather than typed. It reads cross-references/ and matrix.json only. Its one
-statement about what an external framework contains is the C8 pin of the ATLAS tactic
-list, which names the ATLAS release it was read from.
+derived rather than typed. It reads cross-references/ and matrix.json, and for C9 the
+entry-review record crosswalks/review.json and the two release snapshots beside it. Its
+one statement about what an external framework contains is the C8 pin of the ATLAS
+tactic list, which names the ATLAS release it was read from.
 
-Eight properties:
+Nine properties:
 
 - C1 every ``T-####`` in cross-references/ exists in matrix.json.
 - C2 every attack-class id in cross-references/ exists in matrix.json.attackClasses.
@@ -24,12 +26,22 @@ Eight properties:
      table (the rows whose first cell is bold) holds exactly one row per tactic of that
      release, as ``**Name** (AML.TA####)`` under the release's current name and in its
      matrix order, and names no technique id.
+- C9 every ``attackMapping`` and ``atlasMapping`` entry in matrix.json appears once and has
+     exactly one row in crosswalks/review.json, matched by technique, field and id; it
+     carries the row's relationship and a note whose sha256 is the row's ``noteSha256``;
+     every row matches an entry; no entry matches a ``withdrawn`` row; the record's
+     ``unmapped`` list is the techniques carrying no mapping; and its ``releases`` are
+     the ones crosswalks/attack-release.json and crosswalks/atlas-release.json record.
+     The record is written from the review of each entry against the named release,
+     never generated from matrix.json, so an entry no review admitted fails here. A
+     record or snapshot that is missing, does not parse or has the wrong shape (see
+     ``record_shape``) is reported in one C9 line, and C9 checks nothing else.
 
 Run with ``--fix`` to rewrite only the generated block from matrix.json and the mapping
 table. Every other line is left alone; there is no other rewrite, because C3 and C4 are
 editorial placements, not text a script may invent. With the BEGIN or END marker
 missing, or END before BEGIN, ``--fix`` writes nothing and prints "NOT FIXED" ahead of
-the C5 failure. Exit 0 when all eight hold, 1 otherwise, printing one line per violation.
+the C5 failure. Exit 0 when all nine hold, 1 otherwise, printing one line per violation.
 A read of matrix.json that raises an OSError, a ValueError or a RecursionError (see
 ``read_matrix``) is reported in one line on standard error,
 ``FAIL: matrix.json is missing or does not parse: <reason>``, and the run exits 1 without
@@ -39,6 +51,7 @@ is not an object whose ``techniques`` and ``attackClasses`` arrays hold objects 
 ``FAIL: matrix.json parses but has the wrong shape: <reason>``.
 """
 
+import hashlib
 import json
 import re
 import sys
@@ -49,6 +62,17 @@ CROSSREF = ROOT / "cross-references"
 INDEX_NAME = "technique-overlap-index.md"
 OWASP_NAME = "owasp-llm-mapping.md"
 ATLAS_NAME = "mitre-atlas-mapping.md"
+
+# C9: the entry-review record, the technique fields it reviews, and the snapshot each of its
+# releases is read against, by the key the record gives it, with the framework's name.
+REVIEW_PATH = "crosswalks/review.json"
+MAPPING_FIELDS = ("attackMapping", "atlasMapping")
+RELEASE_SNAPSHOTS = (
+    ("attack", "ATT&CK", "crosswalks/attack-release.json"),
+    ("atlas", "ATLAS", "crosswalks/atlas-release.json"),
+)
+REVIEW_ROW_KEYS = ("technique", "field", "id", "relationship", "noteSha256", "reviewed")
+WITHDRAWN_ROW_KEYS = ("technique", "field", "id", "reviewed")
 
 # The ATLAS release the tactic mapping is read against, and that release's tactics in
 # ATLAS matrix order: the tactics map and the matrix sequence positions of
@@ -110,8 +134,14 @@ def read_matrix(root: Path):
     among others, and the message of the RecursionError, which is not a ValueError, that
     json.loads raises for arrays or objects nested deeper than it parses.
     """
+    return read_json(root / "matrix.json")
+
+
+def read_json(path: Path):
+    """(the file at path parsed, None), or (None, the reason it could not be read or parsed),
+    with the reasons ``read_matrix`` gives."""
     try:
-        return json.loads((root / "matrix.json").read_text(encoding="utf-8")), None
+        return json.loads(path.read_text(encoding="utf-8")), None
     except FileNotFoundError:
         return None, "no such file"
     except IsADirectoryError:
@@ -301,6 +331,156 @@ def is_table_header_rows(lines):
             yield i
 
 
+def record_shape(record):
+    """None when the parsed crosswalks/review.json has the shape C9 reads; otherwise the
+    reason it does not, naming the first place that fails, as ``wrong_shape`` words it.
+
+    The shape is an object with four keys: ``releases``, an object holding a string release
+    under each key of RELEASE_SNAPSHOTS and no other key; ``entries`` and ``withdrawn``,
+    arrays of objects whose REVIEW_ROW_KEYS and WITHDRAWN_ROW_KEYS are strings; and
+    ``unmapped``, an array of strings.
+    """
+    if not isinstance(record, dict):
+        return f"the top level is {json_type(record)}, not an object"
+    for key in ("releases", "entries", "withdrawn", "unmapped"):
+        if key not in record:
+            return f"the top level has no {key} key"
+    releases = record["releases"]
+    if not isinstance(releases, dict):
+        return f"releases is {json_type(releases)}, not an object"
+    keys = [key for key, _framework, _path in RELEASE_SNAPSHOTS]
+    if sorted(releases) != sorted(keys):
+        return f"releases has the keys {', '.join(sorted(releases)) or 'none'}, not {' and '.join(keys)}"
+    for key in keys:
+        if not isinstance(releases[key], str):
+            return f"releases.{key} is {json_type(releases[key])}, not a string"
+    for key, fields in (("entries", REVIEW_ROW_KEYS), ("withdrawn", WITHDRAWN_ROW_KEYS)):
+        rows = record[key]
+        if not isinstance(rows, list):
+            return f"{key} is {json_type(rows)}, not an array"
+        for index, row in enumerate(rows):
+            if not isinstance(row, dict):
+                return f"{key}[{index}] is {json_type(row)}, not an object"
+            for field in fields:
+                if field not in row:
+                    return f"{key}[{index}] has no {field}"
+                if not isinstance(row[field], str):
+                    return f"{key}[{index}].{field} is {json_type(row[field])}, not a string"
+    unmapped = record["unmapped"]
+    if not isinstance(unmapped, list):
+        return f"unmapped is {json_type(unmapped)}, not an array"
+    for index, tid in enumerate(unmapped):
+        if not isinstance(tid, str):
+            return f"unmapped[{index}] is {json_type(tid)}, not a string"
+    return None
+
+
+def mapping_entries(techniques: list):
+    """([(technique id, field, entry)], failures): the entries of each technique's
+    MAPPING_FIELDS in matrix order, and a C9 failure for each such field that is not an
+    array and each entry that is not an object with a string id, a string relationship and
+    a note that is a string or absent, which C9 cannot match against a row."""
+    entries, failures = [], []
+    for technique in techniques:
+        tid = technique["id"]
+        for field in MAPPING_FIELDS:
+            if field not in technique:
+                continue
+            value = technique[field]
+            if not isinstance(value, list):
+                failures.append(f"C9 {tid} {field} is {json_type(value)}, not an array")
+                continue
+            for index, entry in enumerate(value):
+                if (isinstance(entry, dict) and isinstance(entry.get("id"), str)
+                        and isinstance(entry.get("relationship"), str)
+                        and isinstance(entry.get("note", ""), str)):
+                    entries.append((tid, field, entry))
+                else:
+                    failures.append(f"C9 {tid} {field}[{index}] is not an object with a string id, "
+                                    f"a string relationship and a string note or none")
+    return entries, failures
+
+
+def review_problems(techniques: list, record: dict, releases: dict) -> list:
+    """C9 failures for the mapping entries of ``techniques`` against ``record``, the parsed
+    entry-review record in the shape ``record_shape`` accepts, and ``releases``, the release
+    each snapshot records under the record's key for it ("attack", "atlas").
+
+    An entry is matched to a row by technique, field and id, and each failure names it so.
+    The note is compared by the sha256 of its UTF-8 bytes. Repeated copies of one entry are
+    each compared with the row, and a line two copies would share is reported once.
+    """
+    entries, failures = mapping_entries(techniques)
+    rows = {}
+    for row in record["entries"]:
+        rows.setdefault((row["technique"], row["field"], row["id"]), []).append(row)
+    withdrawn = {(row["technique"], row["field"], row["id"]) for row in record["withdrawn"]}
+    found = {}
+    for tid, field, entry in entries:
+        found.setdefault((tid, field, entry["id"]), []).append(entry)
+    for key, copies in found.items():
+        name = " ".join(key)
+        matched = rows.get(key, [])
+        lines = []
+        if not matched:
+            lines.append(f"C9 {name} has no review row in {REVIEW_PATH}")
+        elif len(matched) > 1:
+            lines.append(f"C9 {name} has {len(matched)} review rows in {REVIEW_PATH}, not one")
+        else:
+            row = matched[0]
+            for entry in copies:
+                if entry["relationship"] != row["relationship"]:
+                    lines.append(f"C9 {name}: relationship {entry['relationship']} differs from "
+                                 f"the reviewed {row['relationship']}")
+                note = entry.get("note")
+                digest = None if note is None else hashlib.sha256(note.encode("utf-8")).hexdigest()
+                if digest != row["noteSha256"]:
+                    have = "the entry has no note" if digest is None else f"sha256 {digest}"
+                    lines.append(f"C9 {name}: note differs from its review row ({have}; the row "
+                                 f"records {row['noteSha256']})")
+        if key in withdrawn:
+            lines.append(f"C9 {name} was withdrawn on review and is present in matrix.json")
+        if len(copies) > 1:
+            lines.append(f"C9 {name} appears {len(copies)} times in matrix.json; its review row "
+                         f"admits one entry")
+        failures.extend(dict.fromkeys(lines))
+    for key in rows:
+        if key not in found:
+            failures.append(f"C9 {' '.join(key)} is reviewed but absent from matrix.json")
+    carrying = {tid for tid, _field, _entry in entries}
+    unmapped = sorted({technique["id"] for technique in techniques} - carrying)
+    if sorted(record["unmapped"]) != unmapped:
+        failures.append(f"C9 {REVIEW_PATH} lists as unmapped {', '.join(record['unmapped']) or 'none'}; "
+                        f"the techniques carrying no mapping are {', '.join(unmapped) or 'none'}")
+    for key, framework, path in RELEASE_SNAPSHOTS:
+        if record["releases"][key] != releases.get(key):
+            failures.append(f"C9 {REVIEW_PATH} records {framework} {record['releases'][key]}; "
+                            f"{path} records {releases.get(key)}")
+    return failures
+
+
+def check_crosswalk_review(root: Path, techniques: list) -> list:
+    """C9 failures for ``techniques``, the techniques of matrix.json, against the
+    entry-review record and the two release snapshots under ``root``. A record or snapshot
+    that is missing, does not parse or has the wrong shape is reported in one line naming
+    the file, and nothing else is checked."""
+    record, cause = read_json(root / REVIEW_PATH)
+    if cause is not None:
+        return [f"C9 {REVIEW_PATH} is missing or does not parse: {cause}"]
+    cause = record_shape(record)
+    if cause is not None:
+        return [f"C9 {REVIEW_PATH} parses but has the wrong shape: {cause}"]
+    releases = {}
+    for key, _framework, path in RELEASE_SNAPSHOTS:
+        snapshot, cause = read_json(root / path)
+        if cause is not None:
+            return [f"C9 {path} is missing or does not parse: {cause}"]
+        if not isinstance(snapshot, dict) or not isinstance(snapshot.get("release"), str):
+            return [f"C9 {path} parses but has the wrong shape: it records no release as a string"]
+        releases[key] = snapshot["release"]
+    return review_problems(techniques, record, releases)
+
+
 def run_checks(root: Path) -> list:
     failures = []
     version, ids, classes = load_matrix(root)
@@ -399,6 +579,10 @@ def run_checks(root: Path) -> list:
     else:
         failures.append(f"C8 {ATLAS_NAME}: the page is missing")
 
+    # C9 -- every crosswalk entry in matrix.json matches its row in the entry-review record.
+    techniques = json.loads((root / "matrix.json").read_text(encoding="utf-8"))["techniques"]
+    failures.extend(check_crosswalk_review(root, techniques))
+
     return failures
 
 
@@ -463,6 +647,17 @@ def main(argv: list) -> int:
         f"OK: {len(named)} techniques named in the OWASP mapping table, "
         f"{len(no_counterpart)} with no counterpart named, disjoint, "
         f"union equals the {len(ids)} techniques in matrix.json"
+    )
+    entries, _failures = mapping_entries(matrix["techniques"])
+    record, _cause = read_json(ROOT / REVIEW_PATH)
+    per_field = {field: sum(1 for _tid, f, _entry in entries if f == field) for field in MAPPING_FIELDS}
+    print(
+        f"OK: crosswalk review clean: the {len(entries)} entries in matrix.json "
+        f"({per_field['attackMapping']} attackMapping, {per_field['atlasMapping']} atlasMapping) "
+        f"each match their one row of {REVIEW_PATH} in relationship and note, none of the "
+        f"{len(record['withdrawn'])} withdrawn entries is present, and the unmapped list "
+        f"({', '.join(record['unmapped']) or 'none'}) and the releases (ATT&CK "
+        f"{record['releases']['attack']}, ATLAS {record['releases']['atlas']}) hold"
     )
     return 0
 
