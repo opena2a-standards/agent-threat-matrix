@@ -16,7 +16,7 @@ Open [`matrix.json`](matrix.json) first. It holds every tactic, technique, attac
 | `attackClass` | The technique's primary attack class, such as `RAG-POISON` |
 | `hmaChecks`, `oasbControls` | The HackMyAgent checks that detect it and the OASB controls that defend against it |
 | `dvaaValidation` | The DVAA challenge, scenario or agent that reproduces it in the lab, or `null` |
-| `wildPrevalence`, `wildSampleCount` | The wild prevalence the registry serves for the technique, a percentage from 0 to 100, and its sample count, both 0 where it serves none; the top-level `wildPrevalenceSource` gives the endpoint and the date they were read |
+| `wildPrevalence`, `wildSampleCount` | The wild prevalence the registry serves for the technique, a percentage from 0 to 100, and its sample count, both 0 where it serves none; the top-level `wildPrevalenceSource` gives the endpoint and the date they were read. The registry computes it from its honeypot telemetry as callbacks per page visit in the technique's category: callbacks divided by page visits, as a percentage rounded to two decimals and capped at 100, and 0 where the category has no page visits. It measures engagement with a honeypot, not a production attack rate. The wildSampleCount the same endpoint served with wildPrevalence, and 0 where it served none: the callbacks plus the page visits behind that wildPrevalence, a whole number. |
 
 The tactics, in kill chain order:
 

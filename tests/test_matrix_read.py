@@ -60,7 +60,7 @@ def readme_pages() -> tuple:
 SCRIPTS = [
     ("check_readme_claims.py",
      ("related-projects.json", "CHANGELOG.md", "stix/agent-threat-matrix-bundle.json",
-      *readme_pages()),
+      "schema/threat-matrix-v1.2.schema.json", *readme_pages()),
      "", True),
     ("check_technique_pages.py",
      ("techniques", "tactics", "related-projects.json", "docs/data-sources.md"), "FAIL: ", True),

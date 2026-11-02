@@ -152,7 +152,8 @@ import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
 FILES = ("matrix.json", "related-projects.json", "CHANGELOG.md",
-         "stix/agent-threat-matrix-bundle.json", "scripts/check_readme_claims.py")
+         "stix/agent-threat-matrix-bundle.json", "schema/threat-matrix-v1.2.schema.json",
+         "scripts/check_readme_claims.py")
 STIX_BUNDLE = "stix/agent-threat-matrix-bundle.json"
 # The attack-class tables moved from README.md to this page, which links up one level.
 CLASS_PAGE = "docs/attack-classes.md"

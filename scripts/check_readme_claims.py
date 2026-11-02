@@ -276,6 +276,23 @@ does not state the STIX version passes. A line holding the wording once the char
 are removed fails when it carries one of them, as a line stating a count does. A STIX version
 worded any other way is not read.
 
+The field table's row for ``wildPrevalence`` and ``wildSampleCount`` is read where a line
+starts ``| `wildPrevalence`, `wildSampleCount` |``, spaced exactly as shown; a row written
+any other way is not read, and the README must state one. Its description cell, the text
+after that first cell up to the next "|" that no backslash escapes or to the end of the
+line, must hold three sentences of the two field descriptions in
+schema/threat-matrix-v1.2.schema.json, each exactly as the schema states it: the sentence of
+the ``wildPrevalence`` description that contains "callbacks per page visit", the one that
+contains "not a production attack rate", and the sentence of the ``wildSampleCount``
+description that contains "the callbacks plus the page visits". A sentence is a piece of a
+description split on ". ", a period and a space, keeping its period, and a "|" in it is
+written "\\|" in the cell, as a table cell needs. Each of the three must be the one sentence
+of its description that contains those words: a description that holds no such sentence or
+more than one fails the check, naming the words, and so does a schema that is missing, does
+not parse or holds no such description. Every row read is checked. The sentences are read
+from the schema, not typed in the checker, so an edit to one of them in the schema fails a
+README that still states the old words until the row is copied again.
+
 Exit 0 when every claim matches the data, 1 otherwise. ``--help`` (or ``-h``) prints
 the usage and exits 0. Any other argument, such as a mistyped ``--fixx``, prints the
 usage and exits 2 without checking or writing anything. Help takes precedence over an
@@ -314,6 +331,19 @@ RELATED = ROOT / "related-projects.json"
 CHANGELOG = ROOT / "CHANGELOG.md"
 # The committed STIX bundle, whose objects carry the spec_version the README states.
 STIX_BUNDLE = ROOT / "stix" / "agent-threat-matrix-bundle.json"
+# The schema whose field descriptions the README's wildPrevalence, wildSampleCount row copies.
+SCHEMA = ROOT / "schema" / "threat-matrix-v1.2.schema.json"
+
+# The field table's row for the wild prevalence pair, read where a line starts with this
+# text, and the sentences its description cell copies from the schema: for each, the field
+# whose description holds it and the words that pick it out there, in the order the row
+# states them.
+WILD_ROW = "| `wildPrevalence`, `wildSampleCount` |"
+WILD_SENTENCES = (
+    ("wildPrevalence", "callbacks per page visit"),
+    ("wildPrevalence", "not a production attack rate"),
+    ("wildSampleCount", "the callbacks plus the page visits"),
+)
 
 # README.md and the pages that took its reference text, read as one text in this order.
 PAGES = (
@@ -1688,6 +1718,55 @@ def read_matrix():
         return None, str(exc)
 
 
+def sentences(description):
+    """The sentences of a schema description: the pieces of `description` split on ". ", a
+    period and a space, each keeping its period."""
+    pieces = description.split(". ")
+    return [piece + "." for piece in pieces[:-1]] + pieces[-1:]
+
+
+def schema_sentences():
+    """(the sentences WILD_SENTENCES picks from the field descriptions in SCHEMA, in its
+    order, []), or (None, the failure lines naming why they could not be picked).
+
+    The file is read with the reasons ``read_matrix`` gives for matrix.json. A field's
+    description is the string at ``$defs.technique.properties.<field>.description``, and each
+    entry of WILD_SENTENCES must pick out exactly one of its sentences.
+    """
+    source = SCHEMA.relative_to(ROOT).as_posix()
+    try:
+        schema = json.loads(SCHEMA.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        reason = "no such file"
+    except IsADirectoryError:
+        reason = "a directory, not a file"
+    except OSError as exc:
+        reason = exc.strerror or str(exc)
+    except (ValueError, RecursionError) as exc:
+        reason = str(exc)
+    else:
+        reason = None
+    if reason is not None:
+        return None, [f"{source} is missing or does not parse: {reason}"]
+    picked, reasons = [], []
+    for field, words in WILD_SENTENCES:
+        description = schema
+        for key in ("$defs", "technique", "properties", field, "description"):
+            description = description.get(key) if isinstance(description, dict) else None
+        if not isinstance(description, str):
+            reasons.append(f"{source}: no description string at "
+                           f"$defs.technique.properties.{field}.description, which the "
+                           f"README's {field} sentence is copied from")
+            continue
+        found = [s for s in sentences(description) if words in s]
+        if len(found) != 1:
+            reasons.append(f"{source}: the {field} description holds {len(found)} sentences "
+                           f"containing \"{words}\", where the README's row copies exactly one")
+            continue
+        picked.append(found[0])
+    return (None, reasons) if reasons else (picked, [])
+
+
 # What ``wrong_shape`` asks of a key it reads from an object: present, with any value;
 # present, as a string; absent, null or a string; absent, null or an array of strings. Each
 # but the first is worded as the reason line words it.
@@ -1973,6 +2052,27 @@ def main(argv):
         if tier not in tier_rows:
             failures.append(f"README evidence tier table has no row for {tier}")
 
+    # The field table's wildPrevalence, wildSampleCount row: its description cell, up to the
+    # next "|" no backslash escapes, must hold each sentence WILD_SENTENCES picks from the
+    # schema, as the schema states it. Every row read is checked, and the README must state one.
+    picked, reasons = schema_sentences()
+    failures.extend(reasons)
+    schema_source = SCHEMA.relative_to(ROOT).as_posix()
+    wild_rows = 0
+    for m in re.finditer(r"(?m)^" + re.escape(WILD_ROW) + r"((?:[^|\\\n]|\\.)*)", readme):
+        wild_rows += 1
+        line = pages.where(line_of(m.start()))
+        for (field, words), sentence in zip(WILD_SENTENCES, picked or ()):
+            if sentence.replace("|", "\\|") not in m.group(1):
+                failures.append(
+                    f"{line}: the wildPrevalence, wildSampleCount row does not hold, as "
+                    f"{schema_source} states it, the {field} sentence containing "
+                    f"\"{words}\": \"{sentence}\""
+                )
+    if not wild_rows:
+        failures.append(f"README field table has no row for wildPrevalence, wildSampleCount "
+                        f"(a line starting \"{WILD_ROW}\")")
+
     failures.extend(check_class_tables(matrix, pages))
 
     # Related-project figures, read only from the README lines that name the project.
@@ -2199,7 +2299,8 @@ def main(argv):
 
     if failures:
         print("README claims do not match matrix.json, related-projects.json, "
-              "CHANGELOG.md and stix/agent-threat-matrix-bundle.json:\n",
+              "CHANGELOG.md, stix/agent-threat-matrix-bundle.json and "
+              "schema/threat-matrix-v1.2.schema.json:\n",
               file=sys.stderr)
         for f in failures:
             print(f"  - {f}", file=sys.stderr)
