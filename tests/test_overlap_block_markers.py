@@ -44,6 +44,7 @@ NOT_FIXED_END_BEFORE_BEGIN = (
 def scratch_tree() -> Path:
     td = Path(tempfile.mkdtemp(prefix="atm-xref-"))
     shutil.copytree(ROOT / "cross-references", td / "cross-references")
+    shutil.copytree(ROOT / "crosswalks", td / "crosswalks")
     shutil.copy(ROOT / "matrix.json", td / "matrix.json")
     (td / "scripts").mkdir()
     shutil.copy(ROOT / "scripts" / "check_cross_references.py", td / "scripts")

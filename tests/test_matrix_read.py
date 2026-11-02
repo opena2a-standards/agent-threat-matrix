@@ -64,7 +64,7 @@ SCRIPTS = [
      "", True),
     ("check_technique_pages.py",
      ("techniques", "tactics", "related-projects.json", "docs/data-sources.md"), "FAIL: ", True),
-    ("check_cross_references.py", ("cross-references",), "FAIL: ", True),
+    ("check_cross_references.py", ("cross-references", "crosswalks"), "FAIL: ", True),
     ("check_attribution.py", ("ATTRIBUTION.md",), "FAIL: ", False),
 ]
 
@@ -373,7 +373,7 @@ READS = {
     },
     "check_cross_references.py": {
         None: ("techniques", "attackClasses", "version"),
-        "techniques": ("id",),
+        "techniques": ("id", "attackMapping", "atlasMapping"),
         "attackClasses": ("id",),
     },
     "check_attribution.py": {

@@ -63,9 +63,10 @@ check fails when it differs from a fresh rendering:
 - the overlap counts in `cross-references/technique-overlap-index.md`:
   `python3 scripts/check_cross_references.py`.
 
-Three files under `crosswalks/` hold derived content that no check renders afresh.
+Four files under `crosswalks/` hold derived content that no check renders afresh.
 `tests/test_crosswalks.py` guards them; it is a local test that no workflow runs, run with
-`python3 -m pytest -q tests/test_crosswalks.py`:
+`python3 -m pytest -q tests/test_crosswalks.py`. The fourth, the entry-review record, is
+also checked in CI:
 
 - the technique list of `crosswalks/unmapped.md`, the ids in the first column of its table,
   which is typed by hand: the test fails when it differs from the techniques whose
@@ -75,7 +76,14 @@ Three files under `crosswalks/` hold derived content that no check renders afres
   `scripts/build_crosswalk_index.py` writes them from a clone of each published data
   repository, which is not vendored here, and they are never edited by hand. The test
   resolves every `attackMapping` and `atlasMapping` id against them, and fails when the notes
-  in `matrix.json` name a release other than the one a snapshot records.
+  in `matrix.json` name a release other than the one a snapshot records;
+- the entry-review record `crosswalks/review.json`: a row for each `attackMapping` and
+  `atlasMapping` entry with its relation and the sha256 of its note, the entries withdrawn
+  on review, and the techniques left unmapped. It is written from the review of each entry
+  against the named release, never generated from `matrix.json`, and checked by
+  `python3 scripts/check_cross_references.py` in CI, which fails when an entry has no row or
+  differs from its row, when a row matches no entry, when a withdrawn entry is present, and
+  when the record's unmapped list or releases differ from `matrix.json` and the snapshots.
 
 Everything else is editorial: the prose of `README.md`, the pages under `docs/` other than
 the two named above, the prose of the technique pages, `crosswalks/README.md` and the rest

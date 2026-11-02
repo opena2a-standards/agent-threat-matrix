@@ -2,7 +2,7 @@
   "version": "1.2",
   "name": "AI Agent Threat Matrix",
   "created": "2026-03-24",
-  "updated": "2026-10-22",
+  "updated": "2026-11-01",
   "stixNamespace": "d43c7092-69ad-4822-b2cb-a48e459c4580",
   "tactics": [
     {
@@ -331,6 +331,13 @@
       ],
       "wildPrevalence": 0,
       "wildSampleCount": 0,
+      "atlasMapping": [
+        {
+          "id": "AML.T0006.002",
+          "relationship": "relatedMatch",
+          "note": "ATLAS 2026.09 Scan for Exposed AI Infrastructure: requesting the standard paths that AI agent infrastructure exposes to learn its configuration; here the path serves the A2A agent card"
+        }
+      ],
       "evidence": [
         {
           "type": "lab-reproduction",
@@ -558,7 +565,7 @@
       "atlasMapping": [
         {
           "id": "AML.T0054",
-          "relationship": "closeMatch",
+          "relationship": "broadMatch",
           "note": "ATLAS 2026.09 LLM Jailbreak: role-play is a named method of overriding safety behaviour"
         }
       ],
@@ -614,7 +621,7 @@
       "atlasMapping": [
         {
           "id": "AML.T0054",
-          "relationship": "relatedMatch",
+          "relationship": "broadMatch",
           "note": "ATLAS 2026.09 LLM Jailbreak: context saturation reaches the same guardrail bypass by a different means"
         }
       ],
@@ -805,7 +812,7 @@
       "atlasMapping": [
         {
           "id": "AML.T0054",
-          "relationship": "relatedMatch",
+          "relationship": "broadMatch",
           "note": "ATLAS 2026.09 LLM Jailbreak: gradual multi-turn shifting is a method of overriding safety behaviour"
         }
       ],
@@ -855,14 +862,14 @@
       "attackMapping": [
         {
           "id": "T1699",
-          "relationship": "relatedMatch",
+          "relationship": "broadMatch",
           "note": "ATT&CK 20.0 Direct Prompt Injection: overriding system-level instructions across the prompt boundary"
         }
       ],
       "atlasMapping": [
         {
           "id": "AML.T0051.000",
-          "relationship": "relatedMatch",
+          "relationship": "broadMatch",
           "note": "ATLAS 2026.09 LLM Prompt Injection: Direct: a direct injection that crosses the system and user prompt boundary"
         }
       ],
@@ -1416,7 +1423,7 @@
         {
           "id": "AML.T0053",
           "relationship": "relatedMatch",
-          "note": "ATLAS 2026.09 AI Agent Tool Invocation: driving the agent to act beyond its declared capability scope"
+          "note": "ATLAS 2026.09 AI Agent Tool Invocation: invoking the tools an agent has access to, a command or script interpreter among them; T-4001 reaches such a tool past the agent's declared capability restriction"
         }
       ],
       "evidence": [
@@ -1590,6 +1597,13 @@
       ],
       "wildPrevalence": 100,
       "wildSampleCount": 1870,
+      "attackMapping": [
+        {
+          "id": "T1548.005",
+          "relationship": "relatedMatch",
+          "note": "ATT&CK 20.0 Temporary Elevated Cloud Access: delegation and impersonation permissions abused to act with another account's privileges; here the delegation runs along a chain of trusted agents"
+        }
+      ],
       "evidence": [
         {
           "type": "lab-reproduction",
@@ -1635,15 +1649,15 @@
       "attackMapping": [
         {
           "id": "T1027.018",
-          "relationship": "closeMatch",
+          "relationship": "relatedMatch",
           "note": "ATT&CK 20.0 Invisible Unicode: non-rendering characters used to slip content past filters"
         }
       ],
       "atlasMapping": [
         {
           "id": "AML.T0068",
-          "relationship": "closeMatch",
-          "note": "ATLAS 2026.09 LLM Prompt Obfuscation: obfuscation that evades a regex-based policy filter"
+          "relationship": "relatedMatch",
+          "note": "ATLAS 2026.09 LLM Prompt Obfuscation: the same encodings (base64, rot13) hiding prompt content from guardrails and other detection mechanisms; here they hide a tool call or action from policy enforcement"
         }
       ]
     },
@@ -1685,7 +1699,7 @@
       "atlasMapping": [
         {
           "id": "AML.T0054",
-          "relationship": "relatedMatch",
+          "relationship": "broadMatch",
           "note": "ATLAS 2026.09 LLM Jailbreak: displacing safety instructions reaches the same guardrail removal"
         }
       ],
@@ -1759,7 +1773,7 @@
       "atlasMapping": [
         {
           "id": "AML.T0053",
-          "relationship": "relatedMatch",
+          "relationship": "broadMatch",
           "note": "ATLAS 2026.09 AI Agent Tool Invocation: a tool issuing a server-side request the agent would not otherwise reach"
         }
       ],
@@ -1810,6 +1824,13 @@
       ],
       "wildPrevalence": 100,
       "wildSampleCount": 1870,
+      "atlasMapping": [
+        {
+          "id": "AML.T0053",
+          "relationship": "relatedMatch",
+          "note": "ATLAS 2026.09 AI Agent Tool Invocation: using the access an agent holds to reach other services, which the release places under Lateral Movement; here the reach is a peer agent over an A2A connection"
+        }
+      ],
       "evidence": [
         {
           "type": "lab-reproduction",
@@ -1950,7 +1971,7 @@
       "atlasMapping": [
         {
           "id": "AML.T0012",
-          "relationship": "relatedMatch",
+          "relationship": "broadMatch",
           "note": "ATLAS 2026.09 Valid Accounts: reusing obtained credentials to reach adjacent services"
         }
       ]
@@ -1994,13 +2015,6 @@
       ],
       "wildPrevalence": 0,
       "wildSampleCount": 0,
-      "attackMapping": [
-        {
-          "id": "T1210",
-          "relationship": "relatedMatch",
-          "note": "ATT&CK 20.0 Exploitation of Remote Services: reaching database-level access from the agent's SQL tool"
-        }
-      ],
       "atlasMapping": [
         {
           "id": "AML.T0053",
@@ -2223,7 +2237,7 @@
         },
         {
           "id": "AML.T0080.000",
-          "relationship": "relatedMatch",
+          "relationship": "broadMatch",
           "note": "ATLAS 2026.09 AI Agent Context Poisoning: Memory: the replicating entry lives in agent memory"
         }
       ],
@@ -2384,14 +2398,14 @@
       "attackMapping": [
         {
           "id": "T1176",
-          "relationship": "relatedMatch",
-          "note": "ATT&CK 20.0 Software Extensions: a skill or plugin is the agent's analogue of a persistent extension"
+          "relationship": "broadMatch",
+          "note": "ATT&CK 20.0 Software Extensions is broader: its modular components that extend browsers, IDEs and other platforms include an agent's skills and plugins"
         }
       ],
       "atlasMapping": [
         {
           "id": "AML.T0110",
-          "relationship": "closeMatch",
+          "relationship": "broadMatch",
           "note": "ATLAS 2026.09 AI Agent Tool Poisoning: a backdoored tool or skill package, which ATLAS names among agent tools"
         }
       ],
@@ -3158,7 +3172,7 @@
       "atlasMapping": [
         {
           "id": "AML.T0025",
-          "relationship": "relatedMatch",
+          "relationship": "broadMatch",
           "note": "ATLAS 2026.09 Exfiltration via Cyber Means: exfiltration by a traditional network channel"
         }
       ]
@@ -3415,7 +3429,7 @@
       "atlasMapping": [
         {
           "id": "AML.T0101",
-          "relationship": "relatedMatch",
+          "relationship": "narrowMatch",
           "note": "ATLAS 2026.09 Data Destruction via AI Agent Tool Invocation: the destructive case of manipulating data through a tool"
         }
       ]
@@ -3727,6 +3741,13 @@
       "dataSources": [],
       "wildPrevalence": 0,
       "wildSampleCount": 0,
+      "atlasMapping": [
+        {
+          "id": "AML.T0123",
+          "relationship": "relatedMatch",
+          "note": "ATLAS 2026.09 Obfuscated Files or Information: content that appears benign to a detector and is interpreted otherwise downstream; here the gap is two parsers reading the same bytes differently"
+        }
+      ],
       "evidence": [
         {
           "type": "lab-reproduction",
@@ -3773,7 +3794,7 @@
       "atlasMapping": [
         {
           "id": "AML.T0110",
-          "relationship": "relatedMatch",
+          "relationship": "broadMatch",
           "note": "ATLAS 2026.09 AI Agent Tool Poisoning: a planted tool that impersonates or shadows a legitimate one"
         }
       ],
@@ -3824,11 +3845,6 @@
           "id": "AML.T0080",
           "relationship": "closeMatch",
           "note": "ATLAS 2026.09 AI Agent Context Poisoning: persisting across sessions by changing the agent's context"
-        },
-        {
-          "id": "AML.T0121",
-          "relationship": "relatedMatch",
-          "note": "ATLAS 2026.09 AI Agent Environment Reconstruction: recovering state to continue after a reset"
         }
       ],
       "evidence": [
@@ -4163,6 +4179,13 @@
       ],
       "wildPrevalence": 0,
       "wildSampleCount": 0,
+      "atlasMapping": [
+        {
+          "id": "AML.T0123",
+          "relationship": "relatedMatch",
+          "note": "ATLAS 2026.09 Obfuscated Files or Information: content that appears benign or incomplete to a detector and is assembled downstream; here the assembler is the agent's own context pipeline"
+        }
+      ],
       "evidence": [
         {
           "type": "lab-reproduction",

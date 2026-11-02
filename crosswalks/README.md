@@ -4,8 +4,8 @@ Each technique in [`matrix.json`](../matrix.json) carries two optional cross-ref
 `attackMapping` and `atlasMapping`. Each entry names an external technique id, the SKOS
 relation between the matrix technique and it (`exactMatch`, `closeMatch`, `broadMatch`,
 `narrowMatch` or `relatedMatch`), and a note that names the release the id was read against.
-This directory holds the resolvable snapshot of those releases and the residue the crosswalk
-leaves.
+This directory holds the resolvable snapshot of those releases, the residue the crosswalk
+leaves and the record of the review each entry passed.
 
 The mappings were read from the release data itself, a git clone of each published data
 repository, not a REST walk:
@@ -22,6 +22,14 @@ are not vendored here.
 
 [`unmapped.md`](unmapped.md) lists the techniques with no counterpart in either release. It is
 derived from `matrix.json` and checked against it.
+
+[`review.json`](review.json) is the entry-review record: a row for each admitted entry with its
+relation and the sha256 of its note, the entries withdrawn on review, and the techniques left
+unmapped, against the releases it names. It is written from the review of each entry against
+the named release, never generated from `matrix.json`. `python3 scripts/check_cross_references.py`,
+which CI runs, fails when an entry has no row or differs from its row in relation or note, when
+a row matches no entry, when a withdrawn entry is present, and when the unmapped list or the
+releases differ, so an entry no review admitted does not pass it.
 
 `tests/test_crosswalks.py` resolves every `attackMapping` and `atlasMapping` id against the
 snapshot for its framework, so a mapping that names an id absent from the named release fails;
@@ -40,11 +48,15 @@ these arrays are the technique-grain crosswalk in the data.
 it. A refresh changes these files, in one change:
 
 1. `crosswalks/attack-release.json` and `crosswalks/atlas-release.json`: clone the two data
-   repositories and run the script on the new release files, as its docstring shows.
+   repositories and run the script on the new release files, as its docstring shows. The ATLAS
+   release file is `dist/v6/ATLAS-<release>.yaml`; `dist/ATLAS.yaml` is frozen at 5.6.0 and is
+   not the current release.
 2. `matrix.json`: the note of every `attackMapping` and `atlasMapping` entry names the new
    release, and every mapping, and every technique on the unmapped list, is read again against
    it. `updated` moves too: `scripts/validate_matrix.py` requires it to be no earlier than the
-   day it runs whenever `matrix.json` differs from the committed copy.
+   day it runs whenever `matrix.json` differs from the committed copy. Every entry and the
+   unmapped list are reviewed again, and `crosswalks/review.json` is rewritten from that
+   review, never from `matrix.json`.
 3. `stix/agent-threat-matrix-bundle.json`, which carries the notes and takes its `modified`
    dates from `updated`: regenerate it with `python3 scripts/generate_stix.py`.
 4. `crosswalks/README.md` and `crosswalks/unmapped.md`, which name both releases. The table in
@@ -62,3 +74,5 @@ the pin changes when that release adds, renames or retires a tactic;
 the one its snapshot records, while a mapping id is absent from its snapshot, and while the
 unmapped list differs from the techniques carrying no mapping. `python3 scripts/validate_matrix.py`
 fails while the STIX bundle differs from what `scripts/generate_stix.py` renders.
+`python3 scripts/check_cross_references.py` fails while an entry, the unmapped list or the
+releases differ from `crosswalks/review.json`.
