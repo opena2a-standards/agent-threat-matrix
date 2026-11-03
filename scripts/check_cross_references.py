@@ -35,7 +35,13 @@ Nine properties:
      The record is written from the review of each entry against the named release,
      never generated from matrix.json, so an entry no review admitted fails here. A
      record or snapshot that is missing, does not parse or has the wrong shape (see
-     ``record_shape``) is reported in one C9 line, and C9 checks nothing else.
+     ``record_shape``) is reported in one C9 line, and C9 checks nothing else. In the
+     record (see ``record_shape``) and in a snapshot's release, a string that is not valid
+     Unicode text, as the JSON escape ``\\ud800`` alone decodes to (see ``text_problem``),
+     is the wrong shape. In an entry, a relationship or note that is not valid Unicode
+     text is reported as such where C9 compares the entry with its row, and an entry whose
+     id is not valid Unicode text is named by its place in the array and matched against
+     no row.
 
 Run with ``--fix`` to rewrite only the generated block from matrix.json and the mapping
 table. Every other line is left alone; there is no other rewrite, because C3 and C4 are
@@ -165,6 +171,25 @@ def json_type(value) -> str:
     if isinstance(value, list):
         return "an array"
     return "an object"
+
+
+def text_problem(value: str):
+    """None when the string ``value`` is valid Unicode text, which UTF-8 encodes; otherwise the
+    reason it is not, naming the first character UTF-8 cannot encode by its place in ``value``,
+    counted from 1, as in "character 88 is U+D800, a surrogate code point, which UTF-8 cannot
+    encode".
+
+    The surrogate code points, U+D800 to U+DFFF, are the only characters UTF-8 cannot encode.
+    json.loads decodes the JSON escape of one that is not half of a pair, such as ``\\ud800``
+    alone, to that code point, so the file parses while the string has no UTF-8 encoding: it
+    has no bytes to hash, and a line holding it cannot be written out as UTF-8.
+    """
+    try:
+        value.encode("utf-8")
+    except UnicodeEncodeError as exc:
+        return (f"character {exc.start + 1} is U+{ord(value[exc.start]):04X}, a surrogate code "
+                f"point, which UTF-8 cannot encode")
+    return None
 
 
 def wrong_shape(matrix):
@@ -338,7 +363,9 @@ def record_shape(record):
     The shape is an object with four keys: ``releases``, an object holding a string release
     under each key of RELEASE_SNAPSHOTS and no other key; ``entries`` and ``withdrawn``,
     arrays of objects whose REVIEW_ROW_KEYS and WITHDRAWN_ROW_KEYS are strings; and
-    ``unmapped``, an array of strings.
+    ``unmapped``, an array of strings. Each of those strings, and each key of ``releases``,
+    is valid Unicode text (see ``text_problem``), so a failure line that holds one can be
+    written out.
     """
     if not isinstance(record, dict):
         return f"the top level is {json_type(record)}, not an object"
@@ -348,12 +375,19 @@ def record_shape(record):
     releases = record["releases"]
     if not isinstance(releases, dict):
         return f"releases is {json_type(releases)}, not an object"
+    for name in releases:
+        cause = text_problem(name)
+        if cause is not None:
+            return f"releases has a key that is not valid Unicode text ({cause})"
     keys = [key for key, _framework, _path in RELEASE_SNAPSHOTS]
     if sorted(releases) != sorted(keys):
         return f"releases has the keys {', '.join(sorted(releases)) or 'none'}, not {' and '.join(keys)}"
     for key in keys:
         if not isinstance(releases[key], str):
             return f"releases.{key} is {json_type(releases[key])}, not a string"
+        cause = text_problem(releases[key])
+        if cause is not None:
+            return f"releases.{key} is not valid Unicode text ({cause})"
     for key, fields in (("entries", REVIEW_ROW_KEYS), ("withdrawn", WITHDRAWN_ROW_KEYS)):
         rows = record[key]
         if not isinstance(rows, list):
@@ -366,12 +400,18 @@ def record_shape(record):
                     return f"{key}[{index}] has no {field}"
                 if not isinstance(row[field], str):
                     return f"{key}[{index}].{field} is {json_type(row[field])}, not a string"
+                cause = text_problem(row[field])
+                if cause is not None:
+                    return f"{key}[{index}].{field} is not valid Unicode text ({cause})"
     unmapped = record["unmapped"]
     if not isinstance(unmapped, list):
         return f"unmapped is {json_type(unmapped)}, not an array"
     for index, tid in enumerate(unmapped):
         if not isinstance(tid, str):
             return f"unmapped[{index}] is {json_type(tid)}, not a string"
+        cause = text_problem(tid)
+        if cause is not None:
+            return f"unmapped[{index}] is not valid Unicode text ({cause})"
     return None
 
 
@@ -379,7 +419,9 @@ def mapping_entries(techniques: list):
     """([(technique id, field, entry)], failures): the entries of each technique's
     MAPPING_FIELDS in matrix order, and a C9 failure for each such field that is not an
     array and each entry that is not an object with a string id, a string relationship and
-    a note that is a string or absent, which C9 cannot match against a row."""
+    a note that is a string or absent, which C9 cannot match against a row. So is an entry
+    whose id is not valid Unicode text (see ``text_problem``): a line holding that id cannot
+    be written out as UTF-8, so its failure names the entry by its place in the array."""
     entries, failures = [], []
     for technique in techniques:
         tid = technique["id"]
@@ -391,13 +433,17 @@ def mapping_entries(techniques: list):
                 failures.append(f"C9 {tid} {field} is {json_type(value)}, not an array")
                 continue
             for index, entry in enumerate(value):
-                if (isinstance(entry, dict) and isinstance(entry.get("id"), str)
+                if not (isinstance(entry, dict) and isinstance(entry.get("id"), str)
                         and isinstance(entry.get("relationship"), str)
                         and isinstance(entry.get("note", ""), str)):
-                    entries.append((tid, field, entry))
-                else:
                     failures.append(f"C9 {tid} {field}[{index}] is not an object with a string id, "
                                     f"a string relationship and a string note or none")
+                    continue
+                cause = text_problem(entry["id"])
+                if cause is not None:
+                    failures.append(f"C9 {tid} {field}[{index}].id is not valid Unicode text ({cause})")
+                    continue
+                entries.append((tid, field, entry))
     return entries, failures
 
 
@@ -407,7 +453,9 @@ def review_problems(techniques: list, record: dict, releases: dict) -> list:
     each snapshot records under the record's key for it ("attack", "atlas").
 
     An entry is matched to a row by technique, field and id, and each failure names it so.
-    The note is compared by the sha256 of its UTF-8 bytes. Repeated copies of one entry are
+    The note is compared by the sha256 of its UTF-8 bytes. A relationship or note that is
+    not valid Unicode text (see ``text_problem``) is reported as such in place of the
+    comparison; such a note has no UTF-8 bytes to hash. Repeated copies of one entry are
     each compared with the row, and a line two copies would share is reported once.
     """
     entries, failures = mapping_entries(techniques)
@@ -429,10 +477,17 @@ def review_problems(techniques: list, record: dict, releases: dict) -> list:
         else:
             row = matched[0]
             for entry in copies:
-                if entry["relationship"] != row["relationship"]:
+                cause = text_problem(entry["relationship"])
+                if cause is not None:
+                    lines.append(f"C9 {name}: relationship is not valid Unicode text ({cause})")
+                elif entry["relationship"] != row["relationship"]:
                     lines.append(f"C9 {name}: relationship {entry['relationship']} differs from "
                                  f"the reviewed {row['relationship']}")
                 note = entry.get("note")
+                cause = None if note is None else text_problem(note)
+                if cause is not None:
+                    lines.append(f"C9 {name}: note is not valid Unicode text ({cause})")
+                    continue
                 digest = None if note is None else hashlib.sha256(note.encode("utf-8")).hexdigest()
                 if digest != row["noteSha256"]:
                     have = "the entry has no note" if digest is None else f"sha256 {digest}"
@@ -477,6 +532,10 @@ def check_crosswalk_review(root: Path, techniques: list) -> list:
             return [f"C9 {path} is missing or does not parse: {cause}"]
         if not isinstance(snapshot, dict) or not isinstance(snapshot.get("release"), str):
             return [f"C9 {path} parses but has the wrong shape: it records no release as a string"]
+        cause = text_problem(snapshot["release"])
+        if cause is not None:
+            return [f"C9 {path} parses but has the wrong shape: its release is not valid Unicode "
+                    f"text ({cause})"]
         releases[key] = snapshot["release"]
     return review_problems(techniques, record, releases)
 

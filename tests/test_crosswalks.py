@@ -22,6 +22,12 @@ entry with no row, a row twice, an entry twice, a changed relation, an edited no
 row, a withdrawn entry restored, an unmapped list and a release that differ. Until the
 reviewed corrections were applied to matrix.json the check reported 29 problems on it, so the
 first of them was red.
+
+The last tests give an entry, the record and a snapshot a string that is not valid Unicode
+text, as the JSON escape \\ud800 alone decodes to, and one gives a note an escaped surrogate
+pair, which is text. Until C9 reported a string that is not text in a line naming where it
+stands, the run ended with a UnicodeEncodeError traceback when the note or the id of an
+entry held one.
 """
 
 import copy
@@ -29,6 +35,7 @@ import hashlib
 import importlib.util
 import json
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -395,3 +402,176 @@ def test_the_checker_reports_the_crosswalk_review_clean():
                           timeout=120)
     assert proc.returncode == 0, proc.stdout + proc.stderr
     assert "OK: crosswalk review clean" in proc.stdout, proc.stdout
+
+
+# A string that is not valid Unicode text: what the six characters \ud800 in a JSON string
+# decode to, a surrogate code point that is not half of a pair. The JSON is valid, and UTF-8
+# cannot encode the string.
+
+LONE_SURROGATE = json.loads('"\\ud800"')
+NOT_TEXT = "a surrogate code point, which UTF-8 cannot encode"
+
+
+def not_text(where: str, was: str) -> str:
+    """The reason C9 gives for `where`, a string that read `was` before LONE_SURROGATE was
+    appended to it."""
+    return f"{where} is not valid Unicode text (character {len(was) + 1} is U+D800, {NOT_TEXT})"
+
+
+def test_the_escape_the_cases_below_append_is_not_text():
+    # The cases below prove nothing if the escape decoded to a character UTF-8 encodes.
+    assert [f"U+{ord(c):04X}" for c in LONE_SURROGATE] == ["U+D800"]
+    with pytest.raises(UnicodeEncodeError):
+        LONE_SURROGATE.encode("utf-8")
+
+
+def test_a_note_that_is_not_text_is_reported_in_one_line():
+    # The note was hashed as UTF-8, so the check ended with a UnicodeEncodeError.
+    techniques = copy.deepcopy(matrix()["techniques"])
+    t = first_with(techniques, "atlasMapping")
+    entry = t["atlasMapping"][0]
+    was = entry["note"]
+    entry["note"] += LONE_SURROGATE
+    assert review(techniques) == [f"C9 {t['id']} atlasMapping {entry['id']}: "
+                                  f"{not_text('note', was)}"]
+
+
+def test_a_note_holding_an_escaped_surrogate_pair_is_text():
+    # Both halves of a pair decode to one character, which UTF-8 encodes: the note is text,
+    # and it differs from the one the review read.
+    techniques = copy.deepcopy(matrix()["techniques"])
+    t = first_with(techniques, "atlasMapping")
+    entry = t["atlasMapping"][0]
+    reviewed = sha256(entry["note"])
+    entry["note"] += json.loads('"\\ud83d\\ude00"')
+    assert review(techniques) == [
+        f"C9 {t['id']} atlasMapping {entry['id']}: note differs from its review row "
+        f"(sha256 {sha256(entry['note'])}; the row records {reviewed})"]
+
+
+def test_a_relationship_that_is_not_text_is_reported_in_one_line():
+    techniques = copy.deepcopy(matrix()["techniques"])
+    t = first_with(techniques, "attackMapping")
+    entry = t["attackMapping"][0]
+    was = entry["relationship"]
+    entry["relationship"] += LONE_SURROGATE
+    assert review(techniques) == [f"C9 {t['id']} attackMapping {entry['id']}: "
+                                  f"{not_text('relationship', was)}"]
+
+
+def test_an_entry_whose_id_is_not_text_is_named_by_its_place_in_the_array():
+    # A line holding the id cannot be written out as UTF-8, so the entry is named by
+    # technique, field and index, as an entry of the wrong type is; the reviewed id it no
+    # longer holds is absent.
+    techniques = copy.deepcopy(matrix()["techniques"])
+    t = first_with(techniques, "atlasMapping")
+    entry = t["atlasMapping"][0]
+    was = entry["id"]
+    entry["id"] += LONE_SURROGATE
+    assert review(techniques) == [
+        f"C9 {t['id']} {not_text('atlasMapping[0].id', was)}",
+        f"C9 {t['id']} atlasMapping {was} is reviewed but absent from matrix.json",
+    ]
+
+
+def crosswalk_review_of(record: dict = None, snapshots: dict = None) -> list:
+    """The C9 failures of the shipped matrix.json against `record` and `snapshots`, a file
+    name -> parsed snapshot map, with the shipped file for any not given. Each is written by
+    json.dumps, which writes a string that is not text as the escape a contributor types."""
+    given = dict(snapshots or {}, **({} if record is None else {"review.json": record}))
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        (root / "crosswalks").mkdir()
+        for name in ("review.json", "attack-release.json", "atlas-release.json"):
+            target = root / "crosswalks" / name
+            if name in given:
+                target.write_text(json.dumps(given[name], indent=2) + "\n", encoding="utf-8")
+            else:
+                target.write_bytes((CROSSWALKS / name).read_bytes())
+        return CHK.check_crosswalk_review(root, matrix()["techniques"])
+
+
+def test_the_shipped_files_written_by_json_dumps_are_clean():
+    # The cases below prove nothing if writing the files this way failed them.
+    assert crosswalk_review_of(review_record(), {"attack-release.json": attack_release(),
+                                                 "atlas-release.json": atlas_release()}) == []
+
+
+@pytest.mark.parametrize("path, where", [
+    (("releases", "attack"), "releases.attack"),
+    (("entries", 0, "id"), "entries[0].id"),
+    (("entries", 0, "noteSha256"), "entries[0].noteSha256"),
+    (("withdrawn", 0, "technique"), "withdrawn[0].technique"),
+    (("unmapped", 0), "unmapped[0]"),
+], ids=["release", "entry id", "entry noteSha256", "withdrawn technique", "unmapped"])
+def test_a_string_of_the_review_record_that_is_not_text_is_its_wrong_shape(path, where):
+    record = review_record()
+    holder = record
+    for step in path[:-1]:
+        holder = holder[step]
+    was = holder[path[-1]]
+    holder[path[-1]] = was + LONE_SURROGATE
+    assert crosswalk_review_of(record) == [
+        f"C9 crosswalks/review.json parses but has the wrong shape: {not_text(where, was)}"]
+
+
+def test_a_releases_key_of_the_review_record_that_is_not_text_is_its_wrong_shape():
+    # The line for keys other than attack and atlas prints the keys.
+    record = review_record()
+    record["releases"]["atlas" + LONE_SURROGATE] = record["releases"].pop("atlas")
+    assert crosswalk_review_of(record) == [
+        f"C9 crosswalks/review.json parses but has the wrong shape: releases has a key that is "
+        f"not valid Unicode text (character 6 is U+D800, {NOT_TEXT})"]
+
+
+@pytest.mark.parametrize("name", ["attack-release.json", "atlas-release.json"])
+def test_a_snapshot_release_that_is_not_text_is_its_wrong_shape(name):
+    snapshot = _load(CROSSWALKS / name)
+    was = snapshot["release"]
+    snapshot["release"] = was + LONE_SURROGATE
+    assert crosswalk_review_of(snapshots={name: snapshot}) == [
+        f"C9 crosswalks/{name} parses but has the wrong shape: "
+        f"{not_text('its release', was)}"]
+
+
+def checker_run(data: dict) -> subprocess.CompletedProcess:
+    """The checker run from a scratch copy of the files it reads, with `data` as its
+    matrix.json, written by json.dumps, which writes a string that is not text as the escape
+    a contributor types."""
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        (root / "scripts").mkdir()
+        shutil.copy(CHECKER, root / "scripts" / CHECKER.name)
+        shutil.copytree(ROOT / "cross-references", root / "cross-references")
+        shutil.copytree(CROSSWALKS, root / "crosswalks")
+        (root / "matrix.json").write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+        return subprocess.run([sys.executable, str(root / "scripts" / CHECKER.name)],
+                              capture_output=True, text=True, timeout=120)
+
+
+def test_the_checker_run_from_a_scratch_copy_is_clean():
+    # The cases below prove nothing if the scratch copy failed the check unchanged.
+    proc = checker_run(matrix())
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert "OK: crosswalk review clean" in proc.stdout, proc.stdout
+
+
+@pytest.mark.parametrize("key", ["note", "id"])
+def test_the_checker_reports_an_entry_that_is_not_text_in_c9_lines(key):
+    # Hashing the note and printing the line that named the id each ended the run with a
+    # UnicodeEncodeError traceback.
+    data = matrix()
+    t = first_with(data["techniques"], "atlasMapping")
+    entry = t["atlasMapping"][0]
+    reviewed = f"{t['id']} atlasMapping {entry['id']}"
+    was = entry[key]
+    entry[key] += LONE_SURROGATE
+    proc = checker_run(data)
+    if key == "note":
+        lines = [f"C9 {reviewed}: {not_text('note', was)}"]
+    else:
+        lines = [f"C9 {t['id']} {not_text('atlasMapping[0].id', was)}",
+                 f"C9 {reviewed} is reviewed but absent from matrix.json"]
+    assert (proc.returncode, proc.stderr) == (1, ""), proc.stdout + proc.stderr
+    assert proc.stdout == (f"FAIL: {len(lines)} cross-reference check(s) failed:\n"
+                           + "".join(f"  - {line}\n" for line in lines)), proc.stdout
