@@ -281,17 +281,22 @@ starts ``| `wildPrevalence`, `wildSampleCount` |``, spaced exactly as shown; a r
 any other way is not read, and the README must state one. Its description cell, the text
 after that first cell up to the next "|" that no backslash escapes or to the end of the
 line, must hold three sentences of the two field descriptions in
-schema/threat-matrix-v1.2.schema.json, each exactly as the schema states it: the sentence of
-the ``wildPrevalence`` description that contains "callbacks per page visit", the one that
-contains "not a production attack rate", and the sentence of the ``wildSampleCount``
-description that contains "the callbacks plus the page visits". A sentence is a piece of a
-description split on ". ", a period and a space, keeping its period, and a "|" in it is
-written "\\|" in the cell, as a table cell needs. Each of the three must be the one sentence
-of its description that contains those words: a description that holds no such sentence or
-more than one fails the check, naming the words, and so does a schema that is missing, does
-not parse or holds no such description. Every row read is checked. The sentences are read
-from the schema, not typed in the checker, so an edit to one of them in the schema fails a
-README that still states the old words until the row is copied again.
+schema/threat-matrix-v1.2.schema.json, each exactly as the schema states it and as a whole
+sentence of the cell: the sentence of the ``wildPrevalence`` description that contains
+"callbacks per page visit", the one that contains "not a production attack rate", and the
+sentence of the ``wildSampleCount`` description that contains "the callbacks plus the page
+visits". A sentence is a piece of a description split on ". ", a period and a space,
+keeping its period, and a "|" in it is written "\\|" in the cell, as a table cell needs.
+The cell's sentences are the pieces of its text split the same way, once spaces and tabs at
+either end are removed, and each of the three must be one of them. Each of the three must
+also be the one sentence of its description that contains those words: a description that
+holds no such sentence or more than one fails the check, naming the words, and so does a
+schema that is missing, does not parse or holds no such description. Every row read is
+checked. The sentences are read from the schema, not typed in the checker, so after an edit
+to one of them in the schema the check fails until the row holds the edited sentence as one
+of its own, as it does once the row is copied again. That includes an edit that leaves the
+edited sentence inside the row's copy of the old one, such as one that only removes words
+from the start of the sentence.
 
 Exit 0 when every claim matches the data, 1 otherwise. ``--help`` (or ``-h``) prints
 the usage and exits 0. Any other argument, such as a mistyped ``--fixx``, prints the
@@ -2054,7 +2059,11 @@ def main(argv):
 
     # The field table's wildPrevalence, wildSampleCount row: its description cell, up to the
     # next "|" no backslash escapes, must hold each sentence WILD_SENTENCES picks from the
-    # schema, as the schema states it. Every row read is checked, and the README must state one.
+    # schema, as the schema states it, as one of the cell's own sentences: the pieces of its
+    # text, once spaces and tabs at either end are removed, split as a description is. So a
+    # schema sentence that stands only inside a longer sentence of the cell, as one with words
+    # removed from its start does in the row's copy of the old one, is not held. Every row
+    # read is checked, and the README must state one.
     picked, reasons = schema_sentences()
     failures.extend(reasons)
     schema_source = SCHEMA.relative_to(ROOT).as_posix()
@@ -2062,12 +2071,13 @@ def main(argv):
     for m in re.finditer(r"(?m)^" + re.escape(WILD_ROW) + r"((?:[^|\\\n]|\\.)*)", readme):
         wild_rows += 1
         line = pages.where(line_of(m.start()))
+        cell = sentences(m.group(1).strip(" \t"))
         for (field, words), sentence in zip(WILD_SENTENCES, picked or ()):
-            if sentence.replace("|", "\\|") not in m.group(1):
+            if sentence.replace("|", "\\|") not in cell:
                 failures.append(
-                    f"{line}: the wildPrevalence, wildSampleCount row does not hold, as "
-                    f"{schema_source} states it, the {field} sentence containing "
-                    f"\"{words}\": \"{sentence}\""
+                    f"{line}: the wildPrevalence, wildSampleCount row does not hold, as a "
+                    f"whole sentence and as {schema_source} states it, the {field} sentence "
+                    f"containing \"{words}\": \"{sentence}\""
                 )
     if not wild_rows:
         failures.append(f"README field table has no row for wildPrevalence, wildSampleCount "
