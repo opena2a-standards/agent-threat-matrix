@@ -75,7 +75,7 @@ now go red, read with the labels the page defines on a definition line removed a
 A definition in a list item or on a block quote line, as "- [t]: x" or "> [t]: x", was
 counted as standing on no definition line, so the first of those lines passed with t, a and
 b defined there; it must go red on such pages too. A table, a plain scan of the stated rule
-over generated pages, and pages read in under a second pin how the definition line rule
+over generated pages, and pages read in linear time pin how the definition line rule
 follows block quotes, list items and the fenced code blocks they hold.
 
 A "]" followed by "(" makes no link either where no "[" before it opens one: CommonMark
@@ -99,7 +99,7 @@ feed, space, "/" or ">", and at no other character Python's \\s matches, so that
 U+3000 after the name of an element opens or closes none in any reading, the plain scan of
 the stated steps reads the element rule as the checker does on 100,000 generated lines,
 the reading that passes over quoted attribute values among them, and each of five lines
-of 50,000 elements or comments is read with their text removed in under 3 seconds.
+of 50,000 elements or comments is read with their text removed in linear time.
 
 A comment, processing instruction or CDATA section that opens in a style or script element
 and closes after the element's end tag, as in "DV<style><!--</style>AA (99 agents, 77
@@ -130,15 +130,24 @@ bundle carry, and so must a missing bundle, a bundle whose objects carry two spe
 values, and a line stating the STIX version that carries a character which fails a line.
 The version is read from the bundle, not typed in the checker: a bundle whose objects
 carry 2.2 fails the README that states 2.1.
+
+A case that pins a reading time reads its input with none, a tenth and all of the copies
+of the piece it repeats, each reading timed in CPU time, and fails unless all the copies
+add less than 40 times the time the tenth adds: read in linear time, they add about 10
+times as much, and read in quadratic time about 100 times. Each such case compared the
+wall-clock time of one reading with a bound of 1, 3 or 6 seconds, which counts the time
+the test waits for a CPU, so it could fail on a loaded machine with the code unchanged.
 """
 
 import functools
+import gc
 import html
 import html.entities
 import importlib.util
 import json
 import random
 import re
+import resource
 import shutil
 import string
 import subprocess
@@ -759,6 +768,107 @@ def test_a_tactic_or_tier_row_written_another_way_is_not_read():
         shutil.rmtree(td)
 
 
+# A case that pins a reading time takes it in CPU time, which leaves out the time the test
+# waits for a CPU, as wall-clock time does not, and compares it with the time a tenth of the
+# copies take in the same run, as CPU time still turns on the speed of the CPU that runs it.
+SIZE_STEP = 10
+TIME_STEP_LIMIT = 40
+TIMED_ROUNDS = 3
+
+
+def children_cpu_seconds():
+    """The CPU time of the child processes this process has waited for."""
+    usage = resource.getrusage(resource.RUSAGE_CHILDREN)
+    return usage.ru_utime + usage.ru_stime
+
+
+def cpu_seconds(call):
+    """(seconds, value): the CPU time `call()` takes, in this process and in the child
+    processes it waits for, with the cyclic garbage collector off, and what it returns."""
+    collecting = gc.isenabled()
+    gc.disable()
+    try:
+        start = time.process_time() + children_cpu_seconds()
+        value = call()
+        return time.process_time() + children_cpu_seconds() - start, value
+    finally:
+        if collecting:
+            gc.enable()
+
+
+def read_in_subquadratic_time(read, size):
+    """What `read(size)()` returns, where `read(n)` builds an input holding n copies of a
+    piece and returns the call that reads it. After one untimed reading with no copy, the
+    input is read with none, size // SIZE_STEP and size copies, each reading timed with
+    `cpu_seconds`, in up to TIMED_ROUNDS rounds. The case fails unless, after some round,
+    the least time with size copies, less the least time with none, is under TIME_STEP_LIMIT
+    times the least time with the tenth, less the same."""
+    tenth = size // SIZE_STEP
+    read(0)()
+    least, values = {}, {}
+    for _ in range(TIMED_ROUNDS):
+        for n in (0, tenth, size):
+            seconds, value = cpu_seconds(read(n))
+            least[n] = min(seconds, least.get(n, seconds))
+            values.setdefault(n, value)
+        added = {n: least[n] - least[0] for n in (tenth, size)}
+        if added[size] < TIME_STEP_LIMIT * added[tenth]:
+            return values[size]
+    raise AssertionError(f"{size} copies add {added[size]:.3f} s and {tenth} add "
+                         f"{added[tenth]:.3f} s: {TIME_STEP_LIMIT} times or more")
+
+
+def test_cpu_seconds_counts_no_time_spent_waiting():
+    # A test that waits for a CPU, as on a loaded machine, takes wall-clock time but no CPU
+    # time while it waits, as it does while it sleeps.
+    seconds, value = cpu_seconds(lambda: time.sleep(0.5) or "slept")
+    assert value == "slept"
+    assert seconds < 0.1, f"{seconds:.3f} s"
+
+
+def test_cpu_seconds_counts_the_cpu_time_of_a_child_process():
+    # Taken in this process alone, the CPU time of a checker run in a child process would
+    # not be counted. The child prints the CPU time it has taken by then.
+    code = "import time; sum(range(3_000_000)); print(time.process_time())"
+    seconds, r = cpu_seconds(lambda: subprocess.run([sys.executable, "-c", code],
+                                                     capture_output=True, text=True, check=True))
+    assert float(r.stdout) <= seconds, (r.stdout, seconds)
+
+
+def test_a_reading_in_quadratic_time_fails():
+    # Counting the line breaks from the start of the text for each line, as the checker once
+    # named a line, reads the text up to each line.
+    line = "x" * 63 + "\n"
+
+    def read(n):
+        text = line * n
+        return lambda: [text.count("\n", 0, i) for i in range(0, len(text), len(line))]
+
+    with pytest.raises(AssertionError, match="times or more"):
+        read_in_subquadratic_time(read, 4_000)
+
+
+def test_a_reading_in_linear_time_passes_however_long_the_test_waits():
+    # Counting the line break of each line on its own and adding the counts up reads the text
+    # once. The reading of all the lines also sleeps for half a second, as a test waits for a
+    # CPU on a loaded machine: CPU time leaves the sleep out, where wall-clock time counts it.
+    line = "x" * 63 + "\n"
+
+    def read(n):
+        text = line * n
+
+        def call():
+            number = 0
+            for i in range(0, len(text), len(line)):
+                number += text.count("\n", i, i + len(line))
+            if n == 200_000:
+                time.sleep(0.5)
+            return number
+        return call
+
+    assert read_in_subquadratic_time(read, 200_000) == 200_000
+
+
 @pytest.mark.parametrize("line,kilobytes,last", [
     # Lines that start a tactic row and never close its bracket. With a name class that
     # crossed line breaks, the row pattern scanned from each such line to the end of the
@@ -775,10 +885,12 @@ def test_many_tactic_row_lines_are_read_in_linear_time(line, kilobytes, last):
         readme = td / "README.md"
         text = readme.read_text(encoding="utf-8")
         copies = kilobytes * 1024 // len(line)
-        readme.write_text(text + line * copies, encoding="utf-8")
-        start = time.perf_counter()
-        r = run_checker(td)
-        seconds = time.perf_counter() - start
+
+        def read(n):
+            readme.write_text(text + line * n, encoding="utf-8")
+            return lambda: run_checker(td)
+
+        r = read_in_subquadratic_time(read, copies)
         if last is None:
             assert r.returncode == 0, r.stderr
         else:
@@ -786,7 +898,6 @@ def test_many_tactic_row_lines_are_read_in_linear_time(line, kilobytes, last):
             assert r.returncode == 1, r.stdout
             assert f"README.md:{text.count(chr(10)) + copies}: {last} " in r.stderr, \
                 r.stderr[-2000:]
-        assert seconds < 6, f"{seconds:.2f} s"
     finally:
         shutil.rmtree(td)
 
@@ -800,16 +911,17 @@ def test_many_differing_count_wordings_are_read_in_linear_time():
         readme = td / "README.md"
         text = readme.read_text(encoding="utf-8")
         copies = 120_000
-        readme.write_text(text + "1 tactics\n" * copies, encoding="utf-8")
-        start = time.perf_counter()
-        r = run_checker(td)
-        seconds = time.perf_counter() - start
+
+        def read(n):
+            readme.write_text(text + "1 tactics\n" * n, encoding="utf-8")
+            return lambda: run_checker(td)
+
+        r = read_in_subquadratic_time(read, copies)
         assert r.returncode == 1, r.stdout
         # The first and the last copy are each reported at their own line.
         for line in (text.count("\n") + 1, text.count("\n") + copies):
             assert f"README.md:{line}: \"1 tactics\" does not match matrix.json" in r.stderr, \
                 r.stderr[-2000:]
-        assert seconds < 6, f"{seconds:.2f} s"
     finally:
         shutil.rmtree(td)
 
@@ -1455,18 +1567,15 @@ def test_the_html_block_reading_decodes_a_numeric_reference_as_stated(text, form
     assert stated_name_form(checker, text, html_block=True, references=True) == form
 
 
-@pytest.mark.parametrize("digits", ["0" * 100_000 + "65", "x" + "0" * 100_000 + "41"],
-                         ids=["decimal", "hexadecimal"])
-def test_a_reference_with_any_number_of_digits_is_decoded_in_linear_time(digits):
+@pytest.mark.parametrize("radix,code", [("", "65"), ("x", "41")], ids=["decimal", "hexadecimal"])
+def test_a_reference_with_any_number_of_digits_is_decoded_in_linear_time(radix, code):
     # html.unescape reads the digits of a decimal reference with int, which by default
     # refuses a string of more than 4,300 digits with a ValueError. Read with its leading
     # zeros dropped, each reference stands for "A", and each line, of 100,000 zeros, is read
     # in about 0.01 s on Python 3.14.
     checker = load_checker()
-    start = time.perf_counter()
-    assert checker.names(f"DVA&#{digits}", "DVAA")
-    seconds = time.perf_counter() - start
-    assert seconds < 3, f"{seconds:.2f} s"
+    assert read_in_subquadratic_time(lambda n: functools.partial(
+        checker.names, f"DVA&#{radix}{'0' * n}{code}", "DVAA"), 100_000)
 
 
 def test_a_reference_with_more_digits_than_u10ffff_has_stands_for_u_fffd():
@@ -1589,21 +1698,18 @@ def test_one_html_block_reading_reads_a_line_alike_each_time():
             assert checker.step_one(line, reading) == expected, ascii(line)
 
 
-@pytest.mark.parametrize("line", ["DV" + "<a" * 50_000, "DV" + "<a\\" * 40_000 + "AA",
-                                  "DV" + "<a</" * 30_000 + "AA",
-                                  "DV" + "<a\N{NO-BREAK SPACE}" * 40_000 + "AA",
-                                  "DV" + "<a " * 40_000 + "AA",
-                                  "DV" + "<a <b" * 30_000 + "AA"])
-def test_the_html_block_reading_reads_a_long_line_in_linear_time(line):
+@pytest.mark.parametrize("piece,count,end", [
+    ("<a", 50_000, ""), ("<a\\", 40_000, "AA"), ("<a</", 30_000, "AA"),
+    ("<a\N{NO-BREAK SPACE}", 40_000, "AA"), ("<a ", 40_000, "AA"), ("<a <b", 30_000, "AA"),
+], ids=["<a", "<a\\", "<a</", "<a and a no-break space", "<a and a space", "<a <b"])
+def test_the_html_block_reading_reads_a_long_line_in_linear_time(piece, count, end):
     # A tag in that reading runs past any "<" in its name and attributes, so a tag that
     # finds no ">" runs past every "<" after it; looked for again from each "<" on a line of
     # "<a" or "<a ", every look would scan to the end of the line, in time quadratic in its
-    # length.
+    # length. Each line is "DV", the piece repeated and the end.
     checker = load_checker()
-    start = time.perf_counter()
-    checker.names(line, "DVAA")
-    seconds = time.perf_counter() - start
-    assert seconds < 3, f"{seconds:.2f} s"
+    read_in_subquadratic_time(lambda n: functools.partial(
+        checker.names, "DV" + piece * n + end, "DVAA"), count)
 
 
 # The DVAA row of the related-projects table rewritten with "DVAA" in markup beside a
@@ -1815,24 +1921,22 @@ def test_a_quoted_value_is_passed_over_only_in_the_quoted_value_reading():
     assert not checker.QUOTE_AFTER_TAG_NAME.search("DV<b>AA <i x=1> '<' \"<\" <b\"x\"> <a")
 
 
-@pytest.mark.parametrize("line", [
-    "DV" + '<a x="' + '<a "="' * 20_000 + "AA",
-    "DV" + "<a x='" + "<a '='" * 20_000 + "AA",
-    "DV" + '<a x="' + "<a '\"='" * 20_000 + "AA",
-])
-def test_the_quoted_value_reading_reads_a_long_line_in_linear_time(line):
+@pytest.mark.parametrize("start,piece", [
+    ('<a x="', '<a "="'), ("<a x='", "<a '='"), ('<a x="', "<a '\"='"),
+], ids=["double quotes", "single quotes", "single and double quotes"])
+def test_the_quoted_value_reading_reads_a_long_line_in_linear_time(start, piece):
     # Read only after an "=", as CommonMark reads a quoted value, the quote after each "="
     # here would open a value holding the next "<a", so every tag would start inside a
     # quoted value of the tag before it, fall into step with it at the next quote and read
     # on to the end of the line: the first line took about 17 s so. Read wherever it stands
     # in a tag, the quote before each "=" opens a value that the quote after it closes, and
-    # each tag stops at the next "<".
+    # each tag stops at the next "<". Each line is "DV", the start, the piece repeated and
+    # "AA".
     checker = load_checker()
-    assert checker.QUOTE_AFTER_TAG_NAME.search(line)
-    start = time.perf_counter()
-    checker.names(line, "DVAA")
-    seconds = time.perf_counter() - start
-    assert seconds < 3, f"{seconds:.2f} s"
+    line = lambda n: "DV" + start + piece * n + "AA"
+    assert checker.QUOTE_AFTER_TAG_NAME.search(line(20_000))
+    read_in_subquadratic_time(lambda n: functools.partial(checker.names, line(n), "DVAA"),
+                              20_000)
 
 
 # DVAA written in an HTML block with a tag whose quoted attribute value holds ">" on a line
@@ -1909,14 +2013,15 @@ def test_only_an_html_block_reading_with_quoted_values_passed_over_names_these_l
     assert checker.name_form("DV<x\\ y='<'>AA", checker.HtmlBlockHtml()) == "DVAA"
 
 
-@pytest.mark.parametrize("line", [
-    'DV<a x="' + '<a" x="' * 20_000 + "AA",
-    "DV<a x='" + "<a' x='" * 20_000 + "A&#65",
-    "DV" + '<a x=">" ' * 30_000 + "AA",
-    "DV" + '<a x=">" ' * 30_000 + ">AA",
+@pytest.mark.parametrize("start,piece,count,end", [
+    ('DV<a x="', '<a" x="', 20_000, "AA"),
+    ("DV<a x='", "<a' x='", 20_000, "A&#65"),
+    ("DV", '<a x=">" ', 30_000, "AA"),
+    ("DV", '<a x=">" ', 30_000, ">AA"),
 ], ids=["double quotes", "single quotes and a reference", "values holding > and no other >",
         "values holding > and a > at the end"])
-def test_the_html_block_quoted_reading_reads_a_long_line_in_linear_time(line):
+def test_the_html_block_quoted_reading_reads_a_long_line_in_linear_time(start, piece, count,
+                                                                         end):
     # A tag name read as a browser reads one can hold a quote, which opens no value there. On
     # the first two lines the name of each tag after the first ends in the quote that closes
     # the value the tag before it opened, so it falls into step with that tag there and reads
@@ -1925,15 +2030,21 @@ def test_the_html_block_quoted_reading_reads_a_long_line_in_linear_time(line):
     # once where each tag name ends and where the text of each tag stops. A tag runs past
     # each "<" after its name and a space, so on the third line the pattern reads on from
     # each "<" to the end of the line and finds no ">" that stands in no value, and on the
-    # last the tag from the first "<" runs to the ">" at the end.
+    # last the tag from the first "<" runs to the ">" at the end. Each line is the start, the
+    # piece repeated and the end.
     checker = load_checker()
-    assert block_quoted_read(checker, line)
-    start = time.perf_counter()
-    checker.names(line, "DVAA")
-    for references in (None, checker.HTML_BLOCK_REFERENCE):
-        checker.name_form(line, checker.HtmlBlockQuotedHtml(), references=references)
-    seconds = time.perf_counter() - start
-    assert seconds < 3, f"{seconds:.2f} s"
+    assert block_quoted_read(checker, start + piece * count + end)
+
+    def read(n):
+        line = start + piece * n + end
+
+        def call():
+            checker.names(line, "DVAA")
+            for references in (None, checker.HTML_BLOCK_REFERENCE):
+                checker.name_form(line, checker.HtmlBlockQuotedHtml(), references=references)
+        return call
+
+    read_in_subquadratic_time(read, count)
 
 
 # Lines that show "DVAA" with two wrong figures where a "]" stands directly before a "[",
@@ -3693,31 +3804,30 @@ def test_the_stated_element_rule_reads_every_generated_line_as_the_checker_does(
 # the first end tag after it, which is tried at each start tag and reads on to the end of
 # the line from each where no end tag follows, the last line took about 54 s on Python
 # 3.14, and the same line of 10,000 start tags about 1.7 s.
+# Each line is given as a function of the number of elements or comments it holds.
 ELEMENT_RUNS = 50_000
 LONG_ELEMENT_LINES = [
     ("templates in templates",
-     "DV" + "<template>" * ELEMENT_RUNS + "x" + "</template>" * ELEMENT_RUNS + "AA", "DVAA"),
-    ("style elements one after another", "DV" + "<style>x</style>" * ELEMENT_RUNS + "AA",
+     lambda n: "DV" + "<template>" * n + "x" + "</template>" * n + "AA", "DVAA"),
+    ("style elements one after another", lambda n: "DV" + "<style>x</style>" * n + "AA",
      "DVAA"),
     ("start tags in a style element no end tag closes",
-     "DV" + "<style>x" * ELEMENT_RUNS + "AA", "DV"),
+     lambda n: "DV" + "<style>x" * n + "AA", "DV"),
     # Each comment is read up to the end tag after it, not to the one close at the end.
     ("comments in style elements closed at the end of the line",
-     "DV" + "<style><!--</style>" * ELEMENT_RUNS + "AA-->", "DVAA-->"),
+     lambda n: "DV" + "<style><!--</style>" * n + "AA-->", "DVAA-->"),
     ("comments in a script element before its end tag",
-     "DV<script>" + "<!---->" * ELEMENT_RUNS + "</script>AA", "DVAA"),
+     lambda n: "DV<script>" + "<!---->" * n + "</script>AA", "DVAA"),
 ]
 
 
-@pytest.mark.parametrize("line,form", [(text, form) for _, text, form in LONG_ELEMENT_LINES],
+@pytest.mark.parametrize("line,form", [(line, form) for _, line, form in LONG_ELEMENT_LINES],
                          ids=[case for case, _, _ in LONG_ELEMENT_LINES])
 def test_the_element_reading_reads_a_long_line_in_linear_time(line, form):
     checker = load_checker()
-    start = time.perf_counter()
-    read = checker.name_form(line, hide_elements=True)
-    seconds = time.perf_counter() - start
+    read = read_in_subquadratic_time(lambda n: functools.partial(
+        checker.name_form, line(n), hide_elements=True), ELEMENT_RUNS)
     assert read == form
-    assert seconds < 3, f"{seconds:.2f} s"
 
 
 def test_nfkc_gives_what_unicodedata_normalize_gives():
@@ -3757,11 +3867,18 @@ def test_nfkc_gives_what_unicodedata_normalize_gives():
 # time with every test passing. Between the two starters, "A" composes with one U+0301: once
 # in order, only marks of a lower combining class stand between them.
 MARK_PAIRS = 100_000
-OUT_OF_ORDER = "\N{COMBINING ACUTE ACCENT}\N{COMBINING GRAVE ACCENT BELOW}" * MARK_PAIRS
+
+
+def out_of_order(pairs):
+    """U+0301 U+0316 repeated `pairs` times, each pair out of canonical order."""
+    return "\N{COMBINING ACUTE ACCENT}\N{COMBINING GRAVE ACCENT BELOW}" * pairs
+
+
+# Each text is given as a function of the number of pairs it holds, each form at MARK_PAIRS.
 LONG_MARK_RUNS = [
-    ("a run that ends the text", OUT_OF_ORDER,
+    ("a run that ends the text", out_of_order,
      "\N{COMBINING GRAVE ACCENT BELOW}" * MARK_PAIRS + "\N{COMBINING ACUTE ACCENT}" * MARK_PAIRS),
-    ("a run between two starters", "A" + OUT_OF_ORDER + "B",
+    ("a run between two starters", lambda n: "A" + out_of_order(n) + "B",
      "\N{LATIN CAPITAL LETTER A WITH ACUTE}" + "\N{COMBINING GRAVE ACCENT BELOW}" * MARK_PAIRS
      + "\N{COMBINING ACUTE ACCENT}" * (MARK_PAIRS - 1) + "B"),
 ]
@@ -3775,11 +3892,9 @@ def test_name_form_reads_a_long_run_of_combining_marks_in_n_log_n_time(text, for
     # Python 3.14 and 200,000 about four times as long. Put in order by a sort first,
     # 200,000 take a few hundredths of a second.
     checker = load_checker()
-    start = time.perf_counter()
-    read = checker.name_form(text)
-    seconds = time.perf_counter() - start
+    read = read_in_subquadratic_time(lambda n: functools.partial(checker.name_form, text(n)),
+                                     MARK_PAIRS)
     assert read == form
-    assert seconds < 1, f"{seconds:.2f} s"
 
 
 def test_names_reads_a_long_run_of_combining_marks_after_the_name_in_linear_time():
@@ -3791,23 +3906,22 @@ def test_names_reads_a_long_run_of_combining_marks_after_the_name_in_linear_time
     # The no-break space after "<b" adds the second reading, and the form holds the name only
     # once decomposed, as "A" composes with one U+0301, so the line is read with every step.
     checker = load_checker()
-    line = "<b\N{NO-BREAK SPACE} DVAA" + OUT_OF_ORDER
-    start = time.perf_counter()
-    named = checker.names(line, "DVAA")
-    seconds = time.perf_counter() - start
+    named = read_in_subquadratic_time(lambda n: functools.partial(
+        checker.names, "<b\N{NO-BREAK SPACE} DVAA" + out_of_order(n), "DVAA"), MARK_PAIRS)
     assert not named
-    assert seconds < 3, f"{seconds:.2f} s"
 
 
+# Each reading is given the checker and the number of runs its text holds, each result is
+# the one at LABEL_RUNS.
 LABEL_RUNS = 100_000
 LONG_LABEL_TEXTS = [
     # A "[" and then escaped brackets only: no "[" that no backslash escapes follows the
     # first, so one scan reads to the end and no other starts.
-    ("a page of escaped brackets", lambda checker: checker.defined_labels(
-        "[" + "\\[" * LABEL_RUNS), frozenset()),
+    ("a page of escaped brackets", lambda checker, n: functools.partial(
+        checker.defined_labels, "[" + "\\[" * n), frozenset()),
     # A label after each "]", every other one defined: each is scanned up to its own "]".
-    ("a line of labels", lambda checker: checker.name_form(
-        "[DV" + "][x][y" * LABEL_RUNS + "]AA", labels=frozenset({"x"})),
+    ("a line of labels", lambda checker, n: functools.partial(
+        checker.name_form, "[DV" + "][x][y" * n + "]AA", labels=frozenset({"x"})),
      "DV" + "y" * LABEL_RUNS + "AA"),
 ]
 
@@ -3817,13 +3931,9 @@ LONG_LABEL_TEXTS = [
 def test_link_labels_and_definitions_are_read_in_linear_time(read, result):
     # A label is scanned only up to the first "[" or "]" after its "[" that no backslash
     # escapes, and a page only from each "[" that none escapes, so the page of 200,001
-    # characters and the line of 600,006 here are each read in under a second.
+    # characters and the line of 600,006 here are each read in linear time.
     checker = load_checker()
-    start = time.perf_counter()
-    got = read(checker)
-    seconds = time.perf_counter() - start
-    assert got == result
-    assert seconds < 1, f"{seconds:.2f} s"
+    assert read_in_subquadratic_time(lambda n: read(checker, n), LABEL_RUNS) == result
 
 
 def test_a_line_of_many_labels_the_page_defines_is_read_in_linear_time():
@@ -3834,26 +3944,25 @@ def test_a_line_of_many_labels_the_page_defines_is_read_in_linear_time():
     # 10,000 such labels took about 0.05 s.
     checker = load_checker()
     keys = [f"k{i}" for i in range(10_000)]
-    line = "[q" + "".join(f"][{key}][y" for key in keys) + "]AA"
-    start = time.perf_counter()
-    named = checker.names(line, "DVAA", labels=frozenset(keys))
-    seconds = time.perf_counter() - start
+    line = lambda n: "[q" + "".join(f"][{key}][y" for key in keys[:n]) + "]AA"
+    named = read_in_subquadratic_time(lambda n: functools.partial(
+        checker.names, line(n), "DVAA", labels=frozenset(keys[:n])), len(keys))
     assert not named
-    assert len(checker.label_removals(line, frozenset(keys))) == 2
-    assert seconds < 1, f"{seconds:.2f} s"
+    assert len(checker.label_removals(line(len(keys)), frozenset(keys))) == 2
 
 
+# Each page is given as a function of its number of runs, counted here at LABEL_RUNS.
 @pytest.mark.parametrize("page,unsure", [
     # A fenced code block of 100,000 definitions, 700,004 characters.
-    ("```\n" + "[d]: x\n" * LABEL_RUNS, {"d"}),
+    (lambda n: "```\n" + "[d]: x\n" * n, {"d"}),
     # A block that 100,000 shorter runs leave open, 400,011 characters.
-    ("````\n" + "```\n" * LABEL_RUNS + "[d]: x", {"d"}),
+    (lambda n: "````\n" + "```\n" * n + "[d]: x", {"d"}),
     # A fenced code block in a block quote of 100,000 definitions, 900,006 characters.
-    ("> ```\n" + "> [d]: x\n" * LABEL_RUNS, {"d"}),
+    (lambda n: "> ```\n" + "> [d]: x\n" * n, {"d"}),
     # 100,000 nested list items held by 50,000 blank lines, 250,006 characters.
-    ("- * " * (LABEL_RUNS // 2) + "\n" * (LABEL_RUNS // 2) + "[d]: x", set()),
+    (lambda n: "- * " * (n // 2) + "\n" * (n // 2) + "[d]: x", set()),
     # 50,000 nested block quotes, then 50,000 lines that hold the first, 150,007 characters.
-    (">" * (LABEL_RUNS // 2) + "\n>" * (LABEL_RUNS // 2) + "\n[d]: x", set()),
+    (lambda n: ">" * (n // 2) + "\n>" * (n // 2) + "\n[d]: x", set()),
 ], ids=["a fenced code block of definitions", "a fenced code block of shorter runs",
         "a fenced code block of definitions in a block quote",
         "nested list items held by blank lines", "nested block quotes"])
@@ -3861,13 +3970,11 @@ def test_definition_lines_are_read_in_linear_time(page, unsure):
     # Each line of a page is read once for the definition line rule, a line blank after the
     # markers it holds passing over the list items it holds up to the next block quote in
     # one step, and the page once for its definition-like texts, so each of these pages is
-    # read in under a second.
+    # read in linear time.
     checker = load_checker()
-    start = time.perf_counter()
-    got = checker.unsure_labels(page)
-    seconds = time.perf_counter() - start
+    got = read_in_subquadratic_time(lambda n: functools.partial(checker.unsure_labels, page(n)),
+                                    LABEL_RUNS)
     assert got == frozenset(unsure)
-    assert seconds < 1, f"{seconds:.2f} s"
 
 
 def test_a_mark_after_markup_or_written_as_a_reference_is_put_apart():
