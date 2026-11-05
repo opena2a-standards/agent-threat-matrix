@@ -76,3 +76,65 @@ unmapped list differs from the techniques carrying no mapping. `python3 scripts/
 fails while the STIX bundle differs from what `scripts/generate_stix.py` renders.
 `python3 scripts/check_cross_references.py` fails while an entry, the unmapped list or the
 releases differ from `crosswalks/review.json`.
+
+## Checks, controls, signatures and scenarios per technique
+
+[`technique-crosswalk.json`](technique-crosswalk.json) joins every technique in `matrix.json`
+to the HackMyAgent checks and OASB-1 controls it lists, the AIIS signatures that name it, and
+the DVAA scenarios that expect one of its checks. `scripts/build_technique_crosswalk.py`
+renders it from `matrix.json`, `technique-ids.json` and pinned copies of the external inputs
+under `vendor/`; it is never edited by hand.
+
+Which checks cover a technique:
+
+```sh
+jq -c '.byTechnique["T-1001"].hmaChecks' crosswalks/technique-crosswalk.json
+# ["MCP-011","WEBEXPOSE-001","WEBEXPOSE-002"]
+```
+
+Which techniques list a check:
+
+```sh
+jq -c '[.byHmaCheck["CRED-001"][].techniqueId]' crosswalks/technique-crosswalk.json
+# ["T-3001","T-3003","T-3005","T-3006","T-5004"]
+```
+
+How to read it:
+
+- `byTechnique` holds, per technique, `hmaChecks`, `oasbControls`, `aiisSignatures`,
+  `dvaaScenarios` and `attackPayloads`. An AIIS entry's `basis` is `aiis-technique-id` when
+  the technique is the signature's own and `aiis-related-technique-id` when the signature
+  lists it as related. A DVAA entry, `basis: "expected-check"`, names the scenario and the
+  `checks` it expects that the technique lists: a listed check can fire on the scenario, which
+  is not a claim that the scenario validates the technique.
+- `byHmaCheck`, `byOasbControl`, `byAiisSignature` and `byDvaaScenario` are the reverse views.
+  Each entry names a `techniqueId` and carries `relation`. `relation: null` marks a coverage
+  edge: it may be counted, but it is never the technique of a finding. A check can sit under
+  several techniques, as `CRED-001` does under five, so it covers each of them and identifies
+  none. Every `relation` is `null` until a per-producer mapping file states one.
+- A column that is `null` was not assessed, because no source for it exists yet. `[]` was
+  assessed and holds none. `notAssessed` names each `null` column and the reason; today these
+  are the payload columns `attackPayloads.hackmyagent` and `attackPayloads.agentpwn`, which
+  stay `null`, with `byPayload` and `unjoined.payloadsInNoTechnique`, until
+  `mappings/hackmyagent-payloads.json` and `mappings/agentpwn-payloads.json` exist.
+- `unjoined` lists the ids an input names that join no technique: HackMyAgent checks and
+  OASB-1 controls no technique lists, and check ids a DVAA scenario expects that no technique
+  lists.
+- `matrix` identifies `matrix.json` and `technique-ids.json` by sha256, `inputs` names each
+  pinned source with the sha256 of each vendored file, and `generated` is the latest of
+  `matrix.json` `updated` and the inputs' read dates.
+
+To verify the file, run `python3 scripts/check_technique_crosswalk.py`. It renders the file
+again and fails when the committed copy differs, when an id does not resolve against its own
+family's vendored list (a payload id is never read as a check id), when a signature is
+retired, when a pin is not an exact version or a 40-hex commit, or when a file under `vendor/`
+is not listed in its `VENDOR.json`. It reads no network. `python3 scripts/check_vendor_integrity.py`
+is the network half: it fetches each input at its pin and exits 1 when a vendored file differs
+from its source, and 3 when a source cannot be reached, which is not a pass.
+
+To refresh a pin, open `vendor/<source>/VENDOR.json`. It states the pin (`commit` for a git
+source; `version` and `integrity` for the package), the date it was read, the files, and the
+command that writes them: `refresh` for byte-exact copies, `generate` for files a generator
+writes. Run that command at the new pin, set the pin and `read`, run
+`python3 scripts/build_technique_crosswalk.py`, and commit the vendored files, `VENDOR.json`
+and the crosswalk in one change.
