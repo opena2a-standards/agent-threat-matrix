@@ -1,0 +1,10 @@
+{
+  "repo": "opena2a-org/damn-vulnerable-ai-agent",
+  "commit": "519b68d9f9a7fe9d47080e564957c78f88888a5f",
+  "version": null,
+  "read": "2026-11-05",
+  "files": [
+    "expected-checks.json"
+  ],
+  "generate": "git -c credential.helper= clone --filter=blob:none --no-checkout https://github.com/opena2a-org/damn-vulnerable-ai-agent.git <dir> && python3 -I vendor/damn-vulnerable-ai-agent/generate.py <dir> <commit> expected-checks.json > vendor/damn-vulnerable-ai-agent/expected-checks.json; then set commit and read here and run python3 scripts/build_technique_crosswalk.py"
+}

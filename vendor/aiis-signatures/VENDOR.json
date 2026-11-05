@@ -1,0 +1,11 @@
+{
+  "repo": "opena2a-standards/aiis-signatures",
+  "commit": "39c5247144cc38ee8b2aeb16a0ea2364c9f17b75",
+  "version": "v0.4.0",
+  "read": "2026-11-05",
+  "files": [
+    "crosswalks/technique-signatures.json",
+    "retired-ids.yaml"
+  ],
+  "refresh": "git -c credential.helper= clone --filter=blob:none --no-checkout https://github.com/opena2a-standards/aiis-signatures.git <dir>, then for each path in files: git -C <dir> show <commit>:<path> > vendor/aiis-signatures/<path>; then set commit, version and read here and run python3 scripts/build_technique_crosswalk.py"
+}
