@@ -38,6 +38,15 @@ missing ``git``, ``npm`` or ``node``, or, when a package source is pinned, a Pyt
 ``tarfile`` module has no extraction filters (before 3.12, other than 3.8.17, 3.9.17,
 3.10.12, 3.11.4 and later releases of those lines). Neither 1 nor 3 is a pass.
 
+A ``VENDOR.json`` is not a readable pin when a name in ``files``, the ``repo``, ``commit`` or
+``version`` of a git source, or the ``package``, ``version`` or ``registry`` of a package
+holds U+0000 or a surrogate code point (U+D800 to U+DFFF), which ``json.loads`` reads from the
+escape ``\\u0000`` or from a ``\\ud800`` that is not half of a pair. Each of those strings can
+reach a command as an argument; an argument cannot hold U+0000, and UTF-8 cannot encode a
+surrogate code point. The usage error names the member and the first such character, as in
+``vendor/aiis-signatures/VENDOR.json files[2] cannot be passed to a command (character 2 is
+U+0000, which a command-line argument cannot hold)``.
+
 ``--override <source>=<location>`` replaces where a source is fetched from: a git URL or a
 local repository path for a git source, a local tarball for a package. The tests use it with
 a local bare repository and a local tarball, so they open no network connection.
@@ -49,6 +58,7 @@ import base64
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -66,6 +76,13 @@ MANIFEST = "VENDOR.json"
 ATTEMPTS = 3
 REMOVED_VARIABLES = ("GITHUB_TOKEN", "GH_TOKEN", "NPM_TOKEN", "NODE_AUTH_TOKEN")
 TIMEOUT = 900
+# Besides each name in files, the members of a pin that can reach a command as arguments: a
+# git source's are read by git, a package's by npm pack.
+GIT_ARGUMENTS = ("repo", "commit", "version")
+PACKAGE_ARGUMENTS = ("package", "version", "registry")
+# U+0000, which a command-line argument cannot hold, and the surrogate code points, which UTF-8
+# cannot encode.
+UNCARRIED_RE = re.compile(r"[\x00\ud800-\udfff]")
 
 
 class UsageError(Exception):
@@ -120,6 +137,20 @@ def with_attempts(source: str, what: str, action, delay: float):
     raise Unreachable(what)
 
 
+def argument_problem(value: str):
+    """None when a command-line argument can carry the string ``value``; otherwise the reason
+    it cannot, naming the first character at fault by its place in ``value``, counted from 1,
+    as in "character 41 is U+D800, a surrogate code point, which UTF-8 cannot encode"."""
+    found = UNCARRIED_RE.search(value)
+    if found is None:
+        return None
+    char = found.group()
+    place = f"character {found.start() + 1} is U+{ord(char):04X}"
+    if char == "\x00":
+        return f"{place}, which a command-line argument cannot hold"
+    return f"{place}, a surrogate code point, which UTF-8 cannot encode"
+
+
 def load_manifests(root: Path) -> dict:
     vendor = root / VENDOR
     sources = sorted(p.name for p in vendor.iterdir()
@@ -146,6 +177,17 @@ def load_manifests(root: Path) -> dict:
         if missing:
             raise UsageError(f"{rel} has no {', '.join(missing)}; "
                              f"run python3 scripts/check_technique_crosswalk.py")
+        # subprocess raises ValueError on U+0000 and UnicodeEncodeError on U+D800, and passes
+        # U+DC80 on as the byte 0x80, so such a string is refused here, before any fetch. A git
+        # source's version is null when no tag names the commit.
+        members = [(f"files[{index}]", name) for index, name in enumerate(files)]
+        members += [(key, manifest[key])
+                    for key in (PACKAGE_ARGUMENTS if "package" in manifest else GIT_ARGUMENTS)
+                    if isinstance(manifest.get(key), str)]
+        for member, value in members:
+            problem = argument_problem(value)
+            if problem:
+                raise UsageError(f"{rel} {member} cannot be passed to a command ({problem})")
         manifests[source] = manifest
     return manifests
 
