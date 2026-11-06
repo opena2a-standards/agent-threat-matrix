@@ -6,11 +6,13 @@ there, and runs the shipped check on that root, so the committed tree is never w
 case that breaks an input renders the scratch crosswalk again first, so the failure it shows
 is the rule under test, not a stale file. Every id resolves against its own family's list:
 a payload id in a check column fails even though the payload list holds it, and a
-``superseded_by`` value in retired-ids.yaml is not a retired id.
+``superseded_by`` value in retired-ids.yaml is not a retired id. The cases on the files git
+ignores commit the scratch root to a repository built in the test.
 """
 
 import importlib.util
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -33,6 +35,30 @@ TOP_LEVEL = ["schemaVersion", "generated", "matrix", "inputs", "byTechnique", "b
 # The live signatures retired-ids.yaml names only as superseded_by targets.
 SUPERSEDING = ("AIIS-ATTR-EXFIL-URL-01", "AIIS-ATTR-IGNORE-INST-01",
                "AIIS-HIDDEN-JAILBREAK-DAN-01", "AIIS-HIDDEN-ROLE-INJECT-01")
+# The tests' own git runs drop a repository location a git hook exports, and point
+# core.hooksPath away from the host's hooks.
+GIT_ENV = {key: value for key, value in os.environ.items()
+           if key not in ("GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR", "GIT_INDEX_FILE",
+                          "GIT_OBJECT_DIRECTORY", "GIT_ALTERNATE_OBJECT_DIRECTORIES")}
+GIT = ["git", "-c", "user.name=crosswalk-test", "-c", "user.email=crosswalk-test@example.invalid",
+       "-c", "commit.gpgsign=false", "-c", "core.hooksPath=/dev/null"]
+UNLISTED = "is not VENDOR.json, the generator or a file listed in files"
+DS_STORE = "vendor/.DS_Store"
+DS_STORE_LINES = ["X9 vendor/.DS_Store is a file directly under vendor/; every input is a "
+                  "directory with a VENDOR.json"]
+# Paths this repository's .gitignore excludes, each with the lines X9 prints when it judges it.
+IGNORED = [
+    ("vendor/damn-vulnerable-ai-agent/__pycache__/generate.cpython-314.pyc",
+     [f"X9 vendor/damn-vulnerable-ai-agent/__pycache__/generate.cpython-314.pyc {UNLISTED}"]),
+    ("vendor/hackmyagent/.DS_Store", [f"X9 vendor/hackmyagent/.DS_Store {UNLISTED}"]),
+    (DS_STORE, DS_STORE_LINES),
+    ("vendor/__pycache__/generate.cpython-314.pyc",
+     ["X9 vendor/__pycache__/ has no VENDOR.json",
+      f"X9 vendor/__pycache__/generate.cpython-314.pyc {UNLISTED}"]),
+    ("vendor/node_modules/pkg/index.js",
+     ["X9 vendor/node_modules/ has no VENDOR.json",
+      f"X9 vendor/node_modules/pkg/index.js {UNLISTED}"]),
+]
 
 
 def _load(path: Path, name: str):
@@ -53,10 +79,31 @@ def tree(tmp_path):
         source, target = ROOT / rel, root / rel
         target.parent.mkdir(parents=True, exist_ok=True)
         if source.is_dir():
-            shutil.copytree(source, target, ignore=shutil.ignore_patterns("__pycache__"))
+            shutil.copytree(source, target, ignore=shutil.ignore_patterns("__pycache__", ".DS_Store"))
         else:
             shutil.copyfile(source, target)
     return root
+
+
+def git(root: Path, *args: str, env: dict = GIT_ENV) -> str:
+    return subprocess.run([*GIT, "-C", str(root), *args], check=True, capture_output=True,
+                          text=True, timeout=60, env=env).stdout
+
+
+@pytest.fixture
+def checkout(tree):
+    """The scratch root committed to a git repository under this repository's ignore rules."""
+    shutil.copyfile(ROOT / ".gitignore", tree / ".gitignore")
+    git(tree, "init", "-q")
+    git(tree, "add", "--", ".gitignore", *INPUTS)
+    git(tree, "commit", "-q", "-m", "scratch")
+    assert git(tree, "status", "--porcelain") == ""
+    return tree
+
+
+def place(root: Path, rel: str):
+    (root / rel).parent.mkdir(parents=True, exist_ok=True)
+    (root / rel).write_text("stray\n", encoding="utf-8")
 
 
 def check(root: Path, *args: str) -> subprocess.CompletedProcess:
@@ -378,6 +425,152 @@ def test_a_vendor_directory_without_a_pin_fails(tree):
     assert violations(proc, "X9") == [
         "X9 vendor/unpinned/ has no VENDOR.json",
         "X9 vendor/unpinned/data.json is not VENDOR.json, the generator or a file listed in files"]
+
+
+@pytest.mark.parametrize("rel", [rel for rel, _ in IGNORED])
+def test_a_file_git_ignores_under_vendor_passes_in_a_checkout(checkout, rel):
+    place(checkout, rel)
+    assert git(checkout, "status", "--porcelain") == ""
+    proc = check(checkout)
+    assert proc.returncode == 0, proc.stdout
+    assert proc.stdout.startswith("OK: crosswalks/technique-crosswalk.json matches")
+
+
+@pytest.mark.parametrize("rel, lines", IGNORED)
+def test_the_same_file_fails_on_a_tree_without_git(tree, rel, lines):
+    shutil.copyfile(ROOT / ".gitignore", tree / ".gitignore")
+    place(tree, rel)
+    proc = check(tree)
+    assert proc.returncode == 1
+    assert violations(proc, "X9") == lines
+
+
+@pytest.mark.parametrize("rel, lines", IGNORED)
+def test_a_tracked_file_fails_where_an_ignore_rule_matches_it(checkout, rel, lines):
+    place(checkout, rel)
+    git(checkout, "add", "-f", "--", rel)
+    proc = check(checkout)
+    assert proc.returncode == 1
+    assert violations(proc, "X9") == lines
+
+
+@pytest.mark.parametrize("rel, lines", [
+    ("vendor/aiis-signatures/notes.txt", [f"X9 vendor/aiis-signatures/notes.txt {UNLISTED}"]),
+    ("vendor/notes.txt", ["X9 vendor/notes.txt is a file directly under vendor/; every input is "
+                          "a directory with a VENDOR.json"]),
+    ("vendor/unpinned/data.json", ["X9 vendor/unpinned/ has no VENDOR.json",
+                                   f"X9 vendor/unpinned/data.json {UNLISTED}"]),
+])
+def test_an_untracked_file_git_does_not_ignore_fails_in_a_checkout(checkout, rel, lines):
+    place(checkout, rel)
+    proc = check(checkout)
+    assert proc.returncode == 1
+    assert violations(proc, "X9") == lines
+
+
+def test_an_ignored_file_beside_an_unignored_one_leaves_only_the_unignored_one(checkout):
+    place(checkout, "vendor/unpinned/data.json")
+    place(checkout, "vendor/unpinned/.DS_Store")
+    proc = check(checkout)
+    assert proc.returncode == 1
+    assert violations(proc, "X9") == ["X9 vendor/unpinned/ has no VENDOR.json",
+                                      f"X9 vendor/unpinned/data.json {UNLISTED}"]
+
+
+def test_a_listed_file_that_is_absent_fails_in_a_checkout(checkout):
+    (checkout / "vendor/hackmyagent/payload-ids.json").unlink()
+    proc = check(checkout)
+    assert proc.returncode == 1
+    assert violations(proc, "X9") == [
+        "X9 vendor/hackmyagent/payload-ids.json is listed in files but absent"]
+
+
+def test_an_ignore_rule_under_vendor_does_not_hide_what_is_tracked(checkout):
+    (checkout / "vendor/hackmyagent/.gitignore").write_text("*\n", encoding="utf-8")
+    place(checkout, "vendor/hackmyagent/notes.txt")
+    git(checkout, "add", "-f", "--", "vendor/hackmyagent/.gitignore", "vendor/hackmyagent/notes.txt")
+    proc = check(checkout)
+    assert proc.returncode == 1
+    assert violations(proc, "X9") == [f"X9 vendor/hackmyagent/.gitignore {UNLISTED}",
+                                      f"X9 vendor/hackmyagent/notes.txt {UNLISTED}"]
+
+
+def test_an_empty_directory_under_vendor_passes_in_a_checkout(checkout):
+    (checkout / "vendor/empty").mkdir()
+    assert git(checkout, "status", "--porcelain") == ""
+    proc = check(checkout)
+    assert proc.returncode == 0, proc.stdout
+
+
+def test_an_empty_directory_under_vendor_fails_on_a_tree_without_git(tree):
+    (tree / "vendor/empty").mkdir()
+    proc = check(tree)
+    assert proc.returncode == 1
+    assert violations(proc, "X9") == ["X9 vendor/empty/ has no VENDOR.json"]
+
+
+def test_a_nested_repository_in_an_ignored_directory_passes_in_a_checkout(checkout):
+    nested = checkout / "vendor/node_modules/pkg"
+    nested.mkdir(parents=True)
+    git(nested, "init", "-q")
+    place(nested, "index.js")
+    assert git(checkout, "status", "--porcelain") == ""
+    proc = check(checkout)
+    assert proc.returncode == 0, proc.stdout
+
+
+def test_a_nested_repository_git_does_not_ignore_fails_in_a_checkout(checkout):
+    nested = checkout / "vendor/hackmyagent/nested"
+    nested.mkdir()
+    git(nested, "init", "-q")
+    place(nested, "plain.txt")
+    assert git(checkout, "status", "--porcelain") == "?? vendor/hackmyagent/nested/\n"
+    proc = check(checkout)
+    assert proc.returncode == 1
+    assert f"X9 vendor/hackmyagent/nested/plain.txt {UNLISTED}" in violations(proc, "X9")
+
+
+def test_a_case_variant_path_to_the_checkout_reads_git(checkout):
+    variant = checkout.parent / checkout.name.upper()
+    if not variant.exists():
+        pytest.skip("case-sensitive filesystem: no case-variant path to the tree")
+    place(checkout, DS_STORE)
+    proc = check(variant)
+    assert proc.returncode == 0, proc.stdout
+
+
+def test_a_root_nested_in_another_work_tree_is_walked(tree, tmp_path):
+    shutil.copyfile(ROOT / ".gitignore", tmp_path / ".gitignore")
+    git(tmp_path, "init", "-q")
+    place(tree, DS_STORE)
+    git(tree, "check-ignore", "-q", DS_STORE)  # The outer repository's rule matches the file.
+    proc = check(tree)
+    assert proc.returncode == 1
+    assert violations(proc, "X9") == DS_STORE_LINES
+
+
+def test_a_repository_a_git_hook_exports_is_not_read_as_the_roots_checkout(tree, tmp_path):
+    other = tmp_path / "other"
+    other.mkdir()
+    git(other, "init", "-q")
+    (other / ".git/info").mkdir(exist_ok=True)
+    (other / ".git/info/exclude").write_text(".DS_Store\n", encoding="utf-8")
+    env = dict(GIT_ENV, GIT_DIR=str(other / ".git"))
+    place(tree, DS_STORE)
+    git(tree, "check-ignore", "-q", DS_STORE, env=env)  # That repository's rule matches the file.
+    proc = subprocess.run([sys.executable, str(CHECKER), str(tree)], capture_output=True,
+                          text=True, timeout=300, env=env)
+    assert proc.returncode == 1
+    assert violations(proc, "X9") == DS_STORE_LINES
+
+
+def test_a_machine_without_git_walks_the_tree(checkout, tmp_path):
+    place(checkout, DS_STORE)
+    env = dict(GIT_ENV, PATH=str(tmp_path / "no-git-here"))
+    proc = subprocess.run([sys.executable, str(CHECKER), str(checkout)], capture_output=True,
+                          text=True, timeout=300, env=env)
+    assert proc.returncode == 1, proc.stdout + proc.stderr
+    assert violations(proc, "X9") == DS_STORE_LINES
 
 
 @pytest.mark.parametrize("args, code", [(["--bogus"], 2), (["extra"], 2), (["--help"], 0)])

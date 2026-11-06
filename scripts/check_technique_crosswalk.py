@@ -3,8 +3,9 @@
 
 The crosswalk is derived content: ``scripts/build_technique_crosswalk.py`` renders it from
 ``matrix.json``, ``technique-ids.json`` and the pinned inputs under ``vendor/``. This check
-reads no network and no git; ``scripts/check_vendor_integrity.py`` is the half that
-compares each vendored input with its source at the pin. It fails when any of these holds:
+reads no network and asks git only which files X9 leaves out;
+``scripts/check_vendor_integrity.py`` is the half that compares each vendored input with its
+source at the pin. It fails when any of these holds:
 
 - X1 the committed file differs in bytes from a fresh rendering, is absent or is not valid
      JSON, or an input cannot be rendered;
@@ -27,6 +28,13 @@ compares each vendored input with its source at the pin. It fails when any of th
      (``generate.mjs`` or ``generate.py``, kept only by a source with ``generate``) or a
      file listed in ``files``, or a listed file is absent.
 
+X9 judges what the repository can track. When the root is the top of a git work tree, it
+leaves out what ``git ls-files --others --ignored --exclude-standard`` lists, such as
+``__pycache__/`` output and ``.DS_Store``, and a directory directly under ``vendor/`` with no
+file left. A tracked file is judged where an ignore rule matches it, and so is an untracked
+file git does not ignore. A tree with no git, a root nested inside another repository's work
+tree and a machine without git have no such listing, so each file on disk is judged there.
+
 Every id resolves against its own family's list, never a union and never by the id's shape:
 a payload id that equals no check id fails in a check column even though the payload list
 holds it. X2 to X7 are read from the committed file and, when it differs, from the fresh
@@ -45,6 +53,7 @@ import importlib.util
 import json
 import os
 import re
+import subprocess
 import sys
 from datetime import date
 from pathlib import Path
@@ -77,6 +86,10 @@ REPO_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 REGISTRY_RE = re.compile(r"^https://[^\s/]+(/\S*)?$")
 LIST_ITEM_RE = re.compile(r"^-(\s|$)")
 RETIRED_ID_RE = re.compile(r"^- id: ([A-Za-z0-9][A-Za-z0-9._-]*)$")
+# Variables that would point git at a repository other than the root's. Per githooks(5), git
+# exports such variables to a hook, and a hook may run this check on another root.
+GIT_LOCATION_VARS = ("GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR", "GIT_INDEX_FILE",
+                     "GIT_OBJECT_DIRECTORY", "GIT_ALTERNATE_OBJECT_DIRECTORIES")
 
 COMMITTED = f"{B.OUTPUT}"
 FRESH = "the fresh rendering"
@@ -170,6 +183,53 @@ def check_manifest(source: str, manifest: dict, report: Report):
             report.add(8, f"{rel} files names a path twice")
 
 
+def git_ignored_paths(root: Path):
+    """What git lists as untracked and ignored under vendor/ when root is the top of a git work
+    tree, else None: a file by its path, and a nested repository inside an ignored directory
+    by its directory, with a trailing slash. A root nested inside another repository's work
+    tree gets None, since that repository's rules do not describe this tree, and so does a
+    machine without git. The top is compared by file identity, so a path that differs only in
+    letter case on a case-insensitive filesystem still counts as the same directory."""
+    env = {key: value for key, value in os.environ.items() if key not in GIT_LOCATION_VARS}
+
+    def git(*args) -> str:
+        return os.fsdecode(subprocess.run(
+            ["git", "-C", str(root), *args], capture_output=True, check=True, timeout=60,
+            env=env).stdout)
+
+    try:
+        if not os.path.samefile(git("rev-parse", "--show-toplevel").rstrip("\n"), root):
+            return None
+        out = git("ls-files", "-z", "--others", "--ignored", "--exclude-standard",
+                  "--", B.VENDOR)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return [rel for rel in out.split("\0") if rel]
+
+
+def judged_entries(root: Path) -> list:
+    """[(entry, files)] for each path directly under vendor/, with the files X9 judges in it: the
+    entry itself when it is not a directory. Where git gives a listing, the files it names are
+    left out, and an entry with no file left is dropped, whether git names all its files or it
+    holds none. A path git does not name stays judged. Where git gives no listing, each path
+    on disk is kept."""
+    listed = git_ignored_paths(root)
+    ignored = set(listed or ())
+    ignored_directories = tuple(rel for rel in ignored if rel.endswith("/"))
+
+    def is_ignored(path: Path) -> bool:
+        rel = path.relative_to(root).as_posix()
+        return rel in ignored or rel.startswith(ignored_directories)
+
+    entries = []
+    for entry in sorted((root / B.VENDOR).iterdir(), key=lambda p: p.name):
+        paths = sorted(entry.rglob("*")) if entry.is_dir() else [entry]
+        files = [path for path in paths if not path.is_dir() and not is_ignored(path)]
+        if files or listed is None:
+            entries.append((entry, files))
+    return entries
+
+
 def check_vendor_tree(root: Path, report: Report) -> dict:
     """X8 and X9 over vendor/. Returns {source: manifest} for the sources that have one."""
     vendor = root / B.VENDOR
@@ -177,7 +237,7 @@ def check_vendor_tree(root: Path, report: Report) -> dict:
     if not vendor.is_dir():
         report.add(9, f"{B.VENDOR}/ is absent")
         return manifests
-    for entry in sorted(vendor.iterdir(), key=lambda p: p.name):
+    for entry, judged in judged_entries(root):
         rel = f"{B.VENDOR}/{entry.name}"
         if not entry.is_dir():
             report.add(9, f"{rel} is a file directly under {B.VENDOR}/; every input is a "
@@ -216,9 +276,7 @@ def check_vendor_tree(root: Path, report: Report) -> dict:
                     named = f"{rel}/{generator}"
                     if isinstance(manifest["generate"], str) and named not in manifest["generate"]:
                         report.add(9, f"{rel}/{B.MANIFEST} generate does not name {named}")
-        for path in sorted(entry.rglob("*")):
-            if path.is_dir():
-                continue
+        for path in judged:
             name = path.relative_to(entry).as_posix()
             if name not in allowed:
                 report.add(9, f"{rel}/{name} is not {B.MANIFEST}, the generator or a file "
