@@ -10,8 +10,9 @@ it reads ``VENDOR.json`` and fetches the source at the pin:
   ``version`` must be a tag that names it. A source with ``refresh`` holds byte-exact copies,
   each compared with ``git show <commit>:<path>``; a source with ``generate`` is regenerated
   with ``python3 -I vendor/<source>/generate.py <clone> <commit> <file>``.
-- a package (``package``, ``version``): ``npm pack <package>@<version>`` from ``registry``.
-  The tarball's sha512 must equal ``integrity``; each listed file is regenerated with
+- a package (``package``, ``version``): ``npm pack <package>@<version>`` from ``registry``,
+  with an empty npm cache of the run's own, so the tarball is read from the registry each
+  time. The tarball's sha512 must equal ``integrity``; each listed file is regenerated with
   ``node vendor/<source>/generate.mjs <extracted package> <file>``, run with an environment
   that holds PATH only, so no credential reaches the package's module code.
 
@@ -218,16 +219,10 @@ def fetch_git(root: Path, source: str, manifest: dict, location: str, work: Path
 
 
 def safe_extract(tarball: Path, into: Path):
+    # The "data" filter refuses absolute paths, paths that leave the directory, links that
+    # point outside it, and device files.
     with tarfile.open(tarball, "r:gz") as archive:
-        try:
-            archive.extractall(into, filter="data")
-        except TypeError:  # an interpreter without extraction filters
-            for member in archive.getmembers():
-                target = (into / member.name).resolve()
-                if not str(target).startswith(str(into.resolve()) + os.sep) or \
-                        not (member.isfile() or member.isdir()):
-                    raise tarfile.TarError(f"unsafe member {member.name}") from None
-            archive.extractall(into)
+        archive.extractall(into, filter="data")
 
 
 def fetch_package(root: Path, source: str, manifest: dict, location, work: Path,
@@ -240,9 +235,10 @@ def fetch_package(root: Path, source: str, manifest: dict, location, work: Path,
         shutil.rmtree(destination, ignore_errors=True)
         destination.mkdir(parents=True)
         if location is None:
+            # An empty cache of its own, so the tarball is read from the registry each run.
             return run(["npm", "pack", f"{package}@{version}", "--pack-destination",
                         str(destination), "--registry", manifest["registry"],
-                        "--ignore-scripts"], cwd=work)
+                        "--cache", str(work / "npm-cache"), "--ignore-scripts"], cwd=work)
         argv = ["copy", location]
         if not Path(location).is_file():
             return subprocess.CompletedProcess(argv, 1, b"", f"{location} is not a file".encode())
