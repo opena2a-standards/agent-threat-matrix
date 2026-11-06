@@ -301,6 +301,69 @@ def test_a_root_without_vendor_exits_2(tmp_path):
     assert proc.returncode == 2, proc.stdout + proc.stderr
 
 
+# A string of a VENDOR.json that the script can pass to a command as an argument, holding
+# U+0000 or a surrogate code point. json.dumps writes each as an escape, \u0000 or \ud800, and
+# json.loads reads that escape back as the one character, so the file still parses.
+NUL = "which a command-line argument cannot hold"
+SURROGATE = "a surrogate code point, which UTF-8 cannot encode"
+
+
+def assert_one_usage_error(proc: subprocess.CompletedProcess, line: str):
+    assert proc.returncode == 2, proc.stdout + proc.stderr
+    assert proc.stdout == ""
+    assert proc.stderr.splitlines() == [f"usage error: {line}"]
+
+
+@pytest.mark.parametrize("source, name, problem", [
+    (COPIES, "a\x00b", f"character 2 is U+0000, {NUL}"),
+    (COPIES, "a\ud800b", f"character 2 is U+D800, {SURROGATE}"),
+    # subprocess passes U+DC80 on as the byte 0x80 rather than refusing it.
+    (COPIES, "a\udc80b", f"character 2 is U+DC80, {SURROGATE}"),
+    (SCENARIOS, "a\x00b", f"character 2 is U+0000, {NUL}"),
+    (PACKAGE, "a\ud800b.json", f"character 2 is U+D800, {SURROGATE}"),
+])
+def test_a_file_name_holding_nul_or_a_surrogate_is_a_usage_error(tree, source, name, problem):
+    index = len(tree.manifests[source]["files"])
+    tree.manifests[source]["files"] = tree.manifests[source]["files"] + [name]
+    tree.save()
+    assert_one_usage_error(tree.check(), f"vendor/{source}/VENDOR.json files[{index}] cannot "
+                                         f"be passed to a command ({problem})")
+
+
+@pytest.mark.parametrize("source, key, char", [
+    (COPIES, "commit", "\ud800"),
+    (COPIES, "commit", "\x00"),
+    (COPIES, "version", "\x00"),
+    (SCENARIOS, "commit", "\x00"),
+    (COPIES, "repo", "\udfff"),
+    (PACKAGE, "package", "\x00"),
+    (PACKAGE, "version", "\ud800"),
+    (PACKAGE, "registry", "\x00"),
+])
+def test_a_pin_holding_nul_or_a_surrogate_is_a_usage_error(tree, source, key, char):
+    if key == "repo" or source == PACKAGE:
+        # These reach a command only when the source is fetched from where its pin says.
+        del tree.overrides[source]
+    value = tree.manifests[source][key] + char
+    tree.manifests[source][key] = value
+    tree.save()
+    problem = NUL if char == "\x00" else SURROGATE
+    assert_one_usage_error(tree.check(), f"vendor/{source}/VENDOR.json {key} cannot be passed "
+                                         f"to a command (character {len(value)} is "
+                                         f"U+{ord(char):04X}, {problem})")
+
+
+def test_a_file_name_holding_other_text_is_compared(tree):
+    # json.dumps writes U+10000 as the escapes 𐀀, a pair, which json.loads reads
+    # back as that one character. The upstream holds no such file, so it is drift.
+    name = "café-\U00010000.json"
+    tree.manifests[COPIES]["files"] = tree.manifests[COPIES]["files"] + [name]
+    tree.save()
+    proc = tree.check()
+    assert proc.returncode == 1, proc.stdout + proc.stderr
+    assert lines(proc) == [f"DRIFT {COPIES} {name}"]
+
+
 # Runs the script on an interpreter whose tarfile has no extraction filters, as Python 3.9.6
 # has: no tarfile.data_filter, and an extractall that takes no filter argument.
 NO_FILTERS = """\
