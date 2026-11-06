@@ -254,8 +254,12 @@ def fetch_git(root: Path, source: str, manifest: dict, location: str, work: Path
             # With -z, git prints the path unquoted and ends it with a NUL. Without it, git
             # quotes some names, such as café.json while core.quotePath is true, its default,
             # and a name holding a double quote, a backslash or a tab. subprocess passed the
-            # name to git as os.fsencode(name).
-            listed = git(clone, "ls-tree", "-z", "--name-only", commit, "--", name)
+            # name to git as os.fsencode(name). With --literal-pathspecs, git reads the name
+            # as a path. Without it, git reads a leading colon as pathspec magic: git 2.53.0
+            # lists colon.json for :colon.json and x.json for :(top)x.json, and exits 128 on
+            # :!x.json.
+            listed = git(clone, "--literal-pathspecs", "ls-tree", "-z", "--name-only", commit,
+                         "--", name)
             if listed.returncode != 0 or listed.stdout != os.fsencode(name) + b"\0":
                 print(f"{source}: {name} is not in {commit}", file=sys.stderr)
                 fetched[name] = None
