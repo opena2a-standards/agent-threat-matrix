@@ -13,6 +13,7 @@ difference, 3 with an ``UNREACHABLE`` line per source it could not fetch after t
 """
 
 import base64
+import codecs
 import hashlib
 import io
 import json
@@ -185,6 +186,22 @@ class Tree:
         index = data.index(b"0") if b"0" in data else 0
         data[index] = ord("1") if data[index] == ord("0") else ord("0")
         path.write_bytes(bytes(data))
+
+    def pin_a_new_copy(self, name: str, data: bytes):
+        """Commit name, holding data, to the aiis-signatures upstream, pin that commit, add
+        name to files and vendor the same bytes."""
+        work = self.copies_work
+        (work / name).write_bytes(data)
+        run(GIT + ["-C", str(work), "add", "--", name])
+        run(GIT + ["-C", str(work), "commit", "-q", "-m", "a file added after the tag"])
+        run(GIT + ["--git-dir", str(self.copies_bare), "fetch", "-q", str(work),
+                   "refs/heads/main:refs/heads/main"])
+        # The tag v9.9.9 names the first commit, so the new pin carries no version.
+        self.manifests[COPIES].update(
+            commit=run(["git", "-C", str(work), "rev-parse", "HEAD"]).stdout.strip(),
+            version=None, files=self.manifests[COPIES]["files"] + [name])
+        (self.root / "vendor" / COPIES / name).write_bytes(data)
+        self.save()
 
     def check(self, *extra: str) -> subprocess.CompletedProcess:
         argv = [sys.executable, str(SCRIPT), str(self.root), "--retry-delay", "0"]
@@ -485,6 +502,45 @@ def test_a_commit_holding_only_the_path_the_magic_names_is_drift(tree, name, fou
     assert lines(proc) == [f"DRIFT {COPIES} {name}"]
     commit = tree.manifests[COPIES]["commit"]
     assert f"{COPIES}: {name} is not in {commit}" in proc.stderr.splitlines()
+
+
+# A name ISO-8859-1 cannot encode, and the form its DRIFT line takes where standard output is
+# ISO-8859-1: each such character as a backslash escape, the way Python writes standard error.
+UNENCODABLE = "日本語.json"
+ESCAPED = "\\u65e5\\u672c\\u8a9e.json"
+
+
+def started_codecs() -> tuple:
+    """The codecs of standard output and of file names in a Python started with offline_env()."""
+    proc = run([sys.executable, "-c",
+                "import sys; print(sys.stdout.encoding, sys.getfilesystemencoding())"])
+    return tuple(codecs.lookup(name).name for name in proc.stdout.split())
+
+
+@pytest.mark.parametrize("setting, printed", [
+    ({"PYTHONIOENCODING": "utf-8"}, UNENCODABLE),
+    ({"PYTHONIOENCODING": "iso8859-1"}, ESCAPED),
+    ({"LC_ALL": "en_US.ISO8859-1"}, ESCAPED),
+], ids=["utf-8", "pythonioencoding-iso8859-1", "lc-all-iso8859-1"])
+def test_a_drifted_name_standard_output_cannot_encode_is_escaped_and_the_run_goes_on(
+        tree, monkeypatch, setting, printed):
+    tree.pin_a_new_copy(UNENCODABLE, b"{}\n")
+    (tree.root / "vendor" / COPIES / UNENCODABLE).write_bytes(b"[]\n")
+    # The two sources sorted after aiis-signatures differ too: their lines show they were compared.
+    tree.flip_byte(SCENARIOS, "expected-checks.json")
+    tree.flip_byte(PACKAGE, "payload-ids.json")
+    for variable in ("PYTHONIOENCODING", "PYTHONUTF8", "LC_ALL"):
+        monkeypatch.delenv(variable, raising=False)
+    for variable, value in setting.items():
+        monkeypatch.setenv(variable, value)
+    if "LC_ALL" in setting and started_codecs() != ("iso8859-1", "utf-8"):
+        pytest.skip("under this locale, a Python here does not write standard output as "
+                    "ISO-8859-1 while it encodes file names as UTF-8")
+    proc = tree.check()
+    assert proc.returncode == 1, proc.stdout + proc.stderr
+    assert lines(proc) == [f"DRIFT {COPIES} {printed}", f"DRIFT {SCENARIOS} expected-checks.json",
+                           f"DRIFT {PACKAGE} payload-ids.json"]
+    assert proc.stderr == ""
 
 
 # Runs the script on an interpreter whose tarfile has no extraction filters, as Python 3.9.6
