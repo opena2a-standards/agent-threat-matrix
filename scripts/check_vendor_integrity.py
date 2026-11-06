@@ -33,8 +33,10 @@ Output, one line per finding:
 
 Exit 0 when every file matches, 1 when any DRIFT line was printed, 3 when none was but a
 source was unreachable, and 2 on a usage error: an unknown option, a root that is not a
-directory, a ``VENDOR.json`` that is not a readable pin, an override naming no source, or a
-missing ``git``, ``npm`` or ``node``. Neither 1 nor 3 is a pass.
+directory, a ``VENDOR.json`` that is not a readable pin, an override naming no source, a
+missing ``git``, ``npm`` or ``node``, or, when a package source is pinned, a Python whose
+``tarfile`` module has no extraction filters (before 3.12, other than 3.8.17, 3.9.17,
+3.10.12, 3.11.4 and later releases of those lines). Neither 1 nor 3 is a pass.
 
 ``--override <source>=<location>`` replaces where a source is fetched from: a git URL or a
 local repository path for a git source, a local tarball for a package. The tests use it with
@@ -218,9 +220,21 @@ def fetch_git(root: Path, source: str, manifest: dict, location: str, work: Path
     return fetched
 
 
+def require_extraction_filters():
+    """Raise UsageError when this interpreter's tarfile has no extraction filters, which
+    safe_extract needs. They are in Python 3.12 and later, and in 3.8.17, 3.9.17, 3.10.12
+    and 3.11.4 and later releases of those lines."""
+    if not hasattr(tarfile, "data_filter"):
+        raise UsageError(
+            f"{sys.executable} is Python {sys.version.split()[0]}, whose tarfile module has "
+            f"no extraction filters; a package source needs Python 3.12 or later, or "
+            f"3.8.17, 3.9.17, 3.10.12 or 3.11.4 or later in those lines")
+
+
 def safe_extract(tarball: Path, into: Path):
     # The "data" filter refuses absolute paths, paths that leave the directory, links that
     # point outside it, and device files.
+    require_extraction_filters()
     with tarfile.open(tarball, "r:gz") as archive:
         archive.extractall(into, filter="data")
 
@@ -338,6 +352,9 @@ def main(argv: list) -> int:
             raise UsageError("--retry-delay is negative")
         manifests = load_manifests(root)
         overrides = parse_overrides(args.override, manifests)
+        if any("package" in manifest for manifest in manifests.values()):
+            # Checked before any fetch, so the run stops before it reads the network.
+            require_extraction_filters()
         drifted, unreachable, files = [], [], 0
         with tempfile.TemporaryDirectory(prefix="vendor-integrity-") as tmp:
             for source in sorted(manifests):
