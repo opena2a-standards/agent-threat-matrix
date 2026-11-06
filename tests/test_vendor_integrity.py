@@ -375,6 +375,35 @@ def test_a_file_name_holding_other_text_is_compared(tree):
     assert lines(proc) == [f"DRIFT {COPIES} {name}"]
 
 
+# Without -z, git ls-tree prints each of these names quoted: café.json while core.quotePath is
+# true, its default, and the other three whatever core.quotePath is.
+@pytest.mark.parametrize("name", ["café.json", 'say "hi".json', "back\\slash.json",
+                                  "tab\there.json"],
+                         ids=["non-ascii", "double-quote", "backslash", "tab"])
+def test_a_file_name_that_git_quotes_is_found_at_the_pin(tree, name):
+    work = tree.copies_work
+    (work / name).write_bytes(b"{}\n")
+    run(GIT + ["-C", str(work), "add", "--", name])
+    run(GIT + ["-C", str(work), "commit", "-q", "-m", "a name git quotes"])
+    run(GIT + ["--git-dir", str(tree.copies_bare), "fetch", "-q", str(work),
+               "refs/heads/main:refs/heads/main"])
+    # The tag v9.9.9 names the first commit, so the new pin carries no version.
+    tree.manifests[COPIES].update(
+        commit=run(["git", "-C", str(work), "rev-parse", "HEAD"]).stdout.strip(),
+        version=None, files=tree.manifests[COPIES]["files"] + [name])
+    (tree.root / "vendor" / COPIES / name).write_bytes(b"{}\n")
+    tree.save()
+    proc = tree.check()
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert lines(proc) == ["OK: 7 vendored files in 3 sources match their sources at the pin"]
+    # A changed byte in that file is drift the compare finds, with the file found at the pin.
+    tree.flip_byte(COPIES, name)
+    proc = tree.check()
+    assert proc.returncode == 1, proc.stdout + proc.stderr
+    assert lines(proc) == [f"DRIFT {COPIES} {name}"]
+    assert f"{name} is not in" not in proc.stderr
+
+
 # Runs the script on an interpreter whose tarfile has no extraction filters, as Python 3.9.6
 # has: no tarfile.data_filter, and an extractall that takes no filter argument.
 NO_FILTERS = """\

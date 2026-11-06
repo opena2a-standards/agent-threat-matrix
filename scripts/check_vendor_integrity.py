@@ -251,8 +251,12 @@ def fetch_git(root: Path, source: str, manifest: dict, location: str, work: Path
                 fetched[name] = proc.stdout
     else:
         for name in manifest["files"]:
-            listed = git(clone, "ls-tree", "--name-only", commit, "--", name)
-            if listed.returncode != 0 or listed.stdout.decode("utf-8").strip() != name:
+            # With -z, git prints the path unquoted and ends it with a NUL. Without it, git
+            # quotes some names, such as café.json while core.quotePath is true, its default,
+            # and a name holding a double quote, a backslash or a tab. subprocess passed the
+            # name to git as os.fsencode(name).
+            listed = git(clone, "ls-tree", "-z", "--name-only", commit, "--", name)
+            if listed.returncode != 0 or listed.stdout != os.fsencode(name) + b"\0":
                 print(f"{source}: {name} is not in {commit}", file=sys.stderr)
                 fetched[name] = None
                 continue
