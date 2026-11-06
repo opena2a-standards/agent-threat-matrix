@@ -1,0 +1,184 @@
+# Retired AIIS signature ids. An id is never reused. A record is added whenever a
+# signature file is deleted from signatures/ (see CONTRIBUTING.md, Retiring a
+# signature). The AIIS-NNNN ids below were the numeric seed catalogue that
+# predated the named corpus; each is mapped to the corpus signature that carries
+# its intent, narrowed where the seed pattern was a false positive source, or
+# retired where nothing in the corpus should carry it. Pattern fragments in the
+# reason field are literal: a pipe is an alternation, not YAML syntax.
+#
+# disposition: retired | superseded | superseded_narrowed
+# superseded_by: present only for superseded and superseded_narrowed, and names
+#   a live signature id.
+- id: AIIS-0001
+  disposition: superseded
+  superseded_by: AIIS-ATTR-IGNORE-INST-01
+  retired_at: '2026-09-08'
+  retired_in: v0.4.0
+  reason: 'same core regex ignore\s+(all\s+)?(previous|prior|above|earlier)\s+instructions; object list narrowed from instructions/prompts/rules/context to instructions; the hidden_text surface is carried by DAN-01''s ignore/disregard/forget clause'
+- id: AIIS-0002
+  disposition: superseded
+  superseded_by: AIIS-ATTR-IGNORE-INST-01
+  retired_at: '2026-09-08'
+  retired_in: v0.4.0
+  reason: 'disregard\s+(previous|prior|the\s+above) branch; the (all)? your guidelines forms dropped'
+- id: AIIS-0003
+  disposition: superseded_narrowed
+  superseded_by: AIIS-HIDDEN-JAILBREAK-DAN-01
+  retired_at: '2026-09-08'
+  retired_in: v0.4.0
+  reason: 'bare you are now (a|an|my|the) matches onboarding copy; survives as you are (now) (a) (dan|unrestricted|jailbroken|an ai with no/that can) (DAN-01) and the no-restrictions-tail form (SCRIPT-ROLE-PLAY-01)'
+- id: AIIS-0004
+  disposition: retired
+  retired_at: '2026-09-08'
+  retired_in: v0.4.0
+  reason: 'no corpus pattern contains from now on; the bare form is human-facing copy (billing and policy notices); a successor needs an AI-context anchor and fixtures first'
+- id: AIIS-0005
+  disposition: retired
+  retired_at: '2026-09-08'
+  retired_in: v0.4.0
+  reason: 'new instructions[:\s] is ordinary prose; no anchored form exists in the corpus'
+- id: AIIS-0006
+  disposition: superseded_narrowed
+  superseded_by: AIIS-HIDDEN-ROLE-INJECT-01
+  retired_at: '2026-09-08'
+  retired_in: v0.4.0
+  reason: 'bare override directive dropped; override survives as the verb after a matched role delimiter (ROLE-INJECT-01) or an AI address prefix (COMMENT-SYSTEM-OVERRIDE-01)'
+- id: AIIS-0007
+  disposition: superseded_narrowed
+  superseded_by: AIIS-ATTR-IGNORE-INST-01
+  retired_at: '2026-09-08'
+  retired_in: v0.4.0
+  reason: 'forget\s+everything\s+(above|before|you) survives; bare forget (all|your|previous) is forget your password on every login page; DAN-01 carries the forget-previous-instructions form'
+- id: AIIS-0008
+  disposition: retired
+  retired_at: '2026-09-08'
+  retired_in: v0.4.0
+  reason: 'do not follow (your|the|any) (instructions|rules|guidelines) appears in no corpus pattern (ROLE-INJECT-01''s verb list has do not tell, not do not follow); the bare form is human-facing copy'
+- id: AIIS-0009
+  disposition: retired
+  retired_at: '2026-09-08'
+  retired_in: v0.4.0
+  reason: 'prompt-leak family: no corpus signature for system-prompt extraction requests; the seed''s technique T-2002 was a mis-mapping (T-2002 is Indirect Prompt Injection; extraction is T-1003); a future signature in this family carries T-1003'
+- id: AIIS-0010
+  disposition: retired
+  retired_at: '2026-09-08'
+  retired_in: v0.4.0
+  reason: 'as AIIS-0009'
+- id: AIIS-0011
+  disposition: retired
+  retired_at: '2026-09-08'
+  retired_in: v0.4.0
+  reason: 'as AIIS-0009'
+- id: AIIS-0012
+  disposition: retired
+  retired_at: '2026-09-08'
+  retired_in: v0.4.0
+  reason: 'as AIIS-0009'
+- id: AIIS-0013
+  disposition: retired
+  retired_at: '2026-09-08'
+  retired_in: v0.4.0
+  reason: 'as AIIS-0009'
+- id: AIIS-0014
+  disposition: retired
+  retired_at: '2026-09-08'
+  retired_in: v0.4.0
+  reason: 'as AIIS-0009; reveal survives only as a verb behind a role delimiter (ROLE-INJECT-01), an AI address (COMMENT-SYSTEM-OVERRIDE-01) or an X-AI header (HEADER-INJECT-01)'
+- id: AIIS-0015
+  disposition: superseded_narrowed
+  superseded_by: AIIS-HIDDEN-JAILBREAK-DAN-01
+  retired_at: '2026-09-08'
+  retired_in: v0.4.0
+  reason: 'bare \bDAN\b matches the given name; survives as you are (now) (a) dan, act as (a) dan, dan mode (enabled|activated) plus AI context, cued in dan mode'
+- id: AIIS-0016
+  disposition: superseded_narrowed
+  superseded_by: AIIS-HIDDEN-JAILBREAK-DAN-01
+  retired_at: '2026-09-08'
+  retired_in: v0.4.0
+  reason: 'bare jailbreak dropped (device-jailbreak false positives, corpus v0.3.0); survives as jailbreak(ing)? (the|your|this)? <AI object>'
+- id: AIIS-0017
+  disposition: superseded_narrowed
+  superseded_by: AIIS-HIDDEN-JAILBREAK-DAN-01
+  retired_at: '2026-09-08'
+  retired_in: v0.4.0
+  reason: 'bare developer mode (enabled|on|activated)? dropped (OS and WordPress false positives); survives as (dan|developer) mode (enabled|activated) plus AI context within 80 chars'
+- id: AIIS-0018
+  disposition: superseded
+  superseded_by: AIIS-HIDDEN-JAILBREAK-DAN-01
+  retired_at: '2026-09-08'
+  retired_in: v0.4.0
+  reason: 'branch do\s+anything\s+now is identical (AIIS-0018 added \b anchors; DAN-01''s is equal or broader)'
+- id: AIIS-0019
+  disposition: superseded_narrowed
+  superseded_by: AIIS-HIDDEN-JAILBREAK-DAN-01
+  retired_at: '2026-09-08'
+  retired_in: v0.4.0
+  reason: 'bare unrestricted mode is firewall and game-mode copy; survives as you are (now) (a) unrestricted, act as an unrestricted'
+- id: AIIS-0020
+  disposition: superseded_narrowed
+  superseded_by: AIIS-HIDDEN-ROLE-INJECT-01
+  retired_at: '2026-09-08'
+  retired_in: v0.4.0
+  reason: 'bare bypass (your|all|the|any) (safety|content|ethical) (filters|restrictions|guardrails) not carried; bypass survives behind a matched role delimiter (ROLE-INJECT-01) and as that bypasses after a persona assignment (SCRIPT-ROLE-PLAY-01)'
+- id: AIIS-0021
+  disposition: retired
+  retired_at: '2026-09-08'
+  retired_in: v0.4.0
+  reason: '[A-Za-z0-9+/]{40,}={0,2} matches every hash, JWT, data URI and minified identifier run, with no AI-context discriminator; the corpus carries no encoding heuristic (UNICODE-TAG-BLOCK-01 matches decoded invisible codepoints, a different match set); the seed''s technique T-2004 was a mis-mapping (T-2004 is Context Window Exploitation; encoding bypass is T-2006)'
+- id: AIIS-0022
+  disposition: retired
+  retired_at: '2026-09-08'
+  retired_in: v0.4.0
+  reason: '\uXXXX clusters match any JSON or JS with four consecutive non-ASCII escapes; not the unicode_range match set; recorded corpus recall gap, not a successor: an escaped Tag-block payload is invisible to UNICODE-TAG-BLOCK-01'
+- id: AIIS-0023
+  disposition: retired
+  retired_at: '2026-09-08'
+  retired_in: v0.4.0
+  reason: 'entity clusters match any entity-encoded non-Latin text or emoji; same recall-gap note for &#xE0041;-style encoding'
+- id: AIIS-0024
+  disposition: superseded_narrowed
+  superseded_by: AIIS-ATTR-EXFIL-URL-01
+  retired_at: '2026-09-08'
+  retired_in: v0.4.0
+  reason: 'bare callback-service URL (ngrok, burp, requestbin, webhook.site, pipedream, hookbin) matches tutorials and the services'' own docs; survives only when a URL co-occurs within 150 chars with an exfil verb and a secret or agent-context object'
+- id: AIIS-0025
+  disposition: retired
+  retired_at: '2026-09-08'
+  retired_in: v0.4.0
+  reason: 'curl (flags)* https?:// is every README; no AI-context anchor; the corpus never carried command-line heuristics'
+- id: AIIS-0026
+  disposition: retired
+  retired_at: '2026-09-08'
+  retired_in: v0.4.0
+  reason: 'fetch([''"]https?:// is every JavaScript page'
+- id: AIIS-0027
+  disposition: retired
+  retired_at: '2026-09-08'
+  retired_in: v0.4.0
+  reason: 'wget https?:// is every install document'
+- id: AIIS-0028
+  disposition: retired
+  retired_at: '2026-09-08'
+  retired_in: v0.4.0
+  reason: 'sudo|su -|chmod NNN|chown root is every Linux tutorial; no corpus privilege-escalation family; the seed''s vector RETROACTIVE-PRIV does not describe a shell string on a web page and T-2005 (Tool Description Injection) was a mis-mapping'
+- id: AIIS-0029
+  disposition: retired
+  retired_at: '2026-09-08'
+  retired_in: v0.4.0
+  reason: 'grant (all|admin|superuser|root) (privileges|access|permissions) is SQL documentation'
+- id: AIIS-0030
+  disposition: retired
+  retired_at: '2026-09-08'
+  retired_in: v0.4.0
+  reason: 'escalat(e|ion) (to)? (admin|root|superuser|privileged) is support and security prose'
+- id: AIIS-0031
+  disposition: retired
+  retired_at: '2026-09-08'
+  retired_in: v0.4.0
+  reason: 'pattern type css_selector: no engine implements it, and finding CSS-concealed text is the extractor''s job in the corpus model, expressed as surface type hidden_text, not a signature; not ported'
+- id: AIIS-0032
+  disposition: superseded_narrowed
+  superseded_by: AIIS-ATTR-IGNORE-INST-01
+  retired_at: '2026-09-08'
+  retired_in: v0.4.0
+  reason: 'css_selector unimplemented; the aria attribute is surface type alt_aria in the corpus model; its attribute pattern (ignore, disregard, override, forget, you are now) survives as the gated ignore/disregard/forget-everything forms on alt_aria; bare forget (a Forget password aria-label) and you are now dropped as false positives'

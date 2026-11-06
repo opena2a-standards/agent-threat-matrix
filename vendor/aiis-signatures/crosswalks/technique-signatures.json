@@ -1,0 +1,122 @@
+{
+  "byTechnique": {
+    "T-1001": [
+      "AIIS-EXPOSURE-CHROMA-HEARTBEAT-01",
+      "AIIS-EXPOSURE-LANGSERVE-ROUTES-01",
+      "AIIS-EXPOSURE-LITELLM-MODELS-01",
+      "AIIS-EXPOSURE-OLLAMA-TAGS-01",
+      "AIIS-EXPOSURE-OLLAMA-VERSION-01",
+      "AIIS-EXPOSURE-QDRANT-ROOT-01",
+      "AIIS-EXPOSURE-VLLM-MODELS-01"
+    ],
+    "T-1002": [
+      "AIIS-EXPOSURE-MCP-JSONRPC-01"
+    ],
+    "T-2001": [
+      "AIIS-ATTR-EXFIL-URL-01",
+      "AIIS-ATTR-IGNORE-INST-01",
+      "AIIS-COMMENT-SYSTEM-OVERRIDE-01",
+      "AIIS-HEADER-INJECT-01",
+      "AIIS-HIDDEN-CHATML-01",
+      "AIIS-HIDDEN-JAILBREAK-DAN-01",
+      "AIIS-HIDDEN-ROLE-INJECT-01",
+      "AIIS-META-LLM-OVERRIDE-01"
+    ],
+    "T-2003": [
+      "AIIS-HIDDEN-JAILBREAK-DAN-01",
+      "AIIS-SCRIPT-ROLE-PLAY-01"
+    ],
+    "T-2006": [
+      "AIIS-UNICODE-TAG-BLOCK-01"
+    ],
+    "T-2008": [
+      "AIIS-HIDDEN-CHATML-01",
+      "AIIS-HIDDEN-ROLE-INJECT-01"
+    ],
+    "T-8002": [
+      "AIIS-ATTR-EXFIL-URL-01"
+    ]
+  },
+  "bySignature": {
+    "AIIS-ATTR-EXFIL-URL-01": {
+      "techniqueId": "T-8002",
+      "relatedTechniqueIds": [
+        "T-2001"
+      ]
+    },
+    "AIIS-ATTR-IGNORE-INST-01": {
+      "techniqueId": "T-2001",
+      "relatedTechniqueIds": []
+    },
+    "AIIS-COMMENT-SYSTEM-OVERRIDE-01": {
+      "techniqueId": "T-2001",
+      "relatedTechniqueIds": []
+    },
+    "AIIS-EXPOSURE-CHROMA-HEARTBEAT-01": {
+      "techniqueId": "T-1001",
+      "relatedTechniqueIds": []
+    },
+    "AIIS-EXPOSURE-LANGSERVE-ROUTES-01": {
+      "techniqueId": "T-1001",
+      "relatedTechniqueIds": []
+    },
+    "AIIS-EXPOSURE-LITELLM-MODELS-01": {
+      "techniqueId": "T-1001",
+      "relatedTechniqueIds": []
+    },
+    "AIIS-EXPOSURE-MCP-JSONRPC-01": {
+      "techniqueId": "T-1002",
+      "relatedTechniqueIds": []
+    },
+    "AIIS-EXPOSURE-OLLAMA-TAGS-01": {
+      "techniqueId": "T-1001",
+      "relatedTechniqueIds": []
+    },
+    "AIIS-EXPOSURE-OLLAMA-VERSION-01": {
+      "techniqueId": "T-1001",
+      "relatedTechniqueIds": []
+    },
+    "AIIS-EXPOSURE-QDRANT-ROOT-01": {
+      "techniqueId": "T-1001",
+      "relatedTechniqueIds": []
+    },
+    "AIIS-EXPOSURE-VLLM-MODELS-01": {
+      "techniqueId": "T-1001",
+      "relatedTechniqueIds": []
+    },
+    "AIIS-HEADER-INJECT-01": {
+      "techniqueId": "T-2001",
+      "relatedTechniqueIds": []
+    },
+    "AIIS-HIDDEN-CHATML-01": {
+      "techniqueId": "T-2008",
+      "relatedTechniqueIds": [
+        "T-2001"
+      ]
+    },
+    "AIIS-HIDDEN-JAILBREAK-DAN-01": {
+      "techniqueId": "T-2003",
+      "relatedTechniqueIds": [
+        "T-2001"
+      ]
+    },
+    "AIIS-HIDDEN-ROLE-INJECT-01": {
+      "techniqueId": "T-2001",
+      "relatedTechniqueIds": [
+        "T-2008"
+      ]
+    },
+    "AIIS-META-LLM-OVERRIDE-01": {
+      "techniqueId": "T-2001",
+      "relatedTechniqueIds": []
+    },
+    "AIIS-SCRIPT-ROLE-PLAY-01": {
+      "techniqueId": "T-2003",
+      "relatedTechniqueIds": []
+    },
+    "AIIS-UNICODE-TAG-BLOCK-01": {
+      "techniqueId": "T-2006",
+      "relatedTechniqueIds": []
+    }
+  }
+}

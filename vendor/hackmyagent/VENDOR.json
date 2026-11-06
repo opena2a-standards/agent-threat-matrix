@@ -1,0 +1,13 @@
+{
+  "package": "hackmyagent",
+  "version": "0.33.2",
+  "registry": "https://registry.npmjs.org",
+  "integrity": "sha512-9DeR/g4pruOW1yzF/nlTIvpPEN1HTcIgSKf9cUHi2nXgSYfhmbH0McpJeFzZJFaXy1KEY34jVXltyhvc7WiiQQ==",
+  "read": "2026-11-05",
+  "files": [
+    "check-ids.json",
+    "oasb-1-controls.json",
+    "payload-ids.json"
+  ],
+  "generate": "npm pack hackmyagent@<version> --pack-destination <dir> && tar xzf <dir>/hackmyagent-<version>.tgz -C <dir>, then for each name in files: env -i PATH=\"$PATH\" node vendor/hackmyagent/generate.mjs <dir>/package <name> > vendor/hackmyagent/<name>; then set version, integrity (the registry's dist.integrity) and read here and run python3 scripts/build_technique_crosswalk.py"
+}

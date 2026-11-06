@@ -1,0 +1,172 @@
+{
+  "a2a-agent-noauth": [
+    "A2A-001",
+    "A2A-002"
+  ],
+  "a2a-capability-overstating": [],
+  "a2a-identity-replay": [],
+  "a2a-task-hijacking": [],
+  "a2a-trust-chain-poisoning": [],
+  "a2a-worm-propagation": [],
+  "agent-cred-no-protection": [
+    "AGENT-CRED-001"
+  ],
+  "agent-impersonation-a2a": [
+    "AIM-002"
+  ],
+  "agent-thresh-01": [],
+  "aitool-gradio-share": [
+    "AITOOL-002"
+  ],
+  "aitool-jupyter-noauth": [
+    "AITOOL-001"
+  ],
+  "aitool-langserve-exposed": [
+    "AITOOL-004"
+  ],
+  "aitool-mlflow-noauth": [
+    "AITOOL-003"
+  ],
+  "aitool-streamlit-public": [
+    "AITOOL-002"
+  ],
+  "atc-forgery-attack": [
+    "AIM-002",
+    "GIT-001"
+  ],
+  "behavioral-drift-to-exfil": [
+    "GIT-001",
+    "GIT-003",
+    "SEM-CRED-001",
+    "SEM-CRED-002",
+    "SKILL-001",
+    "SUPPLY-001",
+    "SUPPLY-002",
+    "SUPPLY-004"
+  ],
+  "cicd-ai-review-bypass": [],
+  "clipass-token-in-args": [
+    "CLIPASS-001"
+  ],
+  "clipboard-prompt-injection": [],
+  "codeinj-exec-template": [
+    "NEMO-005"
+  ],
+  "consensus-manipulation": [],
+  "context-cache-poisoning": [],
+  "context-lifecycle-displacement": [],
+  "context-lifecycle-priority-hijack": [],
+  "context-lifecycle-split-injection": [],
+  "cross-session-persistence": [],
+  "delegation-privilege-escalation": [],
+  "dependency-confusion-attack": [],
+  "dns-exfil-via-tools": [],
+  "docker-exec-interpolation": [
+    "DOCKERINJ-001"
+  ],
+  "docker-provenance-disabled": [],
+  "embedding-adversarial-rag": [],
+  "encoding-bypass-base64": [
+    "NEMO-009"
+  ],
+  "envleak-process-env": [
+    "NEMO-007"
+  ],
+  "fake-tool-squatting": [],
+  "federated-learning-poisoning": [],
+  "finetune-backdoor": [],
+  "gateway-exposed-openclaw": [],
+  "indirect-prompt-injection-doc": [],
+  "install-curl-pipe-sh": [
+    "INSTALL-001"
+  ],
+  "integrity-digest-bypass": [
+    "INTEGRITY-001"
+  ],
+  "llm-exposed-ollama": [
+    "LLM-001"
+  ],
+  "llm-openai-compat-noauth": [
+    "LLM-004"
+  ],
+  "llm-textgen-listen": [
+    "LLM-003"
+  ],
+  "llm-vllm-exposed": [
+    "LLM-002"
+  ],
+  "mcp-capability-escalation": [],
+  "mcp-context-injection": [],
+  "mcp-discovery-exposed": [],
+  "mcp-rug-pull": [],
+  "mcp-server-impersonation": [],
+  "mcp-state-injection": [],
+  "mcp-tool-poisoning": [],
+  "memory-poison-no-sanitize": [
+    "MEM-006"
+  ],
+  "model-weight-extraction": [],
+  "multimodal-injection-image": [],
+  "oauth-token-relay": [],
+  "parser-differential-json": [],
+  "persistent-agent-memory-poison": [],
+  "pickle-deserialization": [
+    "NEMO-009"
+  ],
+  "plugin-extension-confusion": [],
+  "prompt-leak-finetune-api": [],
+  "prompt-to-lateral-movement": [],
+  "query-param-token": [],
+  "rag-poison-to-impersonation": [],
+  "rate-limit-absent": [],
+  "reward-model-hacking": [],
+  "sandbox-telegram-allowed": [
+    "NEMO-010"
+  ],
+  "security-headers-missing": [],
+  "skill-backdoor-install": [
+    "SKILL-002"
+  ],
+  "soul-override-via-skill": [
+    "SOUL-OVERRIDE-001"
+  ],
+  "stego-binary-asset": [
+    "DEP-004"
+  ],
+  "supply-chain-to-rce": [
+    "CONFIG-004",
+    "CRED-001",
+    "GIT-001",
+    "GIT-003",
+    "SEM-CRED-001",
+    "SEM-CRED-002"
+  ],
+  "timing-side-channel-inference": [],
+  "timing-unsafe-auth": [],
+  "tmppath-hardcoded": [
+    "NEMO-006"
+  ],
+  "toctou-verify-then-apply": [],
+  "token-smuggling-unicode": [
+    "UNICODE-STEGO-001"
+  ],
+  "tool-chain-exfiltration": [],
+  "training-data-extraction": [],
+  "typosquatting-mcp": [
+    "SEM-MCP-007"
+  ],
+  "unicode-stego-package": [
+    "UNICODE-STEGO-001"
+  ],
+  "webcred-api-key": [
+    "WEBCRED-001"
+  ],
+  "webexpose-claude-md": [
+    "WEBEXPOSE-001"
+  ],
+  "webexpose-env-file": [
+    "WEBEXPOSE-002"
+  ],
+  "websocket-preauth-flood": [],
+  "xml-injection-tool-response": []
+}

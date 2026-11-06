@@ -5,21 +5,27 @@ schema/threat-matrix-v1.2.schema.json: the wildPrevalence sentence that contains
 per page visit", its sentence that contains "not a production attack rate", and the
 wildSampleCount sentence that contains "the callbacks plus the page visits".
 scripts/check_readme_claims.py reads the three from the schema and fails, naming the README
-line, when the row's description cell does not hold each exactly as the schema states it, so
-an edit to one of them in the schema cannot leave the README behind.
+line, when the row's description cell does not hold each exactly as the schema states it and
+as a whole sentence of the cell, so after an edit to one of them in the schema the check
+fails until the row holds the edited sentence as one of its own. That includes an edit that
+leaves the edited sentence inside the row's copy of the old one.
 
 Each case runs the checker from a scratch copy of the files it reads, so the committed files
 are never written, and takes the three sentences from the checker's own read of the schema,
 so no case types them. The shipped tree is green. A row that holds none of the three
 sentences, one character changed in each copied sentence, the honeypot sentence changed in
-the schema alone, a row the checker does not read, words that pick out no sentence of their
-description or two, a description that is not there, a schema that is missing or does not
-parse, and a second row on a README page that leaves a sentence out must each go red. A "|"
-in a copied sentence is written "\\|" in the cell, as a table cell needs, and passes; written
-bare, it ends the cell and fails.
+the schema alone, words removed in the schema alone from the start of each sentence (its
+first word, or every word before the words that pick it out) or from the end of the
+wildSampleCount sentence with its period and the rest of its description, words added in the
+row before each copied sentence, a row the checker does not read, words that pick out no
+sentence of their description or two, a description that is not there, a schema that is
+missing or does not parse, and a second row on a README page that leaves a sentence out must
+each go red. A "|" in a copied sentence is written "\\|" in the cell, as a table cell needs,
+and passes; written bare, it ends the cell and fails.
 """
 
 import importlib.util
+import json
 import shutil
 import subprocess
 import sys
@@ -98,6 +104,12 @@ def edit_schema(root: Path, old: str, new: str) -> None:
     path.write_text(text.replace(old, new), encoding="utf-8")
 
 
+def description(root: Path, field: str) -> str:
+    """The `field` description in the scratch copy of the schema."""
+    schema = json.loads((root / SCHEMA).read_text(encoding="utf-8"))
+    return schema["$defs"]["technique"]["properties"][field]["description"]
+
+
 def one_character_changed(sentence: str, keep: str) -> str:
     """`sentence` with the letter nearest its middle that is not inside `keep` replaced by
     another letter, so the words `keep` still pick the sentence out."""
@@ -107,6 +119,22 @@ def one_character_changed(sentence: str, keep: str) -> str:
                if c.isalpha() and not start <= i < start + len(keep)),
               key=lambda i: abs(i - middle))
     return sentence[:pos] + ("x" if sentence[pos] != "x" else "y") + sentence[pos + 1:]
+
+
+def row_failure(number: int, index: int, sentence: str) -> str:
+    """The failure line for README.md line `number` whose row does not hold `sentence`, the
+    sentence the entry `index` of WILD_SENTENCES picks out of the schema, as a whole sentence."""
+    field, words = CHECKER.WILD_SENTENCES[index]
+    return (f"README.md:{number}: {ROW_FAILURE}, as a whole sentence and as {SCHEMA} states "
+            f"it, the {field} sentence containing \"{words}\": \"{sentence}\"")
+
+
+# Two ways to remove words from the start of a sentence, each keeping the words that pick it
+# out: removing its first word, and removing every word before those words.
+START_CUTS = {
+    "first word": lambda sentence, words: sentence[sentence.index(" ") + 1:],
+    "every word before its words": lambda sentence, words: sentence[sentence.index(words):],
+}
 
 
 def test_the_words_pick_out_one_sentence_of_each_shipped_description():
@@ -174,6 +202,52 @@ def test_the_honeypot_sentence_changed_in_the_schema_alone_is_red_on_the_row(tre
     assert lines[0].startswith(f"README.md:{number}: {ROW_FAILURE}"), lines[0]
     assert f'"{WORDS[1]}"' in lines[0]
     assert f'"{changed}"' in lines[0]
+
+
+@pytest.mark.parametrize("cut", START_CUTS)
+@pytest.mark.parametrize("index", range(3), ids=WORDS)
+def test_words_removed_from_the_start_of_a_sentence_in_the_schema_alone_are_red_on_the_row(
+        tree, index, cut):
+    # The shortened sentence stands inside the row's copy of the old one, so the row still
+    # contains it, but not as a sentence of its own.
+    sentence, words = PICKED[index], WORDS[index]
+    shortened = START_CUTS[cut](sentence, words)
+    assert words in shortened and shortened != sentence and sentence.endswith(shortened)
+    edit_schema(tree, sentence, shortened)
+    number, line = row(tree)
+    assert shortened in line
+    proc = run_checker(tree)
+    assert proc.returncode == 1, proc.stdout
+    assert failures(proc) == [row_failure(number, index, shortened)]
+
+
+def test_words_removed_from_the_end_of_the_last_sentence_in_the_schema_alone_are_red(tree):
+    # The wildSampleCount sentence cut directly after the words that pick it out, with its
+    # period and the rest of its description, so it ends the description with no period and
+    # stands inside the row's copy of the old one.
+    field, words = CHECKER.WILD_SENTENCES[2]
+    sentence = PICKED[2]
+    text = description(tree, field)
+    rest = text[text.index(sentence):]
+    shortened = sentence[:sentence.index(words) + len(words)]
+    assert shortened != sentence and sentence.startswith(shortened)
+    edit_schema(tree, rest + "\"", shortened + "\"")
+    assert CHECKER.sentences(description(tree, field))[-1] == shortened
+    number, line = row(tree)
+    assert shortened in line
+    proc = run_checker(tree)
+    assert proc.returncode == 1, proc.stdout
+    assert failures(proc) == [row_failure(number, 2, shortened)]
+
+
+@pytest.mark.parametrize("index", range(3), ids=WORDS)
+def test_words_added_before_a_copied_sentence_in_the_row_are_red_on_the_row(tree, index):
+    # The row's sentence holds the schema's, but starts with words the schema's does not.
+    sentence = PICKED[index]
+    number = edit_row(tree, sentence, "Note: " + sentence)
+    proc = run_checker(tree)
+    assert proc.returncode == 1, proc.stdout
+    assert failures(proc) == [row_failure(number, index, sentence)]
 
 
 def test_a_row_the_checker_does_not_read_is_red(tree):

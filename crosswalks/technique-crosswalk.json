@@ -1,0 +1,4756 @@
+{
+  "schemaVersion": 1,
+  "generated": "2026-11-05",
+  "matrix": {
+    "version": "1.2",
+    "files": [
+      {
+        "path": "matrix.json",
+        "sha256": "6487f04925637f92ad424d6daabc6dd5eb8c9ad2d893678aba0c56f0894268b1"
+      },
+      {
+        "path": "technique-ids.json",
+        "sha256": "1cc0b66119d172557e76db1ae03555dc540ba6077d9b4f6a1693cc43b94e83fd"
+      }
+    ]
+  },
+  "inputs": {
+    "aiis-signatures": {
+      "repository": "opena2a-standards/aiis-signatures",
+      "commit": "39c5247144cc38ee8b2aeb16a0ea2364c9f17b75",
+      "version": "v0.4.0",
+      "read": "2026-11-05",
+      "files": [
+        {
+          "path": "vendor/aiis-signatures/crosswalks/technique-signatures.json",
+          "sha256": "b68d806793088173758ba60eaa939907ff794b2de99566f9689a53eca1dacbd1"
+        },
+        {
+          "path": "vendor/aiis-signatures/retired-ids.yaml",
+          "sha256": "3ced89210b43395a0acd98c68ec34f72a36e10d02dcb8aed88e1a33eb31289a3"
+        }
+      ]
+    },
+    "damn-vulnerable-ai-agent": {
+      "repository": "opena2a-org/damn-vulnerable-ai-agent",
+      "commit": "519b68d9f9a7fe9d47080e564957c78f88888a5f",
+      "version": null,
+      "read": "2026-11-05",
+      "files": [
+        {
+          "path": "vendor/damn-vulnerable-ai-agent/expected-checks.json",
+          "sha256": "cf347effb566d4a57bdb1e4f2a39364c0640acb4ef19a7ab8bbd9ea9bdf4453b"
+        }
+      ]
+    },
+    "hackmyagent": {
+      "package": "hackmyagent",
+      "version": "0.33.2",
+      "read": "2026-11-05",
+      "files": [
+        {
+          "path": "vendor/hackmyagent/check-ids.json",
+          "sha256": "869f0d3b786efff4df3b573766139db887ffeb29fc097aeed3c8f3d96a397fc9"
+        },
+        {
+          "path": "vendor/hackmyagent/oasb-1-controls.json",
+          "sha256": "ccc70af06131f537e63571fd2a07aab85fd862ee22c64a205ed7e9d7b9b18fe6"
+        },
+        {
+          "path": "vendor/hackmyagent/payload-ids.json",
+          "sha256": "46f931f2e957134e867a1df1a375676cb6dbe292795aa4b6683272e12af9a334"
+        }
+      ]
+    }
+  },
+  "byTechnique": {
+    "T-1001": {
+      "hmaChecks": [
+        "MCP-011",
+        "WEBEXPOSE-001",
+        "WEBEXPOSE-002"
+      ],
+      "oasbControls": [
+        "1.1",
+        "1.2",
+        "1.3",
+        "1.4",
+        "10.5"
+      ],
+      "aiisSignatures": [
+        {
+          "id": "AIIS-EXPOSURE-CHROMA-HEARTBEAT-01",
+          "basis": "aiis-technique-id"
+        },
+        {
+          "id": "AIIS-EXPOSURE-LANGSERVE-ROUTES-01",
+          "basis": "aiis-technique-id"
+        },
+        {
+          "id": "AIIS-EXPOSURE-LITELLM-MODELS-01",
+          "basis": "aiis-technique-id"
+        },
+        {
+          "id": "AIIS-EXPOSURE-OLLAMA-TAGS-01",
+          "basis": "aiis-technique-id"
+        },
+        {
+          "id": "AIIS-EXPOSURE-OLLAMA-VERSION-01",
+          "basis": "aiis-technique-id"
+        },
+        {
+          "id": "AIIS-EXPOSURE-QDRANT-ROOT-01",
+          "basis": "aiis-technique-id"
+        },
+        {
+          "id": "AIIS-EXPOSURE-VLLM-MODELS-01",
+          "basis": "aiis-technique-id"
+        }
+      ],
+      "dvaaScenarios": [
+        {
+          "scenario": "webexpose-claude-md",
+          "basis": "expected-check",
+          "checks": [
+            "WEBEXPOSE-001"
+          ]
+        },
+        {
+          "scenario": "webexpose-env-file",
+          "basis": "expected-check",
+          "checks": [
+            "WEBEXPOSE-002"
+          ]
+        }
+      ],
+      "attackPayloads": {
+        "agentpwn": null,
+        "hackmyagent": null
+      }
+    },
+    "T-1002": {
+      "hmaChecks": [
+        "MCP-011"
+      ],
+      "oasbControls": [
+        "10.5"
+      ],
+      "aiisSignatures": [
+        {
+          "id": "AIIS-EXPOSURE-MCP-JSONRPC-01",
+          "basis": "aiis-technique-id"
+        }
+      ],
+      "dvaaScenarios": [],
+      "attackPayloads": {
+        "agentpwn": null,
+        "hackmyagent": null
+      }
+    },
+    "T-1003": {
+      "hmaChecks": [
+        "WEBEXPOSE-001"
+      ],
+      "oasbControls": [
+        "1.1",
+        "1.2",
+        "1.3",
+        "1.4"
+      ],
+      "aiisSignatures": [],
+      "dvaaScenarios": [
+        {
+          "scenario": "webexpose-claude-md",
+          "basis": "expected-check",
+          "checks": [
+            "WEBEXPOSE-001"
+          ]
+        }
+      ],
+      "attackPayloads": {
+        "agentpwn": null,
+        "hackmyagent": null
+      }
+    },
+    "T-1004": {
+      "hmaChecks": [
+        "WEBEXPOSE-001"
+      ],
+      "oasbControls": [
+        "1.1",
+        "1.2",
+        "1.3",
+        "1.4"
+      ],
+      "aiisSignatures": [],
+      "dvaaScenarios": [
+        {
+          "scenario": "webexpose-claude-md",
+          "basis": "expected-check",
+          "checks": [
+            "WEBEXPOSE-001"
+          ]
+        }
+      ],
+      "attackPayloads": {
+        "agentpwn": null,
+        "hackmyagent": null
+      }
+    },
+    "T-1005": {
+      "hmaChecks": [
+        "MCP-001",
+        "MCP-011"
+      ],
+      "oasbControls": [
+        "10.5"
+      ],
+      "aiisSignatures": [],
+      "dvaaScenarios": [],
+      "attackPayloads": {
+        "agentpwn": null,
+        "hackmyagent": null
+      }
+    },
+    "T-1006": {
+      "hmaChecks": [
+        "A2A-001",
+        "A2A-002"
+      ],
+      "oasbControls": [
+        "7.1",
+        "7.2",
+        "7.3",
+        "7.4"
+      ],
+      "aiisSignatures": [],
+      "dvaaScenarios": [
+        {
+          "scenario": "a2a-agent-noauth",
+          "basis": "expected-check",
+          "checks": [
+            "A2A-001",
+            "A2A-002"
+          ]
+        }
+      ],
+      "attackPayloads": {
+        "agentpwn": null,
+        "hackmyagent": null
+      }
+    },
+    "T-1007": {
+      "hmaChecks": [
+        "WEBEXPOSE-001"
+      ],
+      "oasbControls": [
+        "10.5"
+      ],
+      "aiisSignatures": [],
+      "dvaaScenarios": [
+        {
+          "scenario": "webexpose-claude-md",
+          "basis": "expected-check",
+          "checks": [
+            "WEBEXPOSE-001"
+          ]
+        }
+      ],
+      "attackPayloads": {
+        "agentpwn": null,
+        "hackmyagent": null
+      }
+    },
+    "T-2001": {
+      "hmaChecks": [
+        "PROMPT-001",
+        "PROMPT-002",
+        "PROMPT-003",
+        "PROMPT-004"
+      ],
+      "oasbControls": [
+        "3.1",
+        "3.2",
+        "3.3",
+        "3.4",
+        "3.5"
+      ],
+      "aiisSignatures": [
+        {
+          "id": "AIIS-ATTR-EXFIL-URL-01",
+          "basis": "aiis-related-technique-id"
+        },
+        {
+          "id": "AIIS-ATTR-IGNORE-INST-01",
+          "basis": "aiis-technique-id"
+        },
+        {
+          "id": "AIIS-COMMENT-SYSTEM-OVERRIDE-01",
+          "basis": "aiis-technique-id"
+        },
+        {
+          "id": "AIIS-HEADER-INJECT-01",
+          "basis": "aiis-technique-id"
+        },
+        {
+          "id": "AIIS-HIDDEN-CHATML-01",
+          "basis": "aiis-related-technique-id"
+        },
+        {
+          "id": "AIIS-HIDDEN-JAILBREAK-DAN-01",
+          "basis": "aiis-related-technique-id"
+        },
+        {
+          "id": "AIIS-HIDDEN-ROLE-INJECT-01",
+          "basis": "aiis-technique-id"
+        },
+        {
+          "id": "AIIS-META-LLM-OVERRIDE-01",
+          "basis": "aiis-technique-id"
+        }
+      ],
+      "dvaaScenarios": [],
+      "attackPayloads": {
+        "agentpwn": null,
+        "hackmyagent": null
+      }
+    },
+    "T-2002": {
+      "hmaChecks": [
+        "PROMPT-001",
+        "RAG-001",
+        "RAG-002",
+        "RAG-003",
+        "RAG-004"
+      ],
+      "oasbControls": [
+        "3.1",
+        "3.2",
+        "3.3",
+        "3.4",
+        "3.5"
+      ],
+      "aiisSignatures": [],
+      "dvaaScenarios": [],
+      "attackPayloads": {
+        "agentpwn": null,
+        "hackmyagent": null
+      }
+    },
+    "T-2003": {
+      "hmaChecks": [
+        "PROMPT-001"
+      ],
+      "oasbControls": [
+        "3.1",
+        "3.2",
+        "3.3",
+        "3.4",
+        "3.5"
+      ],
+      "aiisSignatures": [
+        {
+          "id": "AIIS-HIDDEN-JAILBREAK-DAN-01",
+          "basis": "aiis-technique-id"
+        },
+        {
+          "id": "AIIS-SCRIPT-ROLE-PLAY-01",
+          "basis": "aiis-technique-id"
+        }
+      ],
+      "dvaaScenarios": [],
+      "attackPayloads": {
+        "agentpwn": null,
+        "hackmyagent": null
+      }
+    },
+    "T-2004": {
+      "hmaChecks": [
+        "PROMPT-001",
+        "PROMPT-002"
+      ],
+      "oasbControls": [
+        "3.1",
+        "3.2",
+        "3.3",
+        "3.4",
+        "3.5"
+      ],
+      "aiisSignatures": [],
+      "dvaaScenarios": [],
+      "attackPayloads": {
+        "agentpwn": null,
+        "hackmyagent": null
+      }
+    },
+    "T-2005": {
+      "hmaChecks": [
+        "SKILL-001",
+        "SKILL-004",
+        "SKILL-005"
+      ],
+      "oasbControls": [
+        "3.1",
+        "3.2",
+        "3.3",
+        "3.4",
+        "3.5"
+      ],
+      "aiisSignatures": [],
+      "dvaaScenarios": [
+        {
+          "scenario": "behavioral-drift-to-exfil",
+          "basis": "expected-check",
+          "checks": [
+            "SKILL-001"
+          ]
+        }
+      ],
+      "attackPayloads": {
+        "agentpwn": null,
+        "hackmyagent": null
+      }
+    },
+    "T-2006": {
+      "hmaChecks": [
+        "UNICODE-STEGO-001",
+        "UNICODE-STEGO-002",
+        "UNICODE-STEGO-003",
+        "UNICODE-STEGO-004",
+        "UNICODE-STEGO-005"
+      ],
+      "oasbControls": [
+        "3.1",
+        "3.2",
+        "3.3",
+        "3.4",
+        "3.5"
+      ],
+      "aiisSignatures": [
+        {
+          "id": "AIIS-UNICODE-TAG-BLOCK-01",
+          "basis": "aiis-technique-id"
+        }
+      ],
+      "dvaaScenarios": [
+        {
+          "scenario": "token-smuggling-unicode",
+          "basis": "expected-check",
+          "checks": [
+            "UNICODE-STEGO-001"
+          ]
+        },
+        {
+          "scenario": "unicode-stego-package",
+          "basis": "expected-check",
+          "checks": [
+            "UNICODE-STEGO-001"
+          ]
+        }
+      ],
+      "attackPayloads": {
+        "agentpwn": null,
+        "hackmyagent": null
+      }
+    },
+    "T-2007": {
+      "hmaChecks": [
+        "PROMPT-001"
+      ],
+      "oasbControls": [
+        "3.1",
+        "3.2",
+        "3.3",
+        "3.4",
+        "3.5"
+      ],
+      "aiisSignatures": [],
+      "dvaaScenarios": [],
+      "attackPayloads": {
+        "agentpwn": null,
+        "hackmyagent": null
+      }
+    },
+    "T-2008": {
+      "hmaChecks": [
+        "SOUL-OVERRIDE-001"
+      ],
+      "oasbControls": [
+        "3.1",
+        "3.2",
+        "3.3",
+        "3.4",
+        "3.5"
+      ],
+      "aiisSignatures": [
+        {
+          "id": "AIIS-HIDDEN-CHATML-01",
+          "basis": "aiis-technique-id"
+        },
+        {
+          "id": "AIIS-HIDDEN-ROLE-INJECT-01",
+          "basis": "aiis-related-technique-id"
+        }
+      ],
+      "dvaaScenarios": [
+        {
+          "scenario": "soul-override-via-skill",
+          "basis": "expected-check",
+          "checks": [
+            "SOUL-OVERRIDE-001"
+          ]
+        }
+      ],
+      "attackPayloads": {
+        "agentpwn": null,
+        "hackmyagent": null
+      }
+    },
+    "T-2009": {
+      "hmaChecks": [
+        "PARSE-001",
+        "PARSE-002",
+        "PARSE-003",
+        "PARSE-004",
+        "PARSE-005",
+        "PARSE-006",
+        "PARSE-007",
+        "PARSE-008",
+        "PARSE-009",
+        "PARSE-010"
+      ],
+      "oasbControls": [
+        "3.1",
+        "3.2",
+        "8.1"
+      ],
+      "aiisSignatures": [],
+      "dvaaScenarios": [],
+      "attackPayloads": {
+        "agentpwn": null,
+        "hackmyagent": null
+      }
+    },
+    "T-3001": {
+      "hmaChecks": [
+        "CRED-001",
+        "CRED-002",
+        "CRED-003",
+        "CRED-004"
+      ],
+      "oasbControls": [
+        "5.1",
+        "5.2",
+        "5.3",
+        "5.4",
+        "5.5"
+      ],
+      "aiisSignatures": [],
+      "dvaaScenarios": [
+        {
+          "scenario": "supply-chain-to-rce",
+          "basis": "expected-check",
+          "checks": [
+            "CRED-001"
+          ]
+        }
+      ],
+      "attackPayloads": {
+        "agentpwn": null,
+        "hackmyagent": null
+      }
+    },
+    "T-3002": {
+      "hmaChecks": [
+        "ENV-001",
+        "ENV-002",
+        "ENV-003",
+        "ENV-004"
+      ],
+      "oasbControls": [
+        "5.1",
+        "5.2",
+        "5.3",
+        "5.4",
+        "5.5"
+      ],
+      "aiisSignatures": [],
+      "dvaaScenarios": [],
+      "attackPayloads": {
+        "agentpwn": null,
+        "hackmyagent": null
+      }
+    },
+    "T-3003": {
+      "hmaChecks": [
+        "CRED-001"
+      ],
+      "oasbControls": [
+        "5.1",
+        "5.2",
+        "5.3",
+        "5.4",
+        "5.5"
+      ],
+      "aiisSignatures": [],
+      "dvaaScenarios": [
+        {
+          "scenario": "supply-chain-to-rce",
+          "basis": "expected-check",
+          "checks": [
+            "CRED-001"
+          ]
+        }
+      ],
+      "attackPayloads": {
+        "agentpwn": null,
+        "hackmyagent": null
+      }
+    },
+    "T-3004": {
+      "hmaChecks": [
+        "MEM-001",
+        "MEM-002",
+        "MEM-003",
+        "MEM-004",
+        "MEM-005",
+        "MEM-006"
+      ],
+      "oasbControls": [
+        "5.1",
+        "5.2",
+        "5.3",
+        "5.4",
+        "5.5"
+      ],
+      "aiisSignatures": [],
+      "dvaaScenarios": [
+        {
+          "scenario": "memory-poison-no-sanitize",
+          "basis": "expected-check",
+          "checks": [
+            "MEM-006"
+          ]
+        }
+      ],
+      "attackPayloads": {
+        "agentpwn": null,
+        "hackmyagent": null
+      }
+    },
+    "T-3005": {
+      "hmaChecks": [
+        "CRED-001",
+        "ENV-001",
+        "ENV-002",
+        "ENV-003",
+        "ENV-004"
+      ],
+      "oasbControls": [
+        "5.1",
+        "5.2",
+        "5.3",
+        "5.4",
+        "5.5"
+      ],
+      "aiisSignatures": [],
+      "dvaaScenarios": [
+        {
+          "scenario": "supply-chain-to-rce",
+          "basis": "expected-check",
+          "checks": [
+            "CRED-001"
+          ]
+        }
+      ],
+      "attackPayloads": {
+        "agentpwn": null,
+        "hackmyagent": null
+      }
+    },
+    "T-3006": {
+      "hmaChecks": [
+        "AGENT-CRED-001",
+        "CRED-001"
+      ],
+      "oasbControls": [
+        "5.1",
+        "5.2",
+        "5.3",
+        "5.4",
+        "5.5"
+      ],
+      "aiisSignatures": [],
+      "dvaaScenarios": [
+        {
+          "scenario": "agent-cred-no-protection",
+          "basis": "expected-check",
+          "checks": [
+            "AGENT-CRED-001"
+          ]
+        },
+        {
+          "scenario": "supply-chain-to-rce",
+          "basis": "expected-check",
+          "checks": [
+            "CRED-001"
+          ]
+        }
+      ],
+      "attackPayloads": {
+        "agentpwn": null,
+        "hackmyagent": null
+      }
+    },
+    "T-4001": {
+      "hmaChecks": [
+        "PERM-001",
+        "PERM-002",
+        "PERM-003"
+      ],
+      "oasbControls": [
+        "2.1",
+        "2.2",
+        "2.3",
+        "2.4",
+        "2.5"
+      ],
+      "aiisSignatures": [],
+      "dvaaScenarios": [],
+      "attackPayloads": {
+        "agentpwn": null,
+        "hackmyagent": null
+      }
+    },
+    "T-4002": {
+      "hmaChecks": [
+        "AUTH-001",
+        "AUTH-002",
+        "AUTH-003",
+        "AUTH-004"
+      ],
+      "oasbControls": [
+        "2.1",
+        "2.2",
+        "2.3",
+        "2.4",
+        "2.5"
+      ],
+      "aiisSignatures": [],
+      "dvaaScenarios": [],
+      "attackPayloads": {
+        "agentpwn": null,
+        "hackmyagent": null
+      }
+    },
+    "T-4003": {
+      "hmaChecks": [
+        "PERM-001"
+      ],
+      "oasbControls": [
+        "2.1",
+        "2.2",
+        "2.3",
+        "2.4",
+        "2.5"
+      ],
+      "aiisSignatures": [],
+      "dvaaScenarios": [],
+      "attackPayloads": {
+        "agentpwn": null,
+        "hackmyagent": null
+      }
+    },
+    "T-4004": {
+      "hmaChecks": [
+        "AUTH-001",
+        "AUTH-002",
+        "AUTH-003",
+        "AUTH-004"
+      ],
+      "oasbControls": [
+        "2.1",
+        "2.2",
+        "2.3",
+        "2.4",
+        "2.5"
+      ],
+      "aiisSignatures": [],
+      "dvaaScenarios": [],
+      "attackPayloads": {
+        "agentpwn": null,
+        "hackmyagent": null
+      }
+    },
+    "T-4005": {
+      "hmaChecks": [
+        "UNICODE-STEGO-001"
+      ],
+      "oasbControls": [
+        "2.1",
+        "2.2",
+        "2.3",
+        "2.4",
+        "2.5"
+      ],
+      "aiisSignatures": [],
+      "dvaaScenarios": [
+        {
+          "scenario": "token-smuggling-unicode",
+          "basis": "expected-check",
+          "checks": [
+            "UNICODE-STEGO-001"
+          ]
+        },
+        {
+          "scenario": "unicode-stego-package",
+          "basis": "expected-check",
+          "checks": [
+            "UNICODE-STEGO-001"
+          ]
+        }
+      ],
+      "attackPayloads": {
+        "agentpwn": null,
+        "hackmyagent": null
+      }
+    },
+    "T-4006": {
+      "hmaChecks": [
+        "PROMPT-001",
+        "PROMPT-002"
+      ],
+      "oasbControls": [
+        "2.1",
+        "2.2",
+        "2.3",
+        "2.4",
+        "2.5"
+      ],
+      "aiisSignatures": [],
+      "dvaaScenarios": [],
+      "attackPayloads": {
+        "agentpwn": null,
+        "hackmyagent": null
+      }
+    },
+    "T-4007": {
+      "hmaChecks": [
+        "FAKETOOL-001",
+        "FAKETOOL-002",
+        "FAKETOOL-003",
+        "FAKETOOL-004",
+        "FAKETOOL-005",
+        "FAKETOOL-006",
+        "FAKETOOL-007",
+        "FAKETOOL-008",
+        "FAKETOOL-009",
+        "FAKETOOL-010"
+      ],
+      "oasbControls": [
+        "2.2",
+        "2.3",
+        "6.2"
+      ],
+      "aiisSignatures": [],
+      "dvaaScenarios": [],
+      "attackPayloads": {
+        "agentpwn": null,
+        "hackmyagent": null
+      }
+    },
+    "T-5001": {
+      "hmaChecks": [
+        "MCP-001",
+        "NET-001",
+        "NET-002",
+        "NET-003"
+      ],
+      "oasbControls": [
+        "10.1",
+        "10.2",
+        "10.3",
+        "10.4",
+        "10.5",
+        "7.1",
+        "7.2",
+        "7.3",
+        "7.4"
+      ],
+      "aiisSignatures": [],
+      "dvaaScenarios": [],
+      "attackPayloads": {
+        "agentpwn": null,
+        "hackmyagent": null
+      }
+    },
+    "T-5002": {
+      "hmaChecks": [
+        "A2A-001",
+        "A2A-002"
+      ],
+      "oasbControls": [
+        "10.1",
+        "10.2",
+        "10.3",
+        "10.4",
+        "10.5",
+        "7.1",
+        "7.2",
+        "7.3",
+        "7.4"
+      ],
+      "aiisSignatures": [],
+      "dvaaScenarios": [
+        {
+          "scenario": "a2a-agent-noauth",
+          "basis": "expected-check",
+          "checks": [
+            "A2A-001",
+            "A2A-002"
+          ]
+        }
+      ],
+      "attackPayloads": {
+        "agentpwn": null,
+        "hackmyagent": null
+      }
+    },
+    "T-5003": {
+      "hmaChecks": [
+        "MCP-001",
+        "MCP-002",
+        "MCP-003"
+      ],
+      "oasbControls": [
+        "10.1",
+        "10.2",
+        "10.3",
+        "10.4",
+        "10.5",
+        "7.1",
+        "7.2",
+        "7.3",
+        "7.4"
+      ],
+      "aiisSignatures": [],
+      "dvaaScenarios": [],
+      "attackPayloads": {
+        "agentpwn": null,
+        "hackmyagent": null
+      }
+    },
+    "T-5004": {
+      "hmaChecks": [
+        "CRED-001"
+      ],
+      "oasbControls": [
+        "10.1",
+        "10.2",
+        "10.3",
+        "10.4",
+        "10.5",
+        "7.1",
+        "7.2",
+        "7.3",
+        "7.4"
+      ],
+      "aiisSignatures": [],
+      "dvaaScenarios": [
+        {
+          "scenario": "supply-chain-to-rce",
+          "basis": "expected-check",
+          "checks": [
+            "CRED-001"
+          ]
+        }
+      ],
+      "attackPayloads": {
+        "agentpwn": null,
+        "hackmyagent": null
+      }
+    },
+    "T-5005": {
+      "hmaChecks": [
+        "MCP-001",
+        "MCP-011"
+      ],
+      "oasbControls": [
+        "10.1",
+        "10.2",
+        "10.3",
+        "10.4",
+        "10.5",
+        "7.1",
+        "7.2",
+        "7.3",
+        "7.4"
+      ],
+      "aiisSignatures": [],
+      "dvaaScenarios": [],
+      "attackPayloads": {
+        "agentpwn": null,
+        "hackmyagent": null
+      }
+    },
+    "T-5006": {
+      "hmaChecks": [
+        "NET-001",
+        "NET-002",
+        "NET-003"
+      ],
+      "oasbControls": [
+        "10.1",
+        "10.2",
+        "10.3",
+        "10.4",
+        "10.5",
+        "7.1",
+        "7.2",
+        "7.3",
+        "7.4"
+      ],
+      "aiisSignatures": [],
+      "dvaaScenarios": [],
+      "attackPayloads": {
+        "agentpwn": null,
+        "hackmyagent": null
+      }
+    },
+    "T-6001": {
+      "hmaChecks": [
+        "MEM-001",
+        "MEM-002",
+        "MEM-003",
+        "MEM-004",
+        "MEM-005",
+        "MEM-006"
+      ],
+      "oasbControls": [
+        "8.1",
+        "8.2",
+        "8.3",
+        "8.4"
+      ],
+      "aiisSignatures": [],
+      "dvaaScenarios": [
+        {
+          "scenario": "memory-poison-no-sanitize",
+          "basis": "expected-check",
+          "checks": [
+            "MEM-006"
+          ]
+        }
+      ],
+      "attackPayloads": {
+        "agentpwn": null,
+        "hackmyagent": null
+      }
+    },
+    "T-6002": {
+      "hmaChecks": [
+        "MEM-001",
+        "MEM-002",
+        "MEM-003",
+        "MEM-004",
+        "MEM-005",
+        "MEM-006"
+      ],
+      "oasbControls": [
+        "8.1",
+        "8.2",
+        "8.3",
+        "8.4"
+      ],
+      "aiisSignatures": [],
+      "dvaaScenarios": [
+        {
+          "scenario": "memory-poison-no-sanitize",
+          "basis": "expected-check",
+          "checks": [
+            "MEM-006"
+          ]
+        }
+      ],
+      "attackPayloads": {
+        "agentpwn": null,
+        "hackmyagent": null
+      }
+    },
+    "T-6003": {
+      "hmaChecks": [
+        "GATEWAY-001",
+        "GATEWAY-002",
+        "GATEWAY-003",
+        "GATEWAY-004",
+        "GATEWAY-005",
+        "GATEWAY-006",
+        "GATEWAY-007",
+        "GATEWAY-008"
+      ],
+      "oasbControls": [
+        "8.1",
+        "8.2",
+        "8.3",
+        "8.4"
+      ],
+      "aiisSignatures": [],
+      "dvaaScenarios": [],
+      "attackPayloads": {
+        "agentpwn": null,
+        "hackmyagent": null
+      }
+    },
+    "T-6004": {
+      "hmaChecks": [
+        "SKILL-001",
+        "SKILL-002",
+        "SKILL-003",
+        "SKILL-004",
+        "SKILL-005",
+        "SKILL-006"
+      ],
+      "oasbControls": [
+        "8.1",
+        "8.2",
+        "8.3",
+        "8.4"
+      ],
+      "aiisSignatures": [],
+      "dvaaScenarios": [
+        {
+          "scenario": "behavioral-drift-to-exfil",
+          "basis": "expected-check",
+          "checks": [
+            "SKILL-001"
+          ]
+        },
+        {
+          "scenario": "skill-backdoor-install",
+          "basis": "expected-check",
+          "checks": [
+            "SKILL-002"
+          ]
+        }
+      ],
+      "attackPayloads": {
+        "agentpwn": null,
+        "hackmyagent": null
+      }
+    },
+    "T-6005": {
+      "hmaChecks": [
+        "HEARTBEAT-001",
+        "HEARTBEAT-002",
+        "HEARTBEAT-003",
+        "HEARTBEAT-004",
+        "HEARTBEAT-005",
+        "HEARTBEAT-006",
+        "HEARTBEAT-007"
+      ],
+      "oasbControls": [
+        "8.1",
+        "8.2",
+        "8.3",
+        "8.4"
+      ],
+      "aiisSignatures": [],
+      "dvaaScenarios": [],
+      "attackPayloads": {
+        "agentpwn": null,
+        "hackmyagent": null
+      }
+    },
+    "T-6006": {
+      "hmaChecks": [
+        "SKILL-001",
+        "SKILL-002",
+        "SKILL-003"
+      ],
+      "oasbControls": [
+        "8.1",
+        "8.2",
+        "8.3",
+        "8.4"
+      ],
+      "aiisSignatures": [],
+      "dvaaScenarios": [
+        {
+          "scenario": "behavioral-drift-to-exfil",
+          "basis": "expected-check",
+          "checks": [
+            "SKILL-001"
+          ]
+        },
+        {
+          "scenario": "skill-backdoor-install",
+          "basis": "expected-check",
+          "checks": [
+            "SKILL-002"
+          ]
+        }
+      ],
+      "attackPayloads": {
+        "agentpwn": null,
+        "hackmyagent": null
+      }
+    },
+    "T-6007": {
+      "hmaChecks": [
+        "PERSIST-001",
+        "PERSIST-002",
+        "PERSIST-003",
+        "PERSIST-004",
+        "PERSIST-005",
+        "PERSIST-006",
+        "PERSIST-007",
+        "PERSIST-008",
+        "PERSIST-009",
+        "PERSIST-010"
+      ],
+      "oasbControls": [
+        "4.3",
+        "8.1",
+        "8.2"
+      ],
+      "aiisSignatures": [],
+      "dvaaScenarios": [],
+      "attackPayloads": {
+        "agentpwn": null,
+        "hackmyagent": null
+      }
+    },
+    "T-7001": {
+      "hmaChecks": [
+        "IO-001",
+        "IO-002",
+        "IO-003",
+        "IO-004"
+      ],
+      "oasbControls": [
+        "4.1",
+        "4.2",
+        "4.3",
+        "4.4"
+      ],
+      "aiisSignatures": [],
+      "dvaaScenarios": [],
+      "attackPayloads": {
+        "agentpwn": null,
+        "hackmyagent": null
+      }
+    },
+    "T-7002": {
+      "hmaChecks": [
+        "INJ-001",
+        "INJ-002",
+        "INJ-003",
+        "IO-001"
+      ],
+      "oasbControls": [
+        "4.1",
+        "4.2",
+        "4.3",
+        "4.4"
+      ],
+      "aiisSignatures": [],
+      "dvaaScenarios": [],
+      "attackPayloads": {
+        "agentpwn": null,
+        "hackmyagent": null
+      }
+    },
+    "T-7003": {
+      "hmaChecks": [
+        "IO-001",
+        "IO-002",
+        "IO-003",
+        "IO-004"
+      ],
+      "oasbControls": [
+        "4.1",
+        "4.2",
+        "4.3",
+        "4.4"
+      ],
+      "aiisSignatures": [],
+      "dvaaScenarios": [],
+      "attackPayloads": {
+        "agentpwn": null,
+        "hackmyagent": null
+      }
+    },
+    "T-7004": {
+      "hmaChecks": [
+        "MEM-001",
+        "MEM-002",
+        "MEM-003",
+        "MEM-004",
+        "MEM-005"
+      ],
+      "oasbControls": [
+        "4.1",
+        "4.2",
+        "4.3",
+        "4.4"
+      ],
+      "aiisSignatures": [],
+      "dvaaScenarios": [],
+      "attackPayloads": {
+        "agentpwn": null,
+        "hackmyagent": null
+      }
+    },
+    "T-7005": {
+      "hmaChecks": [
+        "ENV-001",
+        "ENV-002",
+        "ENV-003",
+        "ENV-004",
+        "IO-001"
+      ],
+      "oasbControls": [
+        "4.1",
+        "4.2",
+        "4.3",
+        "4.4"
+      ],
+      "aiisSignatures": [],
+      "dvaaScenarios": [],
+      "attackPayloads": {
+        "agentpwn": null,
+        "hackmyagent": null
+      }
+    },
+    "T-7006": {
+      "hmaChecks": [
+        "RAG-001",
+        "RAG-002",
+        "RAG-003",
+        "RAG-004"
+      ],
+      "oasbControls": [
+        "4.1",
+        "4.2",
+        "4.3",
+        "4.4"
+      ],
+      "aiisSignatures": [],
+      "dvaaScenarios": [],
+      "attackPayloads": {
+        "agentpwn": null,
+        "hackmyagent": null
+      }
+    },
+    "T-7007": {
+      "hmaChecks": [
+        "LIFECYCLE-001",
+        "LIFECYCLE-002",
+        "LIFECYCLE-003",
+        "LIFECYCLE-004",
+        "LIFECYCLE-005",
+        "LIFECYCLE-006",
+        "LIFECYCLE-007",
+        "LIFECYCLE-008",
+        "LIFECYCLE-009",
+        "LIFECYCLE-010"
+      ],
+      "oasbControls": [
+        "3.1",
+        "3.2",
+        "8.1",
+        "8.2"
+      ],
+      "aiisSignatures": [],
+      "dvaaScenarios": [],
+      "attackPayloads": {
+        "agentpwn": null,
+        "hackmyagent": null
+      }
+    },
+    "T-8001": {
+      "hmaChecks": [
+        "SANDBOX-001",
+        "SANDBOX-002",
+        "SANDBOX-003",
+        "SANDBOX-004"
+      ],
+      "oasbControls": [
+        "4.3"
+      ],
+      "aiisSignatures": [],
+      "dvaaScenarios": [],
+      "attackPayloads": {
+        "agentpwn": null,
+        "hackmyagent": null
+      }
+    },
+    "T-8002": {
+      "hmaChecks": [
+        "NET-001",
+        "SANDBOX-001",
+        "SANDBOX-002",
+        "SANDBOX-003",
+        "SANDBOX-004"
+      ],
+      "oasbControls": [
+        "4.3"
+      ],
+      "aiisSignatures": [
+        {
+          "id": "AIIS-ATTR-EXFIL-URL-01",
+          "basis": "aiis-technique-id"
+        }
+      ],
+      "dvaaScenarios": [],
+      "attackPayloads": {
+        "agentpwn": null,
+        "hackmyagent": null
+      }
+    },
+    "T-8003": {
+      "hmaChecks": [
+        "NET-001",
+        "NET-002",
+        "NET-003"
+      ],
+      "oasbControls": [
+        "4.3"
+      ],
+      "aiisSignatures": [],
+      "dvaaScenarios": [],
+      "attackPayloads": {
+        "agentpwn": null,
+        "hackmyagent": null
+      }
+    },
+    "T-8004": {
+      "hmaChecks": [
+        "NET-001",
+        "SANDBOX-001",
+        "SANDBOX-002",
+        "SANDBOX-003",
+        "SANDBOX-004"
+      ],
+      "oasbControls": [
+        "4.3"
+      ],
+      "aiisSignatures": [],
+      "dvaaScenarios": [],
+      "attackPayloads": {
+        "agentpwn": null,
+        "hackmyagent": null
+      }
+    },
+    "T-8005": {
+      "hmaChecks": [
+        "SANDBOX-001",
+        "SANDBOX-002",
+        "SANDBOX-003",
+        "SANDBOX-004"
+      ],
+      "oasbControls": [
+        "4.3"
+      ],
+      "aiisSignatures": [],
+      "dvaaScenarios": [],
+      "attackPayloads": {
+        "agentpwn": null,
+        "hackmyagent": null
+      }
+    },
+    "T-8006": {
+      "hmaChecks": [
+        "NET-001",
+        "SANDBOX-001",
+        "SANDBOX-002",
+        "SANDBOX-003",
+        "SANDBOX-004"
+      ],
+      "oasbControls": [
+        "4.3"
+      ],
+      "aiisSignatures": [],
+      "dvaaScenarios": [],
+      "attackPayloads": {
+        "agentpwn": null,
+        "hackmyagent": null
+      }
+    },
+    "T-9001": {
+      "hmaChecks": [
+        "INTEGRITY-001",
+        "SUPPLY-001"
+      ],
+      "oasbControls": [
+        "10.5",
+        "2.2",
+        "2.3",
+        "4.1",
+        "4.2"
+      ],
+      "aiisSignatures": [],
+      "dvaaScenarios": [
+        {
+          "scenario": "behavioral-drift-to-exfil",
+          "basis": "expected-check",
+          "checks": [
+            "SUPPLY-001"
+          ]
+        },
+        {
+          "scenario": "integrity-digest-bypass",
+          "basis": "expected-check",
+          "checks": [
+            "INTEGRITY-001"
+          ]
+        }
+      ],
+      "attackPayloads": {
+        "agentpwn": null,
+        "hackmyagent": null
+      }
+    },
+    "T-9002": {
+      "hmaChecks": [
+        "SUPPLY-001"
+      ],
+      "oasbControls": [
+        "10.2",
+        "10.3",
+        "10.5",
+        "9.2",
+        "9.4"
+      ],
+      "aiisSignatures": [],
+      "dvaaScenarios": [
+        {
+          "scenario": "behavioral-drift-to-exfil",
+          "basis": "expected-check",
+          "checks": [
+            "SUPPLY-001"
+          ]
+        }
+      ],
+      "attackPayloads": {
+        "agentpwn": null,
+        "hackmyagent": null
+      }
+    },
+    "T-9003": {
+      "hmaChecks": [
+        "HEARTBEAT-001",
+        "SUPPLY-001"
+      ],
+      "oasbControls": [
+        "10.3",
+        "6.1",
+        "6.2",
+        "6.3",
+        "9.1",
+        "9.4"
+      ],
+      "aiisSignatures": [],
+      "dvaaScenarios": [
+        {
+          "scenario": "behavioral-drift-to-exfil",
+          "basis": "expected-check",
+          "checks": [
+            "SUPPLY-001"
+          ]
+        }
+      ],
+      "attackPayloads": {
+        "agentpwn": null,
+        "hackmyagent": null
+      }
+    },
+    "T-9004": {
+      "hmaChecks": [
+        "SUPPLY-001"
+      ],
+      "oasbControls": [
+        "10.2",
+        "7.1",
+        "7.2",
+        "7.3"
+      ],
+      "aiisSignatures": [],
+      "dvaaScenarios": [
+        {
+          "scenario": "behavioral-drift-to-exfil",
+          "basis": "expected-check",
+          "checks": [
+            "SUPPLY-001"
+          ]
+        }
+      ],
+      "attackPayloads": {
+        "agentpwn": null,
+        "hackmyagent": null
+      }
+    },
+    "T-9005": {
+      "hmaChecks": [
+        "SUPPLY-001"
+      ],
+      "oasbControls": [
+        "10.1",
+        "10.2",
+        "4.1",
+        "4.4"
+      ],
+      "aiisSignatures": [],
+      "dvaaScenarios": [
+        {
+          "scenario": "behavioral-drift-to-exfil",
+          "basis": "expected-check",
+          "checks": [
+            "SUPPLY-001"
+          ]
+        }
+      ],
+      "attackPayloads": {
+        "agentpwn": null,
+        "hackmyagent": null
+      }
+    },
+    "T-9006": {
+      "hmaChecks": [
+        "DEP-001",
+        "DEP-002",
+        "DEP-003",
+        "DEP-004",
+        "SUPPLY-001",
+        "SUPPLY-002",
+        "SUPPLY-003",
+        "SUPPLY-004"
+      ],
+      "oasbControls": [
+        "10.5",
+        "6.1",
+        "6.2",
+        "6.3",
+        "6.4",
+        "6.5"
+      ],
+      "aiisSignatures": [],
+      "dvaaScenarios": [
+        {
+          "scenario": "behavioral-drift-to-exfil",
+          "basis": "expected-check",
+          "checks": [
+            "SUPPLY-001",
+            "SUPPLY-002",
+            "SUPPLY-004"
+          ]
+        },
+        {
+          "scenario": "stego-binary-asset",
+          "basis": "expected-check",
+          "checks": [
+            "DEP-004"
+          ]
+        }
+      ],
+      "attackPayloads": {
+        "agentpwn": null,
+        "hackmyagent": null
+      }
+    }
+  },
+  "byHmaCheck": {
+    "A2A-001": [
+      {
+        "techniqueId": "T-1006",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-5002",
+        "relation": null
+      }
+    ],
+    "A2A-002": [
+      {
+        "techniqueId": "T-1006",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-5002",
+        "relation": null
+      }
+    ],
+    "AGENT-CRED-001": [
+      {
+        "techniqueId": "T-3006",
+        "relation": null
+      }
+    ],
+    "AUTH-001": [
+      {
+        "techniqueId": "T-4002",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-4004",
+        "relation": null
+      }
+    ],
+    "AUTH-002": [
+      {
+        "techniqueId": "T-4002",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-4004",
+        "relation": null
+      }
+    ],
+    "AUTH-003": [
+      {
+        "techniqueId": "T-4002",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-4004",
+        "relation": null
+      }
+    ],
+    "AUTH-004": [
+      {
+        "techniqueId": "T-4002",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-4004",
+        "relation": null
+      }
+    ],
+    "CRED-001": [
+      {
+        "techniqueId": "T-3001",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-3003",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-3005",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-3006",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-5004",
+        "relation": null
+      }
+    ],
+    "CRED-002": [
+      {
+        "techniqueId": "T-3001",
+        "relation": null
+      }
+    ],
+    "CRED-003": [
+      {
+        "techniqueId": "T-3001",
+        "relation": null
+      }
+    ],
+    "CRED-004": [
+      {
+        "techniqueId": "T-3001",
+        "relation": null
+      }
+    ],
+    "DEP-001": [
+      {
+        "techniqueId": "T-9006",
+        "relation": null
+      }
+    ],
+    "DEP-002": [
+      {
+        "techniqueId": "T-9006",
+        "relation": null
+      }
+    ],
+    "DEP-003": [
+      {
+        "techniqueId": "T-9006",
+        "relation": null
+      }
+    ],
+    "DEP-004": [
+      {
+        "techniqueId": "T-9006",
+        "relation": null
+      }
+    ],
+    "ENV-001": [
+      {
+        "techniqueId": "T-3002",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-3005",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-7005",
+        "relation": null
+      }
+    ],
+    "ENV-002": [
+      {
+        "techniqueId": "T-3002",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-3005",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-7005",
+        "relation": null
+      }
+    ],
+    "ENV-003": [
+      {
+        "techniqueId": "T-3002",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-3005",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-7005",
+        "relation": null
+      }
+    ],
+    "ENV-004": [
+      {
+        "techniqueId": "T-3002",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-3005",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-7005",
+        "relation": null
+      }
+    ],
+    "FAKETOOL-001": [
+      {
+        "techniqueId": "T-4007",
+        "relation": null
+      }
+    ],
+    "FAKETOOL-002": [
+      {
+        "techniqueId": "T-4007",
+        "relation": null
+      }
+    ],
+    "FAKETOOL-003": [
+      {
+        "techniqueId": "T-4007",
+        "relation": null
+      }
+    ],
+    "FAKETOOL-004": [
+      {
+        "techniqueId": "T-4007",
+        "relation": null
+      }
+    ],
+    "FAKETOOL-005": [
+      {
+        "techniqueId": "T-4007",
+        "relation": null
+      }
+    ],
+    "FAKETOOL-006": [
+      {
+        "techniqueId": "T-4007",
+        "relation": null
+      }
+    ],
+    "FAKETOOL-007": [
+      {
+        "techniqueId": "T-4007",
+        "relation": null
+      }
+    ],
+    "FAKETOOL-008": [
+      {
+        "techniqueId": "T-4007",
+        "relation": null
+      }
+    ],
+    "FAKETOOL-009": [
+      {
+        "techniqueId": "T-4007",
+        "relation": null
+      }
+    ],
+    "FAKETOOL-010": [
+      {
+        "techniqueId": "T-4007",
+        "relation": null
+      }
+    ],
+    "GATEWAY-001": [
+      {
+        "techniqueId": "T-6003",
+        "relation": null
+      }
+    ],
+    "GATEWAY-002": [
+      {
+        "techniqueId": "T-6003",
+        "relation": null
+      }
+    ],
+    "GATEWAY-003": [
+      {
+        "techniqueId": "T-6003",
+        "relation": null
+      }
+    ],
+    "GATEWAY-004": [
+      {
+        "techniqueId": "T-6003",
+        "relation": null
+      }
+    ],
+    "GATEWAY-005": [
+      {
+        "techniqueId": "T-6003",
+        "relation": null
+      }
+    ],
+    "GATEWAY-006": [
+      {
+        "techniqueId": "T-6003",
+        "relation": null
+      }
+    ],
+    "GATEWAY-007": [
+      {
+        "techniqueId": "T-6003",
+        "relation": null
+      }
+    ],
+    "GATEWAY-008": [
+      {
+        "techniqueId": "T-6003",
+        "relation": null
+      }
+    ],
+    "HEARTBEAT-001": [
+      {
+        "techniqueId": "T-6005",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-9003",
+        "relation": null
+      }
+    ],
+    "HEARTBEAT-002": [
+      {
+        "techniqueId": "T-6005",
+        "relation": null
+      }
+    ],
+    "HEARTBEAT-003": [
+      {
+        "techniqueId": "T-6005",
+        "relation": null
+      }
+    ],
+    "HEARTBEAT-004": [
+      {
+        "techniqueId": "T-6005",
+        "relation": null
+      }
+    ],
+    "HEARTBEAT-005": [
+      {
+        "techniqueId": "T-6005",
+        "relation": null
+      }
+    ],
+    "HEARTBEAT-006": [
+      {
+        "techniqueId": "T-6005",
+        "relation": null
+      }
+    ],
+    "HEARTBEAT-007": [
+      {
+        "techniqueId": "T-6005",
+        "relation": null
+      }
+    ],
+    "INJ-001": [
+      {
+        "techniqueId": "T-7002",
+        "relation": null
+      }
+    ],
+    "INJ-002": [
+      {
+        "techniqueId": "T-7002",
+        "relation": null
+      }
+    ],
+    "INJ-003": [
+      {
+        "techniqueId": "T-7002",
+        "relation": null
+      }
+    ],
+    "INTEGRITY-001": [
+      {
+        "techniqueId": "T-9001",
+        "relation": null
+      }
+    ],
+    "IO-001": [
+      {
+        "techniqueId": "T-7001",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-7002",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-7003",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-7005",
+        "relation": null
+      }
+    ],
+    "IO-002": [
+      {
+        "techniqueId": "T-7001",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-7003",
+        "relation": null
+      }
+    ],
+    "IO-003": [
+      {
+        "techniqueId": "T-7001",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-7003",
+        "relation": null
+      }
+    ],
+    "IO-004": [
+      {
+        "techniqueId": "T-7001",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-7003",
+        "relation": null
+      }
+    ],
+    "LIFECYCLE-001": [
+      {
+        "techniqueId": "T-7007",
+        "relation": null
+      }
+    ],
+    "LIFECYCLE-002": [
+      {
+        "techniqueId": "T-7007",
+        "relation": null
+      }
+    ],
+    "LIFECYCLE-003": [
+      {
+        "techniqueId": "T-7007",
+        "relation": null
+      }
+    ],
+    "LIFECYCLE-004": [
+      {
+        "techniqueId": "T-7007",
+        "relation": null
+      }
+    ],
+    "LIFECYCLE-005": [
+      {
+        "techniqueId": "T-7007",
+        "relation": null
+      }
+    ],
+    "LIFECYCLE-006": [
+      {
+        "techniqueId": "T-7007",
+        "relation": null
+      }
+    ],
+    "LIFECYCLE-007": [
+      {
+        "techniqueId": "T-7007",
+        "relation": null
+      }
+    ],
+    "LIFECYCLE-008": [
+      {
+        "techniqueId": "T-7007",
+        "relation": null
+      }
+    ],
+    "LIFECYCLE-009": [
+      {
+        "techniqueId": "T-7007",
+        "relation": null
+      }
+    ],
+    "LIFECYCLE-010": [
+      {
+        "techniqueId": "T-7007",
+        "relation": null
+      }
+    ],
+    "MCP-001": [
+      {
+        "techniqueId": "T-1005",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-5001",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-5003",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-5005",
+        "relation": null
+      }
+    ],
+    "MCP-002": [
+      {
+        "techniqueId": "T-5003",
+        "relation": null
+      }
+    ],
+    "MCP-003": [
+      {
+        "techniqueId": "T-5003",
+        "relation": null
+      }
+    ],
+    "MCP-011": [
+      {
+        "techniqueId": "T-1001",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-1002",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-1005",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-5005",
+        "relation": null
+      }
+    ],
+    "MEM-001": [
+      {
+        "techniqueId": "T-3004",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-6001",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-6002",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-7004",
+        "relation": null
+      }
+    ],
+    "MEM-002": [
+      {
+        "techniqueId": "T-3004",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-6001",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-6002",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-7004",
+        "relation": null
+      }
+    ],
+    "MEM-003": [
+      {
+        "techniqueId": "T-3004",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-6001",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-6002",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-7004",
+        "relation": null
+      }
+    ],
+    "MEM-004": [
+      {
+        "techniqueId": "T-3004",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-6001",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-6002",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-7004",
+        "relation": null
+      }
+    ],
+    "MEM-005": [
+      {
+        "techniqueId": "T-3004",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-6001",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-6002",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-7004",
+        "relation": null
+      }
+    ],
+    "MEM-006": [
+      {
+        "techniqueId": "T-3004",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-6001",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-6002",
+        "relation": null
+      }
+    ],
+    "NET-001": [
+      {
+        "techniqueId": "T-5001",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-5006",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-8002",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-8003",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-8004",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-8006",
+        "relation": null
+      }
+    ],
+    "NET-002": [
+      {
+        "techniqueId": "T-5001",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-5006",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-8003",
+        "relation": null
+      }
+    ],
+    "NET-003": [
+      {
+        "techniqueId": "T-5001",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-5006",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-8003",
+        "relation": null
+      }
+    ],
+    "PARSE-001": [
+      {
+        "techniqueId": "T-2009",
+        "relation": null
+      }
+    ],
+    "PARSE-002": [
+      {
+        "techniqueId": "T-2009",
+        "relation": null
+      }
+    ],
+    "PARSE-003": [
+      {
+        "techniqueId": "T-2009",
+        "relation": null
+      }
+    ],
+    "PARSE-004": [
+      {
+        "techniqueId": "T-2009",
+        "relation": null
+      }
+    ],
+    "PARSE-005": [
+      {
+        "techniqueId": "T-2009",
+        "relation": null
+      }
+    ],
+    "PARSE-006": [
+      {
+        "techniqueId": "T-2009",
+        "relation": null
+      }
+    ],
+    "PARSE-007": [
+      {
+        "techniqueId": "T-2009",
+        "relation": null
+      }
+    ],
+    "PARSE-008": [
+      {
+        "techniqueId": "T-2009",
+        "relation": null
+      }
+    ],
+    "PARSE-009": [
+      {
+        "techniqueId": "T-2009",
+        "relation": null
+      }
+    ],
+    "PARSE-010": [
+      {
+        "techniqueId": "T-2009",
+        "relation": null
+      }
+    ],
+    "PERM-001": [
+      {
+        "techniqueId": "T-4001",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-4003",
+        "relation": null
+      }
+    ],
+    "PERM-002": [
+      {
+        "techniqueId": "T-4001",
+        "relation": null
+      }
+    ],
+    "PERM-003": [
+      {
+        "techniqueId": "T-4001",
+        "relation": null
+      }
+    ],
+    "PERSIST-001": [
+      {
+        "techniqueId": "T-6007",
+        "relation": null
+      }
+    ],
+    "PERSIST-002": [
+      {
+        "techniqueId": "T-6007",
+        "relation": null
+      }
+    ],
+    "PERSIST-003": [
+      {
+        "techniqueId": "T-6007",
+        "relation": null
+      }
+    ],
+    "PERSIST-004": [
+      {
+        "techniqueId": "T-6007",
+        "relation": null
+      }
+    ],
+    "PERSIST-005": [
+      {
+        "techniqueId": "T-6007",
+        "relation": null
+      }
+    ],
+    "PERSIST-006": [
+      {
+        "techniqueId": "T-6007",
+        "relation": null
+      }
+    ],
+    "PERSIST-007": [
+      {
+        "techniqueId": "T-6007",
+        "relation": null
+      }
+    ],
+    "PERSIST-008": [
+      {
+        "techniqueId": "T-6007",
+        "relation": null
+      }
+    ],
+    "PERSIST-009": [
+      {
+        "techniqueId": "T-6007",
+        "relation": null
+      }
+    ],
+    "PERSIST-010": [
+      {
+        "techniqueId": "T-6007",
+        "relation": null
+      }
+    ],
+    "PROMPT-001": [
+      {
+        "techniqueId": "T-2001",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-2002",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-2003",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-2004",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-2007",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-4006",
+        "relation": null
+      }
+    ],
+    "PROMPT-002": [
+      {
+        "techniqueId": "T-2001",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-2004",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-4006",
+        "relation": null
+      }
+    ],
+    "PROMPT-003": [
+      {
+        "techniqueId": "T-2001",
+        "relation": null
+      }
+    ],
+    "PROMPT-004": [
+      {
+        "techniqueId": "T-2001",
+        "relation": null
+      }
+    ],
+    "RAG-001": [
+      {
+        "techniqueId": "T-2002",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-7006",
+        "relation": null
+      }
+    ],
+    "RAG-002": [
+      {
+        "techniqueId": "T-2002",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-7006",
+        "relation": null
+      }
+    ],
+    "RAG-003": [
+      {
+        "techniqueId": "T-2002",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-7006",
+        "relation": null
+      }
+    ],
+    "RAG-004": [
+      {
+        "techniqueId": "T-2002",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-7006",
+        "relation": null
+      }
+    ],
+    "SANDBOX-001": [
+      {
+        "techniqueId": "T-8001",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-8002",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-8004",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-8005",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-8006",
+        "relation": null
+      }
+    ],
+    "SANDBOX-002": [
+      {
+        "techniqueId": "T-8001",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-8002",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-8004",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-8005",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-8006",
+        "relation": null
+      }
+    ],
+    "SANDBOX-003": [
+      {
+        "techniqueId": "T-8001",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-8002",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-8004",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-8005",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-8006",
+        "relation": null
+      }
+    ],
+    "SANDBOX-004": [
+      {
+        "techniqueId": "T-8001",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-8002",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-8004",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-8005",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-8006",
+        "relation": null
+      }
+    ],
+    "SKILL-001": [
+      {
+        "techniqueId": "T-2005",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-6004",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-6006",
+        "relation": null
+      }
+    ],
+    "SKILL-002": [
+      {
+        "techniqueId": "T-6004",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-6006",
+        "relation": null
+      }
+    ],
+    "SKILL-003": [
+      {
+        "techniqueId": "T-6004",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-6006",
+        "relation": null
+      }
+    ],
+    "SKILL-004": [
+      {
+        "techniqueId": "T-2005",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-6004",
+        "relation": null
+      }
+    ],
+    "SKILL-005": [
+      {
+        "techniqueId": "T-2005",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-6004",
+        "relation": null
+      }
+    ],
+    "SKILL-006": [
+      {
+        "techniqueId": "T-6004",
+        "relation": null
+      }
+    ],
+    "SOUL-OVERRIDE-001": [
+      {
+        "techniqueId": "T-2008",
+        "relation": null
+      }
+    ],
+    "SUPPLY-001": [
+      {
+        "techniqueId": "T-9001",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-9002",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-9003",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-9004",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-9005",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-9006",
+        "relation": null
+      }
+    ],
+    "SUPPLY-002": [
+      {
+        "techniqueId": "T-9006",
+        "relation": null
+      }
+    ],
+    "SUPPLY-003": [
+      {
+        "techniqueId": "T-9006",
+        "relation": null
+      }
+    ],
+    "SUPPLY-004": [
+      {
+        "techniqueId": "T-9006",
+        "relation": null
+      }
+    ],
+    "UNICODE-STEGO-001": [
+      {
+        "techniqueId": "T-2006",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-4005",
+        "relation": null
+      }
+    ],
+    "UNICODE-STEGO-002": [
+      {
+        "techniqueId": "T-2006",
+        "relation": null
+      }
+    ],
+    "UNICODE-STEGO-003": [
+      {
+        "techniqueId": "T-2006",
+        "relation": null
+      }
+    ],
+    "UNICODE-STEGO-004": [
+      {
+        "techniqueId": "T-2006",
+        "relation": null
+      }
+    ],
+    "UNICODE-STEGO-005": [
+      {
+        "techniqueId": "T-2006",
+        "relation": null
+      }
+    ],
+    "WEBEXPOSE-001": [
+      {
+        "techniqueId": "T-1001",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-1003",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-1004",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-1007",
+        "relation": null
+      }
+    ],
+    "WEBEXPOSE-002": [
+      {
+        "techniqueId": "T-1001",
+        "relation": null
+      }
+    ]
+  },
+  "byOasbControl": {
+    "1.1": [
+      {
+        "techniqueId": "T-1001",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-1003",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-1004",
+        "relation": null
+      }
+    ],
+    "1.2": [
+      {
+        "techniqueId": "T-1001",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-1003",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-1004",
+        "relation": null
+      }
+    ],
+    "1.3": [
+      {
+        "techniqueId": "T-1001",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-1003",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-1004",
+        "relation": null
+      }
+    ],
+    "1.4": [
+      {
+        "techniqueId": "T-1001",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-1003",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-1004",
+        "relation": null
+      }
+    ],
+    "10.1": [
+      {
+        "techniqueId": "T-5001",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-5002",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-5003",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-5004",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-5005",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-5006",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-9005",
+        "relation": null
+      }
+    ],
+    "10.2": [
+      {
+        "techniqueId": "T-5001",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-5002",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-5003",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-5004",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-5005",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-5006",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-9002",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-9004",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-9005",
+        "relation": null
+      }
+    ],
+    "10.3": [
+      {
+        "techniqueId": "T-5001",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-5002",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-5003",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-5004",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-5005",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-5006",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-9002",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-9003",
+        "relation": null
+      }
+    ],
+    "10.4": [
+      {
+        "techniqueId": "T-5001",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-5002",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-5003",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-5004",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-5005",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-5006",
+        "relation": null
+      }
+    ],
+    "10.5": [
+      {
+        "techniqueId": "T-1001",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-1002",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-1005",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-1007",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-5001",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-5002",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-5003",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-5004",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-5005",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-5006",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-9001",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-9002",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-9006",
+        "relation": null
+      }
+    ],
+    "2.1": [
+      {
+        "techniqueId": "T-4001",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-4002",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-4003",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-4004",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-4005",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-4006",
+        "relation": null
+      }
+    ],
+    "2.2": [
+      {
+        "techniqueId": "T-4001",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-4002",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-4003",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-4004",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-4005",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-4006",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-4007",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-9001",
+        "relation": null
+      }
+    ],
+    "2.3": [
+      {
+        "techniqueId": "T-4001",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-4002",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-4003",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-4004",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-4005",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-4006",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-4007",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-9001",
+        "relation": null
+      }
+    ],
+    "2.4": [
+      {
+        "techniqueId": "T-4001",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-4002",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-4003",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-4004",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-4005",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-4006",
+        "relation": null
+      }
+    ],
+    "2.5": [
+      {
+        "techniqueId": "T-4001",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-4002",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-4003",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-4004",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-4005",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-4006",
+        "relation": null
+      }
+    ],
+    "3.1": [
+      {
+        "techniqueId": "T-2001",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-2002",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-2003",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-2004",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-2005",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-2006",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-2007",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-2008",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-2009",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-7007",
+        "relation": null
+      }
+    ],
+    "3.2": [
+      {
+        "techniqueId": "T-2001",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-2002",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-2003",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-2004",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-2005",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-2006",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-2007",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-2008",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-2009",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-7007",
+        "relation": null
+      }
+    ],
+    "3.3": [
+      {
+        "techniqueId": "T-2001",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-2002",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-2003",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-2004",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-2005",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-2006",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-2007",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-2008",
+        "relation": null
+      }
+    ],
+    "3.4": [
+      {
+        "techniqueId": "T-2001",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-2002",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-2003",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-2004",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-2005",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-2006",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-2007",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-2008",
+        "relation": null
+      }
+    ],
+    "3.5": [
+      {
+        "techniqueId": "T-2001",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-2002",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-2003",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-2004",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-2005",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-2006",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-2007",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-2008",
+        "relation": null
+      }
+    ],
+    "4.1": [
+      {
+        "techniqueId": "T-7001",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-7002",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-7003",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-7004",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-7005",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-7006",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-9001",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-9005",
+        "relation": null
+      }
+    ],
+    "4.2": [
+      {
+        "techniqueId": "T-7001",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-7002",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-7003",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-7004",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-7005",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-7006",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-9001",
+        "relation": null
+      }
+    ],
+    "4.3": [
+      {
+        "techniqueId": "T-6007",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-7001",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-7002",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-7003",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-7004",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-7005",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-7006",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-8001",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-8002",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-8003",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-8004",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-8005",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-8006",
+        "relation": null
+      }
+    ],
+    "4.4": [
+      {
+        "techniqueId": "T-7001",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-7002",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-7003",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-7004",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-7005",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-7006",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-9005",
+        "relation": null
+      }
+    ],
+    "5.1": [
+      {
+        "techniqueId": "T-3001",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-3002",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-3003",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-3004",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-3005",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-3006",
+        "relation": null
+      }
+    ],
+    "5.2": [
+      {
+        "techniqueId": "T-3001",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-3002",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-3003",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-3004",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-3005",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-3006",
+        "relation": null
+      }
+    ],
+    "5.3": [
+      {
+        "techniqueId": "T-3001",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-3002",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-3003",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-3004",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-3005",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-3006",
+        "relation": null
+      }
+    ],
+    "5.4": [
+      {
+        "techniqueId": "T-3001",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-3002",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-3003",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-3004",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-3005",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-3006",
+        "relation": null
+      }
+    ],
+    "5.5": [
+      {
+        "techniqueId": "T-3001",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-3002",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-3003",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-3004",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-3005",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-3006",
+        "relation": null
+      }
+    ],
+    "6.1": [
+      {
+        "techniqueId": "T-9003",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-9006",
+        "relation": null
+      }
+    ],
+    "6.2": [
+      {
+        "techniqueId": "T-4007",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-9003",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-9006",
+        "relation": null
+      }
+    ],
+    "6.3": [
+      {
+        "techniqueId": "T-9003",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-9006",
+        "relation": null
+      }
+    ],
+    "6.4": [
+      {
+        "techniqueId": "T-9006",
+        "relation": null
+      }
+    ],
+    "6.5": [
+      {
+        "techniqueId": "T-9006",
+        "relation": null
+      }
+    ],
+    "7.1": [
+      {
+        "techniqueId": "T-1006",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-5001",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-5002",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-5003",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-5004",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-5005",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-5006",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-9004",
+        "relation": null
+      }
+    ],
+    "7.2": [
+      {
+        "techniqueId": "T-1006",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-5001",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-5002",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-5003",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-5004",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-5005",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-5006",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-9004",
+        "relation": null
+      }
+    ],
+    "7.3": [
+      {
+        "techniqueId": "T-1006",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-5001",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-5002",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-5003",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-5004",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-5005",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-5006",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-9004",
+        "relation": null
+      }
+    ],
+    "7.4": [
+      {
+        "techniqueId": "T-1006",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-5001",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-5002",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-5003",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-5004",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-5005",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-5006",
+        "relation": null
+      }
+    ],
+    "8.1": [
+      {
+        "techniqueId": "T-2009",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-6001",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-6002",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-6003",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-6004",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-6005",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-6006",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-6007",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-7007",
+        "relation": null
+      }
+    ],
+    "8.2": [
+      {
+        "techniqueId": "T-6001",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-6002",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-6003",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-6004",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-6005",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-6006",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-6007",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-7007",
+        "relation": null
+      }
+    ],
+    "8.3": [
+      {
+        "techniqueId": "T-6001",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-6002",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-6003",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-6004",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-6005",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-6006",
+        "relation": null
+      }
+    ],
+    "8.4": [
+      {
+        "techniqueId": "T-6001",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-6002",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-6003",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-6004",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-6005",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-6006",
+        "relation": null
+      }
+    ],
+    "9.1": [
+      {
+        "techniqueId": "T-9003",
+        "relation": null
+      }
+    ],
+    "9.2": [
+      {
+        "techniqueId": "T-9002",
+        "relation": null
+      }
+    ],
+    "9.4": [
+      {
+        "techniqueId": "T-9002",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-9003",
+        "relation": null
+      }
+    ]
+  },
+  "byAiisSignature": {
+    "AIIS-ATTR-EXFIL-URL-01": [
+      {
+        "techniqueId": "T-2001",
+        "basis": "aiis-related-technique-id",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-8002",
+        "basis": "aiis-technique-id",
+        "relation": null
+      }
+    ],
+    "AIIS-ATTR-IGNORE-INST-01": [
+      {
+        "techniqueId": "T-2001",
+        "basis": "aiis-technique-id",
+        "relation": null
+      }
+    ],
+    "AIIS-COMMENT-SYSTEM-OVERRIDE-01": [
+      {
+        "techniqueId": "T-2001",
+        "basis": "aiis-technique-id",
+        "relation": null
+      }
+    ],
+    "AIIS-EXPOSURE-CHROMA-HEARTBEAT-01": [
+      {
+        "techniqueId": "T-1001",
+        "basis": "aiis-technique-id",
+        "relation": null
+      }
+    ],
+    "AIIS-EXPOSURE-LANGSERVE-ROUTES-01": [
+      {
+        "techniqueId": "T-1001",
+        "basis": "aiis-technique-id",
+        "relation": null
+      }
+    ],
+    "AIIS-EXPOSURE-LITELLM-MODELS-01": [
+      {
+        "techniqueId": "T-1001",
+        "basis": "aiis-technique-id",
+        "relation": null
+      }
+    ],
+    "AIIS-EXPOSURE-MCP-JSONRPC-01": [
+      {
+        "techniqueId": "T-1002",
+        "basis": "aiis-technique-id",
+        "relation": null
+      }
+    ],
+    "AIIS-EXPOSURE-OLLAMA-TAGS-01": [
+      {
+        "techniqueId": "T-1001",
+        "basis": "aiis-technique-id",
+        "relation": null
+      }
+    ],
+    "AIIS-EXPOSURE-OLLAMA-VERSION-01": [
+      {
+        "techniqueId": "T-1001",
+        "basis": "aiis-technique-id",
+        "relation": null
+      }
+    ],
+    "AIIS-EXPOSURE-QDRANT-ROOT-01": [
+      {
+        "techniqueId": "T-1001",
+        "basis": "aiis-technique-id",
+        "relation": null
+      }
+    ],
+    "AIIS-EXPOSURE-VLLM-MODELS-01": [
+      {
+        "techniqueId": "T-1001",
+        "basis": "aiis-technique-id",
+        "relation": null
+      }
+    ],
+    "AIIS-HEADER-INJECT-01": [
+      {
+        "techniqueId": "T-2001",
+        "basis": "aiis-technique-id",
+        "relation": null
+      }
+    ],
+    "AIIS-HIDDEN-CHATML-01": [
+      {
+        "techniqueId": "T-2001",
+        "basis": "aiis-related-technique-id",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-2008",
+        "basis": "aiis-technique-id",
+        "relation": null
+      }
+    ],
+    "AIIS-HIDDEN-JAILBREAK-DAN-01": [
+      {
+        "techniqueId": "T-2001",
+        "basis": "aiis-related-technique-id",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-2003",
+        "basis": "aiis-technique-id",
+        "relation": null
+      }
+    ],
+    "AIIS-HIDDEN-ROLE-INJECT-01": [
+      {
+        "techniqueId": "T-2001",
+        "basis": "aiis-technique-id",
+        "relation": null
+      },
+      {
+        "techniqueId": "T-2008",
+        "basis": "aiis-related-technique-id",
+        "relation": null
+      }
+    ],
+    "AIIS-META-LLM-OVERRIDE-01": [
+      {
+        "techniqueId": "T-2001",
+        "basis": "aiis-technique-id",
+        "relation": null
+      }
+    ],
+    "AIIS-SCRIPT-ROLE-PLAY-01": [
+      {
+        "techniqueId": "T-2003",
+        "basis": "aiis-technique-id",
+        "relation": null
+      }
+    ],
+    "AIIS-UNICODE-TAG-BLOCK-01": [
+      {
+        "techniqueId": "T-2006",
+        "basis": "aiis-technique-id",
+        "relation": null
+      }
+    ]
+  },
+  "byDvaaScenario": {
+    "a2a-agent-noauth": [
+      {
+        "techniqueId": "T-1006",
+        "basis": "expected-check",
+        "checks": [
+          "A2A-001",
+          "A2A-002"
+        ],
+        "relation": null
+      },
+      {
+        "techniqueId": "T-5002",
+        "basis": "expected-check",
+        "checks": [
+          "A2A-001",
+          "A2A-002"
+        ],
+        "relation": null
+      }
+    ],
+    "agent-cred-no-protection": [
+      {
+        "techniqueId": "T-3006",
+        "basis": "expected-check",
+        "checks": [
+          "AGENT-CRED-001"
+        ],
+        "relation": null
+      }
+    ],
+    "behavioral-drift-to-exfil": [
+      {
+        "techniqueId": "T-2005",
+        "basis": "expected-check",
+        "checks": [
+          "SKILL-001"
+        ],
+        "relation": null
+      },
+      {
+        "techniqueId": "T-6004",
+        "basis": "expected-check",
+        "checks": [
+          "SKILL-001"
+        ],
+        "relation": null
+      },
+      {
+        "techniqueId": "T-6006",
+        "basis": "expected-check",
+        "checks": [
+          "SKILL-001"
+        ],
+        "relation": null
+      },
+      {
+        "techniqueId": "T-9001",
+        "basis": "expected-check",
+        "checks": [
+          "SUPPLY-001"
+        ],
+        "relation": null
+      },
+      {
+        "techniqueId": "T-9002",
+        "basis": "expected-check",
+        "checks": [
+          "SUPPLY-001"
+        ],
+        "relation": null
+      },
+      {
+        "techniqueId": "T-9003",
+        "basis": "expected-check",
+        "checks": [
+          "SUPPLY-001"
+        ],
+        "relation": null
+      },
+      {
+        "techniqueId": "T-9004",
+        "basis": "expected-check",
+        "checks": [
+          "SUPPLY-001"
+        ],
+        "relation": null
+      },
+      {
+        "techniqueId": "T-9005",
+        "basis": "expected-check",
+        "checks": [
+          "SUPPLY-001"
+        ],
+        "relation": null
+      },
+      {
+        "techniqueId": "T-9006",
+        "basis": "expected-check",
+        "checks": [
+          "SUPPLY-001",
+          "SUPPLY-002",
+          "SUPPLY-004"
+        ],
+        "relation": null
+      }
+    ],
+    "integrity-digest-bypass": [
+      {
+        "techniqueId": "T-9001",
+        "basis": "expected-check",
+        "checks": [
+          "INTEGRITY-001"
+        ],
+        "relation": null
+      }
+    ],
+    "memory-poison-no-sanitize": [
+      {
+        "techniqueId": "T-3004",
+        "basis": "expected-check",
+        "checks": [
+          "MEM-006"
+        ],
+        "relation": null
+      },
+      {
+        "techniqueId": "T-6001",
+        "basis": "expected-check",
+        "checks": [
+          "MEM-006"
+        ],
+        "relation": null
+      },
+      {
+        "techniqueId": "T-6002",
+        "basis": "expected-check",
+        "checks": [
+          "MEM-006"
+        ],
+        "relation": null
+      }
+    ],
+    "skill-backdoor-install": [
+      {
+        "techniqueId": "T-6004",
+        "basis": "expected-check",
+        "checks": [
+          "SKILL-002"
+        ],
+        "relation": null
+      },
+      {
+        "techniqueId": "T-6006",
+        "basis": "expected-check",
+        "checks": [
+          "SKILL-002"
+        ],
+        "relation": null
+      }
+    ],
+    "soul-override-via-skill": [
+      {
+        "techniqueId": "T-2008",
+        "basis": "expected-check",
+        "checks": [
+          "SOUL-OVERRIDE-001"
+        ],
+        "relation": null
+      }
+    ],
+    "stego-binary-asset": [
+      {
+        "techniqueId": "T-9006",
+        "basis": "expected-check",
+        "checks": [
+          "DEP-004"
+        ],
+        "relation": null
+      }
+    ],
+    "supply-chain-to-rce": [
+      {
+        "techniqueId": "T-3001",
+        "basis": "expected-check",
+        "checks": [
+          "CRED-001"
+        ],
+        "relation": null
+      },
+      {
+        "techniqueId": "T-3003",
+        "basis": "expected-check",
+        "checks": [
+          "CRED-001"
+        ],
+        "relation": null
+      },
+      {
+        "techniqueId": "T-3005",
+        "basis": "expected-check",
+        "checks": [
+          "CRED-001"
+        ],
+        "relation": null
+      },
+      {
+        "techniqueId": "T-3006",
+        "basis": "expected-check",
+        "checks": [
+          "CRED-001"
+        ],
+        "relation": null
+      },
+      {
+        "techniqueId": "T-5004",
+        "basis": "expected-check",
+        "checks": [
+          "CRED-001"
+        ],
+        "relation": null
+      }
+    ],
+    "token-smuggling-unicode": [
+      {
+        "techniqueId": "T-2006",
+        "basis": "expected-check",
+        "checks": [
+          "UNICODE-STEGO-001"
+        ],
+        "relation": null
+      },
+      {
+        "techniqueId": "T-4005",
+        "basis": "expected-check",
+        "checks": [
+          "UNICODE-STEGO-001"
+        ],
+        "relation": null
+      }
+    ],
+    "unicode-stego-package": [
+      {
+        "techniqueId": "T-2006",
+        "basis": "expected-check",
+        "checks": [
+          "UNICODE-STEGO-001"
+        ],
+        "relation": null
+      },
+      {
+        "techniqueId": "T-4005",
+        "basis": "expected-check",
+        "checks": [
+          "UNICODE-STEGO-001"
+        ],
+        "relation": null
+      }
+    ],
+    "webexpose-claude-md": [
+      {
+        "techniqueId": "T-1001",
+        "basis": "expected-check",
+        "checks": [
+          "WEBEXPOSE-001"
+        ],
+        "relation": null
+      },
+      {
+        "techniqueId": "T-1003",
+        "basis": "expected-check",
+        "checks": [
+          "WEBEXPOSE-001"
+        ],
+        "relation": null
+      },
+      {
+        "techniqueId": "T-1004",
+        "basis": "expected-check",
+        "checks": [
+          "WEBEXPOSE-001"
+        ],
+        "relation": null
+      },
+      {
+        "techniqueId": "T-1007",
+        "basis": "expected-check",
+        "checks": [
+          "WEBEXPOSE-001"
+        ],
+        "relation": null
+      }
+    ],
+    "webexpose-env-file": [
+      {
+        "techniqueId": "T-1001",
+        "basis": "expected-check",
+        "checks": [
+          "WEBEXPOSE-002"
+        ],
+        "relation": null
+      }
+    ]
+  },
+  "byPayload": {
+    "agentpwn": null,
+    "hackmyagent": null
+  },
+  "unjoined": {
+    "oasbControlsInNoTechnique": [
+      "9.3",
+      "9.5"
+    ],
+    "dvaaExpectedChecksInNoTechnique": [
+      "AIM-002",
+      "AITOOL-001",
+      "AITOOL-002",
+      "AITOOL-003",
+      "AITOOL-004",
+      "CLIPASS-001",
+      "CONFIG-004",
+      "DOCKERINJ-001",
+      "GIT-001",
+      "GIT-003",
+      "INSTALL-001",
+      "LLM-001",
+      "LLM-002",
+      "LLM-003",
+      "LLM-004",
+      "NEMO-005",
+      "NEMO-006",
+      "NEMO-007",
+      "NEMO-009",
+      "NEMO-010",
+      "SEM-CRED-001",
+      "SEM-CRED-002",
+      "SEM-MCP-007",
+      "WEBCRED-001"
+    ],
+    "hmaChecksInNoTechnique": [
+      "AIM-001",
+      "AIM-002",
+      "AIM-003",
+      "AITOOL-001",
+      "AITOOL-002",
+      "AITOOL-003",
+      "AITOOL-004",
+      "API-001",
+      "API-002",
+      "API-003",
+      "API-004",
+      "API-KEY-EXPOSED",
+      "ASKILL-002",
+      "AST-CAP-001",
+      "AST-CAP-002",
+      "AST-CODE-001",
+      "AST-CODE-002",
+      "AST-CODE-003",
+      "AST-CRED-001",
+      "AST-CRED-002",
+      "AST-CRED-003",
+      "AST-EXFIL-001",
+      "AST-GOV-001",
+      "AST-GOV-002",
+      "AST-GOV-003",
+      "AST-GOV-004",
+      "AST-GOV-005",
+      "AST-HEARTBEAT-001",
+      "AST-INJECT-001",
+      "AST-MANIP-001",
+      "AST-PERSIST-001",
+      "AST-PROMPT-001",
+      "AST-PROMPT-002",
+      "AST-PROMPT-003",
+      "AST-PROMPT-004",
+      "AST-SCOPE-001",
+      "AST-SCOPE-002",
+      "AST-SCOPE-003",
+      "AST-SCOPE-004",
+      "AUDIT-001",
+      "AUDIT-002",
+      "AUDIT-003",
+      "AUDIT-004",
+      "CLAUDE-001",
+      "CLAUDE-002",
+      "CLAUDE-003",
+      "CLAUDE-004",
+      "CLAUDE-005",
+      "CLAUDE-006",
+      "CLAUDE-007",
+      "CLAUDE-MD-EXPOSED",
+      "CLIPASS-001",
+      "CODEINJ-001",
+      "CONFIG-001",
+      "CONFIG-002",
+      "CONFIG-003",
+      "CONFIG-004",
+      "CONFIG-005",
+      "CONFIG-006",
+      "CONFIG-007",
+      "CONFIG-008",
+      "CONFIG-009",
+      "CONFIG-EXPOSED",
+      "CURSOR-001",
+      "CVE-001",
+      "CVE-002",
+      "CVE-003",
+      "CVE-004",
+      "DNA-001",
+      "DNA-002",
+      "DNA-003",
+      "DOCKERINJ-001",
+      "ENCRYPT-001",
+      "ENCRYPT-002",
+      "ENCRYPT-003",
+      "ENCRYPT-004",
+      "ENVLEAK-001",
+      "FIX-BACKUP-FAILED",
+      "FIX-ERROR",
+      "FIX-FOREIGN-ARCHIVE",
+      "FIX-SUMMARY",
+      "FIX-WRITE-FAILED",
+      "GIT-001",
+      "GIT-002",
+      "GIT-003",
+      "HMA-NMC-001",
+      "HMA-NMC-002",
+      "HMA-NMC-003",
+      "HMA-NMC-004",
+      "HMA-NMC-005",
+      "HMA-NMC-006",
+      "HMA-NMC-010",
+      "HMA-NMC-011",
+      "HMA-NMC-012",
+      "HMA-NMC-013",
+      "HMA-NMC-014",
+      "HMA-NMC-015",
+      "HMA-NMC-020",
+      "HMA-NMC-021",
+      "HMA-NMC-022",
+      "HMA-NMC-023",
+      "HMA-NMC-024",
+      "HMA-NMC-030",
+      "HMA-NMC-031",
+      "HMA-NMC-032",
+      "HMA-NMC-033",
+      "HMA-NMC-034",
+      "HMA-NMC-040",
+      "HMA-NMC-041",
+      "HMA-NMC-042",
+      "HMA-NMC-050",
+      "HMA-NMC-051",
+      "HMA-NMC-052",
+      "INJ-004",
+      "INSTALL-001",
+      "LLM-001",
+      "LLM-002",
+      "LLM-003",
+      "LLM-004",
+      "LOG-001",
+      "LOG-002",
+      "LOG-003",
+      "LOG-004",
+      "MCP-004",
+      "MCP-005",
+      "MCP-006",
+      "MCP-007",
+      "MCP-008",
+      "MCP-009",
+      "MCP-010",
+      "MCP-SSE",
+      "MCP-TOOLS",
+      "NEMO-001",
+      "NEMO-002",
+      "NEMO-003",
+      "NEMO-004",
+      "NEMO-005",
+      "NEMO-006",
+      "NEMO-007",
+      "NEMO-008",
+      "NEMO-009",
+      "NEMO-010",
+      "NET-004",
+      "NET-005",
+      "NET-006",
+      "PROC-001",
+      "PROC-002",
+      "PROC-003",
+      "PROC-004",
+      "RATE-001",
+      "RATE-002",
+      "RATE-003",
+      "RATE-004",
+      "SANDBOX-005",
+      "SCAN-001",
+      "SCAN-DECODE-BOUND",
+      "SCAN-NO-OPEN-PORTS",
+      "SCAN-UNREACHABLE",
+      "SCAN-UNREAD-001",
+      "SEC-001",
+      "SEC-002",
+      "SEC-003",
+      "SEC-004",
+      "SEM-CRED-001",
+      "SEM-CRED-002",
+      "SEM-CRED-003",
+      "SEM-CRED-004",
+      "SEM-INST-001",
+      "SEM-INST-002",
+      "SEM-INST-003",
+      "SEM-INST-004",
+      "SEM-LLM-NOT-ANALYZED",
+      "SEM-MCP-001",
+      "SEM-MCP-002",
+      "SEM-MCP-003",
+      "SEM-MCP-004",
+      "SEM-MCP-005",
+      "SEM-MCP-006",
+      "SEM-MCP-007",
+      "SEM-MCP-008",
+      "SEM-PERM-001",
+      "SEM-PERM-002",
+      "SEM-PERM-003",
+      "SESSION-001",
+      "SESSION-002",
+      "SESSION-003",
+      "SESSION-004",
+      "SHELL-EXFIL-001",
+      "SKILL-007",
+      "SKILL-008",
+      "SKILL-009",
+      "SKILL-010",
+      "SKILL-011",
+      "SKILL-012",
+      "SKILL-018",
+      "SKILL-019",
+      "SKILL-020",
+      "SKILL-021",
+      "SKILL-022",
+      "SKILL-023",
+      "SKILL-024",
+      "SKILL-025",
+      "SKILL-MEM-001",
+      "SOUL-AS-001",
+      "SOUL-AS-002",
+      "SOUL-BYPASS",
+      "SOUL-CB-001",
+      "SOUL-CB-002",
+      "SOUL-COMPLETENESS",
+      "SOUL-CONSENT",
+      "SOUL-CONTRADICTION",
+      "SOUL-DH-001",
+      "SOUL-DH-002",
+      "SOUL-ESCAPE-CLAUSE",
+      "SOUL-HB-001",
+      "SOUL-HB-002",
+      "SOUL-HO-001",
+      "SOUL-HO-002",
+      "SOUL-HT-001",
+      "SOUL-HT-002",
+      "SOUL-HV-001",
+      "SOUL-HV-002",
+      "SOUL-HV-003",
+      "SOUL-HV-004",
+      "SOUL-IH-001",
+      "SOUL-IH-002",
+      "SOUL-TH-001",
+      "SOUL-TH-002",
+      "SOUL-TH-003",
+      "SOUL-TH-004",
+      "SOUL-TH-005",
+      "SOUL-UNVERIFIABLE-CLAIM",
+      "SUPPLY-005",
+      "SUPPLY-006",
+      "SUPPLY-007",
+      "SUPPLY-008",
+      "TMPPATH-001",
+      "TOCTOU-001",
+      "TOOL-001",
+      "TOOL-002",
+      "TOOL-003",
+      "TOOL-004",
+      "VSCODE-001",
+      "VSCODE-002",
+      "WEBCRED-001",
+      "WEBEXPOSE-003"
+    ],
+    "payloadsInNoTechnique": {
+      "agentpwn": null,
+      "hackmyagent": null
+    }
+  },
+  "notAssessed": [
+    {
+      "column": "attackPayloads.agentpwn",
+      "reason": "mappings/agentpwn-payloads.json does not exist; this column, byPayload.agentpwn and unjoined.payloadsInNoTechnique.agentpwn are null until it does"
+    },
+    {
+      "column": "attackPayloads.hackmyagent",
+      "reason": "mappings/hackmyagent-payloads.json does not exist; this column, byPayload.hackmyagent and unjoined.payloadsInNoTechnique.hackmyagent are null until it does"
+    }
+  ]
+}

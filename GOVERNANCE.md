@@ -61,7 +61,11 @@ check fails when it differs from a fresh rendering:
 - the counts on `README.md` and on the pages the README check reads with it, and the
   attack-class tables on `docs/attack-classes.md`: `python3 scripts/check_readme_claims.py`;
 - the overlap counts in `cross-references/technique-overlap-index.md`:
-  `python3 scripts/check_cross_references.py`.
+  `python3 scripts/check_cross_references.py`;
+- the technique crosswalk `crosswalks/technique-crosswalk.json`, which joins each technique
+  to its HackMyAgent checks, OASB-1 controls, AIIS signatures and DVAA scenarios, rendered
+  from `matrix.json`, `technique-ids.json` and the pinned inputs under `vendor/` by
+  `scripts/build_technique_crosswalk.py`: `python3 scripts/check_technique_crosswalk.py`.
 
 Four files under `crosswalks/` hold derived content that no check renders afresh.
 `tests/test_crosswalks.py` guards them; it is a local test that no workflow runs, run with
