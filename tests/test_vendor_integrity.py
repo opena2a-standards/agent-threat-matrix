@@ -257,6 +257,17 @@ def test_a_tag_that_names_another_commit_is_drift(tree):
     assert f"tag v9.9.10 does not name {tree.copies_commit}" in proc.stderr
 
 
+@pytest.mark.parametrize("source", [COPIES, SCENARIOS])
+def test_a_version_that_names_no_tag_is_drift(tree, source):
+    # The offline crosswalk check passes this value: it is a non-empty string.
+    tree.manifests[source]["version"] = "not a tag"
+    tree.save()
+    proc = tree.check()
+    assert proc.returncode == 1, proc.stdout + proc.stderr
+    assert lines(proc) == [f"DRIFT {source} VENDOR.json"]
+    assert f"tag not a tag does not name {tree.manifests[source]['commit']}" in proc.stderr
+
+
 def test_an_unreachable_upstream_exits_3_and_compares_nothing(tree):
     # Every vendored file differs from its source, so a compare would print DRIFT lines.
     tree.flip_byte(COPIES, "retired-ids.yaml")

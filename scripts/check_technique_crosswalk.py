@@ -20,10 +20,12 @@ source at the pin. It fails when any of these holds:
      while the producer's ``mappings/<producer>-payloads.json`` exists, or is not null while
      that file does not exist;
 - X8 a ``VENDOR.json`` pin is not of its source's form: a git source carries ``repo``,
-     ``commit`` (40 lower-case hex), ``version`` (the tag naming the commit, or null),
-     ``read`` (a date), ``files`` and one of ``refresh`` or ``generate``; a package carries
-     ``package``, ``version`` (exact, no range), ``registry``, ``integrity`` (sha512),
-     ``read``, ``files`` and ``generate``;
+     ``commit`` (40 lower-case hex), ``version`` (null or a non-empty string, whitespace
+     alone counting as empty; a string that names no tag passes here, and
+     ``scripts/check_vendor_integrity.py`` is the check that verifies the tag names the
+     commit), ``read`` (a date), ``files`` and one of ``refresh`` or ``generate``; a package
+     carries ``package``, ``version`` (exact, no range), ``registry``, ``integrity``
+     (sha512), ``read``, ``files`` and ``generate``;
 - X9 a file under ``vendor/<source>/`` is not ``VENDOR.json``, the source's generator
      (``generate.mjs`` or ``generate.py``, kept only by a source with ``generate``) or a
      file listed in ``files``, or a listed file is absent.
@@ -141,10 +143,11 @@ def check_manifest(source: str, manifest: dict, report: Report):
         if not isinstance(commit, str) or not COMMIT_RE.match(commit):
             report.add(8, f"{rel} commit {commit!r} is not 40 lower-case hex")
         if "version" not in manifest:
-            report.add(8, f"{rel} has no version (the tag naming the commit, or null)")
+            report.add(8, f"{rel} has no version (null or a non-empty string)")
         elif manifest["version"] is not None and (
                 not isinstance(manifest["version"], str) or not manifest["version"].strip()):
-            report.add(8, f"{rel} version {manifest['version']!r} is neither a tag nor null")
+            report.add(8, f"{rel} version {manifest['version']!r} is neither null nor a "
+                          f"non-empty string")
         commands = [key for key in ("refresh", "generate") if key in manifest]
         if len(commands) != 1:
             report.add(8, f"{rel} carries {len(commands)} of refresh and generate; a git pin "

@@ -387,6 +387,50 @@ def test_a_39_hex_commit_in_a_git_pin_fails(tree, source):
         f"X8 {rel} commit '{manifest['commit']}' is not 40 lower-case hex"]
 
 
+def test_the_x8_text_states_what_is_read_in_a_git_version_and_names_the_tag_check():
+    doc = " ".join(CHECK.__doc__.split())
+    x8 = doc[doc.index("- X8 "):doc.index("- X9 ")]
+    assert "``version`` (null or a non-empty string, whitespace alone counting as empty;" in x8
+    assert "a string that names no tag passes here" in x8
+    assert ("``scripts/check_vendor_integrity.py`` is the check that verifies the tag names "
+            "the commit") in x8
+
+
+@pytest.mark.parametrize("source", ["aiis-signatures", "damn-vulnerable-ai-agent"])
+def test_a_git_version_that_names_no_tag_passes_and_is_recorded_in_inputs(tree, source):
+    rel = f"vendor/{source}/VENDOR.json"
+    manifest = read(tree, rel)
+    manifest["version"] = "not a tag"
+    write(tree, rel, manifest)
+    build(tree)
+    proc = check(tree)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert proc.stdout.startswith("OK: ")
+    assert read(tree, CROSSWALK)["inputs"][source]["version"] == "not a tag"
+
+
+@pytest.mark.parametrize("value", ["", "   ", 5, True, ["v0.4.0"]])
+def test_a_git_version_that_is_neither_null_nor_a_non_empty_string_fails(tree, value):
+    rel = "vendor/aiis-signatures/VENDOR.json"
+    manifest = read(tree, rel)
+    manifest["version"] = value
+    write(tree, rel, manifest)
+    proc = check(tree)
+    assert proc.returncode == 1
+    assert violations(proc, "X8") == [
+        f"X8 {rel} version {value!r} is neither null nor a non-empty string"]
+
+
+def test_a_git_pin_without_a_version_fails(tree):
+    rel = "vendor/aiis-signatures/VENDOR.json"
+    manifest = read(tree, rel)
+    del manifest["version"]
+    write(tree, rel, manifest)
+    proc = check(tree)
+    assert proc.returncode == 1
+    assert violations(proc, "X8") == [f"X8 {rel} has no version (null or a non-empty string)"]
+
+
 def test_an_unknown_key_in_a_pin_fails(tree):
     rel = "vendor/aiis-signatures/VENDOR.json"
     manifest = read(tree, rel)
