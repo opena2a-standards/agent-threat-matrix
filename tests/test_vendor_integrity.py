@@ -404,6 +404,57 @@ def test_a_file_name_that_git_quotes_is_found_at_the_pin(tree, name):
     assert f"{name} is not in" not in proc.stderr
 
 
+def pin_a_commit_holding(tree, files: dict, name: str, vendored: bytes):
+    """Commit files to the aiis-signatures upstream, pin that commit and add name, vendored as
+    the bytes vendored, to files of the pin."""
+    work = tree.copies_work
+    for rel, data in files.items():
+        (work / rel).write_bytes(data)
+    # git add reads a pathspec that starts with a colon as magic; ./ keeps each one a path.
+    run(GIT + ["-C", str(work), "add", "--", *(f"./{rel}" for rel in files)])
+    run(GIT + ["-C", str(work), "commit", "-q", "-m", "a commit for the pin"])
+    run(GIT + ["--git-dir", str(tree.copies_bare), "fetch", "-q", str(work),
+               "refs/heads/main:refs/heads/main"])
+    # The tag v9.9.9 names the first commit, so the new pin carries no version.
+    tree.manifests[COPIES].update(
+        commit=run(["git", "-C", str(work), "rev-parse", "HEAD"]).stdout.strip(),
+        version=None, files=tree.manifests[COPIES]["files"] + [name])
+    (tree.root / "vendor" / COPIES / name).write_bytes(vendored)
+    tree.save()
+
+
+# git 2.53.0 reads a pathspec that starts with a colon as magic: git ls-tree lists colon.json
+# for :colon.json and x.json for :(top)x.json, and exits 128 on :!x.json, whose magic it does
+# not support. The commit holds colon.json and x.json beside the name, with other bytes.
+@pytest.mark.parametrize("name", [":colon.json", ":(top)x.json", ":!x.json"],
+                         ids=["colon", "top", "exclude"])
+def test_a_file_name_starting_with_a_colon_is_found_at_the_pin(tree, name):
+    pin_a_commit_holding(tree, {name: b"{}\n", "colon.json": b"[]\n", "x.json": b"[]\n"},
+                         name, b"{}\n")
+    proc = tree.check()
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert lines(proc) == ["OK: 7 vendored files in 3 sources match their sources at the pin"]
+    # A changed byte in that file is drift the compare finds, with the file found at the pin.
+    tree.flip_byte(COPIES, name)
+    proc = tree.check()
+    assert proc.returncode == 1, proc.stdout + proc.stderr
+    assert lines(proc) == [f"DRIFT {COPIES} {name}"]
+    assert f"{name} is not in" not in proc.stderr
+
+
+@pytest.mark.parametrize("name, found", [(":colon.json", "colon.json"),
+                                         (":(top)x.json", "x.json")], ids=["colon", "top"])
+def test_a_commit_holding_only_the_path_the_magic_names_is_drift(tree, name, found):
+    # The commit holds the file a listing that reads the name as magic finds, with the bytes
+    # vendored as the name, and no file of that name.
+    pin_a_commit_holding(tree, {found: b"{}\n"}, name, b"{}\n")
+    proc = tree.check()
+    assert proc.returncode == 1, proc.stdout + proc.stderr
+    assert lines(proc) == [f"DRIFT {COPIES} {name}"]
+    commit = tree.manifests[COPIES]["commit"]
+    assert f"{COPIES}: {name} is not in {commit}" in proc.stderr.splitlines()
+
+
 # Runs the script on an interpreter whose tarfile has no extraction filters, as Python 3.9.6
 # has: no tarfile.data_filter, and an extractall that takes no filter argument.
 NO_FILTERS = """\
