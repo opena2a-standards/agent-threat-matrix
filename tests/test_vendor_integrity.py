@@ -375,16 +375,15 @@ def test_a_file_name_holding_other_text_is_compared(tree):
     assert lines(proc) == [f"DRIFT {COPIES} {name}"]
 
 
-# Without -z, git ls-tree prints each of these names quoted: café.json while core.quotePath is
-# true, its default, and the other three whatever core.quotePath is.
-@pytest.mark.parametrize("name", ["café.json", 'say "hi".json', "back\\slash.json",
-                                  "tab\there.json"],
-                         ids=["non-ascii", "double-quote", "backslash", "tab"])
-def test_a_file_name_that_git_quotes_is_found_at_the_pin(tree, name):
+def pin_a_new_file(tree, name: str):
+    """Commit {}\\n as name in the aiis-signatures upstream, fetch that commit into its bare
+    repository, pin it with name added to files, and vendor the same bytes as name."""
     work = tree.copies_work
     (work / name).write_bytes(b"{}\n")
-    run(GIT + ["-C", str(work), "add", "--", name])
-    run(GIT + ["-C", str(work), "commit", "-q", "-m", "a name git quotes"])
+    # On macOS, git init set core.precomposeunicode to true, and git 2.53.0 then added the name
+    # cafe, U+0301, .json as café.json with é as U+00E9. false adds the name as given.
+    run(GIT + ["-c", "core.precomposeunicode=false", "-C", str(work), "add", "--", name])
+    run(GIT + ["-C", str(work), "commit", "-q", "-m", "a new file"])
     run(GIT + ["--git-dir", str(tree.copies_bare), "fetch", "-q", str(work),
                "refs/heads/main:refs/heads/main"])
     # The tag v9.9.9 names the first commit, so the new pin carries no version.
@@ -393,6 +392,9 @@ def test_a_file_name_that_git_quotes_is_found_at_the_pin(tree, name):
         version=None, files=tree.manifests[COPIES]["files"] + [name])
     (tree.root / "vendor" / COPIES / name).write_bytes(b"{}\n")
     tree.save()
+
+
+def assert_found_at_the_pin(tree, name: str):
     proc = tree.check()
     assert proc.returncode == 0, proc.stdout + proc.stderr
     assert lines(proc) == ["OK: 7 vendored files in 3 sources match their sources at the pin"]
@@ -402,6 +404,36 @@ def test_a_file_name_that_git_quotes_is_found_at_the_pin(tree, name):
     assert proc.returncode == 1, proc.stdout + proc.stderr
     assert lines(proc) == [f"DRIFT {COPIES} {name}"]
     assert f"{name} is not in" not in proc.stderr
+
+
+# Without -z, git ls-tree prints each of these names quoted: café.json while core.quotePath is
+# true, its default, and the other three whatever core.quotePath is.
+@pytest.mark.parametrize("name", ["café.json", 'say "hi".json', "back\\slash.json",
+                                  "tab\there.json"],
+                         ids=["non-ascii", "double-quote", "backslash", "tab"])
+def test_a_file_name_that_git_quotes_is_found_at_the_pin(tree, name):
+    pin_a_new_file(tree, name)
+    assert_found_at_the_pin(tree, name)
+
+
+# cafe, U+0301, .json is café.json with é in decomposed form. On macOS, git 2.53.0 clone wrote
+# core.precomposeunicode=true to the clone's config when the global config did not set it, and
+# in that clone ls-tree printed nothing for the name and show looked for café.json, with é
+# composed. With the setting false in the global config, git clone left it unset, so the test
+# sets it to true in the environment of the git commands it and the script run, after any
+# setting the environment carries.
+def test_a_file_name_in_decomposed_form_is_found_at_the_pin(tree, monkeypatch):
+    count = int(os.environ.get("GIT_CONFIG_COUNT", "0"))
+    monkeypatch.setenv(f"GIT_CONFIG_KEY_{count}", "core.precomposeunicode")
+    monkeypatch.setenv(f"GIT_CONFIG_VALUE_{count}", "true")
+    monkeypatch.setenv("GIT_CONFIG_COUNT", str(count + 1))
+    name = "cafe\N{COMBINING ACUTE ACCENT}.json"
+    pin_a_new_file(tree, name)
+    listed = run(GIT + ["-c", "core.precomposeunicode=false", "--git-dir", str(tree.copies_bare),
+                        "ls-tree", "-z", "--name-only", tree.manifests[COPIES]["commit"]])
+    assert name in listed.stdout.split("\0")
+    assert "caf\N{LATIN SMALL LETTER E WITH ACUTE}.json" not in listed.stdout.split("\0")
+    assert_found_at_the_pin(tree, name)
 
 
 def pin_a_commit_holding(tree, files: dict, name: str, vendored: bytes):

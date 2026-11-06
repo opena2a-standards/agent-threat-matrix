@@ -120,7 +120,12 @@ def last_line(proc: subprocess.CompletedProcess) -> str:
 
 
 def git(clone: Path, *args: str) -> subprocess.CompletedProcess:
-    return run(["git", "-c", "credential.helper=", "-C", str(clone), *args])
+    # On macOS, git 2.53.0 clone wrote core.precomposeunicode=true to the clone's config when
+    # the global config did not set it. In that clone, ls-tree printed nothing for the name
+    # cafe, U+0301, .json in a commit that holds it, and show looked for café.json, with é
+    # composed. With core.precomposeunicode=false here, git found that name as given.
+    return run(["git", "-c", "credential.helper=", "-c", "core.precomposeunicode=false",
+                "-C", str(clone), *args])
 
 
 def with_attempts(source: str, what: str, action, delay: float):
