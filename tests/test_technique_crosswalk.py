@@ -629,3 +629,266 @@ def test_a_root_that_names_no_directory_fails(tmp_path):
                           capture_output=True, text=True, timeout=60)
     assert proc.returncode == 1
     assert proc.stdout.startswith("FAIL: the root argument")
+
+
+# The JSON escape \ud800 with no pair decodes to a surrogate code point, which UTF-8 cannot
+# encode, so the file parses while the string has no bytes to write out.
+LONE = "\ud800"
+DVAA = "vendor/damn-vulnerable-ai-agent/expected-checks.json"
+GIT_PIN = "vendor/aiis-signatures/VENDOR.json"
+PACKAGE_PIN = "vendor/hackmyagent/VENDOR.json"
+SIGNATURE = "AIIS-ATTR-EXFIL-URL-01"
+
+# (input, path to the string, whether it is the key at that path, its place in the line, the
+# rules other than X1 that the same edit fails)
+NOT_TEXT = [
+    ("matrix.json", ["version"], False, "version", []),
+    ("matrix.json", ["techniques", 0, "id"], False, "techniques[0].id", []),
+    ("matrix.json", ["techniques", 0, "hmaChecks", 0], False, "T-1001 hmaChecks[0]", []),
+    ("matrix.json", ["techniques", 0, "oasbControls", 0], False, "T-1001 oasbControls[0]", []),
+    (GIT_PIN, ["repo"], False, "repo", ["X8"]),
+    (GIT_PIN, ["commit"], False, "commit", ["X8"]),
+    (GIT_PIN, ["version"], False, "version", []),
+    (PACKAGE_PIN, ["package"], False, "package", []),
+    (PACKAGE_PIN, ["version"], False, "version", ["X8"]),
+    ("vendor/hackmyagent/check-ids.json", ["checkIds", 0], False, "checkIds[0]", []),
+    ("vendor/hackmyagent/oasb-1-controls.json", ["controls", 0, "id"], False, "controls[0].id",
+     []),
+    (AIIS, ["bySignature", SIGNATURE], True, "bySignature key", []),
+    (AIIS, ["bySignature", SIGNATURE, "techniqueId"], False, f"{SIGNATURE} techniqueId", []),
+    (AIIS, ["bySignature", SIGNATURE, "relatedTechniqueIds", 0], False,
+     f"{SIGNATURE} relatedTechniqueIds[0]", []),
+    (DVAA, ["a2a-agent-noauth"], True, "scenario name", []),
+    (DVAA, ["a2a-agent-noauth", 0], False, "a2a-agent-noauth[0]", []),
+]
+
+
+def write_escaped(root: Path, rel: str, value):
+    """json.dumps by default holds a lone surrogate as its JSON escape, six ASCII characters."""
+    (root / rel).write_text(json.dumps(value, indent=2) + "\n", encoding="utf-8")
+
+
+def poison(doc, path: list, key: bool) -> str:
+    """Append LONE to the string at ``path`` in ``doc``, or to the key there, and return it."""
+    parent = doc
+    for step in path[:-1]:
+        parent = parent[step]
+    if key:
+        bad = path[-1] + LONE
+        parent[bad] = parent.pop(path[-1])
+    else:
+        bad = parent[path[-1]] + LONE
+        parent[path[-1]] = bad
+    return bad
+
+
+def not_text(rel: str, place: str, value: str) -> str:
+    return (f"{rel}: {place} {value!r} is not valid Unicode text (character "
+            f"{value.index(LONE) + 1} is U+D800, a surrogate code point, which UTF-8 cannot "
+            f"encode)")
+
+
+def run_build(root: Path) -> subprocess.CompletedProcess:
+    return subprocess.run([sys.executable, str(BUILDER), str(root)], capture_output=True,
+                          text=True, timeout=300)
+
+
+@pytest.mark.parametrize("rel, path, key, place, others", NOT_TEXT,
+                         ids=[f"{row[0]}-{row[3]}" for row in NOT_TEXT])
+def test_a_string_that_is_not_valid_text_is_named_in_one_line(tree, rel, path, key, place, others):
+    doc = read(tree, rel)
+    bad = poison(doc, path, key)
+    write_escaped(tree, rel, doc)
+    line = f"cannot render {CROSSWALK}: {not_text(rel, place, bad)}"
+
+    proc = check(tree)
+    assert proc.returncode == 1
+    assert proc.stderr == ""
+    assert violations(proc, "X1") == [f"X1 {line}"]
+    assert [text.split()[0] for text in proc.stdout.splitlines()] == ["X1", *others]
+
+    committed = (tree / CROSSWALK).read_bytes()
+    built = run_build(tree)
+    assert built.returncode == 1
+    assert built.stdout == ""
+    assert built.stderr == f"{line}\n"
+    assert (tree / CROSSWALK).read_bytes() == committed
+
+
+def test_a_scenario_name_that_joins_no_technique_is_named_too(tree):
+    doc = read(tree, DVAA)
+    name = sorted(set(doc) - set(read(tree, CROSSWALK)["byDvaaScenario"]))[0]
+    bad = poison(doc, [name], True)
+    write_escaped(tree, DVAA, doc)
+    proc = check(tree)
+    assert proc.returncode == 1
+    assert proc.stderr == ""
+    assert proc.stdout.splitlines() == [
+        f"X1 cannot render {CROSSWALK}: {not_text(DVAA, 'scenario name', bad)}"]
+
+
+@pytest.mark.parametrize("rel", ["matrix.json", GIT_PIN])
+@pytest.mark.parametrize("value, place, bad", [
+    (["v" + LONE], "version[0]", "v" + LONE),
+    ({"tag": "v" + LONE}, "version.tag", "v" + LONE),
+    ({"tag": ["ok", {"name": "v" + LONE}]}, "version.tag[1].name", "v" + LONE),
+    ({"tag" + LONE: 1}, "version key", "tag" + LONE),
+])
+def test_a_copied_value_that_is_not_a_string_is_read_to_its_depth(tree, rel, value, place, bad):
+    doc = read(tree, rel)
+    doc["version"] = value
+    write_escaped(tree, rel, doc)
+    proc = check(tree)
+    assert proc.returncode == 1
+    assert proc.stderr == ""
+    assert violations(proc, "X1") == [
+        f"X1 cannot render {CROSSWALK}: {not_text(rel, place, bad)}"]
+
+
+def test_a_value_nested_past_the_recursion_limit_is_read(tree):
+    depth = 5000
+    path = tree / "matrix.json"
+    text = path.read_text(encoding="utf-8")
+    field = f'"version": {json.dumps(read(tree, "matrix.json")["version"])}'
+    assert field in text
+    # Written by hand: json.dumps with an indent stops at this depth on Python 3.12.
+    nested = "[" * depth + '"v\\ud800"' + "]" * depth
+    path.write_text(text.replace(field, f'"version": {nested}', 1), encoding="utf-8")
+    proc = check(tree)
+    assert proc.returncode == 1
+    assert proc.stderr == ""
+    place = "version" + "[0]" * depth
+    assert proc.stdout.splitlines() == [
+        f"X1 cannot render {CROSSWALK}: {not_text('matrix.json', place, 'v' + LONE)}"]
+
+
+def test_a_listed_file_name_that_is_not_valid_text_is_named(tree):
+    manifest = read(tree, GIT_PIN)
+    bad = "notes" + LONE + ".txt"
+    manifest["files"].append(bad)
+    write_escaped(tree, GIT_PIN, manifest)
+    place = f"files[{len(manifest['files']) - 1}]"
+    proc = check(tree)
+    assert proc.returncode == 1
+    assert proc.stderr == ""
+    assert violations(proc, "X1") == [
+        f"X1 cannot render {CROSSWALK}: {not_text(GIT_PIN, place, bad)}"]
+    assert violations(proc, "X9") == [
+        "X9 vendor/aiis-signatures/notes\\ud800.txt is listed in files but absent"]
+
+
+def test_a_vendor_directory_name_that_is_not_valid_text_is_named(tree, monkeypatch):
+    """A file system that stores bytes hands Python a name that is not UTF-8 with surrogates in
+    it. macOS refuses to create such a directory, so the listing is stubbed."""
+    class Entry:
+        name = "bad\udcff"
+
+        def is_dir(self):
+            return True
+
+        def is_file(self):
+            return True
+
+        def __truediv__(self, other):
+            return self
+
+    monkeypatch.setattr(Path, "iterdir", lambda self: iter([Entry()]))
+    with pytest.raises(BUILD.InputError) as failure:
+        BUILD.vendor_sources(tree)
+    assert str(failure.value) == (
+        "vendor/: directory name 'bad\\udcff' is not valid Unicode text (character 4 is U+DCFF, "
+        "a surrogate code point, which UTF-8 cannot encode)")
+
+
+@pytest.mark.parametrize("rel, path, place", [
+    ("technique-ids.json", ["ids", 0], "ids[0]"),
+    ("vendor/hackmyagent/payload-ids.json", ["payloadIds", 0], "payloadIds[0]"),
+])
+def test_an_id_list_only_the_check_parses_is_named_in_one_line(tree, rel, path, place):
+    doc = read(tree, rel)
+    bad = poison(doc, path, False)
+    write_escaped(tree, rel, doc)
+    build(tree)  # The rendering holds only the sha256 of these two files.
+    proc = check(tree)
+    assert proc.returncode == 1
+    assert proc.stderr == ""
+    assert proc.stdout.splitlines() == [f"X1 cannot read the id lists: {not_text(rel, place, bad)}"]
+
+
+def test_two_inputs_that_are_not_valid_text_are_each_named(tree):
+    matrix = read(tree, "matrix.json")
+    first = poison(matrix, ["techniques", 0, "hmaChecks", 0], False)
+    write_escaped(tree, "matrix.json", matrix)
+    rel = "vendor/hackmyagent/check-ids.json"
+    ids = read(tree, rel)
+    second = poison(ids, ["checkIds", 0], False)
+    write_escaped(tree, rel, ids)
+    proc = check(tree)
+    assert proc.returncode == 1
+    assert proc.stderr == ""
+    assert proc.stdout.splitlines() == [
+        f"X1 cannot render {CROSSWALK}: {not_text('matrix.json', 'T-1001 hmaChecks[0]', first)}",
+        f"X1 cannot read the id lists: {not_text(rel, 'checkIds[0]', second)}"]
+
+
+def test_an_id_list_the_rendering_cannot_read_is_named_once(tree):
+    (tree / "vendor/hackmyagent/check-ids.json").unlink()
+    proc = check(tree)
+    assert proc.returncode == 1
+    assert violations(proc, "X1") == [
+        f"X1 cannot render {CROSSWALK}: vendor/hackmyagent/check-ids.json: absent"]
+
+
+def test_a_committed_string_that_is_not_valid_text_is_printed_as_its_escape(tree):
+    doc = read(tree, CROSSWALK)
+    first = doc["byTechnique"]["T-1001"]["hmaChecks"][0]
+    doc["byTechnique"]["T-1001"]["hmaChecks"][0] = first + LONE
+    doc["byTechnique"]["T-9999" + LONE] = {}
+    write_escaped(tree, CROSSWALK, doc)
+    proc = check(tree)
+    assert proc.returncode == 1
+    assert proc.stderr == ""
+    assert len(violations(proc, "X1")) == 1
+    assert violations(proc, "X2") == [
+        f"X2 {CROSSWALK} byTechnique.T-9999\\ud800: technique T-9999\\ud800 is not in "
+        f"technique-ids.json"]
+    assert violations(proc, "X4") == [
+        f"X4 {CROSSWALK} byTechnique.T-1001.hmaChecks: check {first}\\ud800 is not in "
+        f"vendor/hackmyagent/check-ids.json"]
+
+
+def test_a_pin_key_that_is_not_valid_text_is_printed_as_its_escape(tree):
+    manifest = read(tree, GIT_PIN)
+    manifest["branch" + LONE] = "main"
+    write_escaped(tree, GIT_PIN, manifest)
+    proc = check(tree)
+    assert proc.returncode == 1
+    assert proc.stderr == ""
+    assert proc.stdout.splitlines() == [
+        f"X8 {GIT_PIN} carries keys a git pin does not: branch\\ud800"]
+
+
+def test_a_string_the_rendering_does_not_read_is_not_reported(tree):
+    matrix = read(tree, "matrix.json")
+    technique(matrix, "T-1001")["description"] += LONE
+    write_escaped(tree, "matrix.json", matrix)
+    build(tree)
+    proc = check(tree)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+
+
+def test_a_surrogate_pair_is_valid_text(tree):
+    matrix = read(tree, "matrix.json")
+    technique(matrix, "T-1001")["hmaChecks"].append("NOPE-\U0001F600")
+    write_escaped(tree, "matrix.json", matrix)
+    assert "NOPE-\\ud83d\\ude00" in (tree / "matrix.json").read_text(encoding="utf-8")
+    build(tree)
+    proc = check(tree)
+    assert proc.returncode == 1
+    assert proc.stderr == ""
+    assert "not valid Unicode text" not in proc.stdout
+    assert violations(proc, "X4") == [
+        f"X4 {CROSSWALK} byTechnique.T-1001.hmaChecks: check NOPE-\U0001F600 is not in "
+        f"vendor/hackmyagent/check-ids.json",
+        f"X4 {CROSSWALK} byHmaCheck: check NOPE-\U0001F600 is not in "
+        f"vendor/hackmyagent/check-ids.json"]

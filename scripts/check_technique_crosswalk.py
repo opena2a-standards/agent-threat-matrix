@@ -8,7 +8,9 @@ reads no network and asks git only which files X9 leaves out;
 source at the pin. It fails when any of these holds:
 
 - X1 the committed file differs in bytes from a fresh rendering, is absent or is not valid
-     JSON, or an input cannot be rendered;
+     JSON, or an input cannot be rendered or an id list cannot be read, as when a string read
+     from it is not valid Unicode text (the JSON escape ``\\ud800`` with no pair, which UTF-8
+     cannot encode): the line names the file, the string's place and the string, escaped;
 - X2 a technique id is not in ``technique-ids.json`` ``ids``;
 - X3 an OASB-1 control id is not in ``vendor/hackmyagent/oasb-1-controls.json``;
 - X4 a check id is not in ``vendor/hackmyagent/check-ids.json``;
@@ -42,12 +44,12 @@ a payload id that equals no check id fails in a check column even though the pay
 holds it. X2 to X7 are read from the committed file and, when it differs, from the fresh
 rendering too, so an id that does not resolve is named before the file is rendered again.
 
-Exit 0 when every rule holds, 1 otherwise, printing one line per violation. An optional
-argument names the repository root to check; the default is the parent of this script's
-directory, and the rendering is the one of the build script beside this one. A root
-argument that names no directory prints one line and exits 1 without checking. ``--help``
-prints the usage and exits 0; an option the script does not know, or a second argument,
-prints the usage and exits 2.
+Exit 0 when every rule holds, 1 otherwise, printing one line per violation, in which a
+surrogate code point is written as its escape. An optional argument names the repository
+root to check; the default is the parent of this script's directory, and the rendering is
+the one of the build script beside this one. A root argument that names no directory prints
+one line and exits 1 without checking. ``--help`` prints the usage and exits 0; an option the
+script does not know, or a second argument, prints the usage and exits 2.
 """
 
 import argparse
@@ -105,7 +107,9 @@ class Report:
 
     def add(self, rule: int, line: str):
         bucket = self.lines.setdefault(rule, [])
-        text = f"X{rule} {line}"
+        # A committed file, a pin or a file name can hold a surrogate code point, which has no
+        # UTF-8 encoding, so a line holding one could not be printed.
+        text = f"X{rule} {line}".encode("utf-8", "backslashreplace").decode("utf-8")
         if text not in bucket:
             bucket.append(text)
 
@@ -408,8 +412,10 @@ def check_document(root: Path, label: str, doc: dict, known: dict, report: Repor
                                   f"{spec['ids']}")
 
 
-def known_ids(root: Path, report: Report):
-    """The id list of each family, or None when an input cannot be read."""
+def known_ids(root: Path, report: Report, render_failure: str = None):
+    """The id list of each family, or None when an input cannot be read. The rendering reads
+    the lists of four families through the same readers, so a failure equal to
+    ``render_failure`` is already on the rendering's line and is not reported again."""
     try:
         technique_ids = B.read_object(root, B.TECHNIQUE_IDS).get("ids")
         known = {
@@ -425,7 +431,8 @@ def known_ids(root: Path, report: Report):
                 ids = B.read_object(root, spec["ids"]).get("payloadIds")
                 known["payloads"][producer] = set(B.string_list(ids, spec["ids"], "payloadIds"))
     except B.InputError as exc:
-        report.add(1, f"cannot read the id lists: {exc}")
+        if str(exc) != render_failure:
+            report.add(1, f"cannot read the id lists: {exc}")
         return None
     known["retired"] = retired_ids(root, report)
     return known
@@ -443,10 +450,11 @@ def run(root: Path) -> list:
     report = Report()
     check_vendor_tree(root, report)
 
-    fresh_text = None
+    fresh_text, render_failure = None, None
     try:
         fresh_text = B.render(root)
     except B.InputError as exc:
+        render_failure = str(exc)
         report.add(1, f"cannot render {COMMITTED}: {exc}")
     committed_path = root / COMMITTED
     committed = committed_path.read_bytes() if committed_path.is_file() else None
@@ -474,7 +482,7 @@ def run(root: Path) -> list:
     if fresh is not None and fresh != committed:
         documents.append((FRESH, json.loads(fresh_text)))
 
-    known = known_ids(root, report)
+    known = known_ids(root, report, render_failure)
     if known is not None:
         for label, doc in documents:
             check_document(root, label, doc, known, report)

@@ -130,7 +130,11 @@ family's vendored list (a payload id is never read as a check id), when a signat
 retired, when a pin is not an exact version or a 40-hex commit, or when a file under `vendor/`
 is not listed in its `VENDOR.json`. In a git checkout, that last test leaves out the untracked
 files git ignores, such as `__pycache__/` output and `.DS_Store`. On a tree with no git, a file
-on disk is judged whether a `.gitignore` names it or not. The check reads no network.
+on disk is judged whether a `.gitignore` names it or not. A string it reads from an input that
+is not valid Unicode text, such as the JSON escape `\ud800` with no pair, which UTF-8 cannot
+encode, fails it too, in a line naming the file, the string's place and the string;
+`python3 scripts/build_technique_crosswalk.py` prints the same reason on standard error and
+leaves the file as it was. The check reads no network.
 `python3 scripts/check_vendor_integrity.py` is the network half: it fetches each input at its
 pin and exits 1 when a vendored file differs from its source, and 3 when a source cannot be
 reached, which is not a pass. It exits 2 on a
