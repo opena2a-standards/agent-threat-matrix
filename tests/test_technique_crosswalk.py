@@ -6,11 +6,13 @@ there, and runs the shipped check on that root, so the committed tree is never w
 case that breaks an input renders the scratch crosswalk again first, so the failure it shows
 is the rule under test, not a stale file. Every id resolves against its own family's list:
 a payload id in a check column fails even though the payload list holds it, and a
-``superseded_by`` value in retired-ids.yaml is not a retired id.
+``superseded_by`` value in retired-ids.yaml is not a retired id. The cases on the files git
+ignores commit the scratch root to a repository built in the test.
 """
 
 import importlib.util
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -33,6 +35,30 @@ TOP_LEVEL = ["schemaVersion", "generated", "matrix", "inputs", "byTechnique", "b
 # The live signatures retired-ids.yaml names only as superseded_by targets.
 SUPERSEDING = ("AIIS-ATTR-EXFIL-URL-01", "AIIS-ATTR-IGNORE-INST-01",
                "AIIS-HIDDEN-JAILBREAK-DAN-01", "AIIS-HIDDEN-ROLE-INJECT-01")
+# The tests' own git runs drop a repository location a git hook exports, and point
+# core.hooksPath away from the host's hooks.
+GIT_ENV = {key: value for key, value in os.environ.items()
+           if key not in ("GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR", "GIT_INDEX_FILE",
+                          "GIT_OBJECT_DIRECTORY", "GIT_ALTERNATE_OBJECT_DIRECTORIES")}
+GIT = ["git", "-c", "user.name=crosswalk-test", "-c", "user.email=crosswalk-test@example.invalid",
+       "-c", "commit.gpgsign=false", "-c", "core.hooksPath=/dev/null"]
+UNLISTED = "is not VENDOR.json, the generator or a file listed in files"
+DS_STORE = "vendor/.DS_Store"
+DS_STORE_LINES = ["X9 vendor/.DS_Store is a file directly under vendor/; every input is a "
+                  "directory with a VENDOR.json"]
+# Paths this repository's .gitignore excludes, each with the lines X9 prints when it judges it.
+IGNORED = [
+    ("vendor/damn-vulnerable-ai-agent/__pycache__/generate.cpython-314.pyc",
+     [f"X9 vendor/damn-vulnerable-ai-agent/__pycache__/generate.cpython-314.pyc {UNLISTED}"]),
+    ("vendor/hackmyagent/.DS_Store", [f"X9 vendor/hackmyagent/.DS_Store {UNLISTED}"]),
+    (DS_STORE, DS_STORE_LINES),
+    ("vendor/__pycache__/generate.cpython-314.pyc",
+     ["X9 vendor/__pycache__/ has no VENDOR.json",
+      f"X9 vendor/__pycache__/generate.cpython-314.pyc {UNLISTED}"]),
+    ("vendor/node_modules/pkg/index.js",
+     ["X9 vendor/node_modules/ has no VENDOR.json",
+      f"X9 vendor/node_modules/pkg/index.js {UNLISTED}"]),
+]
 
 
 def _load(path: Path, name: str):
@@ -53,10 +79,31 @@ def tree(tmp_path):
         source, target = ROOT / rel, root / rel
         target.parent.mkdir(parents=True, exist_ok=True)
         if source.is_dir():
-            shutil.copytree(source, target, ignore=shutil.ignore_patterns("__pycache__"))
+            shutil.copytree(source, target, ignore=shutil.ignore_patterns("__pycache__", ".DS_Store"))
         else:
             shutil.copyfile(source, target)
     return root
+
+
+def git(root: Path, *args: str, env: dict = GIT_ENV) -> str:
+    return subprocess.run([*GIT, "-C", str(root), *args], check=True, capture_output=True,
+                          text=True, timeout=60, env=env).stdout
+
+
+@pytest.fixture
+def checkout(tree):
+    """The scratch root committed to a git repository under this repository's ignore rules."""
+    shutil.copyfile(ROOT / ".gitignore", tree / ".gitignore")
+    git(tree, "init", "-q")
+    git(tree, "add", "--", ".gitignore", *INPUTS)
+    git(tree, "commit", "-q", "-m", "scratch")
+    assert git(tree, "status", "--porcelain") == ""
+    return tree
+
+
+def place(root: Path, rel: str):
+    (root / rel).parent.mkdir(parents=True, exist_ok=True)
+    (root / rel).write_text("stray\n", encoding="utf-8")
 
 
 def check(root: Path, *args: str) -> subprocess.CompletedProcess:
@@ -340,6 +387,50 @@ def test_a_39_hex_commit_in_a_git_pin_fails(tree, source):
         f"X8 {rel} commit '{manifest['commit']}' is not 40 lower-case hex"]
 
 
+def test_the_x8_text_states_what_is_read_in_a_git_version_and_names_the_tag_check():
+    doc = " ".join(CHECK.__doc__.split())
+    x8 = doc[doc.index("- X8 "):doc.index("- X9 ")]
+    assert "``version`` (null or a non-empty string, whitespace alone counting as empty;" in x8
+    assert "a string that names no tag passes here" in x8
+    assert ("``scripts/check_vendor_integrity.py`` is the check that verifies the tag names "
+            "the commit") in x8
+
+
+@pytest.mark.parametrize("source", ["aiis-signatures", "damn-vulnerable-ai-agent"])
+def test_a_git_version_that_names_no_tag_passes_and_is_recorded_in_inputs(tree, source):
+    rel = f"vendor/{source}/VENDOR.json"
+    manifest = read(tree, rel)
+    manifest["version"] = "not a tag"
+    write(tree, rel, manifest)
+    build(tree)
+    proc = check(tree)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert proc.stdout.startswith("OK: ")
+    assert read(tree, CROSSWALK)["inputs"][source]["version"] == "not a tag"
+
+
+@pytest.mark.parametrize("value", ["", "   ", 5, True, ["v0.4.0"]])
+def test_a_git_version_that_is_neither_null_nor_a_non_empty_string_fails(tree, value):
+    rel = "vendor/aiis-signatures/VENDOR.json"
+    manifest = read(tree, rel)
+    manifest["version"] = value
+    write(tree, rel, manifest)
+    proc = check(tree)
+    assert proc.returncode == 1
+    assert violations(proc, "X8") == [
+        f"X8 {rel} version {value!r} is neither null nor a non-empty string"]
+
+
+def test_a_git_pin_without_a_version_fails(tree):
+    rel = "vendor/aiis-signatures/VENDOR.json"
+    manifest = read(tree, rel)
+    del manifest["version"]
+    write(tree, rel, manifest)
+    proc = check(tree)
+    assert proc.returncode == 1
+    assert violations(proc, "X8") == [f"X8 {rel} has no version (null or a non-empty string)"]
+
+
 def test_an_unknown_key_in_a_pin_fails(tree):
     rel = "vendor/aiis-signatures/VENDOR.json"
     manifest = read(tree, rel)
@@ -380,6 +471,152 @@ def test_a_vendor_directory_without_a_pin_fails(tree):
         "X9 vendor/unpinned/data.json is not VENDOR.json, the generator or a file listed in files"]
 
 
+@pytest.mark.parametrize("rel", [rel for rel, _ in IGNORED])
+def test_a_file_git_ignores_under_vendor_passes_in_a_checkout(checkout, rel):
+    place(checkout, rel)
+    assert git(checkout, "status", "--porcelain") == ""
+    proc = check(checkout)
+    assert proc.returncode == 0, proc.stdout
+    assert proc.stdout.startswith("OK: crosswalks/technique-crosswalk.json matches")
+
+
+@pytest.mark.parametrize("rel, lines", IGNORED)
+def test_the_same_file_fails_on_a_tree_without_git(tree, rel, lines):
+    shutil.copyfile(ROOT / ".gitignore", tree / ".gitignore")
+    place(tree, rel)
+    proc = check(tree)
+    assert proc.returncode == 1
+    assert violations(proc, "X9") == lines
+
+
+@pytest.mark.parametrize("rel, lines", IGNORED)
+def test_a_tracked_file_fails_where_an_ignore_rule_matches_it(checkout, rel, lines):
+    place(checkout, rel)
+    git(checkout, "add", "-f", "--", rel)
+    proc = check(checkout)
+    assert proc.returncode == 1
+    assert violations(proc, "X9") == lines
+
+
+@pytest.mark.parametrize("rel, lines", [
+    ("vendor/aiis-signatures/notes.txt", [f"X9 vendor/aiis-signatures/notes.txt {UNLISTED}"]),
+    ("vendor/notes.txt", ["X9 vendor/notes.txt is a file directly under vendor/; every input is "
+                          "a directory with a VENDOR.json"]),
+    ("vendor/unpinned/data.json", ["X9 vendor/unpinned/ has no VENDOR.json",
+                                   f"X9 vendor/unpinned/data.json {UNLISTED}"]),
+])
+def test_an_untracked_file_git_does_not_ignore_fails_in_a_checkout(checkout, rel, lines):
+    place(checkout, rel)
+    proc = check(checkout)
+    assert proc.returncode == 1
+    assert violations(proc, "X9") == lines
+
+
+def test_an_ignored_file_beside_an_unignored_one_leaves_only_the_unignored_one(checkout):
+    place(checkout, "vendor/unpinned/data.json")
+    place(checkout, "vendor/unpinned/.DS_Store")
+    proc = check(checkout)
+    assert proc.returncode == 1
+    assert violations(proc, "X9") == ["X9 vendor/unpinned/ has no VENDOR.json",
+                                      f"X9 vendor/unpinned/data.json {UNLISTED}"]
+
+
+def test_a_listed_file_that_is_absent_fails_in_a_checkout(checkout):
+    (checkout / "vendor/hackmyagent/payload-ids.json").unlink()
+    proc = check(checkout)
+    assert proc.returncode == 1
+    assert violations(proc, "X9") == [
+        "X9 vendor/hackmyagent/payload-ids.json is listed in files but absent"]
+
+
+def test_an_ignore_rule_under_vendor_does_not_hide_what_is_tracked(checkout):
+    (checkout / "vendor/hackmyagent/.gitignore").write_text("*\n", encoding="utf-8")
+    place(checkout, "vendor/hackmyagent/notes.txt")
+    git(checkout, "add", "-f", "--", "vendor/hackmyagent/.gitignore", "vendor/hackmyagent/notes.txt")
+    proc = check(checkout)
+    assert proc.returncode == 1
+    assert violations(proc, "X9") == [f"X9 vendor/hackmyagent/.gitignore {UNLISTED}",
+                                      f"X9 vendor/hackmyagent/notes.txt {UNLISTED}"]
+
+
+def test_an_empty_directory_under_vendor_passes_in_a_checkout(checkout):
+    (checkout / "vendor/empty").mkdir()
+    assert git(checkout, "status", "--porcelain") == ""
+    proc = check(checkout)
+    assert proc.returncode == 0, proc.stdout
+
+
+def test_an_empty_directory_under_vendor_fails_on_a_tree_without_git(tree):
+    (tree / "vendor/empty").mkdir()
+    proc = check(tree)
+    assert proc.returncode == 1
+    assert violations(proc, "X9") == ["X9 vendor/empty/ has no VENDOR.json"]
+
+
+def test_a_nested_repository_in_an_ignored_directory_passes_in_a_checkout(checkout):
+    nested = checkout / "vendor/node_modules/pkg"
+    nested.mkdir(parents=True)
+    git(nested, "init", "-q")
+    place(nested, "index.js")
+    assert git(checkout, "status", "--porcelain") == ""
+    proc = check(checkout)
+    assert proc.returncode == 0, proc.stdout
+
+
+def test_a_nested_repository_git_does_not_ignore_fails_in_a_checkout(checkout):
+    nested = checkout / "vendor/hackmyagent/nested"
+    nested.mkdir()
+    git(nested, "init", "-q")
+    place(nested, "plain.txt")
+    assert git(checkout, "status", "--porcelain") == "?? vendor/hackmyagent/nested/\n"
+    proc = check(checkout)
+    assert proc.returncode == 1
+    assert f"X9 vendor/hackmyagent/nested/plain.txt {UNLISTED}" in violations(proc, "X9")
+
+
+def test_a_case_variant_path_to_the_checkout_reads_git(checkout):
+    variant = checkout.parent / checkout.name.upper()
+    if not variant.exists():
+        pytest.skip("case-sensitive filesystem: no case-variant path to the tree")
+    place(checkout, DS_STORE)
+    proc = check(variant)
+    assert proc.returncode == 0, proc.stdout
+
+
+def test_a_root_nested_in_another_work_tree_is_walked(tree, tmp_path):
+    shutil.copyfile(ROOT / ".gitignore", tmp_path / ".gitignore")
+    git(tmp_path, "init", "-q")
+    place(tree, DS_STORE)
+    git(tree, "check-ignore", "-q", DS_STORE)  # The outer repository's rule matches the file.
+    proc = check(tree)
+    assert proc.returncode == 1
+    assert violations(proc, "X9") == DS_STORE_LINES
+
+
+def test_a_repository_a_git_hook_exports_is_not_read_as_the_roots_checkout(tree, tmp_path):
+    other = tmp_path / "other"
+    other.mkdir()
+    git(other, "init", "-q")
+    (other / ".git/info").mkdir(exist_ok=True)
+    (other / ".git/info/exclude").write_text(".DS_Store\n", encoding="utf-8")
+    env = dict(GIT_ENV, GIT_DIR=str(other / ".git"))
+    place(tree, DS_STORE)
+    git(tree, "check-ignore", "-q", DS_STORE, env=env)  # That repository's rule matches the file.
+    proc = subprocess.run([sys.executable, str(CHECKER), str(tree)], capture_output=True,
+                          text=True, timeout=300, env=env)
+    assert proc.returncode == 1
+    assert violations(proc, "X9") == DS_STORE_LINES
+
+
+def test_a_machine_without_git_walks_the_tree(checkout, tmp_path):
+    place(checkout, DS_STORE)
+    env = dict(GIT_ENV, PATH=str(tmp_path / "no-git-here"))
+    proc = subprocess.run([sys.executable, str(CHECKER), str(checkout)], capture_output=True,
+                          text=True, timeout=300, env=env)
+    assert proc.returncode == 1, proc.stdout + proc.stderr
+    assert violations(proc, "X9") == DS_STORE_LINES
+
+
 @pytest.mark.parametrize("args, code", [(["--bogus"], 2), (["extra"], 2), (["--help"], 0)])
 def test_usage(tree, args, code):
     proc = check(tree, *args)
@@ -392,3 +629,266 @@ def test_a_root_that_names_no_directory_fails(tmp_path):
                           capture_output=True, text=True, timeout=60)
     assert proc.returncode == 1
     assert proc.stdout.startswith("FAIL: the root argument")
+
+
+# The JSON escape \ud800 with no pair decodes to a surrogate code point, which UTF-8 cannot
+# encode, so the file parses while the string has no bytes to write out.
+LONE = "\ud800"
+DVAA = "vendor/damn-vulnerable-ai-agent/expected-checks.json"
+GIT_PIN = "vendor/aiis-signatures/VENDOR.json"
+PACKAGE_PIN = "vendor/hackmyagent/VENDOR.json"
+SIGNATURE = "AIIS-ATTR-EXFIL-URL-01"
+
+# (input, path to the string, whether it is the key at that path, its place in the line, the
+# rules other than X1 that the same edit fails)
+NOT_TEXT = [
+    ("matrix.json", ["version"], False, "version", []),
+    ("matrix.json", ["techniques", 0, "id"], False, "techniques[0].id", []),
+    ("matrix.json", ["techniques", 0, "hmaChecks", 0], False, "T-1001 hmaChecks[0]", []),
+    ("matrix.json", ["techniques", 0, "oasbControls", 0], False, "T-1001 oasbControls[0]", []),
+    (GIT_PIN, ["repo"], False, "repo", ["X8"]),
+    (GIT_PIN, ["commit"], False, "commit", ["X8"]),
+    (GIT_PIN, ["version"], False, "version", []),
+    (PACKAGE_PIN, ["package"], False, "package", []),
+    (PACKAGE_PIN, ["version"], False, "version", ["X8"]),
+    ("vendor/hackmyagent/check-ids.json", ["checkIds", 0], False, "checkIds[0]", []),
+    ("vendor/hackmyagent/oasb-1-controls.json", ["controls", 0, "id"], False, "controls[0].id",
+     []),
+    (AIIS, ["bySignature", SIGNATURE], True, "bySignature key", []),
+    (AIIS, ["bySignature", SIGNATURE, "techniqueId"], False, f"{SIGNATURE} techniqueId", []),
+    (AIIS, ["bySignature", SIGNATURE, "relatedTechniqueIds", 0], False,
+     f"{SIGNATURE} relatedTechniqueIds[0]", []),
+    (DVAA, ["a2a-agent-noauth"], True, "scenario name", []),
+    (DVAA, ["a2a-agent-noauth", 0], False, "a2a-agent-noauth[0]", []),
+]
+
+
+def write_escaped(root: Path, rel: str, value):
+    """json.dumps by default holds a lone surrogate as its JSON escape, six ASCII characters."""
+    (root / rel).write_text(json.dumps(value, indent=2) + "\n", encoding="utf-8")
+
+
+def poison(doc, path: list, key: bool) -> str:
+    """Append LONE to the string at ``path`` in ``doc``, or to the key there, and return it."""
+    parent = doc
+    for step in path[:-1]:
+        parent = parent[step]
+    if key:
+        bad = path[-1] + LONE
+        parent[bad] = parent.pop(path[-1])
+    else:
+        bad = parent[path[-1]] + LONE
+        parent[path[-1]] = bad
+    return bad
+
+
+def not_text(rel: str, place: str, value: str) -> str:
+    return (f"{rel}: {place} {value!r} is not valid Unicode text (character "
+            f"{value.index(LONE) + 1} is U+D800, a surrogate code point, which UTF-8 cannot "
+            f"encode)")
+
+
+def run_build(root: Path) -> subprocess.CompletedProcess:
+    return subprocess.run([sys.executable, str(BUILDER), str(root)], capture_output=True,
+                          text=True, timeout=300)
+
+
+@pytest.mark.parametrize("rel, path, key, place, others", NOT_TEXT,
+                         ids=[f"{row[0]}-{row[3]}" for row in NOT_TEXT])
+def test_a_string_that_is_not_valid_text_is_named_in_one_line(tree, rel, path, key, place, others):
+    doc = read(tree, rel)
+    bad = poison(doc, path, key)
+    write_escaped(tree, rel, doc)
+    line = f"cannot render {CROSSWALK}: {not_text(rel, place, bad)}"
+
+    proc = check(tree)
+    assert proc.returncode == 1
+    assert proc.stderr == ""
+    assert violations(proc, "X1") == [f"X1 {line}"]
+    assert [text.split()[0] for text in proc.stdout.splitlines()] == ["X1", *others]
+
+    committed = (tree / CROSSWALK).read_bytes()
+    built = run_build(tree)
+    assert built.returncode == 1
+    assert built.stdout == ""
+    assert built.stderr == f"{line}\n"
+    assert (tree / CROSSWALK).read_bytes() == committed
+
+
+def test_a_scenario_name_that_joins_no_technique_is_named_too(tree):
+    doc = read(tree, DVAA)
+    name = sorted(set(doc) - set(read(tree, CROSSWALK)["byDvaaScenario"]))[0]
+    bad = poison(doc, [name], True)
+    write_escaped(tree, DVAA, doc)
+    proc = check(tree)
+    assert proc.returncode == 1
+    assert proc.stderr == ""
+    assert proc.stdout.splitlines() == [
+        f"X1 cannot render {CROSSWALK}: {not_text(DVAA, 'scenario name', bad)}"]
+
+
+@pytest.mark.parametrize("rel", ["matrix.json", GIT_PIN])
+@pytest.mark.parametrize("value, place, bad", [
+    (["v" + LONE], "version[0]", "v" + LONE),
+    ({"tag": "v" + LONE}, "version.tag", "v" + LONE),
+    ({"tag": ["ok", {"name": "v" + LONE}]}, "version.tag[1].name", "v" + LONE),
+    ({"tag" + LONE: 1}, "version key", "tag" + LONE),
+])
+def test_a_copied_value_that_is_not_a_string_is_read_to_its_depth(tree, rel, value, place, bad):
+    doc = read(tree, rel)
+    doc["version"] = value
+    write_escaped(tree, rel, doc)
+    proc = check(tree)
+    assert proc.returncode == 1
+    assert proc.stderr == ""
+    assert violations(proc, "X1") == [
+        f"X1 cannot render {CROSSWALK}: {not_text(rel, place, bad)}"]
+
+
+def test_a_value_nested_past_the_recursion_limit_is_read(tree):
+    depth = 5000
+    path = tree / "matrix.json"
+    text = path.read_text(encoding="utf-8")
+    field = f'"version": {json.dumps(read(tree, "matrix.json")["version"])}'
+    assert field in text
+    # Written by hand: json.dumps with an indent stops at this depth on Python 3.12.
+    nested = "[" * depth + '"v\\ud800"' + "]" * depth
+    path.write_text(text.replace(field, f'"version": {nested}', 1), encoding="utf-8")
+    proc = check(tree)
+    assert proc.returncode == 1
+    assert proc.stderr == ""
+    place = "version" + "[0]" * depth
+    assert proc.stdout.splitlines() == [
+        f"X1 cannot render {CROSSWALK}: {not_text('matrix.json', place, 'v' + LONE)}"]
+
+
+def test_a_listed_file_name_that_is_not_valid_text_is_named(tree):
+    manifest = read(tree, GIT_PIN)
+    bad = "notes" + LONE + ".txt"
+    manifest["files"].append(bad)
+    write_escaped(tree, GIT_PIN, manifest)
+    place = f"files[{len(manifest['files']) - 1}]"
+    proc = check(tree)
+    assert proc.returncode == 1
+    assert proc.stderr == ""
+    assert violations(proc, "X1") == [
+        f"X1 cannot render {CROSSWALK}: {not_text(GIT_PIN, place, bad)}"]
+    assert violations(proc, "X9") == [
+        "X9 vendor/aiis-signatures/notes\\ud800.txt is listed in files but absent"]
+
+
+def test_a_vendor_directory_name_that_is_not_valid_text_is_named(tree, monkeypatch):
+    """A file system that stores bytes hands Python a name that is not UTF-8 with surrogates in
+    it. macOS refuses to create such a directory, so the listing is stubbed."""
+    class Entry:
+        name = "bad\udcff"
+
+        def is_dir(self):
+            return True
+
+        def is_file(self):
+            return True
+
+        def __truediv__(self, other):
+            return self
+
+    monkeypatch.setattr(Path, "iterdir", lambda self: iter([Entry()]))
+    with pytest.raises(BUILD.InputError) as failure:
+        BUILD.vendor_sources(tree)
+    assert str(failure.value) == (
+        "vendor/: directory name 'bad\\udcff' is not valid Unicode text (character 4 is U+DCFF, "
+        "a surrogate code point, which UTF-8 cannot encode)")
+
+
+@pytest.mark.parametrize("rel, path, place", [
+    ("technique-ids.json", ["ids", 0], "ids[0]"),
+    ("vendor/hackmyagent/payload-ids.json", ["payloadIds", 0], "payloadIds[0]"),
+])
+def test_an_id_list_only_the_check_parses_is_named_in_one_line(tree, rel, path, place):
+    doc = read(tree, rel)
+    bad = poison(doc, path, False)
+    write_escaped(tree, rel, doc)
+    build(tree)  # The rendering holds only the sha256 of these two files.
+    proc = check(tree)
+    assert proc.returncode == 1
+    assert proc.stderr == ""
+    assert proc.stdout.splitlines() == [f"X1 cannot read the id lists: {not_text(rel, place, bad)}"]
+
+
+def test_two_inputs_that_are_not_valid_text_are_each_named(tree):
+    matrix = read(tree, "matrix.json")
+    first = poison(matrix, ["techniques", 0, "hmaChecks", 0], False)
+    write_escaped(tree, "matrix.json", matrix)
+    rel = "vendor/hackmyagent/check-ids.json"
+    ids = read(tree, rel)
+    second = poison(ids, ["checkIds", 0], False)
+    write_escaped(tree, rel, ids)
+    proc = check(tree)
+    assert proc.returncode == 1
+    assert proc.stderr == ""
+    assert proc.stdout.splitlines() == [
+        f"X1 cannot render {CROSSWALK}: {not_text('matrix.json', 'T-1001 hmaChecks[0]', first)}",
+        f"X1 cannot read the id lists: {not_text(rel, 'checkIds[0]', second)}"]
+
+
+def test_an_id_list_the_rendering_cannot_read_is_named_once(tree):
+    (tree / "vendor/hackmyagent/check-ids.json").unlink()
+    proc = check(tree)
+    assert proc.returncode == 1
+    assert violations(proc, "X1") == [
+        f"X1 cannot render {CROSSWALK}: vendor/hackmyagent/check-ids.json: absent"]
+
+
+def test_a_committed_string_that_is_not_valid_text_is_printed_as_its_escape(tree):
+    doc = read(tree, CROSSWALK)
+    first = doc["byTechnique"]["T-1001"]["hmaChecks"][0]
+    doc["byTechnique"]["T-1001"]["hmaChecks"][0] = first + LONE
+    doc["byTechnique"]["T-9999" + LONE] = {}
+    write_escaped(tree, CROSSWALK, doc)
+    proc = check(tree)
+    assert proc.returncode == 1
+    assert proc.stderr == ""
+    assert len(violations(proc, "X1")) == 1
+    assert violations(proc, "X2") == [
+        f"X2 {CROSSWALK} byTechnique.T-9999\\ud800: technique T-9999\\ud800 is not in "
+        f"technique-ids.json"]
+    assert violations(proc, "X4") == [
+        f"X4 {CROSSWALK} byTechnique.T-1001.hmaChecks: check {first}\\ud800 is not in "
+        f"vendor/hackmyagent/check-ids.json"]
+
+
+def test_a_pin_key_that_is_not_valid_text_is_printed_as_its_escape(tree):
+    manifest = read(tree, GIT_PIN)
+    manifest["branch" + LONE] = "main"
+    write_escaped(tree, GIT_PIN, manifest)
+    proc = check(tree)
+    assert proc.returncode == 1
+    assert proc.stderr == ""
+    assert proc.stdout.splitlines() == [
+        f"X8 {GIT_PIN} carries keys a git pin does not: branch\\ud800"]
+
+
+def test_a_string_the_rendering_does_not_read_is_not_reported(tree):
+    matrix = read(tree, "matrix.json")
+    technique(matrix, "T-1001")["description"] += LONE
+    write_escaped(tree, "matrix.json", matrix)
+    build(tree)
+    proc = check(tree)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+
+
+def test_a_surrogate_pair_is_valid_text(tree):
+    matrix = read(tree, "matrix.json")
+    technique(matrix, "T-1001")["hmaChecks"].append("NOPE-\U0001F600")
+    write_escaped(tree, "matrix.json", matrix)
+    assert "NOPE-\\ud83d\\ude00" in (tree / "matrix.json").read_text(encoding="utf-8")
+    build(tree)
+    proc = check(tree)
+    assert proc.returncode == 1
+    assert proc.stderr == ""
+    assert "not valid Unicode text" not in proc.stdout
+    assert violations(proc, "X4") == [
+        f"X4 {CROSSWALK} byTechnique.T-1001.hmaChecks: check NOPE-\U0001F600 is not in "
+        f"vendor/hackmyagent/check-ids.json",
+        f"X4 {CROSSWALK} byHmaCheck: check NOPE-\U0001F600 is not in "
+        f"vendor/hackmyagent/check-ids.json"]

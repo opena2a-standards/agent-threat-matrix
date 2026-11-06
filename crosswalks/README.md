@@ -128,9 +128,18 @@ To verify the file, run `python3 scripts/check_technique_crosswalk.py`. It rende
 again and fails when the committed copy differs, when an id does not resolve against its own
 family's vendored list (a payload id is never read as a check id), when a signature is
 retired, when a pin is not an exact version or a 40-hex commit, or when a file under `vendor/`
-is not listed in its `VENDOR.json`. It reads no network. `python3 scripts/check_vendor_integrity.py`
-is the network half: it fetches each input at its pin and exits 1 when a vendored file differs
-from its source, and 3 when a source cannot be reached, which is not a pass. It exits 2 on a
+is not listed in its `VENDOR.json`. In a git checkout, that last test leaves out the untracked
+files git ignores, such as `__pycache__/` output and `.DS_Store`. On a tree with no git, a file
+on disk is judged whether a `.gitignore` names it or not. A string the rendering reads that is
+not valid Unicode text, such as the JSON escape `\ud800` with no pair, which UTF-8 cannot
+encode, fails the check too, in a line naming the file, the string's place and the string, and
+`python3 scripts/build_technique_crosswalk.py` prints the same reason on standard error and
+leaves the file as it was. Such a string in an entry of `ids` in `technique-ids.json` or of
+`payloadIds` in `vendor/hackmyagent/payload-ids.json` fails the check and not the build, which
+does not read those entries. The check reads no network.
+`python3 scripts/check_vendor_integrity.py` is the network half: it fetches each input at its
+pin and exits 1 when a vendored file differs from its source, and 3 when a source cannot be
+reached, which is not a pass. It exits 2 on a
 usage error, which includes a Python whose `tarfile` module has no extraction filters while a
 package source is pinned: it needs Python 3.12 or later, or 3.8.17, 3.9.17, 3.10.12 or 3.11.4
 or later in those lines.

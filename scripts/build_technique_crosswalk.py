@@ -57,8 +57,10 @@ rendering reads no clock, no environment variable, no git command and no network
 
 Usage: ``python3 scripts/build_technique_crosswalk.py [root]`` writes the file under the
 repository root (default: the parent of this script's directory). Exit 0 when written, 1
-when an input is absent or not of the shape read here (one line naming it), 2 on a usage
-error. ``--help`` prints the usage.
+when an input is absent or not of the shape read here (one line on standard error naming
+it), 2 on a usage error. A string the rendering reads that is not valid Unicode text, such
+as the JSON escape ``\\ud800`` with no pair, is not of that shape, as the file is UTF-8.
+``--help`` prints the usage.
 """
 
 import argparse
@@ -66,6 +68,7 @@ import hashlib
 import json
 import re
 import sys
+from collections import deque
 from pathlib import Path, PurePosixPath
 
 # The docstring's first line, held apart so --help still works under python3 -OO.
@@ -113,6 +116,46 @@ class InputError(Exception):
         self.path = path
 
 
+def text_problem(value: str):
+    """None when the string ``value`` is valid Unicode text, which UTF-8 encodes; otherwise the
+    reason it is not, in the words of scripts/check_cross_references.py.
+
+    json.loads decodes the JSON escape of a surrogate code point that is not half of a pair,
+    such as ``\\ud800`` alone, to that code point, so the file parses while the string has no
+    UTF-8 encoding. A name a file system holds in bytes that are not UTF-8 decodes to one too.
+    """
+    try:
+        value.encode("utf-8")
+    except UnicodeEncodeError as exc:
+        return (f"character {exc.start + 1} is U+{ord(value[exc.start]):04X}, a surrogate code "
+                f"point, which UTF-8 cannot encode")
+    return None
+
+
+def require_text(value, rel: str, where: str):
+    """Raise InputError when a string in the parsed JSON ``value``, read through nested lists
+    and objects with their keys, is not valid Unicode text (see ``text_problem``).
+
+    The line names the input, the string's place from ``where`` and the string itself, whose
+    repr writes a surrogate code point as an escape, so the line can be written out as UTF-8.
+    The walk keeps a queue because json.loads took a value nested 5000 levels on Python 3.12,
+    3.13 and 3.14, past the default recursion limit of 1000 that a recursive walk would hit.
+    """
+    pending = deque([(where, value)])
+    while pending:
+        place, item = pending.popleft()
+        if isinstance(item, str):
+            cause = text_problem(item)
+            if cause:
+                raise InputError(rel, f"{place} {item!r} is not valid Unicode text ({cause})")
+        elif isinstance(item, list):
+            pending.extend((f"{place}[{index}]", child) for index, child in enumerate(item))
+        elif isinstance(item, dict):
+            for key, child in item.items():
+                require_text(key, rel, f"{place} key")
+                pending.append((f"{place}.{key}", child))
+
+
 def read_bytes(root: Path, rel: str) -> bytes:
     path = root / rel
     if not path.is_file():
@@ -143,6 +186,7 @@ def sha256(data: bytes) -> str:
 def string_list(value, rel: str, where: str) -> list:
     if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
         raise InputError(rel, f"{where} is not a list of strings")
+    require_text(value, rel, where)
     return value
 
 
@@ -159,7 +203,10 @@ def vendor_sources(root: Path) -> list:
     vendor = root / VENDOR
     if not vendor.is_dir():
         raise InputError(f"{VENDOR}/", "absent")
-    return sorted(p.name for p in vendor.iterdir() if p.is_dir() and (p / MANIFEST).is_file())
+    sources = sorted(p.name for p in vendor.iterdir() if p.is_dir() and (p / MANIFEST).is_file())
+    for source in sources:
+        require_text(source, f"{VENDOR}/", "directory name")
+    return sources
 
 
 def load_manifest(root: Path, source: str) -> dict:
@@ -174,10 +221,14 @@ def input_entry(root: Path, source: str, manifest: dict) -> dict:
         if not relative_path(name):
             raise InputError(rel, f"files names {name!r}, which is not a relative path")
     if "package" in manifest:
+        copied = ("package", "version")
         entry = {"package": manifest["package"], "version": manifest.get("version")}
     else:
+        copied = ("repo", "commit", "version")
         entry = {"repository": manifest.get("repo"), "commit": manifest.get("commit"),
                  "version": manifest.get("version")}
+    for key in copied:
+        require_text(manifest.get(key), rel, key)
     entry["read"] = manifest.get("read")
     entry["files"] = [{"path": f"{VENDOR}/{source}/{name}",
                        "sha256": sha256(read_bytes(root, f"{VENDOR}/{source}/{name}"))}
@@ -195,6 +246,7 @@ def matrix_techniques(matrix: dict) -> dict:
         tid = technique.get("id") if isinstance(technique, dict) else None
         if not isinstance(tid, str):
             raise InputError(MATRIX, f"techniques[{index}] has no string id")
+        require_text(tid, MATRIX, f"techniques[{index}].id")
         if tid in out:
             raise InputError(MATRIX, f"technique {tid} appears twice")
         checks = string_list(technique.get("hmaChecks", []), MATRIX, f"{tid} hmaChecks")
@@ -212,6 +264,8 @@ def vendored_oasb_controls(root: Path) -> list:
     if not isinstance(controls, list) or not all(
             isinstance(c, dict) and isinstance(c.get("id"), str) for c in controls):
         raise InputError(OASB_CONTROLS, "controls is not a list of objects with a string id")
+    for index, control in enumerate(controls):
+        require_text(control["id"], OASB_CONTROLS, f"controls[{index}].id")
     return [c["id"] for c in controls]
 
 
@@ -222,9 +276,11 @@ def vendored_signatures(root: Path) -> dict:
         raise InputError(AIIS_CROSSWALK, "bySignature is not an object")
     out = {}
     for sid, entry in by_signature.items():
+        require_text(sid, AIIS_CROSSWALK, "bySignature key")
         primary = entry.get("techniqueId") if isinstance(entry, dict) else None
         if not isinstance(primary, str):
             raise InputError(AIIS_CROSSWALK, f"{sid} has no string techniqueId")
+        require_text(primary, AIIS_CROSSWALK, f"{sid} techniqueId")
         related = string_list(entry.get("relatedTechniqueIds", []), AIIS_CROSSWALK,
                               f"{sid} relatedTechniqueIds")
         edges = {(primary, BASIS_AIIS_PRIMARY)} | {(t, BASIS_AIIS_RELATED) for t in related}
@@ -234,9 +290,11 @@ def vendored_signatures(root: Path) -> dict:
 
 def vendored_scenarios(root: Path) -> dict:
     """{scenario: [expected check ids]} from the vendored DVAA file."""
-    doc = read_object(root, DVAA_EXPECTED)
-    return {name: sorted(set(string_list(value, DVAA_EXPECTED, name)))
-            for name, value in doc.items()}
+    out = {}
+    for name, value in read_object(root, DVAA_EXPECTED).items():
+        require_text(name, DVAA_EXPECTED, "scenario name")
+        out[name] = sorted(set(string_list(value, DVAA_EXPECTED, name)))
+    return out
 
 
 def not_assessed_reason(producer: str) -> str:
@@ -250,6 +308,7 @@ def build(root: Path) -> dict:
     matrix_bytes = read_bytes(root, MATRIX)
     ids_bytes = read_bytes(root, TECHNIQUE_IDS)
     matrix = read_object(root, MATRIX)
+    require_text(matrix.get("version"), MATRIX, "version")
     techniques = matrix_techniques(matrix)
 
     sources = vendor_sources(root)

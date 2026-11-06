@@ -3,11 +3,14 @@
 
 The crosswalk is derived content: ``scripts/build_technique_crosswalk.py`` renders it from
 ``matrix.json``, ``technique-ids.json`` and the pinned inputs under ``vendor/``. This check
-reads no network and no git; ``scripts/check_vendor_integrity.py`` is the half that
-compares each vendored input with its source at the pin. It fails when any of these holds:
+reads no network and asks git only which files X9 leaves out;
+``scripts/check_vendor_integrity.py`` is the half that compares each vendored input with its
+source at the pin. It fails when any of these holds:
 
 - X1 the committed file differs in bytes from a fresh rendering, is absent or is not valid
-     JSON, or an input cannot be rendered;
+     JSON, or an input cannot be rendered or an id list cannot be read, as when a string read
+     from it is not valid Unicode text (the JSON escape ``\\ud800`` with no pair, which UTF-8
+     cannot encode): the line names the file, the string's place and the string, escaped;
 - X2 a technique id is not in ``technique-ids.json`` ``ids``;
 - X3 an OASB-1 control id is not in ``vendor/hackmyagent/oasb-1-controls.json``;
 - X4 a check id is not in ``vendor/hackmyagent/check-ids.json``;
@@ -19,25 +22,34 @@ compares each vendored input with its source at the pin. It fails when any of th
      while the producer's ``mappings/<producer>-payloads.json`` exists, or is not null while
      that file does not exist;
 - X8 a ``VENDOR.json`` pin is not of its source's form: a git source carries ``repo``,
-     ``commit`` (40 lower-case hex), ``version`` (the tag naming the commit, or null),
-     ``read`` (a date), ``files`` and one of ``refresh`` or ``generate``; a package carries
-     ``package``, ``version`` (exact, no range), ``registry``, ``integrity`` (sha512),
-     ``read``, ``files`` and ``generate``;
+     ``commit`` (40 lower-case hex), ``version`` (null or a non-empty string, whitespace
+     alone counting as empty; a string that names no tag passes here, and
+     ``scripts/check_vendor_integrity.py`` is the check that verifies the tag names the
+     commit), ``read`` (a date), ``files`` and one of ``refresh`` or ``generate``; a package
+     carries ``package``, ``version`` (exact, no range), ``registry``, ``integrity``
+     (sha512), ``read``, ``files`` and ``generate``;
 - X9 a file under ``vendor/<source>/`` is not ``VENDOR.json``, the source's generator
      (``generate.mjs`` or ``generate.py``, kept only by a source with ``generate``) or a
      file listed in ``files``, or a listed file is absent.
+
+X9 judges what the repository can track. When the root is the top of a git work tree, it
+leaves out what ``git ls-files --others --ignored --exclude-standard`` lists, such as
+``__pycache__/`` output and ``.DS_Store``, and a directory directly under ``vendor/`` with no
+file left. A tracked file is judged where an ignore rule matches it, and so is an untracked
+file git does not ignore. A tree with no git, a root nested inside another repository's work
+tree and a machine without git have no such listing, so each file on disk is judged there.
 
 Every id resolves against its own family's list, never a union and never by the id's shape:
 a payload id that equals no check id fails in a check column even though the payload list
 holds it. X2 to X7 are read from the committed file and, when it differs, from the fresh
 rendering too, so an id that does not resolve is named before the file is rendered again.
 
-Exit 0 when every rule holds, 1 otherwise, printing one line per violation. An optional
-argument names the repository root to check; the default is the parent of this script's
-directory, and the rendering is the one of the build script beside this one. A root
-argument that names no directory prints one line and exits 1 without checking. ``--help``
-prints the usage and exits 0; an option the script does not know, or a second argument,
-prints the usage and exits 2.
+Exit 0 when every rule holds, 1 otherwise, printing one line per violation, in which a
+surrogate code point is written as its escape. An optional argument names the repository
+root to check; the default is the parent of this script's directory, and the rendering is
+the one of the build script beside this one. A root argument that names no directory prints
+one line and exits 1 without checking. ``--help`` prints the usage and exits 0; an option the
+script does not know, or a second argument, prints the usage and exits 2.
 """
 
 import argparse
@@ -45,6 +57,7 @@ import importlib.util
 import json
 import os
 import re
+import subprocess
 import sys
 from datetime import date
 from pathlib import Path
@@ -77,6 +90,10 @@ REPO_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 REGISTRY_RE = re.compile(r"^https://[^\s/]+(/\S*)?$")
 LIST_ITEM_RE = re.compile(r"^-(\s|$)")
 RETIRED_ID_RE = re.compile(r"^- id: ([A-Za-z0-9][A-Za-z0-9._-]*)$")
+# Variables that would point git at a repository other than the root's. Per githooks(5), git
+# exports such variables to a hook, and a hook may run this check on another root.
+GIT_LOCATION_VARS = ("GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR", "GIT_INDEX_FILE",
+                     "GIT_OBJECT_DIRECTORY", "GIT_ALTERNATE_OBJECT_DIRECTORIES")
 
 COMMITTED = f"{B.OUTPUT}"
 FRESH = "the fresh rendering"
@@ -90,7 +107,9 @@ class Report:
 
     def add(self, rule: int, line: str):
         bucket = self.lines.setdefault(rule, [])
-        text = f"X{rule} {line}"
+        # A committed file, a pin or a file name can hold a surrogate code point, which has no
+        # UTF-8 encoding, so a line holding one could not be printed.
+        text = f"X{rule} {line}".encode("utf-8", "backslashreplace").decode("utf-8")
         if text not in bucket:
             bucket.append(text)
 
@@ -128,10 +147,11 @@ def check_manifest(source: str, manifest: dict, report: Report):
         if not isinstance(commit, str) or not COMMIT_RE.match(commit):
             report.add(8, f"{rel} commit {commit!r} is not 40 lower-case hex")
         if "version" not in manifest:
-            report.add(8, f"{rel} has no version (the tag naming the commit, or null)")
+            report.add(8, f"{rel} has no version (null or a non-empty string)")
         elif manifest["version"] is not None and (
                 not isinstance(manifest["version"], str) or not manifest["version"].strip()):
-            report.add(8, f"{rel} version {manifest['version']!r} is neither a tag nor null")
+            report.add(8, f"{rel} version {manifest['version']!r} is neither null nor a "
+                          f"non-empty string")
         commands = [key for key in ("refresh", "generate") if key in manifest]
         if len(commands) != 1:
             report.add(8, f"{rel} carries {len(commands)} of refresh and generate; a git pin "
@@ -170,6 +190,53 @@ def check_manifest(source: str, manifest: dict, report: Report):
             report.add(8, f"{rel} files names a path twice")
 
 
+def git_ignored_paths(root: Path):
+    """What git lists as untracked and ignored under vendor/ when root is the top of a git work
+    tree, else None: a file by its path, and a nested repository inside an ignored directory
+    by its directory, with a trailing slash. A root nested inside another repository's work
+    tree gets None, since that repository's rules do not describe this tree, and so does a
+    machine without git. The top is compared by file identity, so a path that differs only in
+    letter case on a case-insensitive filesystem still counts as the same directory."""
+    env = {key: value for key, value in os.environ.items() if key not in GIT_LOCATION_VARS}
+
+    def git(*args) -> str:
+        return os.fsdecode(subprocess.run(
+            ["git", "-C", str(root), *args], capture_output=True, check=True, timeout=60,
+            env=env).stdout)
+
+    try:
+        if not os.path.samefile(git("rev-parse", "--show-toplevel").rstrip("\n"), root):
+            return None
+        out = git("ls-files", "-z", "--others", "--ignored", "--exclude-standard",
+                  "--", B.VENDOR)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return [rel for rel in out.split("\0") if rel]
+
+
+def judged_entries(root: Path) -> list:
+    """[(entry, files)] for each path directly under vendor/, with the files X9 judges in it: the
+    entry itself when it is not a directory. Where git gives a listing, the files it names are
+    left out, and an entry with no file left is dropped, whether git names all its files or it
+    holds none. A path git does not name stays judged. Where git gives no listing, each path
+    on disk is kept."""
+    listed = git_ignored_paths(root)
+    ignored = set(listed or ())
+    ignored_directories = tuple(rel for rel in ignored if rel.endswith("/"))
+
+    def is_ignored(path: Path) -> bool:
+        rel = path.relative_to(root).as_posix()
+        return rel in ignored or rel.startswith(ignored_directories)
+
+    entries = []
+    for entry in sorted((root / B.VENDOR).iterdir(), key=lambda p: p.name):
+        paths = sorted(entry.rglob("*")) if entry.is_dir() else [entry]
+        files = [path for path in paths if not path.is_dir() and not is_ignored(path)]
+        if files or listed is None:
+            entries.append((entry, files))
+    return entries
+
+
 def check_vendor_tree(root: Path, report: Report) -> dict:
     """X8 and X9 over vendor/. Returns {source: manifest} for the sources that have one."""
     vendor = root / B.VENDOR
@@ -177,7 +244,7 @@ def check_vendor_tree(root: Path, report: Report) -> dict:
     if not vendor.is_dir():
         report.add(9, f"{B.VENDOR}/ is absent")
         return manifests
-    for entry in sorted(vendor.iterdir(), key=lambda p: p.name):
+    for entry, judged in judged_entries(root):
         rel = f"{B.VENDOR}/{entry.name}"
         if not entry.is_dir():
             report.add(9, f"{rel} is a file directly under {B.VENDOR}/; every input is a "
@@ -216,9 +283,7 @@ def check_vendor_tree(root: Path, report: Report) -> dict:
                     named = f"{rel}/{generator}"
                     if isinstance(manifest["generate"], str) and named not in manifest["generate"]:
                         report.add(9, f"{rel}/{B.MANIFEST} generate does not name {named}")
-        for path in sorted(entry.rglob("*")):
-            if path.is_dir():
-                continue
+        for path in judged:
             name = path.relative_to(entry).as_posix()
             if name not in allowed:
                 report.add(9, f"{rel}/{name} is not {B.MANIFEST}, the generator or a file "
@@ -347,8 +412,10 @@ def check_document(root: Path, label: str, doc: dict, known: dict, report: Repor
                                   f"{spec['ids']}")
 
 
-def known_ids(root: Path, report: Report):
-    """The id list of each family, or None when an input cannot be read."""
+def known_ids(root: Path, report: Report, render_failure: str = None):
+    """The id list of each family, or None when an input cannot be read. The rendering reads
+    the lists of four families through the same readers, so a failure equal to
+    ``render_failure`` is already on the rendering's line and is not reported again."""
     try:
         technique_ids = B.read_object(root, B.TECHNIQUE_IDS).get("ids")
         known = {
@@ -364,7 +431,8 @@ def known_ids(root: Path, report: Report):
                 ids = B.read_object(root, spec["ids"]).get("payloadIds")
                 known["payloads"][producer] = set(B.string_list(ids, spec["ids"], "payloadIds"))
     except B.InputError as exc:
-        report.add(1, f"cannot read the id lists: {exc}")
+        if str(exc) != render_failure:
+            report.add(1, f"cannot read the id lists: {exc}")
         return None
     known["retired"] = retired_ids(root, report)
     return known
@@ -382,10 +450,11 @@ def run(root: Path) -> list:
     report = Report()
     check_vendor_tree(root, report)
 
-    fresh_text = None
+    fresh_text, render_failure = None, None
     try:
         fresh_text = B.render(root)
     except B.InputError as exc:
+        render_failure = str(exc)
         report.add(1, f"cannot render {COMMITTED}: {exc}")
     committed_path = root / COMMITTED
     committed = committed_path.read_bytes() if committed_path.is_file() else None
@@ -413,7 +482,7 @@ def run(root: Path) -> list:
     if fresh is not None and fresh != committed:
         documents.append((FRESH, json.loads(fresh_text)))
 
-    known = known_ids(root, report)
+    known = known_ids(root, report, render_failure)
     if known is not None:
         for label, doc in documents:
             check_document(root, label, doc, known, report)
