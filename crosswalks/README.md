@@ -130,7 +130,10 @@ family's vendored list (a payload id is never read as a check id), when a signat
 retired, when a pin is not an exact version or a 40-hex commit, or when a file under `vendor/`
 is not listed in its `VENDOR.json`. It reads no network. `python3 scripts/check_vendor_integrity.py`
 is the network half: it fetches each input at its pin and exits 1 when a vendored file differs
-from its source, and 3 when a source cannot be reached, which is not a pass.
+from its source, and 3 when a source cannot be reached, which is not a pass. It exits 2 on a
+usage error, which includes a Python whose `tarfile` module has no extraction filters while a
+package source is pinned: it needs Python 3.12 or later, or 3.8.17, 3.9.17, 3.10.12 or 3.11.4
+or later in those lines.
 
 To refresh a pin, open `vendor/<source>/VENDOR.json`. It states the pin (`commit` for a git
 source; `version` and `integrity` for the package), the date it was read, the files, and the

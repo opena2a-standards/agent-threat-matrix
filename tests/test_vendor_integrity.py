@@ -301,6 +301,43 @@ def test_a_root_without_vendor_exits_2(tmp_path):
     assert proc.returncode == 2, proc.stdout + proc.stderr
 
 
+# Runs the script on an interpreter whose tarfile has no extraction filters, as Python 3.9.6
+# has: no tarfile.data_filter, and an extractall that takes no filter argument.
+NO_FILTERS = """\
+import runpy, sys, tarfile
+del tarfile.data_filter
+extractall = tarfile.TarFile.extractall
+def old_extractall(self, path=".", members=None, *, numeric_owner=False):
+    return extractall(self, path, members, numeric_owner=numeric_owner)
+tarfile.TarFile.extractall = old_extractall
+sys.argv = sys.argv[1:]
+runpy.run_path(sys.argv[0], run_name="__main__")
+"""
+
+
+def check_without_filters(tree) -> subprocess.CompletedProcess:
+    argv = [sys.executable, "-c", NO_FILTERS, str(SCRIPT), str(tree.root), "--retry-delay", "0"]
+    for source, location in tree.overrides.items():
+        argv += ["--override", f"{source}={location}"]
+    return subprocess.run(argv, capture_output=True, text=True, timeout=600, env=offline_env())
+
+
+def test_a_python_without_tarfile_filters_is_a_usage_error_with_a_package_source(tree):
+    proc = check_without_filters(tree)
+    assert proc.returncode == 2, proc.stdout + proc.stderr
+    assert proc.stdout == ""
+    assert "usage error:" in proc.stderr and "no extraction filters" in proc.stderr
+    assert "Traceback" not in proc.stderr
+
+
+def test_a_python_without_tarfile_filters_checks_git_sources_alone(tree):
+    shutil.rmtree(tree.root / "vendor" / PACKAGE)
+    del tree.overrides[PACKAGE]
+    proc = check_without_filters(tree)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert lines(proc) == ["OK: 3 vendored files in 2 sources match their sources at the pin"]
+
+
 def test_the_scenario_generator_reads_each_scenario_at_the_commit(tree):
     proc = subprocess.run([sys.executable, "-I", str(DVAA_GENERATOR), str(tree.scenarios_work),
                            tree.scenarios_commit, "expected-checks.json"],
