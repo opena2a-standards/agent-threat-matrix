@@ -31,6 +31,10 @@ Output, one line per finding:
   tag names another commit, or the tarball's sha512 is not ``integrity``);
 - ``UNREACHABLE <source>: upstream unreachable, drift not measured``, after three attempts.
 
+A character that standard output's encoding cannot hold is written as a backslash escape, as
+standard error writes it. On macOS under LC_ALL=en_US.ISO8859-1, the drift of ``日本語.json``
+in aiis-signatures is the line ``DRIFT aiis-signatures \\u65e5\\u672c\\u8a9e.json``.
+
 Exit 0 when every file matches, 1 when any DRIFT line was printed, 3 when none was but a
 source was unreachable, and 2 on a usage error: an unknown option, a root that is not a
 directory, a ``VENDOR.json`` that is not a readable pin, an override naming no source, a
@@ -120,7 +124,12 @@ def last_line(proc: subprocess.CompletedProcess) -> str:
 
 
 def git(clone: Path, *args: str) -> subprocess.CompletedProcess:
-    return run(["git", "-c", "credential.helper=", "-C", str(clone), *args])
+    # On macOS, git 2.53.0 clone wrote core.precomposeunicode=true to the clone's config when
+    # the global config did not set it. In that clone, ls-tree printed nothing for the name
+    # cafe, U+0301, .json in a commit that holds it, and show looked for café.json, with é
+    # composed. With core.precomposeunicode=false here, git found that name as given.
+    return run(["git", "-c", "credential.helper=", "-c", "core.precomposeunicode=false",
+                "-C", str(clone), *args])
 
 
 def with_attempts(source: str, what: str, action, delay: float):
@@ -380,6 +389,14 @@ def parse_overrides(values: list, manifests: dict) -> dict:
 
 
 def main(argv: list) -> int:
+    # On macOS under LC_ALL=en_US.ISO8859-1, Python writes standard output as ISO-8859-1 with
+    # strict errors, so the DRIFT line of 日本語.json would raise UnicodeEncodeError and end the
+    # run before the sources after it. Standard output takes the error handler standard error
+    # has, which writes a character the encoding cannot hold as a backslash escape. sys.stdout
+    # is None when the process started with its standard output closed.
+    reconfigure = getattr(sys.stdout, "reconfigure", None)
+    if reconfigure is not None:
+        reconfigure(errors="backslashreplace")
     parser = argparse.ArgumentParser(description=DESCRIPTION, allow_abbrev=False)
     parser.add_argument("root", nargs="?",
                         help="the repository root; the default is the parent of this "
