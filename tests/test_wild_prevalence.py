@@ -354,12 +354,34 @@ GREEN = [
 ]
 
 
+def drop_telemetry(t: dict) -> bool:
+    """Take the honeypot-telemetry entries out of a technique's evidence, and the array where
+    that leaves it empty, as the sync does on a technique a period serves no samples on;
+    return whether the technique carried one."""
+    if not telemetry(t):
+        return False
+    if kept(t):
+        t["evidence"] = kept(t)
+    else:
+        del t["evidence"]
+    return True
+
+
 @pytest.mark.parametrize("prevalence,samples", [pytest.param(p, s, id=name) for name, p, s in GREEN])
 def test_validator_accepts(tree, prevalence, samples):
+    # The sync writes a telemetry entry on each technique a period serves samples on, so the
+    # first technique can carry one, and S15 refuses it once the technique's wildSampleCount
+    # is 0. A pair with a sample count of 0 drops that entry where the technique carries one,
+    # as the sync does on a technique served no samples, and then renders again the STIX
+    # bundle, which lists each evidence entry, and evidence-gaps.json, which lists the
+    # techniques with none, as S10 and S16 compare them with a fresh rendering of matrix.json.
     matrix = load(tree)
-    matrix["techniques"][0]["wildPrevalence"] = prevalence
-    matrix["techniques"][0]["wildSampleCount"] = samples
+    first = matrix["techniques"][0]
+    first["wildPrevalence"], first["wildSampleCount"] = prevalence, samples
+    dropped = samples == 0 and drop_telemetry(first)
     dump(tree, matrix)
+    if dropped:
+        render_stix(tree)
     proc = run_validator(tree)
     assert proc.returncode == 0, proc.stdout + proc.stderr
 
@@ -1047,6 +1069,21 @@ def test_a_page_case_passes_on_a_tree_that_holds_the_entries_it_writes(tmp_path,
         assert telemetry(technique(load(copy), tid)) == telemetry(technique(before, tid)), tid
 
 
+def sync_samples_on(root: Path, sampled) -> None:
+    """Have the sync write into the tree at root a period, read the day before, with samples
+    on the techniques sampled picks from the technique ids of the tree and on no other: the
+    tree then carries a telemetry entry on those techniques alone."""
+    ids = [t["id"] for t in load(root)["techniques"]]
+    with_samples = sampled(ids)
+    start, end = SYNCED_PERIOD
+    payload = {"wildPeriod": {"start": days_ago(start), "end": days_ago(end)},
+               "techniques": [{"id": tid, "wildPrevalence": 50 if tid in with_samples else 0,
+                               "wildSampleCount": 12 if tid in with_samples else 0} for tid in ids]}
+    proc = sync(root, payload, days_ago(SYNCED_READ))
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert [t["id"] for t in load(root)["techniques"] if telemetry(t)] == with_samples
+
+
 # The techniques a period serves samples on, from the technique ids of the tree. A tree the
 # sync wrote such a period into carries a telemetry entry on those techniques alone: T-2002
 # carries none on the three trees, and no technique beyond the two served() serves samples on
@@ -1072,14 +1109,28 @@ def test_a_sync_case_passes_on_a_tree_that_holds_other_sample_counts(tmp_path, c
     # a period into, read the day before, with samples on the techniques sampled names and on
     # no other.
     held = scratch_copy(ROOT, tmp_path / "held")
-    ids = [t["id"] for t in load(held)["techniques"]]
-    with_samples = sampled(ids)
-    start, end = SYNCED_PERIOD
-    payload = {"wildPeriod": {"start": days_ago(start), "end": days_ago(end)},
-               "techniques": [{"id": tid, "wildPrevalence": 50 if tid in with_samples else 0,
-                               "wildSampleCount": 12 if tid in with_samples else 0} for tid in ids]}
-    proc = sync(held, payload, days_ago(SYNCED_READ))
-    assert proc.returncode == 0, proc.stdout + proc.stderr
-    assert [t["id"] for t in load(held)["techniques"] if telemetry(t)] == with_samples
-
+    sync_samples_on(held, sampled)
     case(scratch_copy(held, tmp_path / "copy"))
+
+
+# The techniques a period serves samples on, the first technique among them. A tree the sync
+# wrote such a period into carries a telemetry entry on the first technique, the one
+# test_validator_accepts writes each pair of GREEN into.
+FIRST_SAMPLED = [
+    pytest.param(lambda ids: ids[:1], id="the first technique alone"),
+    pytest.param(lambda ids: ids, id="every technique"),
+]
+
+
+@pytest.mark.parametrize("prevalence,samples", [pytest.param(p, s, id=name) for name, p, s in GREEN])
+@pytest.mark.parametrize("sampled", FIRST_SAMPLED)
+def test_a_validator_case_passes_on_a_tree_that_holds_samples_on_the_technique_it_writes(
+        tmp_path, sampled, prevalence, samples):
+    # S15 refuses a telemetry entry on a technique whose wildSampleCount is 0, so a pair of
+    # GREEN with a sample count of 0 holds only once the case drops the entry the tree carries
+    # on the first technique. The case runs here on a scratch copy of a tree the sync wrote a
+    # period into, read the day before, with samples on the techniques sampled names and on
+    # no other.
+    held = scratch_copy(ROOT, tmp_path / "held")
+    sync_samples_on(held, sampled)
+    test_validator_accepts(scratch_copy(held, tmp_path / "copy"), prevalence, samples)
