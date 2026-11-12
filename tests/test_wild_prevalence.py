@@ -979,6 +979,64 @@ def test_sync_exits_1_when_the_crosswalk_cannot_be_rendered(tree):
     assert (tree / CROSSWALK).read_bytes() == crosswalk
 
 
+def test_sync_again_after_a_failed_render_renders_what_that_run_left_behind(tree):
+    # A write whose crosswalk cannot be rendered leaves matrix.json written, and the crosswalk
+    # and the Evidence lines of the technique pages behind it. Once the vendored input is
+    # back, the same response finds the period held with its values, so the sync leaves
+    # matrix.json as it is; it renders the crosswalk and runs the page fix, as they disagree
+    # with matrix.json, and then both checks pass. The sync after that writes nothing.
+    check_ids = tree / "vendor" / "hackmyagent" / "check-ids.json"
+    vendored = check_ids.read_bytes()
+    check_ids.unlink()
+    payload = served(load(tree))
+    assert sync(tree, payload).returncode == 1
+    check_ids.write_bytes(vendored)
+    assert run_crosswalk_check(tree).returncode == 1
+    assert run_page_check(tree).returncode == 1
+    matrix_bytes = (tree / "matrix.json").read_bytes()
+
+    proc = sync(tree, payload)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert proc.stdout == (
+        f"matrix.json already holds the values {API_URL} served for the closed period "
+        f"{bounds(closed_period())}, read {today()}.\n"
+        f"crosswalks/technique-crosswalk.json and the pages scripts/check_technique_pages.py checks "
+        f"disagreed with matrix.json, so the STIX bundle, evidence-gaps.json and "
+        f"crosswalks/technique-crosswalk.json are rendered again, and the technique pages list the "
+        f"evidence entries matrix.json carries.\n"), proc.stdout
+    for checked in (run_crosswalk_check(tree), run_page_check(tree), run_validator(tree)):
+        assert checked.returncode == 0, checked.stdout + checked.stderr
+    assert (tree / "matrix.json").read_bytes() == matrix_bytes
+
+    before = files(tree)
+    again = sync(tree, payload)
+    assert again.returncode == 0, again.stdout + again.stderr
+    assert again.stdout.endswith("; nothing written\n"), again.stdout
+    assert files(tree) == before
+
+
+def test_sync_that_writes_nothing_exits_1_when_a_page_has_no_place_for_its_evidence_lines(tree):
+    # After a write, a technique page loses its Tactic link and its Evidence lines. The same
+    # response again leaves matrix.json as it is, renders the files rendered from it, and
+    # exits 1 with the report of scripts/check_technique_pages.py --fix, which has no place to
+    # write the Evidence lines.
+    payload = served(load(tree))
+    assert sync(tree, payload).returncode == 0
+    matrix_bytes = (tree / "matrix.json").read_bytes()
+    tid = load(tree)["techniques"][1]["id"]
+    page = tree / "techniques" / f"{tid}.md"
+    text = page.read_text(encoding="utf-8")
+    page.write_text("".join(line for line in text.splitlines(keepends=True)
+                            if not line.startswith(("- Tactic: [", "- Evidence: "))), encoding="utf-8")
+    proc = sync(tree, payload)
+    assert proc.returncode == 1, proc.stdout + proc.stderr
+    assert proc.stderr.startswith("FAIL: the STIX bundle, evidence-gaps.json and "
+                                  "crosswalks/technique-crosswalk.json are written, but "
+                                  "scripts/check_technique_pages.py --fix failed:\n"), proc.stderr
+    assert f"  - {tid}: References section does not list the evidence entries" in proc.stderr, proc.stderr
+    assert (tree / "matrix.json").read_bytes() == matrix_bytes
+
+
 # --------------------------------------------------------------------------- the technique pages
 
 def page_lines(root: Path) -> dict:
