@@ -15,15 +15,23 @@ are checked the same way. So are the Evidence lines of the References section, o
 every References section linked only the technique's attack class and tactic pages. So is
 docs/data-sources.md, rendered in full from the data source vocabulary and the techniques
 that map none.
+
+scripts/sync_wild_prevalence.py rewrites the honeypot-telemetry entries each time it writes a
+period, so the Evidence line cases write the entries whose lines they change into their
+scratch copy rather than finding them in the tree, and a test runs each of them on copies of
+trees the sync wrote samples into on T-1001 alone, on every technique and on none.
 """
 
+import functools
 import importlib.util
 import json
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 import time
+from datetime import date, timedelta
 from pathlib import Path
 
 import pytest
@@ -42,16 +50,18 @@ def _load_checker():
 CHK = _load_checker()
 
 
-def scratch_tree() -> Path:
-    td = Path(tempfile.mkdtemp(prefix="atm-pages-"))
+def scratch_tree(source: Path = ROOT, td: Path = None) -> Path:
+    """Copy the files the checker reads from the tree at source into td, an empty directory,
+    or into a new temporary directory."""
+    td = td or Path(tempfile.mkdtemp(prefix="atm-pages-"))
     (td / "scripts").mkdir()
-    shutil.copy(ROOT / SCRIPT, td / SCRIPT)
-    shutil.copy(ROOT / "matrix.json", td / "matrix.json")
-    shutil.copy(ROOT / "related-projects.json", td / "related-projects.json")
-    shutil.copytree(ROOT / "techniques", td / "techniques")
-    shutil.copytree(ROOT / "tactics", td / "tactics")
+    shutil.copy(source / SCRIPT, td / SCRIPT)
+    shutil.copy(source / "matrix.json", td / "matrix.json")
+    shutil.copy(source / "related-projects.json", td / "related-projects.json")
+    shutil.copytree(source / "techniques", td / "techniques")
+    shutil.copytree(source / "tactics", td / "tactics")
     (td / "docs").mkdir()
-    shutil.copy(ROOT / CHK.DATA_SOURCES_PAGE, td / CHK.DATA_SOURCES_PAGE)
+    shutil.copy(source / CHK.DATA_SOURCES_PAGE, td / CHK.DATA_SOURCES_PAGE)
     return td
 
 
@@ -71,6 +81,13 @@ def tree():
     td = scratch_tree()
     yield td
     shutil.rmtree(td, ignore_errors=True)
+
+
+@pytest.fixture
+def source() -> Path:
+    """The tree a case reads without writing it: the committed one. The test at the end of
+    this file runs such a case on copies of trees the sync wrote."""
+    return ROOT
 
 
 def test_shipped_tree_is_green():
@@ -1075,12 +1092,20 @@ EVIDENCE_LINE_RE = re.compile(r"^- Evidence: .*$", re.M)
 ENDPOINT = "https://api.oa2a.org/api/v1/threat-matrix"
 T2001_LINKS = ["- Attack Class: [SOUL-INJECT](../attack-classes/SOUL-INJECT.md)",
                "- Tactic: [initial-access](../tactics/initial-access.md)"]
-T2001_EVIDENCE = (f"- Evidence: honeypot-telemetry dated 2026-10-19, [{ENDPOINT}]({ENDPOINT}). The "
-                  "wildPrevalence and wildSampleCount this endpoint served for the technique on this "
-                  "date; they measure engagement with a honeypot, not a production attack rate.")
 # The DVAA challenge T-2001's dvaaValidation names, L1-03, at the line of its key.
 T2001_CHALLENGE = ("https://github.com/opena2a-org/damn-vulnerable-ai-agent/blob/"
                    "eb6f66cc40e5ce5743b27cf3fe33d52e5ac69014/src/challenges/index.js#L98")
+TELEMETRY_NOTE = ("The wildPrevalence and wildSampleCount this endpoint served for the technique on "
+                  "this date; they measure engagement with a honeypot, not a production attack rate.")
+# The entries the Evidence line cases give T-2001 in their scratch copy, as T-2001 carried them
+# when scripts/sync_wild_prevalence.py had written the read of 2026-10-19: the lab-reproduction
+# entry citing that challenge, then the honeypot-telemetry entry of that read. The sync writes
+# the telemetry entries from the samples each period serves, so the one T-2001 carries in the
+# tree a case copies can carry another date and note, or be absent.
+T2001_ENTRIES = [{"type": "lab-reproduction", "reference": T2001_CHALLENGE, "date": "2026-10-07"},
+                 {"type": "honeypot-telemetry", "reference": ENDPOINT, "date": "2026-10-19",
+                  "note": TELEMETRY_NOTE}]
+T2001_EVIDENCE = f"- Evidence: honeypot-telemetry dated 2026-10-19, [{ENDPOINT}]({ENDPOINT}). {TELEMETRY_NOTE}"
 T2001_LAB = f"- Evidence: lab-reproduction dated 2026-10-07, [{T2001_CHALLENGE}]({T2001_CHALLENGE})"
 T2001_LISTED = f"lab-reproduction {T2001_CHALLENGE} 2026-10-07; honeypot-telemetry {ENDPOINT} 2026-10-19"
 T2001_NOT_LISTED = (f"T-2001: References section does not list the evidence entries matrix.json "
@@ -1111,9 +1136,24 @@ def edit_technique(root: Path, tid: str, change) -> None:
     path.write_text(json.dumps(matrix, indent=2), encoding="utf-8")
 
 
-def test_t2001_references_cite_the_dvaa_challenge_and_the_endpoint_its_entries_were_read_from():
-    text = (ROOT / "techniques" / "T-2001.md").read_text(encoding="utf-8")
-    assert references(text) == T2001_LINKS + [T2001_LAB, T2001_EVIDENCE]
+def hold_t2001_entries(root: Path) -> None:
+    """Give T-2001 in the tree at root T2001_ENTRIES as its evidence and have --fix write their
+    Evidence lines on its page, which then show T2001_LAB and T2001_EVIDENCE."""
+    edit_technique(root, "T-2001", lambda t: t.update(evidence=[dict(e) for e in T2001_ENTRIES]))
+    fixed = run_checker(root, "--fix")
+    assert fixed.returncode == 0, fixed.stdout + fixed.stderr
+
+
+def test_t2001_references_cite_the_dvaa_challenge_and_the_endpoint_its_entries_were_read_from(source):
+    # The sync writes T-2001 a telemetry entry dated with its read when the period it writes
+    # serves T-2001 samples, and none when it serves none.
+    matrix = json.loads((source / "matrix.json").read_text(encoding="utf-8"))
+    t2001 = next(t for t in matrix["techniques"] if t["id"] == "T-2001")
+    telemetry = [e for e in t2001["evidence"] if e["type"] == "honeypot-telemetry"]
+    assert [(e["reference"], e["date"]) for e in telemetry] in (
+        [], [(ENDPOINT, matrix["wildPrevalenceSource"]["read"])])
+    text = (source / "techniques" / "T-2001.md").read_text(encoding="utf-8")
+    assert references(text) == T2001_LINKS + [T2001_LAB] + [evidence_line(e) for e in telemetry]
 
 
 @pytest.mark.parametrize("technique", TECHNIQUES, ids=[t["id"] for t in TECHNIQUES])
@@ -1141,6 +1181,7 @@ def test_the_checker_renders_an_entry_as_the_page_shows_it():
 
 
 def test_a_missing_evidence_line_is_red_and_fixed(tree):
+    hold_t2001_entries(tree)
     page = tree / "techniques" / "T-2001.md"
     before = page.read_text(encoding="utf-8")
     mutate(page, T2001_EVIDENCE + "\n", "")
@@ -1166,6 +1207,7 @@ STALE_EVIDENCE = [
 @pytest.mark.parametrize("stale", [line for _, line in STALE_EVIDENCE],
                          ids=[name for name, _ in STALE_EVIDENCE])
 def test_a_stale_evidence_line_is_red_and_fixed(tree, stale):
+    hold_t2001_entries(tree)
     page = tree / "techniques" / "T-2001.md"
     before = page.read_text(encoding="utf-8")
     mutate(page, T2001_EVIDENCE, stale)
@@ -1179,6 +1221,7 @@ def test_a_stale_evidence_line_is_red_and_fixed(tree, stale):
 
 
 def test_an_evidence_line_outside_its_place_is_red_and_moved_back(tree):
+    hold_t2001_entries(tree)
     page = tree / "techniques" / "T-2001.md"
     before = page.read_text(encoding="utf-8")
     mutate(page, T2001_EVIDENCE + "\n", "")
@@ -1194,6 +1237,7 @@ def test_an_evidence_line_outside_its_place_is_red_and_moved_back(tree):
 
 
 def test_a_repeated_evidence_line_is_red_and_fixed(tree):
+    hold_t2001_entries(tree)
     page = tree / "techniques" / "T-2001.md"
     before = page.read_text(encoding="utf-8")
     mutate(page, T2001_EVIDENCE + "\n", T2001_EVIDENCE + "\n" + T2001_EVIDENCE + "\n")
@@ -1207,6 +1251,11 @@ def test_a_repeated_evidence_line_is_red_and_fixed(tree):
 
 
 def test_an_evidence_line_on_a_technique_with_no_entry_is_red_and_dropped(tree):
+    # The sync writes a telemetry entry on each technique a period serves samples on, so the
+    # case drops the entries of T-1001, and with --fix their lines, before it adds a line.
+    edit_technique(tree, "T-1001", lambda t: t.pop("evidence", None))
+    fixed = run_checker(tree, "--fix")
+    assert fixed.returncode == 0, fixed.stdout + fixed.stderr
     page = tree / "techniques" / "T-1001.md"
     before = page.read_text(encoding="utf-8")
     mutate(page, T1001_TACTIC, T1001_TACTIC + T2001_EVIDENCE + "\n")
@@ -1221,6 +1270,7 @@ def test_an_evidence_line_on_a_technique_with_no_entry_is_red_and_dropped(tree):
 
 
 def test_evidence_lines_follow_an_entry_added_to_the_data(tree):
+    hold_t2001_entries(tree)
     edit_technique(tree, "T-2001", lambda t: t["evidence"].append(ADDED_ENTRY))
 
     result = run_checker(tree)
@@ -1236,6 +1286,7 @@ def test_evidence_lines_follow_an_entry_added_to_the_data(tree):
 
 
 def test_evidence_lines_follow_the_entries_removed_from_the_data(tree):
+    hold_t2001_entries(tree)
     edit_technique(tree, "T-2001", lambda t: t.pop("evidence"))
 
     result = run_checker(tree)
@@ -1257,6 +1308,7 @@ def test_an_evidence_line_inside_a_fenced_block_is_not_a_data_line(tree):
 
 
 def test_evidence_lines_with_no_tactic_link_to_go_under_are_left_alone(tree):
+    hold_t2001_entries(tree)
     page = tree / "techniques" / "T-2001.md"
     mutate(page, T2001_LINKS[1] + "\n", "")
     mutate(page, T2001_EVIDENCE, T2001_EVIDENCE.replace("dated 2026-10-19", "dated 2026-10-18"))
@@ -1274,6 +1326,7 @@ def test_evidence_lines_with_no_tactic_link_to_go_under_are_left_alone(tree):
 
 
 def test_evidence_lines_with_two_tactic_links_to_go_under_are_left_alone(tree):
+    hold_t2001_entries(tree)
     page = tree / "techniques" / "T-2001.md"
     mutate(page, T2001_EVIDENCE, T2001_EVIDENCE.replace("dated 2026-10-19", "dated 2026-10-18"))
     mutate(page, "- **Evidence Tier:** observed\n",
@@ -1360,3 +1413,79 @@ def test_a_data_sources_line_stays_put_on_a_page_without_one_oasb_controls_line(
     assert f"T-1001: Data Sources line is '{by_id}', matrix.json says '{EXAMPLE_LINE}'" in result.stdout
     assert MISPLACED not in result.stdout, "with no single OASB Controls line there is no place to move it to"
     assert page.read_text(encoding="utf-8") == before + EXAMPLE_LINE + "\n"
+
+
+# --------------------------------------------------------------------------- trees the sync wrote
+# scripts/sync_wild_prevalence.py writes on each technique the samples a period serves, with
+# a honeypot-telemetry entry dated with its read on each technique served samples and none on
+# the others, and the technique pages list the entries matrix.json then carries.
+
+
+def days_ago(days: int) -> str:
+    return (date.today() - timedelta(days=days)).isoformat()
+
+
+# The techniques a period serves samples on, from the technique ids of the tree.
+SAMPLED = [
+    pytest.param(lambda ids: ["T-1001"], id="samples on T-1001 alone"),
+    pytest.param(lambda ids: ids, id="samples on every technique"),
+    pytest.param(lambda ids: [], id="samples on no technique"),
+]
+
+
+@pytest.fixture(scope="module", params=SAMPLED)
+def synced(request, tmp_path_factory) -> Path:
+    """A copy of the repository on which the sync wrote the period from 31 to 2 days before
+    the run, read the day before, with samples on the techniques the param names and on no
+    other. The copy first gives no period, as the sync writes no values for a period that does
+    not start after the one matrix.json holds."""
+    root = tmp_path_factory.mktemp("synced") / "tree"
+    shutil.copytree(ROOT, root, ignore=shutil.ignore_patterns(
+        ".git", "__pycache__", ".pytest_cache", ".venv", "venv", "node_modules", ".DS_Store"))
+    path = root / "matrix.json"
+    matrix = json.loads(path.read_text(encoding="utf-8"))
+    matrix["wildPrevalenceSource"].pop("period", None)
+    path.write_text(json.dumps(matrix, indent=2) + "\n", encoding="utf-8")
+    ids = [t["id"] for t in matrix["techniques"]]
+    sampled = request.param(ids)
+    response = root.parent / "response.json"
+    response.write_text(json.dumps({
+        "wildPeriod": {"start": days_ago(31), "end": days_ago(2)},
+        "techniques": [{"id": tid, "wildPrevalence": 50 if tid in sampled else 0,
+                        "wildSampleCount": 12 if tid in sampled else 0} for tid in ids]}),
+        encoding="utf-8")
+    proc = subprocess.run([sys.executable, str(root / "scripts" / "sync_wild_prevalence.py"),
+                           "--payload", str(response), "--read-date", days_ago(1)],
+                          capture_output=True, text=True, timeout=300)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    written = json.loads(path.read_text(encoding="utf-8"))["techniques"]
+    assert [t["id"] for t in written
+            if any(e["type"] == "honeypot-telemetry" for e in t.get("evidence", []))] == sampled
+    return root
+
+
+# The cases of the Evidence lines: each reads or changes the Evidence lines of T-2001 or of
+# T-1001.
+EVIDENCE_CASES = [
+    pytest.param(test_t2001_references_cite_the_dvaa_challenge_and_the_endpoint_its_entries_were_read_from,
+                 id="the T-2001 References lines"),
+    pytest.param(test_a_missing_evidence_line_is_red_and_fixed, id="a missing line"),
+    *[pytest.param(functools.partial(test_a_stale_evidence_line_is_red_and_fixed, stale=line),
+                   id=f"a stale line: {name}") for name, line in STALE_EVIDENCE],
+    pytest.param(test_an_evidence_line_outside_its_place_is_red_and_moved_back, id="a line outside its place"),
+    pytest.param(test_a_repeated_evidence_line_is_red_and_fixed, id="a repeated line"),
+    pytest.param(test_an_evidence_line_on_a_technique_with_no_entry_is_red_and_dropped,
+                 id="a line on a technique with no entry"),
+    pytest.param(test_evidence_lines_follow_an_entry_added_to_the_data, id="an entry added"),
+    pytest.param(test_evidence_lines_follow_the_entries_removed_from_the_data, id="the entries removed"),
+    pytest.param(test_an_evidence_line_inside_a_fenced_block_is_not_a_data_line, id="a line in a fence"),
+    pytest.param(test_evidence_lines_with_no_tactic_link_to_go_under_are_left_alone, id="no Tactic link"),
+    pytest.param(test_evidence_lines_with_two_tactic_links_to_go_under_are_left_alone, id="two Tactic links"),
+]
+
+
+@pytest.mark.parametrize("case", EVIDENCE_CASES)
+def test_an_evidence_line_case_passes_on_a_tree_the_sync_wrote_samples_into(synced, case, tmp_path):
+    # Each case runs on a scratch copy of the tree the sync wrote; the T-2001 References case
+    # reads that copy as it reads the committed tree.
+    case(scratch_tree(synced, tmp_path))

@@ -4,6 +4,12 @@ Every case runs the script on a scratch copy of the tree against a small git rep
 built in the test and laid out as DVAA lays out its scenarios and its challenges, so no case
 reads the network and the committed files are never written. The pages of that repository
 are test data: their steps, labels, challenges and dates are written here.
+
+scripts/sync_wild_prevalence.py rewrites the samples and the honeypot-telemetry entries each
+time it writes a period, so a case that compares the whole evidence array of a technique
+writes the samples and the telemetry entries it needs into its scratch copy, and a test runs
+each such case on copies of trees the sync wrote samples into on T-1001 alone, on every
+technique and on none.
 """
 
 import importlib.util
@@ -13,7 +19,7 @@ import re
 import shutil
 import subprocess
 import sys
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -132,14 +138,18 @@ def blob(repo: Path, commit_id: str, path: str) -> str:
     return git(repo, "rev-parse", f"{commit_id}:{path}")
 
 
-@pytest.fixture
-def tree(tmp_path: Path) -> Path:
-    root = tmp_path / "tree"
+def scratch_copy(source: Path, root: Path) -> Path:
+    """Copy FILES from the tree at source into root."""
     for rel in FILES:
         dst = root / rel
         dst.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy(ROOT / rel, dst)
+        shutil.copy(source / rel, dst)
     return root
+
+
+@pytest.fixture
+def tree(tmp_path: Path) -> Path:
+    return scratch_copy(ROOT, tmp_path / "tree")
 
 
 @pytest.fixture
@@ -206,6 +216,34 @@ def not_dvaa(t: dict) -> list:
     return [e for e in t.get("evidence", []) if not PIN.written_here(e)]
 
 
+def hold_samples(tree: Path, with_samples, without_samples) -> None:
+    """Give each technique in with_samples samples and, after its other entries, one
+    honeypot-telemetry entry that cites the read wildPrevalenceSource gives, and each in
+    without_samples no samples and no such entry, dropping an evidence array left empty, in
+    the matrix.json under tree.
+
+    The sync writes the samples each period serves, and the telemetry entry with them, so the
+    techniques that carry that entry can differ from one write to the next. A case that
+    compares the whole evidence array of a technique writes the state it needs into its
+    scratch copy with this, rather than finding it in the tree.
+    """
+    matrix = load(tree)
+    source = matrix["wildPrevalenceSource"]
+    for tid in (*with_samples, *without_samples):
+        t = technique(matrix, tid)
+        kept = [e for e in t.get("evidence", []) if e["type"] != TELEMETRY]
+        if tid in with_samples:
+            t["wildPrevalence"], t["wildSampleCount"] = 50, 12
+            kept.append({"type": TELEMETRY, "reference": source["url"], "date": source["read"]})
+        else:
+            t["wildPrevalence"], t["wildSampleCount"] = 0, 0
+        if kept:
+            t["evidence"] = kept
+        else:
+            t.pop("evidence", None)
+    dump(tree, matrix)
+
+
 def link(commit_id: str, path: str) -> str:
     return f"{DVAA}/blob/{commit_id}/{path}"
 
@@ -247,27 +285,32 @@ def test_pins_each_scenario_page_that_names_a_technique(tree, dvaa):
 
 
 def test_writes_the_entries_the_pins_back_and_drops_the_ones_they_no_longer_back(tree, dvaa):
-    shipped = load(ROOT)
+    # T-1002 and T-2001 carry the telemetry entry, which the script keeps after the entries
+    # it writes, and the other techniques named here carry no samples, so their evidence is
+    # the entries the pins back.
+    hold_samples(tree, ("T-1002", "T-2001"), ("T-1004", "T-1006", "T-4003", "T-5003", "T-7007"))
+    held = load(tree)
     proc = run_pin(tree, dvaa.path)
     assert proc.returncode == 0, proc.stdout + proc.stderr
     matrix = load(tree)
-    telemetry = [e for e in technique(shipped, "T-1002")["evidence"] if e["type"] == TELEMETRY]
+    telemetry = [e for e in technique(held, "T-1002")["evidence"] if e["type"] == TELEMETRY]
+    assert telemetry
     assert technique(matrix, "T-1002")["evidence"] == [
         {"type": LAB, "reference": link(dvaa.first, CHAIN), "date": "2026-03-01"}] + telemetry
     assert technique(matrix, "T-1004")["evidence"] == [
         {"type": LAB, "reference": link(dvaa.second, PROBE), "date": "2026-04-22"}]
     # A label that is not the technique's name backs no entry, and this clone defines no
     # challenge, so the challenge T-2001's dvaaValidation names backs none either.
-    assert technique(matrix, "T-2001")["evidence"] == not_dvaa(technique(shipped, "T-2001"))
-    # The shipped entries cite pages these pins do not hold, so they go, and with them an
-    # evidence array left empty.
+    assert technique(matrix, "T-2001")["evidence"] == not_dvaa(technique(held, "T-2001"))
+    # The entries the tree held cite pages these pins do not hold, so they go, and with them
+    # an evidence array left empty.
     for tid in ("T-1006", "T-4003", "T-5003", "T-7007"):
-        assert {e["type"] for e in technique(shipped, tid)["evidence"]} == {LAB}, tid
+        assert {e["type"] for e in technique(held, tid)["evidence"]} == {LAB}, tid
         assert "evidence" not in technique(matrix, tid), tid
-    # Every shipped entry that cites DVAA cites a page or file this clone does not hold.
-    written = [t["id"] for t in shipped["techniques"] if not_dvaa(t) != t.get("evidence", [])]
+    # Every entry the tree held that cites DVAA cites a page or file this clone does not hold.
+    written = [t["id"] for t in held["techniques"] if not_dvaa(t) != t.get("evidence", [])]
     assert f"written on {', '.join(written)}; updated is {matrix['updated']}" in proc.stdout
-    assert matrix["updated"] == max(shipped["updated"], today())
+    assert matrix["updated"] == max(held["updated"], today())
     gaps = sorted(t["id"] for t in matrix["techniques"] if not t.get("evidence"))
     assert load(tree, "evidence-gaps.json")["ids"] == gaps
     assert f"carry no evidence entry: {', '.join(gaps)}" in proc.stdout, proc.stdout
@@ -303,6 +346,8 @@ def test_running_again_writes_nothing_and_keeps_the_read_date(tree, dvaa):
 
 
 def test_a_page_changed_after_the_pin_moves_it_and_its_entries(tree, dvaa):
+    # T-1004 and T-1006 carry no samples here, so their evidence is the entry the pins back.
+    hold_samples(tree, (), ("T-1004", "T-1006"))
     assert run_pin(tree, dvaa.path).returncode == 0
     write(dvaa.path, PROBE, PROBE_TEXT + "\n2. **T-1006 (Agent Card Discovery):** The agent reads the card.\n")
     later = commit(dvaa.path, "probe step", LATER, PROBE)
@@ -339,6 +384,9 @@ def test_a_replace_ref_does_not_stand_in_for_the_pinned_commit(tree, dvaa):
 
 
 def test_head_pins_the_clone_at_another_commit(tree, dvaa):
+    # T-1004 carries no samples here, so it carries no entry once the pins name no page that
+    # backs one.
+    hold_samples(tree, (), ("T-1004",))
     proc = run_pin(tree, dvaa.path, "--head", dvaa.first)
     assert proc.returncode == 0, proc.stdout + proc.stderr
     pins = load(tree, "evidence-sources.json")["dvaa"]
@@ -673,3 +721,64 @@ def test_usage_errors_exit_2(tree, dvaa, args, needle):
     proc = run_pin(tree, dvaa.path, *args)
     assert proc.returncode == 2, proc.stdout + proc.stderr
     assert needle in proc.stderr, proc.stderr
+
+
+# --------------------------------------------------------------------------- trees the sync wrote
+# scripts/sync_wild_prevalence.py writes on each technique the samples a period serves, with
+# a honeypot-telemetry entry dated with its read on each technique served samples and none on
+# the others.
+
+
+def days_ago(days: int) -> str:
+    return (date.today() - timedelta(days=days)).isoformat()
+
+
+# The techniques a period serves samples on, from the technique ids of the tree.
+SAMPLED = [
+    pytest.param(lambda ids: ["T-1001"], id="samples on T-1001 alone"),
+    pytest.param(lambda ids: ids, id="samples on every technique"),
+    pytest.param(lambda ids: [], id="samples on no technique"),
+]
+
+
+@pytest.fixture(scope="module", params=SAMPLED)
+def synced(request, tmp_path_factory) -> Path:
+    """A copy of the repository on which the sync wrote the period from 31 to 2 days before
+    the run, read the day before, with samples on the techniques the param names and on no
+    other. The copy first gives no period, as the sync writes no values for a period that does
+    not start after the one matrix.json holds."""
+    root = tmp_path_factory.mktemp("synced") / "tree"
+    shutil.copytree(ROOT, root, ignore=shutil.ignore_patterns(
+        ".git", "__pycache__", ".pytest_cache", ".venv", "venv", "node_modules", ".DS_Store"))
+    matrix = load(root)
+    matrix["wildPrevalenceSource"].pop("period", None)
+    dump(root, matrix)
+    ids = [t["id"] for t in matrix["techniques"]]
+    sampled = request.param(ids)
+    response = root.parent / "response.json"
+    response.write_text(json.dumps({
+        "wildPeriod": {"start": days_ago(31), "end": days_ago(2)},
+        "techniques": [{"id": tid, "wildPrevalence": 50 if tid in sampled else 0,
+                        "wildSampleCount": 12 if tid in sampled else 0} for tid in ids]}),
+        encoding="utf-8")
+    proc = subprocess.run([sys.executable, str(root / "scripts" / "sync_wild_prevalence.py"),
+                           "--payload", str(response), "--read-date", days_ago(1)],
+                          capture_output=True, text=True, timeout=300)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert [t["id"] for t in load(root)["techniques"]
+            if any(e["type"] == TELEMETRY for e in t.get("evidence", []))] == sampled
+    return root
+
+
+# The cases that compare the whole evidence array of a technique the sync can give samples.
+EVIDENCE_CASES = [
+    pytest.param(test_writes_the_entries_the_pins_back_and_drops_the_ones_they_no_longer_back,
+                 id="the entries written and dropped"),
+    pytest.param(test_a_page_changed_after_the_pin_moves_it_and_its_entries, id="a page changed after the pin"),
+    pytest.param(test_head_pins_the_clone_at_another_commit, id="--head"),
+]
+
+
+@pytest.mark.parametrize("case", EVIDENCE_CASES)
+def test_a_case_passes_on_a_tree_the_sync_wrote_samples_into(synced, case, dvaa, tmp_path):
+    case(scratch_copy(synced, tmp_path / "tree"), dvaa)

@@ -3,6 +3,11 @@
 Every case runs scripts/validate_matrix.py against a scratch copy of the tree so the
 committed files are never perturbed. The shipped tree must be green; each rule the
 validator enforces is proven red on one minimal mutation.
+
+scripts/sync_wild_prevalence.py rewrites the samples and the honeypot-telemetry entries each
+time it writes a period, so a case that needs T-1001 to carry no samples or no evidence
+writes that into its scratch copy, and a test runs each such case on copies of trees the sync
+wrote samples into on T-1001 alone, on every technique and on none.
 """
 
 import importlib.util
@@ -14,7 +19,7 @@ import subprocess
 import sys
 import tempfile
 import unicodedata
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
 import pytest
@@ -28,12 +33,13 @@ INPUT_SCHEMAS = ["schema/threat-matrix-v1.2.schema.json", "schema/consumer-readi
                  "schema/evidence-sources.schema.json"]
 
 
-def scratch_tree(td: Path = None) -> Path:
+def scratch_tree(td: Path = None, source: Path = ROOT) -> Path:
+    """Copy FILES from the tree at source into td, or into a new temporary directory."""
     td = td or Path(tempfile.mkdtemp(prefix="atm-schema-"))
     for rel in FILES:
         dst = td / rel
         dst.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy(ROOT / rel, dst)
+        shutil.copy(source / rel, dst)
     return td
 
 
@@ -70,9 +76,17 @@ def add_subtechnique(root: Path) -> None:
     dump(root, "matrix.json", matrix)
 
 
-def mutate(fn):
-    """Apply fn to a scratch tree, run the validator, clean up, return the process."""
-    root = scratch_tree()
+@pytest.fixture
+def source() -> Path:
+    """The tree a case copies: the committed one. The test at the end of this file runs the
+    cases that take it on copies of trees the sync wrote."""
+    return ROOT
+
+
+def mutate(fn, source: Path = ROOT):
+    """Apply fn to a scratch copy of the tree at source, run the validator, clean up, return
+    the process."""
+    root = scratch_tree(source=source)
     try:
         fn(root)
         return run_validator(root)
@@ -1067,9 +1081,24 @@ def technique_of(matrix: dict, tid: str) -> dict:
     return next(t for t in matrix["techniques"] if t["id"] == tid)
 
 
-def run_with_evidence(tid: str, entry: dict, render: bool = True):
-    """Append entry to the evidence of technique tid in a scratch tree, render the STIX
-    bundle again unless render is False, and validate the tree.
+def without_samples(matrix: dict, tid: str) -> dict:
+    """Give technique tid of matrix no samples, and drop its honeypot-telemetry entries and an
+    evidence array that leaves empty, as scripts/sync_wild_prevalence.py writes a technique a
+    period serves no samples for; return the technique."""
+    t = technique_of(matrix, tid)
+    t["wildPrevalence"], t["wildSampleCount"] = 0, 0
+    kept = [e for e in t.get("evidence", []) if e["type"] != TELEMETRY]
+    if kept:
+        t["evidence"] = kept
+    else:
+        t.pop("evidence", None)
+    return t
+
+
+def run_with_evidence(tid: str, entry: dict, render: bool = True, source: Path = ROOT, prepare=None):
+    """Append entry to the evidence of technique tid in a scratch copy of the tree at source,
+    once prepare, where given, has changed the copy's matrix; render the STIX bundle again
+    unless render is False, and validate the tree.
 
     Returns the process and the position the entry took in the technique's evidence[].
     """
@@ -1077,13 +1106,15 @@ def run_with_evidence(tid: str, entry: dict, render: bool = True):
 
     def fn(root):
         m = load(root, "matrix.json")
+        if prepare is not None:
+            prepare(m)
         evidence = technique_of(m, tid).setdefault("evidence", [])
         position["index"] = len(evidence)
         evidence.append(entry)
         dump(root, "matrix.json", m)
         if render:
             regenerate_stix(root)
-    proc = mutate(fn)
+    proc = mutate(fn, source)
     return proc, position["index"]
 
 
@@ -1105,14 +1136,16 @@ def test_telemetry_entry_dated_other_than_the_read_is_red():
                f"2026-01-01 is not {source['read']}, the date wildPrevalenceSource says the endpoint was read")
 
 
-def test_telemetry_entry_on_a_technique_the_endpoint_served_no_samples_for_is_red():
-    matrix = load(ROOT, "matrix.json")
-    assert technique_of(matrix, "T-1001")["wildSampleCount"] == 0
-    source = matrix["wildPrevalenceSource"]
-    proc, index = run_with_evidence("T-1001", {"type": TELEMETRY, "reference": source["url"],
-                                               "date": source["read"]})
-    _red(proc, f"S15 T-1001: evidence[{index}] reference {source['url']!r} does not resolve: the endpoint "
-               f"served no samples for the technique on {source['read']}: its wildSampleCount is 0")
+def test_telemetry_entry_on_a_technique_the_endpoint_served_no_samples_for_is_red(source):
+    # The sync writes on each technique the samples a period serves, with a telemetry entry
+    # where it serves some, so the case gives T-1001 no samples, and drops such an entry,
+    # before it adds one.
+    read = load(source, "matrix.json")["wildPrevalenceSource"]
+    entry = {"type": TELEMETRY, "reference": read["url"], "date": read["read"]}
+    proc, index = run_with_evidence("T-1001", entry, source=source,
+                                    prepare=lambda m: without_samples(m, "T-1001"))
+    _red(proc, f"S15 T-1001: evidence[{index}] reference {read['url']!r} does not resolve: the endpoint "
+               f"served no samples for the technique on {read['read']}: its wildSampleCount is 0")
 
 
 @pytest.mark.parametrize("kind", ["observation", "publication", "advisory"])
@@ -1263,24 +1296,28 @@ def test_repeated_lab_entry_is_red():
     _red(proc, f"S15 T-1002: evidence[{index}] repeats evidence[0] (the same type, reference and date)")
 
 
-def test_lab_entry_resolves_once_a_pinned_page_names_the_technique_under_its_name():
+def test_lab_entry_resolves_once_a_pinned_page_names_the_technique_under_its_name(source):
     # The validator before this rule refused every lab-reproduction entry; it reads the pins now.
+    # The sync writes a telemetry entry on each technique a period serves samples on, so the
+    # case first gives T-1001 no samples and no entry, then the lab entry.
+    counted = {}
+
     def fn(root):
         sources = load(root, "evidence-sources.json")
         page = next(p for p in sources["dvaa"]["pages"] if p["path"] == LATERAL)
         page["names"].append({"line": 99, "technique": "T-1001", "label": "Endpoint Enumeration"})
         dump(root, "evidence-sources.json", sources)
         m = load(root, "matrix.json")
+        without_samples(m, "T-1001").pop("evidence", None)
+        counted["entries"] = sum(len(t.get("evidence", [])) for t in m["techniques"])
+        counted["bare"] = sum(1 for t in m["techniques"] if not t.get("evidence"))
         technique_of(m, "T-1001")["evidence"] = [page_entry(LATERAL)]
         dump(root, "matrix.json", m)
         regenerate_stix(root)
-    proc = mutate(fn)
+    proc = mutate(fn, source)
     assert proc.returncode == 0, proc.stdout + proc.stderr
-    shipped = load(ROOT, "matrix.json")
     # T-1001 carried no entry, so the tree has one entry more and one bare technique fewer.
-    assert "evidence" not in technique_of(shipped, "T-1001")
-    entries = sum(len(t.get("evidence", [])) for t in shipped["techniques"]) + 1
-    bare = sum(1 for t in shipped["techniques"] if not t.get("evidence")) - 1
+    entries, bare = counted["entries"] + 1, counted["bare"] - 1
     assert f"{entries} evidence entries resolved ({bare} techniques with none)" in proc.stdout, proc.stdout
 
 
@@ -1587,18 +1624,31 @@ def test_shipped_gap_list_names_every_technique_without_evidence():
     assert load(ROOT, "evidence-gaps.json")["ids"] == gap_ids(matrix)
 
 
-def test_generator_prints_the_techniques_left_without_evidence():
-    root = scratch_tree()
+def leave_t1001_without_evidence(root: Path) -> None:
+    """Give T-1001 in the tree at root no samples and no evidence entry, and render the STIX
+    bundle and evidence-gaps.json again, so the gap list names at least T-1001: the sync can
+    write samples, and a telemetry entry with them, on every technique."""
+    m = load(root, "matrix.json")
+    without_samples(m, "T-1001").pop("evidence", None)
+    dump(root, "matrix.json", m)
+    regenerate_stix(root)
+
+
+def test_generator_prints_the_techniques_left_without_evidence(source):
+    root = scratch_tree(source=source)
     try:
+        leave_t1001_without_evidence(root)
+        rendered = (root / "evidence-gaps.json").read_bytes()
         (root / "evidence-gaps.json").unlink()
         proc = subprocess.run(["python3", str(root / "scripts" / "generate_stix.py")],
                               capture_output=True, text=True, timeout=120)
         assert proc.returncode == 0, proc.stdout + proc.stderr
         matrix = load(root, "matrix.json")
         gaps = gap_ids(matrix)
+        assert "T-1001" in gaps
         assert (f"{root / 'evidence-gaps.json'}: {len(gaps)} of {len(matrix['techniques'])} techniques "
                 f"carry no evidence entry: {', '.join(gaps)}") in proc.stdout, proc.stdout
-        assert (root / "evidence-gaps.json").read_bytes() == (ROOT / "evidence-gaps.json").read_bytes()
+        assert (root / "evidence-gaps.json").read_bytes() == rendered
     finally:
         shutil.rmtree(root)
 
@@ -1614,12 +1664,13 @@ def test_gap_list_follows_the_evidence_when_the_files_are_rendered_again():
     assert proc.returncode == 0, proc.stdout + proc.stderr
 
 
-def test_s16_gap_list_edited_by_hand_is_red():
+def test_s16_gap_list_edited_by_hand_is_red(source):
     def fn(root):
+        leave_t1001_without_evidence(root)
         gaps = load(root, "evidence-gaps.json")
         gaps["ids"] = gaps["ids"][1:]
         dump(root, "evidence-gaps.json", gaps)
-    _red(mutate(fn), "S16 evidence-gaps.json is not what scripts/generate_stix.py renders from matrix.json")
+    _red(mutate(fn, source), "S16 evidence-gaps.json is not what scripts/generate_stix.py renders from matrix.json")
 
 
 def test_s16_gap_list_out_of_step_with_the_evidence_is_red():
@@ -1773,3 +1824,68 @@ def test_white_space_and_its_complement_are_the_code_points_ecma_262_names(valid
     not_space = re.compile(f"[{validator.ECMA_NOT_SPACE}]")
     assert {code for code in codes if space.match(chr(code))} == want
     assert {code for code in codes if not_space.match(chr(code))} == set(codes) - want
+
+
+# --------------------------------------------------------------------------- trees the sync wrote
+# scripts/sync_wild_prevalence.py writes on each technique the samples a period serves, with
+# a honeypot-telemetry entry dated with its read on each technique served samples and none on
+# the others, and renders the STIX bundle and evidence-gaps.json again.
+
+
+def days_ago(days: int) -> str:
+    return (date.today() - timedelta(days=days)).isoformat()
+
+
+# The techniques a period serves samples on, from the technique ids of the tree.
+SAMPLED = [
+    pytest.param(lambda ids: ["T-1001"], id="samples on T-1001 alone"),
+    pytest.param(lambda ids: ids, id="samples on every technique"),
+    pytest.param(lambda ids: [], id="samples on no technique"),
+]
+
+
+@pytest.fixture(scope="module", params=SAMPLED)
+def synced(request, tmp_path_factory) -> Path:
+    """A copy of the repository on which the sync wrote the period from 31 to 2 days before
+    the run, read the day before, with samples on the techniques the param names and on no
+    other. The copy first gives no period, as the sync writes no values for a period that does
+    not start after the one matrix.json holds."""
+    root = tmp_path_factory.mktemp("synced") / "tree"
+    shutil.copytree(ROOT, root, ignore=shutil.ignore_patterns(
+        ".git", "__pycache__", ".pytest_cache", ".venv", "venv", "node_modules", ".DS_Store"))
+    matrix = load(root, "matrix.json")
+    matrix["wildPrevalenceSource"].pop("period", None)
+    dump(root, "matrix.json", matrix)
+    ids = [t["id"] for t in matrix["techniques"]]
+    sampled = request.param(ids)
+    response = root.parent / "response.json"
+    response.write_text(json.dumps({
+        "wildPeriod": {"start": days_ago(31), "end": days_ago(2)},
+        "techniques": [{"id": tid, "wildPrevalence": 50 if tid in sampled else 0,
+                        "wildSampleCount": 12 if tid in sampled else 0} for tid in ids]}))
+    proc = subprocess.run([sys.executable, str(root / "scripts" / "sync_wild_prevalence.py"),
+                           "--payload", str(response), "--read-date", days_ago(1)],
+                          capture_output=True, text=True, timeout=300)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    written = load(root, "matrix.json")["techniques"]
+    assert [t["id"] for t in written
+            if any(e["type"] == TELEMETRY for e in t.get("evidence", []))] == sampled
+    return root
+
+
+# The cases that copy the tree at source: each writes into its scratch copy the samples and
+# evidence of T-1001 it needs.
+SOURCE_CASES = [
+    pytest.param(test_telemetry_entry_on_a_technique_the_endpoint_served_no_samples_for_is_red,
+                 id="a telemetry entry on a technique served no samples"),
+    pytest.param(test_lab_entry_resolves_once_a_pinned_page_names_the_technique_under_its_name,
+                 id="a lab entry that resolves"),
+    pytest.param(test_generator_prints_the_techniques_left_without_evidence,
+                 id="the techniques left without evidence"),
+    pytest.param(test_s16_gap_list_edited_by_hand_is_red, id="a gap list edited by hand"),
+]
+
+
+@pytest.mark.parametrize("case", SOURCE_CASES)
+def test_a_case_passes_on_a_tree_the_sync_wrote_samples_into(synced, case):
+    case(synced)
