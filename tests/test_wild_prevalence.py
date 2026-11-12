@@ -155,6 +155,16 @@ RED = [
      "matrix.wildPrevalenceSource.url: 'http://api.oa2a.org/api/v1/threat-matrix' does not match"),
     ("source with an unknown field", _source(note="hand typed"),
      "matrix.wildPrevalenceSource: unexpected property 'note'"),
+    ("period without an end", _source(period={"start": "2026-09-01"}),
+     "matrix.wildPrevalenceSource.period: missing required property 'end'"),
+    ("period end in another format", _source(period={"start": "2026-09-01", "end": "30 September 2026"}),
+     "matrix.wildPrevalenceSource.period.end: '30 September 2026' does not match"),
+    ("period with an unknown field", _source(period={"start": "2026-09-01", "end": "2026-09-30", "closed": True}),
+     "matrix.wildPrevalenceSource.period: unexpected property 'closed'"),
+    ("period end that is no calendar date", _source(period={"start": "2026-09-01", "end": "2026-09-31"}),
+     "S19 wildPrevalenceSource.period: end '2026-09-31' is not a calendar date"),
+    ("period start that is no calendar date", _source(period={"start": "2026-02-29", "end": "2026-03-31"}),
+     "S19 wildPrevalenceSource.period: start '2026-02-29' is not a calendar date"),
 ]
 
 
@@ -191,6 +201,44 @@ def test_s14_prevalence_above_zero_with_no_samples_is_red(tree):
     assert f"S14 {first['id']}: wildPrevalence is 50 but wildSampleCount is 0" in proc.stderr, proc.stderr
 
 
+def _period(start: int, end: int):
+    """Give wildPrevalenceSource a period from start to end days after its read date."""
+    def fn(m):
+        read = date.fromisoformat(m["wildPrevalenceSource"]["read"])
+        m["wildPrevalenceSource"]["period"] = {"start": (read + timedelta(days=start)).isoformat(),
+                                               "end": (read + timedelta(days=end)).isoformat()}
+    return fn
+
+
+S19_RED = [
+    ("period that starts after it ends", -10, -20, "start {start} is later than end {end}"),
+    ("period that ends on the read date", -30, 0, "end {end} is not earlier than read {read}"),
+    ("period that ends after the read date", -30, 12, "end {end} is not earlier than read {read}"),
+]
+
+
+@pytest.mark.parametrize("start,end,needle", [pytest.param(s, e, n, id=name) for name, s, e, n in S19_RED])
+def test_s19_refuses_a_period_that_had_not_ended_when_it_was_read(tree, start, end, needle):
+    matrix = load(tree)
+    _period(start, end)(matrix)
+    dump(tree, matrix)
+    proc = run_validator(tree)
+    assert proc.returncode == 1, proc.stdout + proc.stderr
+    source = matrix["wildPrevalenceSource"]
+    expected = "S19 wildPrevalenceSource.period: " + needle.format(read=source["read"], **source["period"])
+    assert expected in proc.stderr, proc.stderr
+
+
+@pytest.mark.parametrize("start,end", [pytest.param(-30, -1, id="ended the day before the read"),
+                                       pytest.param(-1, -1, id="one day, the day before the read")])
+def test_validator_accepts_a_period_that_ended_before_the_read_date(tree, start, end):
+    matrix = load(tree)
+    _period(start, end)(matrix)
+    dump(tree, matrix)
+    proc = run_validator(tree)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+
+
 GREEN = [
     ("no data: both 0", 0, 0),
     ("samples with no prevalence", 0, 10),
@@ -213,8 +261,18 @@ def test_validator_accepts(tree, prevalence, samples):
 
 # --------------------------------------------------------------------------- the generator
 
-def served(matrix: dict) -> dict:
-    """A response shaped like the endpoint's: every technique but the last, with values on three."""
+def days_ago(days: int) -> str:
+    return (date.today() - timedelta(days=days)).isoformat()
+
+
+def closed_period() -> dict:
+    """A period that ended before every read date the generator cases give."""
+    return {"start": days_ago(40), "end": days_ago(10)}
+
+
+def served(matrix: dict, period=None) -> dict:
+    """A response shaped like the endpoint's, for a closed period: every technique but the
+    last, with values on three."""
     entries = []
     for t in matrix["techniques"][:-1]:
         entries.append({"id": t["id"], "name": t["name"], "threatStatus": "active",
@@ -224,7 +282,7 @@ def served(matrix: dict) -> dict:
     entries[1].update(wildPrevalence=98.44, wildSampleCount=7610)
     entries[2].update(wildPrevalence=100, wildSampleCount=11306)
     entries.append({"id": "T-9999", "wildPrevalence": 12.5, "wildSampleCount": 40})
-    return {"version": "1.1", "techniques": entries}
+    return {"version": "1.1", "wildPeriod": period or closed_period(), "techniques": entries}
 
 
 def test_sync_writes_both_fields_on_every_technique_and_zero_where_none_is_served(tree):
@@ -246,7 +304,7 @@ def test_sync_writes_both_fields_on_every_technique_and_zero_where_none_is_serve
     assert (technique(matrix, ids[2])["wildPrevalence"], technique(matrix, ids[2])["wildSampleCount"]) == (100, 11306)
     assert (technique(matrix, ids[-1])["wildPrevalence"], technique(matrix, ids[-1])["wildSampleCount"]) == (0, 0)
     assert all((t["wildPrevalence"], t["wildSampleCount"]) == (0, 0) for t in matrix["techniques"][3:])
-    assert matrix["wildPrevalenceSource"] == {"url": API_URL, "read": today()}
+    assert matrix["wildPrevalenceSource"] == {"url": API_URL, "read": today(), "period": closed_period()}
     assert matrix["updated"] == today()
     assert f"from {API_URL}, read {today()}: 2 above 0" in proc.stdout, proc.stdout
     assert f"Not listed by the endpoint, written as 0: {ids[-1]}" in proc.stdout, proc.stdout
@@ -517,7 +575,7 @@ def test_sync_fetches_the_endpoint_once_and_dates_the_read_today(tree, monkeypat
     monkeypatch.setattr(module.urllib.request, "urlopen", fake_urlopen)
     assert module.main([]) == 0
     assert calls == [(API_URL, 30)]
-    assert load(tree)["wildPrevalenceSource"] == {"url": API_URL, "read": today()}
+    assert load(tree)["wildPrevalenceSource"] == {"url": API_URL, "read": today(), "period": closed_period()}
 
 
 def test_sync_reports_a_failed_fetch_and_writes_nothing(tree, monkeypatch, capsys):
@@ -536,3 +594,177 @@ def test_sync_reports_a_failed_fetch_and_writes_nothing(tree, monkeypatch, capsy
 def test_sync_description_is_its_docstring_summary():
     module = load_module(ROOT)
     assert module.DESCRIPTION == module.__doc__.strip().splitlines()[0]
+
+
+# --------------------------------------------------------------------------- closed periods only
+
+def files(root: Path):
+    return (root / "matrix.json").read_bytes(), (root / STIX).read_bytes()
+
+
+def sync(root: Path, payload, read: str = None) -> subprocess.CompletedProcess:
+    return run_sync(root, "--payload", str(write_payload(root, payload)), "--read-date", read or today())
+
+
+def bounds(period: dict) -> str:
+    return f"{period['start']} to {period['end']}"
+
+
+def test_sync_refuses_a_response_that_names_no_closed_period(tree):
+    # The endpoint serves its values with no period: the file keeps the values it holds.
+    payload = served(load(tree))
+    del payload["wildPeriod"]
+    before = files(tree)
+    proc = sync(tree, payload)
+    assert proc.returncode == 1, proc.stdout + proc.stderr
+    assert proc.stderr == ("FAIL: the response names no closed period in wildPeriod, so its values are "
+                           "not copied until the registry serves one; matrix.json is unchanged\n"), proc.stderr
+    assert files(tree) == before
+
+
+def test_sync_fetch_of_a_response_that_names_no_closed_period_writes_nothing(tree, monkeypatch, capsys):
+    module = load_module(tree)
+    payload = served(load(tree))
+    del payload["wildPeriod"]
+    body = json.dumps(payload).encode("utf-8")
+    monkeypatch.setattr(module.urllib.request, "urlopen", lambda url, timeout=None: io.BytesIO(body))
+    before = files(tree)
+    assert module.main([]) == 1
+    assert "the response names no closed period in wildPeriod" in capsys.readouterr().err
+    assert files(tree) == before
+
+
+PERIOD_REFUSED = [
+    ("a period that is not an object", lambda: "2026-10",
+     "wildPeriod in the response is not an object with a start and an end"),
+    ("a period without a start", lambda: {"end": days_ago(10)},
+     "wildPeriod.start None in the response is not a YYYY-MM-DD date"),
+    ("a period end that is no calendar date", lambda: {"start": "2026-02-01", "end": "2026-02-30"},
+     "wildPeriod.end '2026-02-30' in the response is not a YYYY-MM-DD date"),
+    ("a period end in the basic format", lambda: {"start": "2026-02-01", "end": "20260228"},
+     "wildPeriod.end '20260228' in the response is not a YYYY-MM-DD date"),
+    ("a period that starts after it ends", lambda: {"start": days_ago(10), "end": days_ago(40)},
+     "after it ends on"),
+    ("a period that ends on the read date", lambda: {"start": days_ago(30), "end": today()},
+     "is not closed: it ends on or after the read date"),
+    ("a period that ends after the read date",
+     lambda: {"start": days_ago(30), "end": (date.today() + timedelta(days=5)).isoformat()},
+     "is not closed: it ends on or after the read date"),
+]
+
+
+@pytest.mark.parametrize("period,needle", [pytest.param(p, n, id=name) for name, p, n in PERIOD_REFUSED])
+def test_sync_refuses_a_period_that_is_not_closed_and_writes_nothing(tree, period, needle):
+    payload = served(load(tree))
+    payload["wildPeriod"] = period()
+    before = files(tree)
+    proc = sync(tree, payload)
+    assert proc.returncode == 1, proc.stdout + proc.stderr
+    assert needle in proc.stderr, proc.stderr
+    assert "matrix.json is unchanged" in proc.stderr, proc.stderr
+    assert files(tree) == before
+
+
+def test_sync_records_the_period_bounds_and_names_them_in_each_telemetry_note(tree):
+    period = closed_period()
+    proc = sync(tree, served(load(tree)))
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    matrix = load(tree)
+    assert f"for the closed period {bounds(period)} on {len(matrix['techniques'])} techniques" in proc.stdout
+    assert matrix["wildPrevalenceSource"]["period"] == period
+    notes = [e["note"] for t in matrix["techniques"] for e in t.get("evidence", []) if e["type"] == TELEMETRY]
+    assert len(notes) == 2, notes
+    for note in notes:
+        assert f"served for the technique over the closed period {bounds(period)}, read on this date" in note
+    validated = run_validator(tree)
+    assert validated.returncode == 0, validated.stdout + validated.stderr
+
+
+def test_sync_writes_nothing_for_the_held_period_served_again_with_its_values(tree):
+    payload = served(load(tree))
+    held_read = days_ago(3)
+    assert sync(tree, payload, held_read).returncode == 0
+    before = files(tree)
+    proc = sync(tree, payload)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert proc.stdout == (f"matrix.json already holds the values {API_URL} served for the closed period "
+                           f"{bounds(closed_period())}, read {held_read}; nothing written\n"), proc.stdout
+    assert files(tree) == before
+
+
+def _more_samples(payload):
+    payload["techniques"][1]["wildSampleCount"] += 1
+    return payload["techniques"][1]["id"]
+
+
+def _other_prevalence(payload):
+    payload["techniques"][2]["wildPrevalence"] = 99.5
+    return payload["techniques"][2]["id"]
+
+
+def _unlisted(payload):
+    return payload["techniques"].pop(2)["id"]
+
+
+@pytest.mark.parametrize("change", [pytest.param(_more_samples, id="another sample count"),
+                                    pytest.param(_other_prevalence, id="another prevalence"),
+                                    pytest.param(_unlisted, id="a technique no longer listed")])
+def test_sync_never_rewrites_a_value_held_for_a_period(tree, change):
+    payload = served(load(tree))
+    assert sync(tree, payload).returncode == 0
+    before = files(tree)
+    tid = change(payload)
+    proc = sync(tree, payload)
+    assert proc.returncode == 1, proc.stdout + proc.stderr
+    assert proc.stderr == (f"FAIL: matrix.json holds the values for the period {bounds(closed_period())}, "
+                           f"and the response serves other values for it on {tid}; a value held for a "
+                           f"period is never rewritten; matrix.json is unchanged\n"), proc.stderr
+    assert files(tree) == before
+
+
+OVERLAPPING = [
+    ("a period that starts on the day the held one ends", lambda: {"start": days_ago(10), "end": days_ago(1)}),
+    ("a period inside the held one", lambda: {"start": days_ago(30), "end": days_ago(20)}),
+    ("a period that ends before the held one starts", lambda: {"start": days_ago(70), "end": days_ago(41)}),
+]
+
+
+@pytest.mark.parametrize("period", [pytest.param(p, id=name) for name, p in OVERLAPPING])
+def test_sync_refuses_a_period_that_does_not_start_after_the_held_one(tree, period):
+    assert sync(tree, served(load(tree))).returncode == 0
+    before = files(tree)
+    served_period = period()
+    proc = sync(tree, served(load(tree), served_period))
+    assert proc.returncode == 1, proc.stdout + proc.stderr
+    assert proc.stderr == (f"FAIL: the period {bounds(served_period)} does not start after "
+                           f"{bounds(closed_period())}, the period matrix.json holds values for; a value "
+                           f"held for a period is never rewritten; matrix.json is unchanged\n"), proc.stderr
+    assert files(tree) == before
+
+
+def test_sync_writes_the_next_closed_period_in_place_of_the_held_one(tree):
+    assert sync(tree, served(load(tree))).returncode == 0
+    following = {"start": days_ago(9), "end": days_ago(1)}
+    payload = served(load(tree), following)
+    payload["techniques"][1].update(wildPrevalence=50, wildSampleCount=12)
+    proc = sync(tree, payload)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    matrix = load(tree)
+    assert matrix["wildPrevalenceSource"] == {"url": API_URL, "read": today(), "period": following}
+    entry = technique(matrix, payload["techniques"][1]["id"])
+    assert (entry["wildPrevalence"], entry["wildSampleCount"]) == (50, 12)
+    assert bounds(following) in entry["evidence"][-1]["note"]
+    validated = run_validator(tree)
+    assert validated.returncode == 0, validated.stdout + validated.stderr
+
+
+def test_sync_refuses_a_held_period_without_a_start_and_an_end(tree):
+    matrix = load(tree)
+    matrix["wildPrevalenceSource"]["period"] = {"start": "2026-09-01"}
+    dump(tree, matrix)
+    before = files(tree)
+    proc = sync(tree, served(matrix))
+    assert proc.returncode == 1, proc.stdout + proc.stderr
+    assert proc.stderr == ("FAIL: wildPrevalenceSource.period in matrix.json is not a YYYY-MM-DD start "
+                           "and end; matrix.json is unchanged\n"), proc.stderr
+    assert files(tree) == before

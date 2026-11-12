@@ -93,6 +93,9 @@ Standard library only, no network. Two passes:
         and whose ``kind`` is ``check`` names one of the technique's ``hmaChecks``,
         so the technique page's Data Sources line shows no check its HMA Checks
         line leaves out
+   - S19 a ``period`` in ``wildPrevalenceSource`` is a closed period: its ``start``
+        and ``end`` are calendar dates, ``start`` is no later than ``end``, and ``end``
+        is earlier than the ``read`` date, so the period had ended when it was read
 
 Exit 0 when everything holds, 1 otherwise.
 """
@@ -601,6 +604,7 @@ def semantic_checks(matrix: dict, readiness: dict, technique_ids_file, pages: di
         for tid in path.get("techniques", []):
             if tid not in ids:
                 errors.append(f"S9 attackPaths {path['id']}: step {tid} is not a technique id")
+    period_findings(matrix["wildPrevalenceSource"], errors)
     return commit_note
 
 
@@ -610,6 +614,22 @@ def calendar_date(value: str) -> bool:
     except ValueError:
         return False
     return True
+
+
+def period_findings(source: dict, errors: list) -> None:
+    """S19: the period wildPrevalenceSource gives, where it gives one, had ended when it was read."""
+    period = source.get("period")
+    if period is None:
+        return
+    start, end, read = period["start"], period["end"], source["read"]
+    dates = [f"{key} {value!r}" for key, value in (("start", start), ("end", end)) if not calendar_date(value)]
+    if dates:
+        errors.append(f"S19 wildPrevalenceSource.period: {' and '.join(dates)} is not a calendar date")
+    elif start > end:
+        errors.append(f"S19 wildPrevalenceSource.period: start {start} is later than end {end}")
+    elif calendar_date(read) and end >= read:
+        errors.append(f"S19 wildPrevalenceSource.period: end {end} is not earlier than read {read}, so the "
+                      f"period had not ended when it was read; values are copied only for a closed period")
 
 
 def committed_findings(where: str, committed: str, read: str, errors: list) -> None:

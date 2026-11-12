@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://threats.opena2a.org/schema/threat-matrix-v1.2.schema.json",
   "title": "AI Agent Threat Matrix 1.2",
-  "description": "Shape of matrix.json. Technique ids are T-NNNN, or T-NNNN.NNN for a sub-technique; sub-techniques sit flat in techniques[] and carry parentId. The nine technique fields required by 1.1 are unchanged and still required. Every field added in 1.2 is optional. Added after the 1.2 release and required: wildPrevalence and wildSampleCount on every technique, and the top-level wildPrevalenceSource that says where and when they were read. Changed after the 1.2 release, while no technique carried a data source: an entry of the top-level dataSources registry requires readBy, and the items of a technique's dataSources are objects that name the source and the check, signature or sensor field that uses it, where they were bare ids. scripts/validate_matrix.py checks this schema with an in-repo subset checker and then the cross-field rules the schema cannot express (see the x-semantic notes).",
+  "description": "Shape of matrix.json. Technique ids are T-NNNN, or T-NNNN.NNN for a sub-technique; sub-techniques sit flat in techniques[] and carry parentId. The nine technique fields required by 1.1 are unchanged and still required. Every field added in 1.2 is optional. Added after the 1.2 release and required: wildPrevalence and wildSampleCount on every technique, and the top-level wildPrevalenceSource that says where and when they were read. Added after the 1.2 release and optional: the period of wildPrevalenceSource, the closed period the values cover. Changed after the 1.2 release, while no technique carried a data source: an entry of the top-level dataSources registry requires readBy, and the items of a technique's dataSources are objects that name the source and the check, signature or sensor field that uses it, where they were bare ids. scripts/validate_matrix.py checks this schema with an in-repo subset checker and then the cross-field rules the schema cannot express (see the x-semantic notes).",
   "type": "object",
   "required": ["version", "name", "created", "updated", "stixNamespace", "tactics", "techniques", "attackClasses", "attackPaths", "dataSources", "wildPrevalenceSource"],
   "additionalProperties": false,
@@ -150,13 +150,24 @@
       }
     },
     "wildPrevalenceSource": {
-      "description": "Where and when the wildPrevalence and wildSampleCount of every technique were read. scripts/sync_wild_prevalence.py writes it with them.",
+      "description": "Where and when the wildPrevalence and wildSampleCount of every technique were read, and the closed period they cover. scripts/sync_wild_prevalence.py writes it with them.",
       "type": "object",
       "required": ["url", "read"],
       "additionalProperties": false,
       "properties": {
         "url": { "type": "string", "pattern": "^https://", "description": "The registry endpoint the values were read from." },
-        "read": { "$ref": "#/$defs/date", "description": "The date the endpoint was read." }
+        "read": { "$ref": "#/$defs/date", "description": "The date the endpoint was read." },
+        "period": {
+          "description": "The closed period the values cover, as the endpoint named it: the first and the last day, both included. scripts/sync_wild_prevalence.py copies values only from a response that names a period that ended before the read date, and never rewrites the values held for a period. Absent where the read named no period.",
+          "type": "object",
+          "required": ["start", "end"],
+          "additionalProperties": false,
+          "properties": {
+            "start": { "$ref": "#/$defs/date", "description": "The first day of the period." },
+            "end": { "$ref": "#/$defs/date", "description": "The last day of the period." }
+          },
+          "x-semantic": "start and end are calendar dates, start is no later than end, and end is earlier than read"
+        }
       }
     },
     "dataSource": {
