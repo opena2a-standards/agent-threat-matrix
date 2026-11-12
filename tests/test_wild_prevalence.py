@@ -247,6 +247,61 @@ def test_validator_accepts_a_period_that_ended_before_the_read_date(tree, start,
     assert proc.returncode == 0, proc.stdout + proc.stderr
 
 
+def render_stix(root: Path) -> None:
+    """Render the STIX bundle and evidence-gaps.json of the tree again, as S10 and S16 compare them."""
+    proc = subprocess.run([sys.executable, str(root / "scripts" / "generate_stix.py")],
+                          capture_output=True, text=True, timeout=120)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+
+
+def _read_on(read: str, period=None):
+    """Move the wildPrevalenceSource read, and the date of each honeypot-telemetry entry dated
+    with it, to read, so S15 still resolves every entry; give the source period where one is
+    passed."""
+    def fn(m):
+        source = m["wildPrevalenceSource"]
+        for t in m["techniques"]:
+            for entry in t.get("evidence", []):
+                if entry["type"] == TELEMETRY and entry["date"] == source["read"]:
+                    entry["date"] = read
+        source["read"] = read
+        if period is not None:
+            source["period"] = period
+    return fn
+
+
+# Each read matches the schema's YYYY-MM-DD pattern and is no day of the calendar.
+S20_RED = [
+    ("30 February", "2026-02-30", None),
+    ("30 February with a period that ends after it", "2026-02-30", {"start": "2026-01-01", "end": "2026-03-31"}),
+    ("29 February of a common year", "2025-02-29", None),
+    ("month 13", "2026-13-01", None),
+]
+
+
+@pytest.mark.parametrize("read,period", [pytest.param(r, p, id=name) for name, r, p in S20_RED])
+def test_s20_refuses_a_read_date_that_is_not_a_calendar_date(tree, read, period):
+    matrix = load(tree)
+    _read_on(read, period)(matrix)
+    dump(tree, matrix)
+    render_stix(tree)
+    proc = run_validator(tree)
+    assert proc.returncode == 1, proc.stdout + proc.stderr
+    assert proc.stderr.splitlines() == [
+        "FAIL: matrix.json does not validate (1 finding(s)):",
+        f"  - S20 wildPrevalenceSource.read: {read!r} is not a calendar date",
+    ], proc.stderr
+
+
+def test_validator_accepts_a_read_on_29_february_of_a_leap_year(tree):
+    matrix = load(tree)
+    _read_on("2024-02-29", {"start": "2024-01-01", "end": "2024-01-31"})(matrix)
+    dump(tree, matrix)
+    render_stix(tree)
+    proc = run_validator(tree)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+
+
 GREEN = [
     ("no data: both 0", 0, 0),
     ("samples with no prevalence", 0, 10),
