@@ -10,8 +10,15 @@ time it writes a period, so a case that compares the whole evidence array of a t
 writes the samples and the telemetry entries it needs into its scratch copy, and a test runs
 each such case on copies of trees the sync wrote samples into on T-1001 alone, on every
 technique and on none.
+
+When the script writes matrix.json it also renders crosswalks/technique-crosswalk.json and
+runs scripts/check_technique_pages.py --fix, so the scratch copy holds the crosswalk, the
+scripts that render and check it and the pinned inputs under vendor/ it is rendered from, and
+the technique and tactic pages with the files the page check reads.
 """
 
+import difflib
+import hashlib
 import importlib.util
 import json
 import os
@@ -29,9 +36,21 @@ ROOT = Path(__file__).resolve().parent.parent
 FILES = ("matrix.json", "technique-ids.json", "schema/threat-matrix-v1.2.schema.json",
          "schema/consumer-readiness.json", "schema/evidence-sources.schema.json",
          "scripts/validate_matrix.py", "scripts/generate_stix.py", "scripts/pin_evidence_sources.py",
-         "stix/agent-threat-matrix-bundle.json", "evidence-gaps.json", "evidence-sources.json")
+         "stix/agent-threat-matrix-bundle.json", "evidence-gaps.json", "evidence-sources.json",
+         "scripts/build_technique_crosswalk.py", "scripts/check_technique_crosswalk.py",
+         "crosswalks/technique-crosswalk.json", "scripts/check_technique_pages.py",
+         "related-projects.json", "docs/data-sources.md")
+# The technique and tactic pages, which scripts/check_technique_pages.py checks against
+# matrix.json and the script has it rewrite; that check also reads related-projects.json and
+# docs/data-sources.md, listed above. And the pinned inputs under vendor/, which
+# scripts/build_technique_crosswalk.py renders the crosswalk from with matrix.json and
+# technique-ids.json.
+DIRS = ("techniques", "tactics", "vendor")
 SCRIPT = "scripts/pin_evidence_sources.py"
 STIX = "stix/agent-threat-matrix-bundle.json"
+CROSSWALK = "crosswalks/technique-crosswalk.json"
+CROSSWALK_CHECK = "scripts/check_technique_crosswalk.py"
+PAGE_CHECK = "scripts/check_technique_pages.py"
 DVAA = "https://github.com/opena2a-org/damn-vulnerable-ai-agent"
 LAB = "lab-reproduction"
 TELEMETRY = "honeypot-telemetry"
@@ -139,11 +158,15 @@ def blob(repo: Path, commit_id: str, path: str) -> str:
 
 
 def scratch_copy(source: Path, root: Path) -> Path:
-    """Copy FILES from the tree at source into root."""
+    """Copy FILES and DIRS from the tree at source into root."""
     for rel in FILES:
         dst = root / rel
         dst.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy(source / rel, dst)
+    for rel in DIRS:
+        # scripts/check_technique_crosswalk.py fails on a file under vendor/ that VENDOR.json
+        # does not list, such as a __pycache__/ or .DS_Store file there.
+        shutil.copytree(source / rel, root / rel, ignore=shutil.ignore_patterns("__pycache__", ".DS_Store"))
     return root
 
 
@@ -208,7 +231,11 @@ def technique(matrix: dict, tid: str) -> dict:
 
 
 def snapshot(root: Path) -> dict:
-    return {rel: (root / rel).read_bytes() for rel in FILES if (root / rel).is_file()}
+    """The bytes of FILES and of the technique and tactic pages under root, by path from root."""
+    paths = [root / rel for rel in FILES]
+    for rel in ("techniques", "tactics"):
+        paths.extend(sorted((root / rel).glob("*.md")))
+    return {path.relative_to(root).as_posix(): path.read_bytes() for path in paths if path.is_file()}
 
 
 def not_dvaa(t: dict) -> list:
@@ -429,6 +456,110 @@ def test_pins_only_the_labels_the_validator_admits(tree, dvaa):
                                           {"line": 9, "technique": "T-1006", "label": "\x85Agent Card Discovery"}]}
     validated = run_validator(tree)
     assert validated.returncode == 0, validated.stdout + validated.stderr
+
+
+# --------------------------------------------------------------------------- the files rendered from matrix.json
+
+def run_check(root: Path, rel: str, *args: str) -> subprocess.CompletedProcess:
+    return subprocess.run([sys.executable, str(root / rel), *args], capture_output=True, text=True, timeout=300)
+
+
+def page_lines(root: Path) -> dict:
+    """The lines of each technique page under root, by its file name."""
+    return {path.name: path.read_text(encoding="utf-8").splitlines()
+            for path in sorted((root / "techniques").glob("*.md"))}
+
+
+def test_a_write_renders_the_crosswalk_again_and_the_crosswalk_check_passes(tree, dvaa):
+    # crosswalks/technique-crosswalk.json records the sha256 of matrix.json and is dated with
+    # the latest of updated and the read dates of the vendored inputs, and
+    # scripts/check_technique_crosswalk.py fails when it differs from a fresh rendering. Of
+    # matrix.json the crosswalk also reads the version and the id, hmaChecks and oasbControls
+    # of each technique, which the script does not write, so no other value of the file changes.
+    before = load(tree, CROSSWALK)
+    proc = run_pin(tree, dvaa.path)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    checked = run_check(tree, CROSSWALK_CHECK)
+    assert checked.returncode == 0, checked.stdout + checked.stderr
+    assert "crosswalks/technique-crosswalk.json is rendered again" in proc.stdout, proc.stdout
+
+    after = load(tree, CROSSWALK)
+    digest = hashlib.sha256((tree / "matrix.json").read_bytes()).hexdigest()
+    assert after["matrix"]["files"][0] == {"path": "matrix.json", "sha256": digest}
+    assert after["generated"] == load(tree)["updated"] == today()
+    after["generated"] = before["generated"]
+    after["matrix"]["files"][0]["sha256"] = before["matrix"]["files"][0]["sha256"]
+    assert after == before
+
+
+def test_a_write_lists_the_entries_on_the_technique_pages_and_the_page_check_passes(tree, dvaa):
+    # The References section of a technique page lists the technique's evidence entries, one
+    # Evidence line each, and scripts/check_technique_pages.py fails on a page whose lines
+    # differ from them. A write gives T-1002 and T-1004 the entries of the pages these pins
+    # hold and drops the DVAA entries these pins do not back, so the run rewrites the
+    # Evidence lines of each technique whose entries the write changed, and no other line.
+    checked = run_check(tree, PAGE_CHECK)
+    assert checked.returncode == 0, checked.stdout + checked.stderr
+    held, before = load(tree), page_lines(tree)
+    proc = run_pin(tree, dvaa.path)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    checked = run_check(tree, PAGE_CHECK)
+    assert checked.returncode == 0, checked.stdout + checked.stderr
+    assert "the technique pages list the evidence entries matrix.json now carries" in proc.stdout, proc.stdout
+
+    matrix, after = load(tree), page_lines(tree)
+    written = [u["id"] for t, u in zip(held["techniques"], matrix["techniques"])
+               if t.get("evidence") != u.get("evidence")]
+    assert {"T-1002", "T-1004"} <= set(written), written
+    assert sorted(name for name in after if after[name] != before[name]) == sorted(f"{tid}.md" for tid in written)
+    for name in after:
+        moved = [line[2:] for line in difflib.ndiff(before[name], after[name]) if line[:2] in ("- ", "+ ")]
+        assert all(line.startswith("- Evidence: ") for line in moved), (name, moved)
+    probe = link(dvaa.second, PROBE)
+    assert f"- Evidence: {LAB} dated 2026-04-22, [{probe}]({probe})" in after["T-1004.md"]
+
+
+def test_a_write_exits_1_when_the_crosswalk_cannot_be_rendered(tree, dvaa):
+    # The crosswalk is rendered from the pinned inputs under vendor/ too. Without one of them
+    # scripts/build_technique_crosswalk.py writes nothing and exits 1, and the script exits 1
+    # with its line, after matrix.json, the STIX bundle and evidence-gaps.json are written and
+    # before the page check runs.
+    (tree / "vendor" / "hackmyagent" / "check-ids.json").unlink()
+    held, crosswalk, pages = load(tree), (tree / CROSSWALK).read_bytes(), page_lines(tree)
+    proc = run_pin(tree, dvaa.path)
+    assert proc.returncode == 1, proc.stdout + proc.stderr
+    assert proc.stderr == ("FAIL: matrix.json, the STIX bundle and evidence-gaps.json are written, but "
+                           "scripts/build_technique_crosswalk.py failed: cannot render "
+                           "crosswalks/technique-crosswalk.json: vendor/hackmyagent/check-ids.json: "
+                           "absent\n"), proc.stderr
+    matrix = load(tree)
+    assert matrix != held
+    assert load(tree, "evidence-gaps.json")["ids"] == sorted(
+        t["id"] for t in matrix["techniques"] if not t.get("evidence"))
+    assert (tree / CROSSWALK).read_bytes() == crosswalk
+    assert page_lines(tree) == pages
+
+
+def test_a_write_exits_1_when_a_page_has_no_place_for_its_evidence_lines(tree, dvaa):
+    # Evidence lines sit directly under the Tactic link, so a page without one has no place
+    # for them: scripts/check_technique_pages.py --fix reports the page and exits 1, and the
+    # script exits 1 with that report, after matrix.json, the STIX bundle, evidence-gaps.json
+    # and the crosswalk are written.
+    page = tree / "techniques" / "T-1004.md"
+    text = page.read_text(encoding="utf-8")
+    page.write_text("".join(line for line in text.splitlines(keepends=True)
+                            if not line.startswith(("- Tactic: [", "- Evidence: "))), encoding="utf-8")
+    proc = run_pin(tree, dvaa.path)
+    assert proc.returncode == 1, proc.stdout + proc.stderr
+    assert proc.stderr.startswith("FAIL: matrix.json, the STIX bundle, evidence-gaps.json and "
+                                  "crosswalks/technique-crosswalk.json are written, but "
+                                  "scripts/check_technique_pages.py --fix failed:\n"), proc.stderr
+    assert "  - T-1004: References section does not list the evidence entries" in proc.stderr, proc.stderr
+    assert technique(load(tree), "T-1004")["evidence"][0] == {
+        "type": LAB, "reference": link(dvaa.second, PROBE), "date": "2026-04-22"}
+    # The crosswalk is rendered before the page check runs, so it follows the file written.
+    checked = run_check(tree, CROSSWALK_CHECK)
+    assert checked.returncode == 0, checked.stdout + checked.stderr
 
 
 # --------------------------------------------------------------------------- what a dvaaValidation names

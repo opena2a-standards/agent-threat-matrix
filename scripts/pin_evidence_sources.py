@@ -48,9 +48,15 @@ technique.
 When evidence-sources.json and matrix.json already hold what the clone holds at the head,
 nothing is written and ``read`` keeps the date the file records. Otherwise ``read`` is
 today; when matrix.json changes, ``updated`` moves to today if it is older, as
-scripts/validate_matrix.py requires of a change, and the STIX bundle and evidence-gaps.json
-are rendered again with scripts/generate_stix.py, whose report of the techniques left with
-no evidence entry is printed.
+scripts/validate_matrix.py requires of a change, the STIX bundle and evidence-gaps.json are
+rendered again with scripts/generate_stix.py, whose report of the techniques left with no
+evidence entry is printed, crosswalks/technique-crosswalk.json is rendered again with
+scripts/build_technique_crosswalk.py, which records the sha256 of matrix.json and dates the
+file with the latest of ``updated`` and the read dates of its vendored inputs, and then
+scripts/check_technique_pages.py --fix runs. The References section of a technique page
+lists the technique's evidence entries, one Evidence line each, and that check fails on a
+page whose lines differ from them, so the run writes the Evidence lines of the entries this
+script wrote and drops those of the entries it dropped.
 
 Usage::
 
@@ -68,8 +74,10 @@ names a technique (so it is not read as a DVAA clone, and no entry is dropped on
 ``src/challenges/index.js`` is there but is not valid UTF-8, holds no ``CHALLENGES`` object
 (an ``export const CHALLENGES = {`` line, closed by a ``};`` line), or defines in it no
 challenge, a challenge whose id is not its key, a challenge with no name or a challenge
-twice, the STIX bundle cannot be rendered, or under ``--check`` the files differ; 2 on a
-usage error.
+twice, the STIX bundle or the crosswalk cannot be rendered, scripts/check_technique_pages.py
+--fix exits 1, as it does when a page line still disagrees with matrix.json after it writes
+what it can, such as on a technique page with no Tactic link to write the Evidence lines
+under, or under ``--check`` the files differ; 2 on a usage error.
 """
 
 import argparse
@@ -86,6 +94,8 @@ ROOT = Path(__file__).resolve().parent.parent
 MATRIX = ROOT / "matrix.json"
 SOURCES = ROOT / "evidence-sources.json"
 STIX_GENERATOR = ROOT / "scripts" / "generate_stix.py"
+CROSSWALK_BUILDER = ROOT / "scripts" / "build_technique_crosswalk.py"
+PAGE_CHECKER = ROOT / "scripts" / "check_technique_pages.py"
 REPOSITORY = "https://github.com/opena2a-org/damn-vulnerable-ai-agent"
 LAB = "lab-reproduction"
 # The first line of the docstring, which ``python3 -OO`` strips.
@@ -571,10 +581,31 @@ def main(argv=None) -> int:
             print(f"FAIL: matrix.json is written, but scripts/generate_stix.py failed: "
                   f"{proc.stderr.strip() or proc.stdout.strip()}", file=sys.stderr)
             return 1
+        # The crosswalk records the sha256 of matrix.json, and scripts/check_technique_crosswalk.py
+        # fails when it differs from a fresh rendering, so it is rendered from the file just written.
+        crosswalk = subprocess.run([sys.executable, str(CROSSWALK_BUILDER)],
+                                   capture_output=True, text=True, timeout=120)
+        if crosswalk.returncode != 0:
+            print(f"FAIL: matrix.json, the STIX bundle and evidence-gaps.json are written, but "
+                  f"scripts/build_technique_crosswalk.py failed: "
+                  f"{crosswalk.stderr.strip() or crosswalk.stdout.strip()}", file=sys.stderr)
+            return 1
+        # The technique pages list the evidence entries; --fix exits 0 only when no page line
+        # disagrees with matrix.json once it has written what it can.
+        pages_fixed = subprocess.run([sys.executable, str(PAGE_CHECKER), "--fix"],
+                                     capture_output=True, text=True, timeout=120)
+        if pages_fixed.returncode != 0:
+            print(f"FAIL: matrix.json, the STIX bundle, evidence-gaps.json and "
+                  f"crosswalks/technique-crosswalk.json are written, but "
+                  f"scripts/check_technique_pages.py --fix failed:\n"
+                  f"{(pages_fixed.stdout + pages_fixed.stderr).strip()}", file=sys.stderr)
+            return 1
         print(f"matrix.json carries the {count + vcount} {LAB} entries the pins back, written on "
               f"{', '.join(changed_techniques(matrix, cited))}; updated is {cited['updated']}, and the "
               f"STIX bundle and evidence-gaps.json are rendered again:")
         print(proc.stdout.strip())
+        print("crosswalks/technique-crosswalk.json is rendered again, and the technique pages list the "
+              "evidence entries matrix.json now carries.")
     else:
         print(f"matrix.json already carries the {count + vcount} {LAB} entries the pins back.")
     report_names(mislabelled, unknown)
