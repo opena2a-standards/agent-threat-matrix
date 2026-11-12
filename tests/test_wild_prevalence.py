@@ -471,6 +471,22 @@ def telemetry(t: dict) -> list:
     return [e for e in t.get("evidence", []) if e["type"] == TELEMETRY]
 
 
+def hold_samples(matrix: dict, tid: str, evidence: list) -> None:
+    """Give a technique of matrix samples, and as its evidence the entries passed followed by
+    one honeypot-telemetry entry that cites the endpoint on the read date wildPrevalenceSource
+    gives.
+
+    The sync writes the samples each period serves, and the telemetry entry with them, so the
+    techniques that carry that entry can differ from one write to the next. A case that needs
+    a technique to carry it writes it into its scratch copy with this, rather than finding it
+    in the tree.
+    """
+    t = technique(matrix, tid)
+    t["wildPrevalence"], t["wildSampleCount"] = 50, 12
+    t["evidence"] = evidence + [{"type": TELEMETRY, "reference": API_URL,
+                                 "date": matrix["wildPrevalenceSource"]["read"]}]
+
+
 def test_sync_dates_each_telemetry_entry_with_the_read_and_the_tree_validates(tree):
     original = load(tree)
     read = (date.today() - timedelta(days=3)).isoformat()
@@ -515,11 +531,15 @@ def test_sync_keeps_evidence_entries_that_do_not_cite_the_endpoint(tree):
 
 
 def test_sync_drops_an_evidence_array_it_leaves_empty(tree):
-    # T-2002 carries only the telemetry entry: its dvaaValidation names no DVAA challenge or
-    # scenario, and no pinned page names it.
-    shipped = technique(load(tree), "T-2002")
-    assert [e["type"] for e in shipped["evidence"]] == [TELEMETRY]
-    payload = served(load(tree))
+    # The case gives T-2002 samples and the telemetry entry as its only evidence entry, and
+    # renders evidence-gaps.json again, which then does not list T-2002. served() serves T-2002
+    # no samples, so the write drops that entry and with it the array.
+    matrix = load(tree)
+    hold_samples(matrix, "T-2002", [])
+    dump(tree, matrix)
+    render_stix(tree)
+    assert "T-2002" not in load(tree, "evidence-gaps.json")["ids"]
+    payload = served(matrix)
     assert all(e["id"] != "T-2002" or e["wildSampleCount"] == 0 for e in payload["techniques"])
     proc = run_sync(tree, "--payload", str(write_payload(tree, payload)), "--read-date", today())
     assert proc.returncode == 0, proc.stdout + proc.stderr
@@ -890,8 +910,8 @@ def page_lines(root: Path) -> dict:
             for path in sorted((root / "techniques").glob("*.md"))}
 
 
-def run_page_check(root: Path) -> subprocess.CompletedProcess:
-    return subprocess.run([sys.executable, str(root / "scripts" / "check_technique_pages.py")],
+def run_page_check(root: Path, *args: str) -> subprocess.CompletedProcess:
+    return subprocess.run([sys.executable, str(root / "scripts" / "check_technique_pages.py"), *args],
                           capture_output=True, text=True, timeout=120)
 
 
@@ -899,8 +919,17 @@ def test_sync_writes_the_evidence_lines_of_the_technique_pages_and_the_page_chec
     # The References section of a technique page lists the technique's evidence entries, one
     # Evidence line each, and scripts/check_technique_pages.py fails on a page whose lines
     # differ from them. A write dates each telemetry entry with its read and names its period
-    # in the note, and drops the entry of each technique served no samples.
+    # in the note, and drops the entry of each technique served no samples. The case gives the
+    # fourth technique, which served() serves no samples, samples and a telemetry entry after
+    # its other entries, and has the page check write its Evidence lines, so the write drops
+    # the entry of a technique beyond the two it serves samples on.
     assert run_page_check(tree).returncode == 0
+    matrix = load(tree)
+    beyond = matrix["techniques"][3]["id"]
+    hold_samples(matrix, beyond, kept(technique(matrix, beyond)))
+    dump(tree, matrix)
+    fixed = run_page_check(tree, "--fix")
+    assert fixed.returncode == 0, fixed.stdout + fixed.stderr
     shipped = load(tree)
     before = page_lines(tree)
     listed_before = {t["id"] for t in shipped["techniques"]
@@ -930,11 +959,12 @@ def test_sync_writes_the_evidence_lines_of_the_technique_pages_and_the_page_chec
         moved = [line[2:] for line in difflib.ndiff(before[name], after[name]) if line[:2] in ("- ", "+ ")]
         assert all(line.startswith("- Evidence: ") for line in moved), (tid, moved)
     # The pages that change are those of the techniques whose telemetry entry the write
-    # replaced or dropped, and of those it gave one; the tree holds an entry on techniques
-    # beyond the two served samples, so some pages drop it. A technique of the two whose
-    # entry before the write was the one the write gives it, the same date and note, as on a
-    # tree the sync wrote this period into from this read, keeps its page as it was.
-    assert listed_before - set(ids[1:3])
+    # replaced or dropped, and of those it gave one; the case gave the fourth technique an
+    # entry, so its page drops it, as do those of the other techniques beyond the two served
+    # samples that the tree held an entry on. A technique of the two whose entry before the
+    # write was the one the write gives it, the same date and note, as on a tree the sync
+    # wrote this period into from this read, keeps its page as it was.
+    assert beyond in listed_before - set(ids[1:3])
     as_held = {tid for tid in ids[1:3]
                if telemetry(technique(matrix, tid)) == telemetry(technique(shipped, tid))}
     assert sorted(name for name in after if after[name] != before[name]) == \
@@ -1015,3 +1045,41 @@ def test_a_page_case_passes_on_a_tree_that_holds_the_entries_it_writes(tmp_path,
     case(copy)
     for tid in ids[1:3]:
         assert telemetry(technique(load(copy), tid)) == telemetry(technique(before, tid)), tid
+
+
+# The techniques a period serves samples on, from the technique ids of the tree. A tree the
+# sync wrote such a period into carries a telemetry entry on those techniques alone: T-2002
+# carries none on the three trees, and no technique beyond the two served() serves samples on
+# carries one on the second and the third.
+OTHER_COUNTS = [
+    pytest.param(lambda ids: [tid for tid in ids if tid != "T-2002"], id="every technique but T-2002"),
+    pytest.param(lambda ids: ids[1:3], id="the two served() serves samples on"),
+    pytest.param(lambda ids: [], id="no technique"),
+]
+SYNC_CASES = [
+    pytest.param(test_sync_drops_an_evidence_array_it_leaves_empty,
+                 id="the case that drops an evidence array"),
+    pytest.param(test_sync_writes_the_evidence_lines_of_the_technique_pages_and_the_page_check_passes,
+                 id="the case that writes the Evidence lines"),
+]
+
+
+@pytest.mark.parametrize("case", SYNC_CASES)
+@pytest.mark.parametrize("sampled", OTHER_COUNTS)
+def test_a_sync_case_passes_on_a_tree_that_holds_other_sample_counts(tmp_path, case, sampled):
+    # A sync case that needs a technique to carry the telemetry entry writes it into its
+    # scratch copy with hold_samples. Each runs here on a scratch copy of a tree the sync wrote
+    # a period into, read the day before, with samples on the techniques sampled names and on
+    # no other.
+    held = scratch_copy(ROOT, tmp_path / "held")
+    ids = [t["id"] for t in load(held)["techniques"]]
+    with_samples = sampled(ids)
+    start, end = SYNCED_PERIOD
+    payload = {"wildPeriod": {"start": days_ago(start), "end": days_ago(end)},
+               "techniques": [{"id": tid, "wildPrevalence": 50 if tid in with_samples else 0,
+                               "wildSampleCount": 12 if tid in with_samples else 0} for tid in ids]}
+    proc = sync(held, payload, days_ago(SYNCED_READ))
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert [t["id"] for t in load(held)["techniques"] if telemetry(t)] == with_samples
+
+    case(scratch_copy(held, tmp_path / "copy"))
