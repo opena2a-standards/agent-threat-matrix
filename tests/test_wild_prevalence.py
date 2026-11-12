@@ -10,6 +10,7 @@ copy.
 """
 
 import difflib
+import hashlib
 import importlib.util
 import io
 import json
@@ -28,12 +29,17 @@ FILES = ("matrix.json", "technique-ids.json", "schema/threat-matrix-v1.2.schema.
          "schema/consumer-readiness.json", "schema/evidence-sources.schema.json",
          "scripts/validate_matrix.py", "scripts/generate_stix.py", "scripts/sync_wild_prevalence.py",
          "scripts/check_technique_pages.py", "related-projects.json", "docs/data-sources.md",
-         "stix/agent-threat-matrix-bundle.json", "evidence-gaps.json", "evidence-sources.json")
+         "stix/agent-threat-matrix-bundle.json", "evidence-gaps.json", "evidence-sources.json",
+         "scripts/build_technique_crosswalk.py", "scripts/check_technique_crosswalk.py",
+         "crosswalks/technique-crosswalk.json")
 # The technique and tactic pages, which scripts/check_technique_pages.py checks against
 # matrix.json, as the sync runs it; that check also reads related-projects.json and
-# docs/data-sources.md, listed above.
-DIRS = ("techniques", "tactics")
+# docs/data-sources.md, listed above. And the pinned inputs under vendor/, which
+# scripts/build_technique_crosswalk.py renders the crosswalk from with matrix.json and
+# technique-ids.json, as the sync runs it.
+DIRS = ("techniques", "tactics", "vendor")
 STIX = "stix/agent-threat-matrix-bundle.json"
+CROSSWALK = "crosswalks/technique-crosswalk.json"
 TELEMETRY = "honeypot-telemetry"
 
 
@@ -54,7 +60,10 @@ def scratch_copy(source: Path, target: Path) -> Path:
         dst.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy(source / rel, dst)
     for rel in DIRS:
-        shutil.copytree(source / rel, target / rel)
+        # scripts/check_technique_crosswalk.py fails on a file under vendor/ that VENDOR.json
+        # does not list, such as a __pycache__/ or .DS_Store file there.
+        shutil.copytree(source / rel, target / rel,
+                        ignore=shutil.ignore_patterns("__pycache__", ".DS_Store"))
     matrix = load(target)
     if "period" in matrix["wildPrevalenceSource"]:
         del matrix["wildPrevalenceSource"]["period"]
@@ -751,8 +760,10 @@ def test_sync_description_is_its_docstring_summary():
 # --------------------------------------------------------------------------- closed periods only
 
 def files(root: Path):
-    """matrix.json, the STIX bundle and the technique pages, which the sync writes, as bytes."""
+    """matrix.json, the STIX bundle, the crosswalk and the technique pages, which the sync
+    writes, as bytes."""
     return ((root / "matrix.json").read_bytes(), (root / STIX).read_bytes(),
+            (root / CROSSWALK).read_bytes(),
             tuple(path.read_bytes() for path in sorted((root / "techniques").glob("*.md"))))
 
 
@@ -924,6 +935,50 @@ def test_sync_refuses_a_held_period_without_a_start_and_an_end(tree):
     assert files(tree) == before
 
 
+# --------------------------------------------------------------------------- the crosswalk
+
+def run_crosswalk_check(root: Path) -> subprocess.CompletedProcess:
+    return subprocess.run([sys.executable, str(root / "scripts" / "check_technique_crosswalk.py")],
+                          capture_output=True, text=True, timeout=300)
+
+
+def test_sync_renders_the_crosswalk_again_and_the_crosswalk_check_passes(tree):
+    # crosswalks/technique-crosswalk.json records the sha256 of matrix.json and is dated with
+    # the latest of updated and the read dates of the vendored inputs, and
+    # scripts/check_technique_crosswalk.py fails when it differs from a fresh rendering. A
+    # write changes no other value of the file.
+    before = load(tree, CROSSWALK)
+    proc = sync(tree, served(load(tree)))
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert "crosswalks/technique-crosswalk.json are rendered again" in proc.stdout, proc.stdout
+    checked = run_crosswalk_check(tree)
+    assert checked.returncode == 0, checked.stdout + checked.stderr
+
+    after = load(tree, CROSSWALK)
+    digest = hashlib.sha256((tree / "matrix.json").read_bytes()).hexdigest()
+    assert after["matrix"]["files"][0] == {"path": "matrix.json", "sha256": digest}
+    assert after["generated"] == load(tree)["updated"] == today()
+    after["generated"] = before["generated"]
+    after["matrix"]["files"][0]["sha256"] = before["matrix"]["files"][0]["sha256"]
+    assert after == before
+
+
+def test_sync_exits_1_when_the_crosswalk_cannot_be_rendered(tree):
+    # The crosswalk is rendered from the pinned inputs under vendor/ too. Without one of them
+    # scripts/build_technique_crosswalk.py writes nothing and exits 1, and the sync exits 1
+    # with its line, after matrix.json and the STIX bundle are written.
+    (tree / "vendor" / "hackmyagent" / "check-ids.json").unlink()
+    crosswalk = (tree / CROSSWALK).read_bytes()
+    proc = sync(tree, served(load(tree)))
+    assert proc.returncode == 1, proc.stdout + proc.stderr
+    assert proc.stderr == ("FAIL: matrix.json, the STIX bundle and evidence-gaps.json are written, but "
+                           "scripts/build_technique_crosswalk.py failed: cannot render "
+                           "crosswalks/technique-crosswalk.json: vendor/hackmyagent/check-ids.json: "
+                           "absent\n"), proc.stderr
+    assert load(tree)["wildPrevalenceSource"]["period"] == closed_period()
+    assert (tree / CROSSWALK).read_bytes() == crosswalk
+
+
 # --------------------------------------------------------------------------- the technique pages
 
 def page_lines(root: Path) -> dict:
@@ -996,10 +1051,10 @@ def test_sync_writes_the_evidence_lines_of_the_technique_pages_and_the_page_chec
 def test_sync_exits_1_when_a_page_has_no_place_for_its_evidence_lines(tree):
     # Evidence lines sit directly under the Tactic link, so a page without one has no place
     # for them: scripts/check_technique_pages.py --fix reports the page and exits 1, after
-    # matrix.json and the STIX bundle are written. On such a page the check reports Evidence
-    # lines only where they differ from the entries, so the page also loses its telemetry
-    # Evidence line: it then lacks the line of the entry the write gives the technique, also
-    # on a tree that held that entry.
+    # matrix.json, the STIX bundle and the crosswalk are written. On such a page the check
+    # reports Evidence lines only where they differ from the entries, so the page also loses
+    # its telemetry Evidence line: it then lacks the line of the entry the write gives the
+    # technique, also on a tree that held that entry.
     tid = load(tree)["techniques"][1]["id"]
     page = tree / "techniques" / f"{tid}.md"
     text = page.read_text(encoding="utf-8")
@@ -1008,10 +1063,14 @@ def test_sync_exits_1_when_a_page_has_no_place_for_its_evidence_lines(tree):
                     encoding="utf-8")
     proc = sync(tree, served(load(tree)))
     assert proc.returncode == 1, proc.stdout + proc.stderr
-    assert proc.stderr.startswith("FAIL: matrix.json, the STIX bundle and evidence-gaps.json are written, but "
+    assert proc.stderr.startswith("FAIL: matrix.json, the STIX bundle, evidence-gaps.json and "
+                                  "crosswalks/technique-crosswalk.json are written, but "
                                   "scripts/check_technique_pages.py --fix failed:\n"), proc.stderr
     assert f"  - {tid}: References section does not list the evidence entries" in proc.stderr, proc.stderr
     assert load(tree)["wildPrevalenceSource"]["period"] == closed_period()
+    # The crosswalk is rendered before the page check runs, so it follows the file written.
+    checked = run_crosswalk_check(tree)
+    assert checked.returncode == 0, checked.stdout + checked.stderr
 
 
 # --------------------------------------------------------------------------- the trees the cases copy

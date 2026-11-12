@@ -19,11 +19,14 @@ entries, and none on the others. It leaves every other evidence entry as it was,
 ``evidence`` array it leaves empty, and writes no other technique field. When it writes
 matrix.json it also moves ``updated`` to today if it is older, as scripts/validate_matrix.py
 requires of any change, renders the STIX bundle and evidence-gaps.json again with
-scripts/generate_stix.py, whose objects take their ``modified`` date from ``updated``, and
-then runs scripts/check_technique_pages.py --fix. The References section of a technique
-page lists the technique's evidence entries, one Evidence line each, and that check fails
-on a page whose lines differ from them, so the run writes the Evidence lines of the
-entries this script wrote and drops those of the entries it dropped.
+scripts/generate_stix.py, whose objects take their ``modified`` date from ``updated``,
+renders crosswalks/technique-crosswalk.json again with scripts/build_technique_crosswalk.py,
+which records the sha256 of matrix.json and dates the file with the latest of ``updated``
+and the read dates of its vendored inputs, and then runs
+scripts/check_technique_pages.py --fix. The References section of a technique page lists
+the technique's evidence entries, one Evidence line each, and that check fails on a page
+whose lines differ from them, so the run writes the Evidence lines of the entries this
+script wrote and drops those of the entries it dropped.
 
 It never rewrites a value matrix.json holds for a period. A response for the period
 ``wildPrevalenceSource`` already gives, with the values matrix.json holds for it, writes
@@ -54,11 +57,11 @@ period ends; a ``wildPrevalenceSource`` period in matrix.json without a YYYY-MM-
 ``start`` and ``end``; and a technique in matrix.json whose ``evidence`` is not an array.
 
 Exit 0 when matrix.json was written or already held the values, 1 when the response is
-refused, the STIX bundle cannot be rendered, or scripts/check_technique_pages.py --fix
-exits 1, as it does when a page line still disagrees with matrix.json after it writes what
-it can, such as on a technique page with no Tactic link to write the Evidence lines under,
-and 2 on a usage error (a ``--read-date`` that is not a YYYY-MM-DD date, or is later than
-today, included).
+refused, the STIX bundle or the crosswalk cannot be rendered, or
+scripts/check_technique_pages.py --fix exits 1, as it does when a page line still disagrees
+with matrix.json after it writes what it can, such as on a technique page with no Tactic
+link to write the Evidence lines under, and 2 on a usage error (a ``--read-date`` that is
+not a YYYY-MM-DD date, or is later than today, included).
 """
 
 import argparse
@@ -74,6 +77,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 MATRIX = ROOT / "matrix.json"
 STIX_GENERATOR = ROOT / "scripts" / "generate_stix.py"
+CROSSWALK_BUILDER = ROOT / "scripts" / "build_technique_crosswalk.py"
 PAGE_CHECKER = ROOT / "scripts" / "check_technique_pages.py"
 API_URL = "https://api.oa2a.org/api/v1/threat-matrix"
 TELEMETRY = "honeypot-telemetry"
@@ -312,12 +316,22 @@ def main(argv=None) -> int:
         print(f"FAIL: matrix.json is written, but scripts/generate_stix.py failed: "
               f"{proc.stderr.strip() or proc.stdout.strip()}", file=sys.stderr)
         return 1
+    # The crosswalk records the sha256 of matrix.json, and scripts/check_technique_crosswalk.py
+    # fails when it differs from a fresh rendering, so it is rendered from the file just written.
+    crosswalk = subprocess.run([sys.executable, str(CROSSWALK_BUILDER)],
+                               capture_output=True, text=True, timeout=120)
+    if crosswalk.returncode != 0:
+        print(f"FAIL: matrix.json, the STIX bundle and evidence-gaps.json are written, but "
+              f"scripts/build_technique_crosswalk.py failed: "
+              f"{crosswalk.stderr.strip() or crosswalk.stdout.strip()}", file=sys.stderr)
+        return 1
     # The technique pages list the evidence entries; --fix exits 0 only when no page line
     # disagrees with matrix.json once it has written what it can.
     pages = subprocess.run([sys.executable, str(PAGE_CHECKER), "--fix"],
                            capture_output=True, text=True, timeout=120)
     if pages.returncode != 0:
-        print(f"FAIL: matrix.json, the STIX bundle and evidence-gaps.json are written, but "
+        print(f"FAIL: matrix.json, the STIX bundle, evidence-gaps.json and "
+              f"crosswalks/technique-crosswalk.json are written, but "
               f"scripts/check_technique_pages.py --fix failed:\n"
               f"{(pages.stdout + pages.stderr).strip()}", file=sys.stderr)
         return 1
@@ -326,8 +340,9 @@ def main(argv=None) -> int:
           f"{len(matrix['techniques'])} techniques from "
           f"{API_URL}, read {read_date}: {report['aboveZero']} above 0, and a {TELEMETRY} evidence "
           f"entry dated {read_date} on the {report['withSamples']} with a wildSampleCount above 0. "
-          f"updated is {matrix['updated']}, the STIX bundle and evidence-gaps.json are rendered again, "
-          f"and the technique pages list the evidence entries matrix.json now carries.")
+          f"updated is {matrix['updated']}, the STIX bundle, evidence-gaps.json and "
+          f"crosswalks/technique-crosswalk.json are rendered again, and the technique pages list "
+          f"the evidence entries matrix.json now carries.")
     if report["absent"]:
         print(f"Not listed by the endpoint, written as 0: {', '.join(report['absent'])}")
     if report["unlisted"]:
