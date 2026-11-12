@@ -540,6 +540,100 @@ def test_a_write_exits_1_when_the_crosswalk_cannot_be_rendered(tree, dvaa):
     assert page_lines(tree) == pages
 
 
+def test_a_run_after_a_failed_render_renders_what_that_run_left_behind(tree, dvaa):
+    # A write whose crosswalk cannot be rendered leaves matrix.json and evidence-sources.json
+    # written, and the crosswalk and the Evidence lines of the technique pages behind them.
+    # Once the vendored input is back, the next run finds both files as the clone gives them,
+    # so it writes neither; it renders the crosswalk and runs the page fix, as they disagree
+    # with matrix.json, and then both checks pass. The run after that writes nothing.
+    check_ids = tree / "vendor" / "hackmyagent" / "check-ids.json"
+    vendored = check_ids.read_bytes()
+    check_ids.unlink()
+    assert run_pin(tree, dvaa.path).returncode == 1
+    check_ids.write_bytes(vendored)
+    for rel in (CROSSWALK_CHECK, PAGE_CHECK):
+        assert run_check(tree, rel).returncode == 1, rel
+    written = {rel: (tree / rel).read_bytes() for rel in ("matrix.json", "evidence-sources.json")}
+
+    proc = run_pin(tree, dvaa.path)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert proc.stderr == "", proc.stderr
+    lines = proc.stdout.splitlines()
+    assert lines[0] == (f"evidence-sources.json already pins the 2 DVAA scenario pages that name a technique "
+                        f"at {dvaa.head}, read {today()}."), proc.stdout
+    assert f"matrix.json already carries the 2 {LAB} entries the pins back." in lines, proc.stdout
+    assert (f"{CROSSWALK} and the pages {PAGE_CHECK} checks disagreed with matrix.json, so the STIX bundle "
+            f"and evidence-gaps.json are rendered again:") in lines, proc.stdout
+    assert (f"{CROSSWALK} is rendered again, and the technique pages list the evidence entries "
+            f"matrix.json carries.") in lines, proc.stdout
+    assert "nothing written" not in proc.stdout, proc.stdout
+    for rel in (CROSSWALK_CHECK, PAGE_CHECK):
+        checked = run_check(tree, rel)
+        assert checked.returncode == 0, checked.stdout + checked.stderr
+    validated = run_validator(tree)
+    assert validated.returncode == 0, validated.stdout + validated.stderr
+    assert {rel: (tree / rel).read_bytes() for rel in written} == written
+
+    before = snapshot(tree)
+    again = run_pin(tree, dvaa.path)
+    assert again.returncode == 0, again.stdout + again.stderr
+    assert again.stdout.splitlines()[0].endswith("; nothing written"), again.stdout
+    assert snapshot(tree) == before
+
+
+# A file rendered from matrix.json, and the name a run gives it when it disagrees with matrix.json.
+LEFT_BEHIND = [
+    pytest.param(STIX, "the STIX bundle", id="the STIX bundle"),
+    pytest.param("evidence-gaps.json", "evidence-gaps.json", id="evidence-gaps.json"),
+    pytest.param(CROSSWALK, CROSSWALK, id="the crosswalk"),
+    pytest.param("techniques/T-1004.md", f"the pages {PAGE_CHECK} checks", id="a technique page"),
+]
+
+
+@pytest.mark.parametrize("rel, name", LEFT_BEHIND)
+def test_a_run_that_writes_no_pin_renders_a_file_left_behind_matrix_json(tree, dvaa, rel, name):
+    # The file as it was before a write, put back after it, is behind matrix.json: the next run
+    # writes neither matrix.json nor evidence-sources.json, names the file, and renders it as
+    # the write did, so the tree is the one the write left.
+    stale = (tree / rel).read_bytes()
+    if rel == "evidence-gaps.json":
+        # The write need not change which techniques carry no entry, so the file is put back
+        # with one id it does not list.
+        gaps = json.loads(stale)
+        gaps["ids"] = sorted(gaps["ids"] + ["T-9999"])
+        stale = (json.dumps(gaps, indent=2) + "\n").encode("utf-8")
+    assert run_pin(tree, dvaa.path).returncode == 0
+    after = snapshot(tree)
+    assert (tree / rel).read_bytes() != stale
+    (tree / rel).write_bytes(stale)
+
+    proc = run_pin(tree, dvaa.path)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert (f"{name} disagreed with matrix.json, so the STIX bundle and evidence-gaps.json are rendered "
+            f"again:") in proc.stdout.splitlines(), proc.stdout
+    assert snapshot(tree) == after
+
+
+def test_a_run_that_writes_no_pin_exits_1_when_a_page_has_no_place_for_its_evidence_lines(tree, dvaa):
+    # After a write, a technique page loses its Tactic link and its Evidence lines. The next
+    # run writes neither matrix.json nor evidence-sources.json, renders the files rendered from
+    # matrix.json, and exits 1 with the report of scripts/check_technique_pages.py --fix, which
+    # has no place to write the Evidence lines.
+    assert run_pin(tree, dvaa.path).returncode == 0
+    written = {rel: (tree / rel).read_bytes() for rel in ("matrix.json", "evidence-sources.json")}
+    page = tree / "techniques" / "T-1004.md"
+    text = page.read_text(encoding="utf-8")
+    page.write_text("".join(line for line in text.splitlines(keepends=True)
+                            if not line.startswith(("- Tactic: [", "- Evidence: "))), encoding="utf-8")
+    proc = run_pin(tree, dvaa.path)
+    assert proc.returncode == 1, proc.stdout + proc.stderr
+    assert proc.stderr.startswith("FAIL: the STIX bundle, evidence-gaps.json and "
+                                  "crosswalks/technique-crosswalk.json are written, but "
+                                  "scripts/check_technique_pages.py --fix failed:\n"), proc.stderr
+    assert "  - T-1004: References section does not list the evidence entries" in proc.stderr, proc.stderr
+    assert {rel: (tree / rel).read_bytes() for rel in written} == written
+
+
 def test_a_write_exits_1_when_a_page_has_no_place_for_its_evidence_lines(tree, dvaa):
     # Evidence lines sit directly under the Tactic link, so a page without one has no place
     # for them: scripts/check_technique_pages.py --fix reports the page and exits 1, and the

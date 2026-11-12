@@ -46,9 +46,10 @@ names no challenge or scenario at the head backs no entry, and the script prints
 technique.
 
 When evidence-sources.json and matrix.json already hold what the clone holds at the head,
-nothing is written and ``read`` keeps the date the file records. Otherwise ``read`` is
-today; when matrix.json changes, ``updated`` moves to today if it is older, as
-scripts/validate_matrix.py requires of a change, the STIX bundle and evidence-gaps.json are
+neither is written, ``read`` keeps the date the file records, and nothing else is written
+unless a file rendered from matrix.json disagrees with it, as the next paragraph says.
+Otherwise ``read`` is today; when matrix.json changes, ``updated`` moves to today if it is
+older, as scripts/validate_matrix.py requires of a change, the STIX bundle and evidence-gaps.json are
 rendered again with scripts/generate_stix.py, whose report of the techniques left with no
 evidence entry is printed, crosswalks/technique-crosswalk.json is rendered again with
 scripts/build_technique_crosswalk.py, which records the sha256 of matrix.json and dates the
@@ -57,6 +58,14 @@ scripts/check_technique_pages.py --fix runs. The References section of a techniq
 lists the technique's evidence entries, one Evidence line each, and that check fails on a
 page whose lines differ from them, so the run writes the Evidence lines of the entries this
 script wrote and drops those of the entries it dropped.
+
+A run that leaves matrix.json as it is renders those files and runs that check in the same
+way when one of them disagrees with matrix.json: when the STIX bundle or evidence-gaps.json
+differs from what scripts/generate_stix.py renders from it, crosswalks/technique-crosswalk.json
+differs from what scripts/build_technique_crosswalk.py renders or cannot be rendered, or
+scripts/check_technique_pages.py exits 1. A run that writes matrix.json and then cannot
+render one of them, as when a vendored input of the crosswalk is absent, leaves the tree so,
+and once the cause is fixed the next run renders them.
 
 Usage::
 
@@ -82,6 +91,7 @@ under, or under ``--check`` the files differ; 2 on a usage error.
 
 import argparse
 import copy
+import importlib.util
 import json
 import os
 import re
@@ -496,6 +506,99 @@ def report_unnamed(unnamed: list) -> None:
             print(f"  {tid} {', '.join(repr(value) for value in values)}")
 
 
+def listed(items: list) -> str:
+    """The items as a list in a sentence: a, b and c."""
+    return items[0] if len(items) == 1 else f"{', '.join(items[:-1])} and {items[-1]}"
+
+
+def load_script(path: Path):
+    """The module of the script at path, loaded without running its main."""
+    spec = importlib.util.spec_from_file_location(path.stem, path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def read_or_none(path: Path, binary: bool = False):
+    """The text of the file at path, or its bytes with binary, or None when it cannot be read."""
+    try:
+        return path.read_bytes() if binary else path.read_text(encoding="utf-8")
+    except (OSError, ValueError):
+        return None
+
+
+def stale_renderings() -> list:
+    """The files rendered from matrix.json that disagree with it: the STIX bundle and
+    evidence-gaps.json where they differ from what scripts/generate_stix.py renders,
+    crosswalks/technique-crosswalk.json where it differs from what
+    scripts/build_technique_crosswalk.py renders or cannot be rendered, and the pages
+    scripts/check_technique_pages.py checks where it exits 1."""
+    stale = []
+    matrix = json.loads(MATRIX.read_text(encoding="utf-8"))
+    stix = load_script(STIX_GENERATOR)
+    try:
+        bundle = stix.render(matrix)
+    except stix.GenerationError:
+        bundle = None
+    if bundle is None or read_or_none(stix.DEFAULT_OUTPUT) != bundle:
+        stale.append("the STIX bundle")
+    if read_or_none(stix.DEFAULT_GAPS_OUTPUT) != stix.render_gaps(matrix):
+        stale.append("evidence-gaps.json")
+    builder = load_script(CROSSWALK_BUILDER)
+    try:
+        crosswalk = builder.render(ROOT).encode("utf-8")
+    except builder.InputError:
+        crosswalk = None
+    if crosswalk is None or read_or_none(ROOT / builder.OUTPUT, binary=True) != crosswalk:
+        stale.append(builder.OUTPUT)
+    pages = subprocess.run([sys.executable, str(PAGE_CHECKER)], capture_output=True, text=True, timeout=120)
+    if pages.returncode != 0:
+        stale.append("the pages scripts/check_technique_pages.py checks")
+    return stale
+
+
+def failed_after(written: list, step: str) -> str:
+    """The FAIL line of a render step that failed once the files in written were written."""
+    if not written:
+        return f"FAIL: {step} failed"
+    return f"FAIL: {listed(written)} {'is' if len(written) == 1 else 'are'} written, but {step} failed"
+
+
+def render_from_matrix(written: list):
+    """Render the STIX bundle and evidence-gaps.json, then crosswalks/technique-crosswalk.json,
+    from matrix.json, and then run scripts/check_technique_pages.py --fix.
+
+    Return what scripts/generate_stix.py printed. When a step fails, print its FAIL line,
+    which names the files in written, those written before this ran, and the files the steps
+    before it wrote, and return None.
+    """
+    written = list(written)
+    proc = subprocess.run([sys.executable, str(STIX_GENERATOR)], capture_output=True, text=True, timeout=120)
+    if proc.returncode != 0:
+        print(f"{failed_after(written, 'scripts/generate_stix.py')}: "
+              f"{proc.stderr.strip() or proc.stdout.strip()}", file=sys.stderr)
+        return None
+    written += ["the STIX bundle", "evidence-gaps.json"]
+    # The crosswalk records the sha256 of matrix.json, and scripts/check_technique_crosswalk.py
+    # fails when it differs from a fresh rendering, so it is rendered from the file as it is now.
+    crosswalk = subprocess.run([sys.executable, str(CROSSWALK_BUILDER)],
+                               capture_output=True, text=True, timeout=120)
+    if crosswalk.returncode != 0:
+        print(f"{failed_after(written, 'scripts/build_technique_crosswalk.py')}: "
+              f"{crosswalk.stderr.strip() or crosswalk.stdout.strip()}", file=sys.stderr)
+        return None
+    written.append("crosswalks/technique-crosswalk.json")
+    # The technique pages list the evidence entries; --fix exits 0 only when no page line
+    # disagrees with matrix.json once it has written what it can.
+    pages = subprocess.run([sys.executable, str(PAGE_CHECKER), "--fix"],
+                           capture_output=True, text=True, timeout=120)
+    if pages.returncode != 0:
+        print(f"{failed_after(written, 'scripts/check_technique_pages.py --fix')}:\n"
+              f"{(pages.stdout + pages.stderr).strip()}", file=sys.stderr)
+        return None
+    return proc.stdout.strip()
+
+
 def parse_args(argv):
     parser = argparse.ArgumentParser(description=DESCRIPTION)
     parser.add_argument("--dvaa", type=Path, required=True, help="a git clone of DVAA to read")
@@ -558,7 +661,11 @@ def main(argv=None) -> int:
         report_unnamed(unnamed)
         return 0
 
-    if current == sources_text and not matrix_changed:
+    # A run that wrote matrix.json and then failed to render a file from it leaves that file
+    # behind, and the next run finds matrix.json as it wants it, so a run that leaves
+    # matrix.json as it is renders them when one of them disagrees with it.
+    stale = [] if matrix_changed else stale_renderings()
+    if current == sources_text and not matrix_changed and not stale:
         print(f"evidence-sources.json already pins the {pages} DVAA scenario pages that name a technique "
               f"at {head}, read {block['read']}, and matrix.json carries the {count} {LAB} entries they "
               f"back; nothing written")
@@ -567,47 +674,39 @@ def main(argv=None) -> int:
         report_unnamed(unnamed)
         return 0
 
-    if current != sources_text:
-        SOURCES.write_text(sources_text, encoding="utf-8")
-    print(f"Pinned the {pages} DVAA scenario pages that name a technique at {head}, read {block['read']}, "
-          f"in evidence-sources.json.")
+    if current == sources_text and not matrix_changed:
+        print(f"evidence-sources.json already pins the {pages} DVAA scenario pages that name a technique "
+              f"at {head}, read {block['read']}.")
+    else:
+        if current != sources_text:
+            SOURCES.write_text(sources_text, encoding="utf-8")
+        print(f"Pinned the {pages} DVAA scenario pages that name a technique at {head}, read {block['read']}, "
+              f"in evidence-sources.json.")
     print(named_line(block, vcount))
     if matrix_changed:
         if cited["updated"] < today:
             cited["updated"] = today
         MATRIX.write_text(json.dumps(cited, indent=2) + "\n", encoding="utf-8")
-        proc = subprocess.run([sys.executable, str(STIX_GENERATOR)], capture_output=True, text=True, timeout=120)
-        if proc.returncode != 0:
-            print(f"FAIL: matrix.json is written, but scripts/generate_stix.py failed: "
-                  f"{proc.stderr.strip() or proc.stdout.strip()}", file=sys.stderr)
-            return 1
-        # The crosswalk records the sha256 of matrix.json, and scripts/check_technique_crosswalk.py
-        # fails when it differs from a fresh rendering, so it is rendered from the file just written.
-        crosswalk = subprocess.run([sys.executable, str(CROSSWALK_BUILDER)],
-                                   capture_output=True, text=True, timeout=120)
-        if crosswalk.returncode != 0:
-            print(f"FAIL: matrix.json, the STIX bundle and evidence-gaps.json are written, but "
-                  f"scripts/build_technique_crosswalk.py failed: "
-                  f"{crosswalk.stderr.strip() or crosswalk.stdout.strip()}", file=sys.stderr)
-            return 1
-        # The technique pages list the evidence entries; --fix exits 0 only when no page line
-        # disagrees with matrix.json once it has written what it can.
-        pages_fixed = subprocess.run([sys.executable, str(PAGE_CHECKER), "--fix"],
-                                     capture_output=True, text=True, timeout=120)
-        if pages_fixed.returncode != 0:
-            print(f"FAIL: matrix.json, the STIX bundle, evidence-gaps.json and "
-                  f"crosswalks/technique-crosswalk.json are written, but "
-                  f"scripts/check_technique_pages.py --fix failed:\n"
-                  f"{(pages_fixed.stdout + pages_fixed.stderr).strip()}", file=sys.stderr)
+        rendered = render_from_matrix(["matrix.json"])
+        if rendered is None:
             return 1
         print(f"matrix.json carries the {count + vcount} {LAB} entries the pins back, written on "
               f"{', '.join(changed_techniques(matrix, cited))}; updated is {cited['updated']}, and the "
               f"STIX bundle and evidence-gaps.json are rendered again:")
-        print(proc.stdout.strip())
+        print(rendered)
         print("crosswalks/technique-crosswalk.json is rendered again, and the technique pages list the "
               "evidence entries matrix.json now carries.")
     else:
         print(f"matrix.json already carries the {count + vcount} {LAB} entries the pins back.")
+        if stale:
+            rendered = render_from_matrix([])
+            if rendered is None:
+                return 1
+            print(f"{listed(stale)} disagreed with matrix.json, so the STIX bundle and evidence-gaps.json "
+                  f"are rendered again:")
+            print(rendered)
+            print("crosswalks/technique-crosswalk.json is rendered again, and the technique pages list the "
+                  "evidence entries matrix.json carries.")
     report_names(mislabelled, unknown)
     report_unnamed(unnamed)
     return 0
