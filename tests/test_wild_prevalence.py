@@ -1015,6 +1015,48 @@ def test_sync_again_after_a_failed_render_renders_what_that_run_left_behind(tree
     assert files(tree) == before
 
 
+# A file scripts/generate_stix.py renders, the rule of scripts/validate_matrix.py that compares
+# its bytes with the rendering, and the name the sync gives it when it disagrees with matrix.json.
+GENERATED = [
+    pytest.param(STIX, "S10", "the STIX bundle", id="the STIX bundle"),
+    pytest.param("evidence-gaps.json", "S16", "evidence-gaps.json", id="evidence-gaps.json"),
+]
+# Line endings other than the LF the generator writes. Read as text, each reads as LF.
+LINE_ENDINGS = [pytest.param(b"\r\n", id="CRLF"), pytest.param(b"\r", id="CR")]
+
+
+@pytest.mark.parametrize("ending", LINE_ENDINGS)
+@pytest.mark.parametrize("rel, rule, name", GENERATED)
+def test_sync_again_renders_a_file_that_differs_only_in_its_line_endings(tree, rel, rule, name, ending):
+    # The validator compares the bytes of the file with the rendering, so the file with its
+    # line endings changed fails it. The same response again leaves matrix.json as it is,
+    # names the file and renders it again, and the tree validates.
+    payload = served(load(tree))
+    assert sync(tree, payload).returncode == 0
+    before = files(tree)
+    rendered = (tree / rel).read_bytes()
+    assert rendered.count(b"\n") > 1 and b"\r" not in rendered
+    (tree / rel).write_bytes(rendered.replace(b"\n", ending))
+    validated = run_validator(tree)
+    assert validated.returncode == 1, validated.stdout + validated.stderr
+    assert (f"  - {rule} {rel} is not what scripts/generate_stix.py renders from matrix.json; "
+            f"regenerate it with: python3 scripts/generate_stix.py") in validated.stderr.splitlines(), \
+        validated.stderr
+
+    proc = sync(tree, payload)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert proc.stdout == (
+        f"matrix.json already holds the values {API_URL} served for the closed period "
+        f"{bounds(closed_period())}, read {today()}.\n"
+        f"{name} disagreed with matrix.json, so the STIX bundle, evidence-gaps.json and "
+        f"crosswalks/technique-crosswalk.json are rendered again, and the technique pages list the "
+        f"evidence entries matrix.json carries.\n"), proc.stdout
+    assert (tree / rel).read_bytes() == rendered
+    assert files(tree) == before
+    validated = run_validator(tree)
+    assert validated.returncode == 0, validated.stdout + validated.stderr
+
+
 def test_sync_that_writes_nothing_exits_1_when_a_page_has_no_place_for_its_evidence_lines(tree):
     # After a write, a technique page loses its Tactic link and its Evidence lines. The same
     # response again leaves matrix.json as it is, renders the files rendered from it, and

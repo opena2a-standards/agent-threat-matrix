@@ -614,6 +614,44 @@ def test_a_run_that_writes_no_pin_renders_a_file_left_behind_matrix_json(tree, d
     assert snapshot(tree) == after
 
 
+# A file scripts/generate_stix.py renders, the rule of scripts/validate_matrix.py that compares
+# its bytes with the rendering, and the name a run gives it when it disagrees with matrix.json.
+GENERATED = [
+    pytest.param(STIX, "S10", "the STIX bundle", id="the STIX bundle"),
+    pytest.param("evidence-gaps.json", "S16", "evidence-gaps.json", id="evidence-gaps.json"),
+]
+# Line endings other than the LF the generator writes. Read as text, each reads as LF.
+LINE_ENDINGS = [pytest.param(b"\r\n", id="CRLF"), pytest.param(b"\r", id="CR")]
+
+
+@pytest.mark.parametrize("ending", LINE_ENDINGS)
+@pytest.mark.parametrize("rel, rule, name", GENERATED)
+def test_a_run_that_writes_no_pin_renders_a_file_that_differs_only_in_its_line_endings(
+        tree, dvaa, rel, rule, name, ending):
+    # The validator compares the bytes of the file with the rendering, so the file with its
+    # line endings changed fails it. The next run writes neither matrix.json nor
+    # evidence-sources.json, names the file and renders it again, and the tree validates.
+    assert run_pin(tree, dvaa.path).returncode == 0
+    after = snapshot(tree)
+    rendered = (tree / rel).read_bytes()
+    assert rendered.count(b"\n") > 1 and b"\r" not in rendered
+    (tree / rel).write_bytes(rendered.replace(b"\n", ending))
+    validated = run_validator(tree)
+    assert validated.returncode == 1, validated.stdout + validated.stderr
+    assert (f"  - {rule} {rel} is not what scripts/generate_stix.py renders from matrix.json; "
+            f"regenerate it with: python3 scripts/generate_stix.py") in validated.stderr.splitlines(), \
+        validated.stderr
+
+    proc = run_pin(tree, dvaa.path)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert (f"{name} disagreed with matrix.json, so the STIX bundle and evidence-gaps.json are rendered "
+            f"again:") in proc.stdout.splitlines(), proc.stdout
+    assert "nothing written" not in proc.stdout, proc.stdout
+    assert snapshot(tree) == after
+    validated = run_validator(tree)
+    assert validated.returncode == 0, validated.stdout + validated.stderr
+
+
 def test_a_run_that_writes_no_pin_exits_1_when_a_page_has_no_place_for_its_evidence_lines(tree, dvaa):
     # After a write, a technique page loses its Tactic link and its Evidence lines. The next
     # run writes neither matrix.json nor evidence-sources.json, renders the files rendered from
