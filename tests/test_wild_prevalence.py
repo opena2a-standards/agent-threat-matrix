@@ -3,7 +3,10 @@
 The validator cases run scripts/validate_matrix.py against a scratch copy of the tree, as
 tests/test_validate_matrix.py does. The generator cases run scripts/sync_wild_prevalence.py
 on a scratch copy, from a saved response (``--payload``) or with the fetch replaced in
-process, so no case reads the network and the committed files are never written.
+process, so no case reads the network and the committed files are never written. A case
+that takes the ``tree`` fixture runs on a scratch copy of the committed tree and on one of a
+tree the sync wrote a recently closed period into; scratch_copy takes the period out of each
+copy.
 """
 
 import difflib
@@ -38,15 +41,54 @@ def today() -> str:
     return date.today().isoformat()
 
 
-@pytest.fixture
-def tree(tmp_path: Path) -> Path:
+def scratch_copy(source: Path, target: Path) -> Path:
+    """Copy FILES and DIRS from the tree at source into target, which holds none of them, and
+    take the period out of the copy's wildPrevalenceSource.
+
+    The generator cases have the sync write periods fixed by the day they run, and the sync
+    writes no values for a period that does not start after the one matrix.json holds. The
+    copy gives no period, so the sync takes the first closed period a case serves.
+    """
     for rel in FILES:
-        dst = tmp_path / rel
+        dst = target / rel
         dst.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy(ROOT / rel, dst)
+        shutil.copy(source / rel, dst)
     for rel in DIRS:
-        shutil.copytree(ROOT / rel, tmp_path / rel)
-    return tmp_path
+        shutil.copytree(source / rel, target / rel)
+    matrix = load(target)
+    if "period" in matrix["wildPrevalenceSource"]:
+        del matrix["wildPrevalenceSource"]["period"]
+        dump(target, matrix)
+    return target
+
+
+# The trees the cases copy.
+COMMITTED = "the committed tree"
+SYNCED = "a tree that holds a recently closed period"
+# The period the second one holds, in days before the day the tests run, and its read.
+SYNCED_PERIOD, SYNCED_READ = (31, 2), 1
+
+
+@pytest.fixture(scope="module")
+def synced(tmp_path_factory) -> Path:
+    """A tree that holds a recently closed period, as the committed tree does once the sync
+    has written one: a scratch copy on which the sync wrote the values the copy held."""
+    root = scratch_copy(ROOT, tmp_path_factory.mktemp("synced"))
+    start, end = SYNCED_PERIOD
+    held = {"wildPeriod": {"start": days_ago(start), "end": days_ago(end)},
+            "techniques": [{"id": t["id"], "wildPrevalence": t["wildPrevalence"],
+                            "wildSampleCount": t["wildSampleCount"]} for t in load(root)["techniques"]]}
+    proc = sync(root, held, days_ago(SYNCED_READ))
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    return root
+
+
+@pytest.fixture(params=[COMMITTED, SYNCED])
+def tree(request, tmp_path: Path) -> Path:
+    """A scratch copy of the committed tree, and one of a tree that holds a recently closed
+    period: a case that takes this fixture runs once on each."""
+    source = ROOT if request.param == COMMITTED else request.getfixturevalue("synced")
+    return scratch_copy(source, tmp_path)
 
 
 def load(root: Path, rel: str = "matrix.json"):
@@ -422,6 +464,11 @@ def test_sync_keeps_a_read_date_older_than_today_and_still_moves_updated(tree):
 def kept(t: dict) -> list:
     """The entries of a technique that do not cite the endpoint, which the sync keeps."""
     return [e for e in t.get("evidence", []) if e["type"] != TELEMETRY]
+
+
+def telemetry(t: dict) -> list:
+    """The honeypot-telemetry entries of a technique, which the sync writes."""
+    return [e for e in t.get("evidence", []) if e["type"] == TELEMETRY]
 
 
 def test_sync_dates_each_telemetry_entry_with_the_read_and_the_tree_validates(tree):
@@ -883,25 +930,88 @@ def test_sync_writes_the_evidence_lines_of_the_technique_pages_and_the_page_chec
         moved = [line[2:] for line in difflib.ndiff(before[name], after[name]) if line[:2] in ("- ", "+ ")]
         assert all(line.startswith("- Evidence: ") for line in moved), (tid, moved)
     # The pages that change are those of the techniques whose telemetry entry the write
-    # replaced or dropped, and of those it gave one; the shipped file holds the earlier
-    # read's entry on techniques beyond the two served samples, so some pages drop it.
+    # replaced or dropped, and of those it gave one; the tree holds an entry on techniques
+    # beyond the two served samples, so some pages drop it. A technique of the two whose
+    # entry before the write was the one the write gives it, the same date and note, as on a
+    # tree the sync wrote this period into from this read, keeps its page as it was.
     assert listed_before - set(ids[1:3])
+    as_held = {tid for tid in ids[1:3]
+               if telemetry(technique(matrix, tid)) == telemetry(technique(shipped, tid))}
     assert sorted(name for name in after if after[name] != before[name]) == \
-        sorted(f"{tid}.md" for tid in listed_before | set(ids[1:3]))
+        sorted(f"{tid}.md" for tid in (listed_before | set(ids[1:3])) - as_held)
 
 
 def test_sync_exits_1_when_a_page_has_no_place_for_its_evidence_lines(tree):
     # Evidence lines sit directly under the Tactic link, so a page without one has no place
     # for them: scripts/check_technique_pages.py --fix reports the page and exits 1, after
-    # matrix.json and the STIX bundle are written.
+    # matrix.json and the STIX bundle are written. On such a page the check reports Evidence
+    # lines only where they differ from the entries, so the page also loses its telemetry
+    # Evidence line: it then lacks the line of the entry the write gives the technique, also
+    # on a tree that held that entry.
     tid = load(tree)["techniques"][1]["id"]
     page = tree / "techniques" / f"{tid}.md"
     text = page.read_text(encoding="utf-8")
     page.write_text("".join(line for line in text.splitlines(keepends=True)
-                            if not line.startswith("- Tactic: [")), encoding="utf-8")
+                            if not line.startswith(("- Tactic: [", f"- Evidence: {TELEMETRY} "))),
+                    encoding="utf-8")
     proc = sync(tree, served(load(tree)))
     assert proc.returncode == 1, proc.stdout + proc.stderr
     assert proc.stderr.startswith("FAIL: matrix.json, the STIX bundle and evidence-gaps.json are written, but "
                                   "scripts/check_technique_pages.py --fix failed:\n"), proc.stderr
     assert f"  - {tid}: References section does not list the evidence entries" in proc.stderr, proc.stderr
     assert load(tree)["wildPrevalenceSource"]["period"] == closed_period()
+
+
+# --------------------------------------------------------------------------- the trees the cases copy
+
+def copied(root: Path) -> dict:
+    """The bytes of each file under root that scratch_copy copies, by its path from root."""
+    paths = [root / rel for rel in FILES]
+    for rel in DIRS:
+        paths.extend(path for path in sorted((root / rel).rglob("*")) if path.is_file())
+    return {path.relative_to(root).as_posix(): path.read_bytes() for path in paths}
+
+
+def test_a_scratch_copy_gives_no_period_and_is_otherwise_the_tree_it_copies(synced, tmp_path):
+    held = load(synced)
+    start, end = SYNCED_PERIOD
+    assert held["wildPrevalenceSource"] == {"url": API_URL, "read": days_ago(SYNCED_READ),
+                                            "period": {"start": days_ago(start), "end": days_ago(end)}}
+    copy = scratch_copy(synced, tmp_path / "copy")
+    del held["wildPrevalenceSource"]["period"]
+    assert load(copy) == held
+    was, now = copied(synced), copied(copy)
+    assert list(now) == list(was)
+    assert [rel for rel in now if now[rel] != was[rel]] == ["matrix.json"]
+    # A tree that gives no period is copied byte for byte.
+    assert copied(scratch_copy(copy, tmp_path / "again")) == now
+
+
+SAME_ENTRIES = [
+    pytest.param(test_sync_writes_the_evidence_lines_of_the_technique_pages_and_the_page_check_passes, 3,
+                 id="the case that writes a read three days old"),
+    pytest.param(test_sync_exits_1_when_a_page_has_no_place_for_its_evidence_lines, 0,
+                 id="the case that writes a read of today"),
+]
+
+
+@pytest.mark.parametrize("case,read", SAME_ENTRIES)
+def test_a_page_case_passes_on_a_tree_that_holds_the_entries_it_writes(tmp_path, case, read):
+    # A page case has the sync write the period closed_period() gives, with samples on two
+    # techniques. A tree that holds that period from the read date of the case carries on
+    # those two the entries the case writes, the same date and the same note, so their
+    # Evidence lines are on the pages before the case runs. It holds an entry on a third
+    # technique too, which the case drops. The case runs on a scratch copy of that tree.
+    held = scratch_copy(ROOT, tmp_path / "held")
+    payload = served(load(held))
+    payload["techniques"][3].update(wildPrevalence=50, wildSampleCount=12)
+    proc = sync(held, payload, days_ago(read))
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    before = load(held)
+    ids = [t["id"] for t in before["techniques"]]
+    assert [t["id"] for t in before["techniques"] if telemetry(t)] == ids[1:4]
+
+    copy = scratch_copy(held, tmp_path / "copy")
+    case(copy)
+    for tid in ids[1:3]:
+        assert telemetry(technique(load(copy), tid)) == telemetry(technique(before, tid)), tid
