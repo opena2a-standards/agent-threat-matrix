@@ -6,6 +6,7 @@ on a scratch copy, from a saved response (``--payload``) or with the fetch repla
 process, so no case reads the network and the committed files are never written.
 """
 
+import difflib
 import importlib.util
 import io
 import json
@@ -23,7 +24,12 @@ API_URL = "https://api.oa2a.org/api/v1/threat-matrix"
 FILES = ("matrix.json", "technique-ids.json", "schema/threat-matrix-v1.2.schema.json",
          "schema/consumer-readiness.json", "schema/evidence-sources.schema.json",
          "scripts/validate_matrix.py", "scripts/generate_stix.py", "scripts/sync_wild_prevalence.py",
+         "scripts/check_technique_pages.py", "related-projects.json", "docs/data-sources.md",
          "stix/agent-threat-matrix-bundle.json", "evidence-gaps.json", "evidence-sources.json")
+# The technique and tactic pages, which scripts/check_technique_pages.py checks against
+# matrix.json, as the sync runs it; that check also reads related-projects.json and
+# docs/data-sources.md, listed above.
+DIRS = ("techniques", "tactics")
 STIX = "stix/agent-threat-matrix-bundle.json"
 TELEMETRY = "honeypot-telemetry"
 
@@ -38,6 +44,8 @@ def tree(tmp_path: Path) -> Path:
         dst = tmp_path / rel
         dst.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy(ROOT / rel, dst)
+    for rel in DIRS:
+        shutil.copytree(ROOT / rel, tmp_path / rel)
     return tmp_path
 
 
@@ -599,7 +607,9 @@ def test_sync_description_is_its_docstring_summary():
 # --------------------------------------------------------------------------- closed periods only
 
 def files(root: Path):
-    return (root / "matrix.json").read_bytes(), (root / STIX).read_bytes()
+    """matrix.json, the STIX bundle and the technique pages, which the sync writes, as bytes."""
+    return ((root / "matrix.json").read_bytes(), (root / STIX).read_bytes(),
+            tuple(path.read_bytes() for path in sorted((root / "techniques").glob("*.md"))))
 
 
 def sync(root: Path, payload, read: str = None) -> subprocess.CompletedProcess:
@@ -768,3 +778,75 @@ def test_sync_refuses_a_held_period_without_a_start_and_an_end(tree):
     assert proc.stderr == ("FAIL: wildPrevalenceSource.period in matrix.json is not a YYYY-MM-DD start "
                            "and end; matrix.json is unchanged\n"), proc.stderr
     assert files(tree) == before
+
+
+# --------------------------------------------------------------------------- the technique pages
+
+def page_lines(root: Path) -> dict:
+    """The lines of each technique page under root, by its file name."""
+    return {path.name: path.read_text(encoding="utf-8").splitlines()
+            for path in sorted((root / "techniques").glob("*.md"))}
+
+
+def run_page_check(root: Path) -> subprocess.CompletedProcess:
+    return subprocess.run([sys.executable, str(root / "scripts" / "check_technique_pages.py")],
+                          capture_output=True, text=True, timeout=120)
+
+
+def test_sync_writes_the_evidence_lines_of_the_technique_pages_and_the_page_check_passes(tree):
+    # The References section of a technique page lists the technique's evidence entries, one
+    # Evidence line each, and scripts/check_technique_pages.py fails on a page whose lines
+    # differ from them. A write dates each telemetry entry with its read and names its period
+    # in the note, and drops the entry of each technique served no samples.
+    assert run_page_check(tree).returncode == 0
+    shipped = load(tree)
+    before = page_lines(tree)
+    listed_before = {t["id"] for t in shipped["techniques"]
+                     if any(e["type"] == TELEMETRY for e in t.get("evidence", []))}
+    period, read = closed_period(), days_ago(3)
+
+    proc = sync(tree, served(shipped), read)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    checked = run_page_check(tree)
+    assert checked.returncode == 0, checked.stdout + checked.stderr
+    assert "the technique pages list the evidence entries matrix.json now carries" in proc.stdout, proc.stdout
+
+    matrix = load(tree)
+    ids = [t["id"] for t in matrix["techniques"]]
+    after = page_lines(tree)
+    for tid in ids:
+        name = f"{tid}.md"
+        listed = [line for line in after[name] if line.startswith(f"- Evidence: {TELEMETRY} ")]
+        if tid in ids[1:3]:
+            # The two techniques served samples list the entry of this read.
+            note = technique(matrix, tid)["evidence"][-1]["note"]
+            assert bounds(period) in note, tid
+            assert listed == [f"- Evidence: {TELEMETRY} dated {read}, [{API_URL}]({API_URL}). {note}"], tid
+        else:
+            assert listed == [], tid
+        # Every line the write adds to a page or removes from it is an Evidence line.
+        moved = [line[2:] for line in difflib.ndiff(before[name], after[name]) if line[:2] in ("- ", "+ ")]
+        assert all(line.startswith("- Evidence: ") for line in moved), (tid, moved)
+    # The pages that change are those of the techniques whose telemetry entry the write
+    # replaced or dropped, and of those it gave one; the shipped file holds the earlier
+    # read's entry on techniques beyond the two served samples, so some pages drop it.
+    assert listed_before - set(ids[1:3])
+    assert sorted(name for name in after if after[name] != before[name]) == \
+        sorted(f"{tid}.md" for tid in listed_before | set(ids[1:3]))
+
+
+def test_sync_exits_1_when_a_page_has_no_place_for_its_evidence_lines(tree):
+    # Evidence lines sit directly under the Tactic link, so a page without one has no place
+    # for them: scripts/check_technique_pages.py --fix reports the page and exits 1, after
+    # matrix.json and the STIX bundle are written.
+    tid = load(tree)["techniques"][1]["id"]
+    page = tree / "techniques" / f"{tid}.md"
+    text = page.read_text(encoding="utf-8")
+    page.write_text("".join(line for line in text.splitlines(keepends=True)
+                            if not line.startswith("- Tactic: [")), encoding="utf-8")
+    proc = sync(tree, served(load(tree)))
+    assert proc.returncode == 1, proc.stdout + proc.stderr
+    assert proc.stderr.startswith("FAIL: matrix.json, the STIX bundle and evidence-gaps.json are written, but "
+                                  "scripts/check_technique_pages.py --fix failed:\n"), proc.stderr
+    assert f"  - {tid}: References section does not list the evidence entries" in proc.stderr, proc.stderr
+    assert load(tree)["wildPrevalenceSource"]["period"] == closed_period()
