@@ -519,11 +519,11 @@ def load_script(path: Path):
     return module
 
 
-def read_or_none(path: Path, binary: bool = False):
-    """The text of the file at path, or its bytes with binary, or None when it cannot be read."""
+def read_or_none(path: Path):
+    """The bytes of the file at path, or None when it cannot be read."""
     try:
-        return path.read_bytes() if binary else path.read_text(encoding="utf-8")
-    except (OSError, ValueError):
+        return path.read_bytes()
+    except OSError:
         return None
 
 
@@ -532,24 +532,29 @@ def stale_renderings() -> list:
     evidence-gaps.json where they differ from what scripts/generate_stix.py renders,
     crosswalks/technique-crosswalk.json where it differs from what
     scripts/build_technique_crosswalk.py renders or cannot be rendered, and the pages
-    scripts/check_technique_pages.py checks where it exits 1."""
+    scripts/check_technique_pages.py checks where it exits 1.
+
+    The three files are compared as bytes with the UTF-8 encoding of their rendering, as
+    scripts/validate_matrix.py compares the bundle and evidence-gaps.json (S10, S16). Read as
+    text, a file whose lines end in CRLF or CR reads the same as the rendering, whose lines
+    end in LF, and the validator still fails on it."""
     stale = []
     matrix = json.loads(MATRIX.read_text(encoding="utf-8"))
     stix = load_script(STIX_GENERATOR)
     try:
-        bundle = stix.render(matrix)
+        bundle = stix.render(matrix).encode("utf-8")
     except stix.GenerationError:
         bundle = None
     if bundle is None or read_or_none(stix.DEFAULT_OUTPUT) != bundle:
         stale.append("the STIX bundle")
-    if read_or_none(stix.DEFAULT_GAPS_OUTPUT) != stix.render_gaps(matrix):
+    if read_or_none(stix.DEFAULT_GAPS_OUTPUT) != stix.render_gaps(matrix).encode("utf-8"):
         stale.append("evidence-gaps.json")
     builder = load_script(CROSSWALK_BUILDER)
     try:
         crosswalk = builder.render(ROOT).encode("utf-8")
     except builder.InputError:
         crosswalk = None
-    if crosswalk is None or read_or_none(ROOT / builder.OUTPUT, binary=True) != crosswalk:
+    if crosswalk is None or read_or_none(ROOT / builder.OUTPUT) != crosswalk:
         stale.append(builder.OUTPUT)
     pages = subprocess.run([sys.executable, str(PAGE_CHECKER)], capture_output=True, text=True, timeout=120)
     if pages.returncode != 0:
