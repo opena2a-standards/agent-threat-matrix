@@ -9,8 +9,10 @@ holds the technique's canonical class, the one whose ``primary`` array lists it.
 These cases hold the data to that, and hold each script that read the old field to the field
 it means: the class pages and the README class tables group techniques by ``family``,
 scripts/check_canonical_classes.py (V7) holds ``attackClass`` to canonical-classes.json, and
-scripts/check_live_api_drift.py finds a hollow class from the family a served technique
-names. No case uses the network, and every case that writes runs on a scratch copy.
+scripts/check_live_api_drift.py finds a hollow family from the family a served technique
+names, and the lines it prints about the entries of the top-level ``attackClasses`` call
+each entry a family. No case uses the network, and every case that writes runs on a
+scratch copy.
 
 The names around the data are held to the same split. In the schema, a name that says
 attack class holds one of the ten classes, apart from the top-level ``attackClasses``,
@@ -23,6 +25,7 @@ scripts/derive_class_checks.py calls the entries it derives checks for families.
 
 import copy
 import importlib.util
+import io
 import json
 import re
 import shutil
@@ -235,6 +238,69 @@ def test_a_payload_served_before_the_rename_is_read_with_a_note():
 
 def test_a_payload_with_no_techniques_carries_no_note():
     assert DRIFT.hollow_classes({"techniques": [], "attackClasses": []}) == ([], None)
+
+
+HOLLOW_FAMILY_LINE = ("  - families that a served technique names and whose live attackClasses "
+                      "entry is missing or lists no technique: RAG-POISON")
+
+
+def _run_drift(monkeypatch, live: dict) -> int:
+    """Run the drift check's main() in a scratch directory holding matrix.json and a README
+    without the sentence about the live API's version, with ``live`` served by a stub of
+    urlopen, so the lines it prints are about the families alone."""
+    td = Path(tempfile.mkdtemp(prefix="atm-drift-family-"))
+    try:
+        shutil.copy(ROOT / "matrix.json", td / "matrix.json")
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        (td / "README.md").write_text(
+            "\n".join(line for line in readme.splitlines() if "labels the matrix" not in line),
+            encoding="utf-8")
+        body = json.dumps(live).encode()
+        monkeypatch.setattr(DRIFT.urllib.request, "urlopen",
+                            lambda url, timeout=None: io.BytesIO(body))
+        monkeypatch.delenv("GITHUB_EVENT_NAME", raising=False)
+        monkeypatch.chdir(td)
+        return DRIFT.main()
+    finally:
+        shutil.rmtree(td, ignore_errors=True)
+
+
+def test_the_drift_check_prints_a_hollow_family_as_a_family(monkeypatch, capsys):
+    rc = _run_drift(monkeypatch, _emptied(copy.deepcopy(MATRIX), "RAG-POISON"))
+    out = capsys.readouterr().out
+    assert rc == 1, out
+    assert out.splitlines() == [
+        "FAIL: live registry drifts from matrix.json (1 finding(s)):",
+        HOLLOW_FAMILY_LINE,
+    ]
+
+
+def test_the_drift_check_prints_a_family_the_live_api_lacks_as_a_family(monkeypatch, capsys):
+    live = copy.deepcopy(MATRIX)
+    live["attackClasses"] = [c for c in live["attackClasses"] if c["id"] != "RAG-POISON"]
+    rc = _run_drift(monkeypatch, live)
+    out = capsys.readouterr().out
+    n = len(MATRIX["attackClasses"])
+    assert rc == 1, out
+    assert out.splitlines() == [
+        "FAIL: live registry drifts from matrix.json (2 finding(s)):",
+        f"  - families (attackClasses): live API has {n - 1}, matrix.json has {n}",
+        HOLLOW_FAMILY_LINE,
+    ]
+
+
+def test_the_drift_check_prints_a_hollow_family_served_before_the_rename_as_a_family(
+        monkeypatch, capsys):
+    rc = _run_drift(monkeypatch, _emptied(_served_before_the_rename(), "RAG-POISON"))
+    out = capsys.readouterr().out
+    assert rc == 1, out
+    assert out.splitlines() == [
+        "NOTE: the live API serves no technique family field, so each technique's attackClass "
+        "is read as its family, as matrix.json named the field before it was renamed family "
+        "(pending registry re-import)",
+        "FAIL: live registry drifts from matrix.json (1 finding(s)):",
+        HOLLOW_FAMILY_LINE,
+    ]
 
 
 # --------------------------------------------------------------------------- names

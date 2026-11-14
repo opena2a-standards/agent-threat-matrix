@@ -1795,11 +1795,11 @@ ANY, STRING = "any value", "a string"
 STRING_OR_NULL, STRINGS_OR_NULL = "a string or null", "an array of strings or null"
 
 # What this check needs from matrix.json, in the order ``wrong_shape`` checks it: each array,
-# whether the top level must hold it (an absent attackClasses is read as no classes), and the
+# whether the top level must hold it (an absent attackClasses is read as no families), and the
 # keys of its objects, with what each must hold. An id is a string, as
 # scripts/check_canonical_classes.py asks, and so is a name, category or description, which
 # the check uses as text. A technique's tactic, family and evidenceTier, which the check
-# groups techniques by, are each absent, null or a string, and a class's techniques, which it
+# groups techniques by, are each absent, null or a string, and a family's techniques, which it
 # sorts beside technique ids, are absent, null or an array of strings. ``order`` is only
 # compared and written as text, so it may hold any value, and so may the top-level
 # ``version``, which may also be absent; a key the check only tests for emptiness, as it does

@@ -8,7 +8,8 @@ compares the metadata and counts that have actually drifted before:
 - version: the API hardcoded "1.0" for two months after the spec shipped 1.1
   (rendered in the site header on every page).
 - created: the API served the request date as the creation date.
-- counts: registry-side migrations once added classes without memberships.
+- counts: registry-side migrations once added families, the entries of the top-level
+  attackClasses, without memberships.
 - README.md: the sentence stating which version the live API labels the matrix
   with, which version this repository is at, and that the counts agree. It is a
   measurement of this same payload, so it is held to it, and it fails once the
@@ -81,10 +82,11 @@ def readme_findings(readme: str, live: dict, spec: dict) -> list:
 
 
 def hollow_classes(live: dict) -> tuple:
-    """(the sorted ids of the classes served with an empty membership while a served
-    technique names one as its family, a note or None).
+    """(the sorted ids of the families that a served technique names and whose entry in
+    the served attackClasses is missing or lists no technique, a note or None).
 
-    A class served with an empty membership while techniques declare it is the exact
+    Each entry of the top-level attackClasses is a family, not a canonical attack class.
+    A family served with an empty membership while techniques name it is the exact
     defect that rendered "0 techniques" on the live /classes page. A technique's family
     is read from ``family``. A payload with no technique that carries ``family`` was
     imported while matrix.json still named that field ``attackClass``, a name that now
@@ -128,7 +130,7 @@ def main() -> int:
             # live registry by construction until the registry re-imports after
             # the merge; on pull_request runs that one condition is reported, not
             # failed. Every other drift (an older version, a changed created
-            # date, a count, a hollow class) still fails, and push and scheduled
+            # date, a count, a hollow family) still fails, and push and scheduled
             # runs fail on the version too, because after a merge the registry
             # is the thing that must catch up.
             if (
@@ -140,17 +142,21 @@ def main() -> int:
                 continue
             failures.append(finding)
 
-    for coll in ("tactics", "techniques", "attackClasses", "attackPaths"):
+    # An entry of attackClasses is a family, so its count is printed under that name.
+    for coll, label in (("tactics", "tactics"), ("techniques", "techniques"),
+                        ("attackClasses", "families (attackClasses)"),
+                        ("attackPaths", "attackPaths")):
         n_live, n_spec = len(live.get(coll) or []), len(spec.get(coll) or [])
         if n_live != n_spec:
-            failures.append(f"{coll}: live API has {n_live}, matrix.json has {n_spec}")
+            failures.append(f"{label}: live API has {n_live}, matrix.json has {n_spec}")
 
     hollow, note = hollow_classes(live)
     if note:
         notes.append(note)
     if hollow:
         failures.append(
-            f"classes with empty techniques[] while techniques declare membership: {', '.join(hollow)}"
+            "families that a served technique names and whose live attackClasses entry is "
+            f"missing or lists no technique: {', '.join(hollow)}"
         )
 
     failures.extend(readme_findings(readme, live, spec))

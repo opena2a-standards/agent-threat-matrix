@@ -5,7 +5,9 @@ scripts/check_docs_prose.py must be green on the shipped tree. Each dash form an
 its own line, while code, comments, front matter, compounds, ranges and table delimiter rows
 stay unreported. So must each form of "attack class" written without "canonical" in front,
 the wording the pages used for a family before they called it one, while a canonical attack
-class, a path, an anchor, an identifier, code and a comment stay unreported. Scratch trees with no git checkout, or nested inside another repository's
+class, a path, an anchor, an identifier, code and a comment stay unreported. The technique
+template in CONTRIBUTING.md, a fenced block the check skips, passes as the page a new
+technique starts from. Scratch trees with no git checkout, or nested inside another repository's
 work tree, exercise the file walk the checker falls back to; a scratch git tree shows that a
 new file is checked before it is staged, that an ignored file is not, and that a path to the
 tree differing only in letter case still reads git. A file that is not UTF-8 is reported at
@@ -266,6 +268,20 @@ def test_the_shipped_pages_that_list_families_call_them_families():
         text = (ROOT / rel).read_text(encoding="utf-8")
         assert CHK.check_text(rel, text) == [], rel
         assert re.search(r"\bfamil(?:y|ies)\b", text, re.I), rel
+
+
+def test_a_page_started_from_the_technique_template_passes():
+    # CONTRIBUTING.md gives the technique template in a fenced block, which the check skips.
+    # A new page in techniques/ starts from it, and there each of its lines is prose the
+    # check reads, so the template passes as that page and keeps a section for the family
+    # and one for the canonical attack class.
+    text = (ROOT / "CONTRIBUTING.md").read_text(encoding="utf-8")
+    templates = [block for block in re.findall(r"^```markdown\n(.*?)^```$", text, re.S | re.M)
+                 if block.startswith("# T-XXXX: ")]
+    assert len(templates) == 1, templates
+    assert CHK.check_text("techniques/T-XXXX.md", templates[0]) == []
+    assert re.search(r"^## Family$", templates[0], re.M)
+    assert re.search(r"^## Canonical attack class$", templates[0], re.M | re.I)
 
 
 def test_table_delimiter_rows_are_not_reported():
