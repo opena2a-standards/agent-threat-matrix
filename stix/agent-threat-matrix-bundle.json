@@ -2427,7 +2427,7 @@
       "object_refs": [
         "attack-pattern--5e2e9ce3-3b55-52a1-9ba7-76b3985ad028"
       ],
-      "x_attack_class_id": "PHANTOM-SOUL",
+      "x_family_id": "PHANTOM-SOUL",
       "x_category": "governance"
     },
     {
@@ -2443,7 +2443,7 @@
       "object_refs": [
         "attack-pattern--69a20ad9-93af-58d2-ae67-5f7a80f17d53"
       ],
-      "x_attack_class_id": "SOUL-BOUNDARY",
+      "x_family_id": "SOUL-BOUNDARY",
       "x_category": "governance"
     },
     {
@@ -2459,7 +2459,7 @@
       "object_refs": [
         "attack-pattern--8aa15cee-3a7a-5d6d-b8be-f037ce972c96"
       ],
-      "x_attack_class_id": "SOUL-DELEGATE",
+      "x_family_id": "SOUL-DELEGATE",
       "x_category": "governance"
     },
     {
@@ -2476,7 +2476,7 @@
         "attack-pattern--99db9b7e-1b6a-5bda-805b-f4b208cd454e",
         "attack-pattern--4381e231-8a71-5872-8a32-52a7c3594fab"
       ],
-      "x_attack_class_id": "SOUL-DRIFT",
+      "x_family_id": "SOUL-DRIFT",
       "x_category": "governance"
     },
     {
@@ -2492,7 +2492,7 @@
       "object_refs": [
         "attack-pattern--6671c790-9498-5e27-8c32-5edc187b8f42"
       ],
-      "x_attack_class_id": "SOUL-FORK",
+      "x_family_id": "SOUL-FORK",
       "x_category": "governance"
     },
     {
@@ -2509,7 +2509,7 @@
         "attack-pattern--065a16b2-e69a-5e8b-918a-71a40d42d00b",
         "attack-pattern--6671c790-9498-5e27-8c32-5edc187b8f42"
       ],
-      "x_attack_class_id": "SOUL-HIJACK",
+      "x_family_id": "SOUL-HIJACK",
       "x_category": "governance"
     },
     {
@@ -2526,7 +2526,7 @@
         "attack-pattern--6abddb31-f871-567b-af22-169346f61ab4",
         "attack-pattern--32404f91-ead5-50e5-bd52-700e622aad41"
       ],
-      "x_attack_class_id": "SOUL-HV",
+      "x_family_id": "SOUL-HV",
       "x_category": "governance"
     },
     {
@@ -2542,7 +2542,7 @@
       "object_refs": [
         "attack-pattern--065a16b2-e69a-5e8b-918a-71a40d42d00b"
       ],
-      "x_attack_class_id": "SOUL-IMPERSONATE",
+      "x_family_id": "SOUL-IMPERSONATE",
       "x_category": "governance"
     },
     {
@@ -2562,7 +2562,7 @@
         "attack-pattern--5a7b1bed-1117-59c1-983d-cbbc654fddd9",
         "attack-pattern--69a20ad9-93af-58d2-ae67-5f7a80f17d53"
       ],
-      "x_attack_class_id": "SOUL-INJECT",
+      "x_family_id": "SOUL-INJECT",
       "x_category": "governance"
     },
     {
@@ -2581,7 +2581,7 @@
         "attack-pattern--5a7b1bed-1117-59c1-983d-cbbc654fddd9",
         "attack-pattern--69a20ad9-93af-58d2-ae67-5f7a80f17d53"
       ],
-      "x_attack_class_id": "SOUL-POISON",
+      "x_family_id": "SOUL-POISON",
       "x_category": "governance"
     },
     {
@@ -2598,7 +2598,7 @@
         "attack-pattern--b4d7edb1-1498-577a-85fd-94ac87fd630e",
         "attack-pattern--a09f8058-1a20-5f48-91f7-4edbbdd38af8"
       ],
-      "x_attack_class_id": "HEARTBEAT-RCE",
+      "x_family_id": "HEARTBEAT-RCE",
       "x_category": "supply-chain"
     },
     {
@@ -2618,7 +2618,7 @@
         "attack-pattern--cd77ab92-4f98-51bd-8375-19bf56cb2dd6",
         "attack-pattern--75496a8e-fbdc-5196-885b-42e317cd0c8b"
       ],
-      "x_attack_class_id": "MEM-POISON",
+      "x_family_id": "MEM-POISON",
       "x_category": "supply-chain"
     },
     {
@@ -2637,7 +2637,7 @@
         "attack-pattern--862bad76-642b-5741-a794-96a71f097f7c",
         "attack-pattern--da566eae-4fb6-579c-9ab0-7efa22718eaa"
       ],
-      "x_attack_class_id": "ORG-SKILL-SPREAD",
+      "x_family_id": "ORG-SKILL-SPREAD",
       "x_category": "supply-chain"
     },
     {
@@ -2654,7 +2654,7 @@
         "attack-pattern--cdf0cc7f-a07d-54cc-9802-273b0af25f69",
         "attack-pattern--32b5b7c3-5b4d-5337-90c9-dcbb397b6834"
       ],
-      "x_attack_class_id": "RAG-POISON",
+      "x_family_id": "RAG-POISON",
       "x_category": "supply-chain"
     },
     {
@@ -2676,7 +2676,7 @@
         "attack-pattern--2db15fb6-2bc8-5ae2-b546-4bcd5ad8b89b",
         "attack-pattern--b312785a-a45e-56d5-98df-faa5044759ab"
       ],
-      "x_attack_class_id": "SKILL-EXFIL",
+      "x_family_id": "SKILL-EXFIL",
       "x_category": "supply-chain"
     },
     {
@@ -2694,7 +2694,7 @@
         "attack-pattern--e2cb6e0d-ba4e-5c0d-a7d6-07f0689781e8",
         "attack-pattern--b4a19a48-ef28-51a9-b952-67a864da7598"
       ],
-      "x_attack_class_id": "SKILL-FRONTMATTER",
+      "x_family_id": "SKILL-FRONTMATTER",
       "x_category": "supply-chain"
     },
     {
@@ -2710,7 +2710,7 @@
       "object_refs": [
         "attack-pattern--513e91ee-8d49-5024-b2db-fa4329a852af"
       ],
-      "x_attack_class_id": "SKILL-MEM-AMP",
+      "x_family_id": "SKILL-MEM-AMP",
       "x_category": "supply-chain"
     },
     {
@@ -2726,7 +2726,7 @@
       "object_refs": [
         "attack-pattern--a09f8058-1a20-5f48-91f7-4edbbdd38af8"
       ],
-      "x_attack_class_id": "SUPPLY-CHAIN-INSTALL",
+      "x_family_id": "SUPPLY-CHAIN-INSTALL",
       "x_category": "supply-chain"
     },
     {
@@ -2743,7 +2743,7 @@
         "attack-pattern--7a546d92-21c8-512e-9949-7b9490f9c455",
         "attack-pattern--5d0f4003-f6ad-54f6-ab3e-e6e402567142"
       ],
-      "x_attack_class_id": "UNICODE-STEGO",
+      "x_family_id": "UNICODE-STEGO",
       "x_category": "supply-chain"
     },
     {
@@ -2760,7 +2760,7 @@
         "attack-pattern--5e2e9ce3-3b55-52a1-9ba7-76b3985ad028",
         "attack-pattern--6671c790-9498-5e27-8c32-5edc187b8f42"
       ],
-      "x_attack_class_id": "A2A-EXPOSE",
+      "x_family_id": "A2A-EXPOSE",
       "x_category": "infrastructure"
     },
     {
@@ -2778,7 +2778,7 @@
         "attack-pattern--ea806f83-4ba1-59ad-bd88-da17ae4a63d0",
         "attack-pattern--c843672f-903b-5228-b340-f032eb0fa147"
       ],
-      "x_attack_class_id": "AITOOL-EXPOSE",
+      "x_family_id": "AITOOL-EXPOSE",
       "x_category": "infrastructure"
     },
     {
@@ -2795,7 +2795,7 @@
         "attack-pattern--3b83bf10-37df-555a-b24b-6d84dd8e6d59",
         "attack-pattern--67f43189-c688-503d-a386-6ec382984d29"
       ],
-      "x_attack_class_id": "CODE-INJECTION",
+      "x_family_id": "CODE-INJECTION",
       "x_category": "infrastructure"
     },
     {
@@ -2811,7 +2811,7 @@
       "object_refs": [
         "attack-pattern--91a80bd6-41e9-59e1-b046-5fe9c4557801"
       ],
-      "x_attack_class_id": "GATEWAY-EXPLOIT",
+      "x_family_id": "GATEWAY-EXPLOIT",
       "x_category": "infrastructure"
     },
     {
@@ -2827,7 +2827,7 @@
       "object_refs": [
         "attack-pattern--67f43189-c688-503d-a386-6ec382984d29"
       ],
-      "x_attack_class_id": "INTEGRITY-BYPASS",
+      "x_family_id": "INTEGRITY-BYPASS",
       "x_category": "infrastructure"
     },
     {
@@ -2844,7 +2844,7 @@
         "attack-pattern--f1c9743e-5532-543c-a19b-cb160eba7353",
         "attack-pattern--ea806f83-4ba1-59ad-bd88-da17ae4a63d0"
       ],
-      "x_attack_class_id": "LLM-EXPOSE",
+      "x_family_id": "LLM-EXPOSE",
       "x_category": "infrastructure"
     },
     {
@@ -2865,7 +2865,7 @@
         "attack-pattern--928c992f-36f1-5e63-94e9-fa9093cb41c0",
         "attack-pattern--769d5eb7-9e68-5515-a428-3217db0394bd"
       ],
-      "x_attack_class_id": "MCP-EXPLOIT",
+      "x_family_id": "MCP-EXPLOIT",
       "x_category": "infrastructure"
     },
     {
@@ -2889,7 +2889,7 @@
         "attack-pattern--151469ae-398d-53d2-bd66-3505a958b756",
         "attack-pattern--fb9a29ec-bfa4-5d40-b54f-657916edaa2e"
       ],
-      "x_attack_class_id": "RETROACTIVE-PRIV",
+      "x_family_id": "RETROACTIVE-PRIV",
       "x_category": "infrastructure"
     },
     {
@@ -2905,7 +2905,7 @@
       "object_refs": [
         "attack-pattern--67f43189-c688-503d-a386-6ec382984d29"
       ],
-      "x_attack_class_id": "TOCTOU-RACE",
+      "x_family_id": "TOCTOU-RACE",
       "x_category": "infrastructure"
     },
     {
@@ -2922,7 +2922,7 @@
         "attack-pattern--f40e09ae-6e81-564f-969d-2ebc94ea249e",
         "attack-pattern--89717b51-7861-5522-b3dc-fb52f2792012"
       ],
-      "x_attack_class_id": "NEMO-CRED-LEAK",
+      "x_family_id": "NEMO-CRED-LEAK",
       "x_category": "nemoclaw"
     },
     {
@@ -2940,7 +2940,7 @@
         "attack-pattern--ea806f83-4ba1-59ad-bd88-da17ae4a63d0",
         "attack-pattern--a719745c-827c-5fb0-bfb2-b6a26dc3b2f0"
       ],
-      "x_attack_class_id": "NEMO-NETWORK-EXPOSE",
+      "x_family_id": "NEMO-NETWORK-EXPOSE",
       "x_category": "nemoclaw"
     },
     {
@@ -2956,7 +2956,7 @@
       "object_refs": [
         "attack-pattern--f1c9743e-5532-543c-a19b-cb160eba7353"
       ],
-      "x_attack_class_id": "NEMO-OPENCLAW-INHERIT",
+      "x_family_id": "NEMO-OPENCLAW-INHERIT",
       "x_category": "nemoclaw"
     },
     {
@@ -2972,7 +2972,7 @@
       "object_refs": [
         "attack-pattern--62d65d6b-4c58-55b5-8c29-0eb4bf06a28b"
       ],
-      "x_attack_class_id": "NEMO-SANDBOX-ESCAPE",
+      "x_family_id": "NEMO-SANDBOX-ESCAPE",
       "x_category": "nemoclaw"
     },
     {
@@ -2988,7 +2988,7 @@
       "object_refs": [
         "attack-pattern--da566eae-4fb6-579c-9ab0-7efa22718eaa"
       ],
-      "x_attack_class_id": "NEMO-SUPPLY-CHAIN",
+      "x_family_id": "NEMO-SUPPLY-CHAIN",
       "x_category": "nemoclaw"
     },
     {
@@ -3005,7 +3005,7 @@
         "attack-pattern--065a16b2-e69a-5e8b-918a-71a40d42d00b",
         "attack-pattern--ae40b799-7bea-5e20-a19f-37ec73b5bfcf"
       ],
-      "x_attack_class_id": "AGENT-IMPERSONATE",
+      "x_family_id": "AGENT-IMPERSONATE",
       "x_category": "identity"
     },
     {
@@ -3021,7 +3021,7 @@
       "object_refs": [
         "attack-pattern--065a16b2-e69a-5e8b-918a-71a40d42d00b"
       ],
-      "x_attack_class_id": "BEHAVIORAL-IMPERSONATE",
+      "x_family_id": "BEHAVIORAL-IMPERSONATE",
       "x_category": "identity"
     },
     {
@@ -3037,7 +3037,7 @@
       "object_refs": [
         "attack-pattern--62d65d6b-4c58-55b5-8c29-0eb4bf06a28b"
       ],
-      "x_attack_class_id": "SANDBOX-ESCAPE",
+      "x_family_id": "SANDBOX-ESCAPE",
       "x_category": "sandbox"
     },
     {
@@ -3053,7 +3053,7 @@
       "object_refs": [
         "attack-pattern--5d194501-520d-5811-a636-41bb6a3e829d"
       ],
-      "x_attack_class_id": "PARSER-DIFFERENTIAL",
+      "x_family_id": "PARSER-DIFFERENTIAL",
       "x_category": "infrastructure"
     },
     {
@@ -3069,7 +3069,7 @@
       "object_refs": [
         "attack-pattern--71c2c4bf-f8d5-5548-8244-642ae2f12fde"
       ],
-      "x_attack_class_id": "FAKETOOL-INJECT",
+      "x_family_id": "FAKETOOL-INJECT",
       "x_category": "supply-chain"
     },
     {
@@ -3085,7 +3085,7 @@
       "object_refs": [
         "attack-pattern--12643458-e11c-53b9-b2f2-750dc52549a0"
       ],
-      "x_attack_class_id": "PERSIST-STATE",
+      "x_family_id": "PERSIST-STATE",
       "x_category": "supply-chain"
     },
     {
@@ -3101,7 +3101,7 @@
       "object_refs": [
         "attack-pattern--7206d129-8e74-57cc-ae48-7d9e371b183a"
       ],
-      "x_attack_class_id": "ASSEMBLY-INJECT",
+      "x_family_id": "ASSEMBLY-INJECT",
       "x_category": "governance"
     },
     {

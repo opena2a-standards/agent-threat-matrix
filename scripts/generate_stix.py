@@ -11,9 +11,14 @@ Object types and their canonical names:
 - ``identity``            ``identity:agent-threat-matrix``   the publishing organization
 - ``x-opena2a-tactic``    ``tactic:<tactic id>``            one per tactic
 - ``attack-pattern``      ``<technique id>``                one per technique
-- ``grouping``            ``class:<attack class id>``       one per attack class
+- ``grouping``            ``class:<family id>``             one per family
 - ``course-of-action``    ``oasb:<control id>``             one per distinct OASB control
 - ``relationship``        ``rel:<source>:<type>:<target>``  subtechnique-of, mitigates
+
+A grouping holds the techniques of one family, an entry of the top-level ``attackClasses``
+of matrix.json, and names the family in ``x_family_id``. A family is not a canonical
+attack class. The property was named ``x_attack_class_id``; the canonical name keeps its
+prefix ``class:``, so renaming the property changed no grouping id.
 
 ``created`` is the matrix ``created`` date and ``modified`` the matrix ``updated``
 date, both at midnight UTC. ``created_by_ref`` on every object points at the identity.
@@ -181,20 +186,21 @@ def build_bundle(matrix: dict) -> dict:
         objects.append(obj)
         pattern_id_by_technique[tid] = obj["id"]
 
-    for attack_class in matrix["attackClasses"]:
-        cid = attack_class["id"]
-        members = attack_class.get("techniques", [])
+    for family in matrix["attackClasses"]:
+        fid = family["id"]
+        members = family.get("techniques", [])
         for tid in members:
             if tid not in technique_ids:
-                raise GenerationError(f"class {cid}: member {tid} is not in techniques[]")
-        obj = common("grouping", f"class:{cid}")
+                raise GenerationError(f"family {fid}: member {tid} is not in techniques[]")
+        # The prefix "class:" keeps every grouping id it had before the property was renamed.
+        obj = common("grouping", f"class:{fid}")
         obj.update({
-            "name": attack_class["name"],
-            "description": attack_class["description"],
+            "name": family["name"],
+            "description": family["description"],
             "context": "unspecified",
             "object_refs": [pattern_id_by_technique[tid] for tid in members],
-            "x_attack_class_id": cid,
-            "x_category": attack_class["category"],
+            "x_family_id": fid,
+            "x_category": family["category"],
         })
         objects.append(obj)
 

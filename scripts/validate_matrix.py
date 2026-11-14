@@ -39,7 +39,8 @@ Standard library only, no network. Two passes:
         ``subTechniques: false``, no dotted id may appear
    - S8 technique-ids.json carries the matrix version and exactly the sorted
         technique ids of matrix.json
-   - S9 attack class and attack path membership lists name techniques
+   - S9 the membership lists of the families (attackClasses[]) and of the attack
+        paths name techniques
    - S10 stix/agent-threat-matrix-bundle.json is byte-identical to what
         scripts/generate_stix.py renders from this matrix.json
    - S11 technique-ids.json ``matrixCommit`` is the 40-hex sha of the commit
@@ -499,7 +500,7 @@ def semantic_checks(matrix: dict, readiness: dict, technique_ids_file, pages: di
     commit_note = ""
     techniques = matrix["techniques"]
     tactic_ids = {t["id"] for t in matrix["tactics"]}
-    class_ids = {c["id"] for c in matrix["attackClasses"]}
+    family_ids = {family["id"] for family in matrix["attackClasses"]}
 
     seen = set()
     for index, t in enumerate(techniques):
@@ -520,7 +521,7 @@ def semantic_checks(matrix: dict, readiness: dict, technique_ids_file, pages: di
         tid = technique_label(t, index)
         if t["tactic"] not in tactic_ids:
             errors.append(f"S2 {tid}: tactic {t['tactic']!r} is not in tactics[]")
-        if t["family"] not in class_ids:
+        if t["family"] not in family_ids:
             errors.append(f"S3 {tid}: family {t['family']!r} is not in attackClasses[]")
         for mapping in t.get("dataSources", []):
             source, tool = mapping["source"], mapping["tool"]
@@ -603,10 +604,10 @@ def semantic_checks(matrix: dict, readiness: dict, technique_ids_file, pages: di
         else:
             commit_note = resolve_matrix_commit(commit, listed, errors)
 
-    for attack_class in matrix["attackClasses"]:
-        for tid in attack_class.get("techniques", []):
+    for family in matrix["attackClasses"]:
+        for tid in family.get("techniques", []):
             if tid not in ids:
-                errors.append(f"S9 attackClasses {attack_class['id']}: member {tid} is not a technique id")
+                errors.append(f"S9 attackClasses {family['id']}: member {tid} is not a technique id")
     for path in matrix["attackPaths"]:
         for tid in path.get("techniques", []):
             if tid not in ids:

@@ -11,14 +11,24 @@ it means: the class pages and the README class tables group techniques by ``fami
 scripts/check_canonical_classes.py (V7) holds ``attackClass`` to canonical-classes.json, and
 scripts/check_live_api_drift.py finds a hollow class from the family a served technique
 names. No case uses the network, and every case that writes runs on a scratch copy.
+
+The names around the data are held to the same split. In the schema, a name that says
+attack class holds one of the ten classes, apart from the top-level ``attackClasses``,
+which keeps its name, and an entry of that array is defined as ``family``, its id as
+``familyId``. In the STIX bundle, the committed copy and a fresh rendering, no property
+named for attack class holds a family, and each family grouping names its family in
+``x_family_id`` under the grouping id it had before the property was renamed.
+scripts/derive_class_checks.py calls the entries it derives checks for families.
 """
 
 import copy
 import importlib.util
 import json
+import re
 import shutil
 import subprocess
 import tempfile
+import uuid
 from pathlib import Path
 
 import pytest
@@ -27,6 +37,7 @@ ROOT = Path(__file__).resolve().parent.parent
 MATRIX = json.loads((ROOT / "matrix.json").read_text(encoding="utf-8"))
 CANONICAL_FILE = json.loads((ROOT / "canonical-classes.json").read_text(encoding="utf-8"))
 SCHEMA = json.loads((ROOT / "schema" / "threat-matrix-v1.2.schema.json").read_text(encoding="utf-8"))
+STIX = json.loads((ROOT / "stix" / "agent-threat-matrix-bundle.json").read_text(encoding="utf-8"))
 CHECKER = Path("scripts") / "check_canonical_classes.py"
 
 # The classifier's label set, in the order canonical-classes.json lists it.
@@ -224,3 +235,127 @@ def test_a_payload_served_before_the_rename_is_read_with_a_note():
 
 def test_a_payload_with_no_techniques_carries_no_note():
     assert DRIFT.hollow_classes({"techniques": [], "attackClasses": []}) == ([], None)
+
+
+# --------------------------------------------------------------------------- names
+
+# The top-level array keeps its name, as docs/attack-classes.md states; its entries are
+# families, and the schema defines one as family.
+KEPT_NAMES = {"#/properties/attackClasses"}
+
+
+def _says_attack_class(name: str) -> bool:
+    """True for a name that says attack class in any spelling: attackClass, attackClassId,
+    x_attack_class_id."""
+    return "attackclass" in re.sub(r"[^a-z]", "", name.lower())
+
+
+def _named_schemas(node, path="#"):
+    """(path, name, subschema) for each name that a $defs or a properties object of the
+    schema defines, at any depth."""
+    if isinstance(node, list):
+        for i, item in enumerate(node):
+            yield from _named_schemas(item, f"{path}/{i}")
+        return
+    if not isinstance(node, dict):
+        return
+    for key, value in node.items():
+        if key in ("$defs", "properties") and isinstance(value, dict):
+            for name, sub in value.items():
+                yield f"{path}/{key}/{name}", name, sub
+                yield from _named_schemas(sub, f"{path}/{key}/{name}")
+        else:
+            yield from _named_schemas(value, f"{path}/{key}")
+
+
+def test_every_schema_name_that_says_attack_class_holds_a_canonical_class():
+    named = [path for path, name, _ in _named_schemas(SCHEMA) if _says_attack_class(name)]
+    assert "#/$defs/technique/properties/attackClass" in named
+    wrong = sorted(path for path, name, sub in _named_schemas(SCHEMA)
+                   if _says_attack_class(name) and path not in KEPT_NAMES
+                   and sub.get("$ref") != "#/$defs/canonicalClass")
+    assert not wrong, f"named for attack class, defined as something else: {wrong}"
+
+
+def test_an_entry_of_attack_classes_and_a_technique_family_take_the_family_definitions():
+    defs = SCHEMA["$defs"]
+    assert SCHEMA["properties"]["attackClasses"]["items"] == {"$ref": "#/$defs/family"}
+    assert defs["family"]["properties"]["id"] == {"$ref": "#/$defs/familyId"}
+    assert defs["technique"]["properties"]["family"]["$ref"] == "#/$defs/familyId"
+
+
+def _properties(node):
+    """(name, value) for each property of a STIX object, nested ones included."""
+    if isinstance(node, dict):
+        for key, value in node.items():
+            yield key, value
+            yield from _properties(value)
+    elif isinstance(node, list):
+        for item in node:
+            yield from _properties(item)
+
+
+def _rendered_bundle() -> dict:
+    generator = _load("generate_stix", "scripts/generate_stix.py")
+    return json.loads(generator.render(copy.deepcopy(MATRIX)))
+
+
+@pytest.mark.parametrize("which", ["committed", "rendered"])
+def test_no_stix_property_named_for_attack_class_holds_anything_but_a_canonical_class(which):
+    bundle = STIX if which == "committed" else _rendered_bundle()
+    wrong = [(key, value) for key, value in _properties(bundle["objects"])
+             if _says_attack_class(key) and value not in CANONICAL_CLASSES]
+    assert not wrong, f"{len(wrong)} properties named for attack class hold another value: {wrong[:3]}"
+
+
+def test_each_family_grouping_names_its_family_in_x_family_id():
+    families = {family["id"]: family for family in MATRIX["attackClasses"]}
+    groupings = [obj for obj in STIX["objects"] if obj["type"] == "grouping"]
+    assert sorted(obj.get("x_family_id", "") for obj in groupings) == sorted(families)
+    for obj in groupings:
+        family = families[obj["x_family_id"]]
+        assert (obj["name"], obj["x_category"]) == (family["name"], family["category"])
+
+
+def test_a_family_grouping_keeps_the_id_it_had_before_the_property_was_renamed():
+    # The canonical name of a grouping is class:<family id>, as it was while the property
+    # was x_attack_class_id, so its uuid5 id is the one published then.
+    generator = _load("generate_stix", "scripts/generate_stix.py")
+    namespace = uuid.UUID(MATRIX["stixNamespace"])
+    for obj in (obj for obj in STIX["objects"] if obj["type"] == "grouping"):
+        assert obj["id"] == generator.stix_id(namespace, "grouping", f"class:{obj['x_family_id']}")
+
+
+# --------------------------------------------------------------------------- derived checks
+
+TAXONOMY = ("const TAXONOMY_MAP: Record<string, string> = {\n"
+            "  'MEM-001': 'MEM-POISON',\n"
+            "  'ZZZ-001': 'NOT-A-FAMILY',\n"
+            "};\n")
+
+
+def test_derive_class_checks_calls_the_entries_it_derives_checks_for_families():
+    td = Path(tempfile.mkdtemp(prefix="atm-derive-"))
+    try:
+        (td / "tree" / "scripts").mkdir(parents=True)
+        shutil.copy(ROOT / "scripts" / "derive_class_checks.py", td / "tree" / "scripts")
+        shutil.copy(ROOT / "matrix.json", td / "tree" / "matrix.json")
+        (td / "hma" / "src" / "hardening").mkdir(parents=True)
+        (td / "hma" / "src" / "hardening" / "taxonomy.ts").write_text(TAXONOMY, encoding="utf-8")
+        proc = subprocess.run(["python3", str(td / "tree" / "scripts" / "derive_class_checks.py"),
+                               str(td / "hma")], capture_output=True, text=True, timeout=60)
+        derived = json.loads((td / "tree" / "matrix.json").read_text(encoding="utf-8"))
+    finally:
+        shutil.rmtree(td)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    families = [family["id"] for family in MATRIX["attackClasses"]]
+    expected = {fid: (["MEM-001"] if fid == "MEM-POISON" else []) for fid in families}
+    changed = sum(1 for family in MATRIX["attackClasses"]
+                  if (family.get("hmaChecks") or []) != expected[family["id"]])
+    assert proc.stdout.splitlines() == [
+        f"Derived hmaChecks for {len(families)} families ({changed} changed) from 2 mapped checks.",
+        f"QUARANTINED (not one of the {len(families)} families in matrix.json): "
+        "NOT-A-FAMILY -> ZZZ-001",
+        "Families with no HMA checks mapped: " + ", ".join(f for f in families if f != "MEM-POISON"),
+    ]
+    assert {family["id"]: family["hmaChecks"] for family in derived["attackClasses"]} == expected
