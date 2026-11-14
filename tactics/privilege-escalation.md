@@ -8,8 +8,8 @@ Escalate capabilities beyond declared scope or bypass authorization
 
 ## Techniques
 
-| ID | Name | Evidence tier | Attack class |
-|----|------|---------------|--------------|
+| ID | Name | Evidence tier | Family |
+|----|------|---------------|--------|
 | [T-4001](../techniques/T-4001.md) | Capability Override | validated | SOUL-DELEGATE |
 | [T-4002](../techniques/T-4002.md) | Admin Impersonation | validated | AGENT-IMPERSONATE |
 | [T-4003](../techniques/T-4003.md) | Tool Parameter Injection | validated | MCP-EXPLOIT |

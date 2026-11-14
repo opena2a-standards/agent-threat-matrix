@@ -8,8 +8,8 @@ Extract API keys, tokens, and credentials from agent context and connected servi
 
 ## Techniques
 
-| ID | Name | Evidence tier | Attack class |
-|----|------|---------------|--------------|
+| ID | Name | Evidence tier | Family |
+|----|------|---------------|--------|
 | [T-3001](../techniques/T-3001.md) | System Prompt Credential Extraction | observed | RETROACTIVE-PRIV |
 | [T-3002](../techniques/T-3002.md) | Environment Variable Leakage | observed | NEMO-CRED-LEAK |
 | [T-3003](../techniques/T-3003.md) | Tool Response Credential Capture | validated | RETROACTIVE-PRIV |

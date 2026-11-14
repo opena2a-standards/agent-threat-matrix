@@ -8,8 +8,8 @@ Gather and stage data from databases, file systems, and APIs
 
 ## Techniques
 
-| ID | Name | Evidence tier | Attack class |
-|----|------|---------------|--------------|
+| ID | Name | Evidence tier | Family |
+|----|------|---------------|--------|
 | [T-7001](../techniques/T-7001.md) | File System Enumeration | validated | NEMO-SANDBOX-ESCAPE |
 | [T-7002](../techniques/T-7002.md) | Database Extraction | validated | CODE-INJECTION |
 | [T-7003](../techniques/T-7003.md) | API Data Harvesting | validated | SKILL-EXFIL |

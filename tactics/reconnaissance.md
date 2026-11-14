@@ -8,8 +8,8 @@ Map the target agent's attack surface, capabilities, and behavioral boundaries
 
 ## Techniques
 
-| ID | Name | Evidence tier | Attack class |
-|----|------|---------------|--------------|
+| ID | Name | Evidence tier | Family |
+|----|------|---------------|--------|
 | [T-1001](../techniques/T-1001.md) | Endpoint Enumeration | observed | RETROACTIVE-PRIV |
 | [T-1002](../techniques/T-1002.md) | Tool Discovery | validated | MCP-EXPLOIT |
 | [T-1003](../techniques/T-1003.md) | System Prompt Extraction | validated | SOUL-INJECT |

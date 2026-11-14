@@ -35,9 +35,9 @@ The organization's
 separates a normative change from an editorial one. In this repository the normative
 content is:
 
-- `matrix.json`, the matrix itself: every tactic, technique, attack class and attack path,
-  with each technique's evidence tier and its technique-level crosswalk to MITRE ATT&CK and
-  MITRE ATLAS, the `attackMapping` and `atlasMapping` arrays;
+- `matrix.json`, the matrix itself: every tactic, technique, family and attack path, with
+  each technique's canonical attack class, its evidence tier and its technique-level
+  crosswalk to MITRE ATT&CK and MITRE ATLAS, the `attackMapping` and `atlasMapping` arrays;
 - `technique-ids.json`, the technique id list, kept in step with `matrix.json`;
 - `canonical-classes.json`, the canonical attack classes resolved to technique ids;
 - `schema/`, the JSON Schema for `matrix.json`, the JSON Schema for `evidence-sources.json`
@@ -59,7 +59,7 @@ check fails when it differs from a fresh rendering:
 - the data lines of the pages in `techniques/`, and the whole of each page in `tactics/`:
   `python3 scripts/check_technique_pages.py`;
 - the counts on `README.md` and on the pages the README check reads with it, and the
-  attack-class tables on `docs/attack-classes.md`: `python3 scripts/check_readme_claims.py`;
+  family tables on `docs/attack-classes.md`: `python3 scripts/check_readme_claims.py`;
 - the overlap counts in `cross-references/technique-overlap-index.md`:
   `python3 scripts/check_cross_references.py`;
 - the technique crosswalk `crosswalks/technique-crosswalk.json`, which joins each technique
@@ -111,7 +111,7 @@ and
 an editorial change is a pull request directly, and a normative change opens an issue in
 this repository first. This page adds what is specific to the matrix.
 
-- A new technique or attack class is proposed with the
+- A new technique or family is proposed with the
   [technique submission form](.github/ISSUE_TEMPLATE/technique-submission.yml), whose
   required fields are the inputs of the evidence standard. [CONTRIBUTING.md](CONTRIBUTING.md)
   gives the evidence each tier requires, the technique template, the id ranges, and the two
@@ -142,8 +142,8 @@ an id:
 - a change to the set of `evidenceTier` values the schema fixes;
 - a change to the scope statement.
 
-MINOR steps for every other release that changes normative content: a new technique, attack
-class, tactic or optional field, a re-tier, a re-placement, a deprecation.
+MINOR steps for every other release that changes normative content: a new technique, family,
+tactic or optional field, a re-tier, a re-placement, a deprecation.
 
 `updated` in `matrix.json` moves on every normative change; `scripts/validate_matrix.py`
 requires it to be no earlier than the current date whenever the file differs from the

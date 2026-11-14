@@ -8,8 +8,8 @@ Establish persistent access surviving restarts and session changes
 
 ## Techniques
 
-| ID | Name | Evidence tier | Attack class |
-|----|------|---------------|--------------|
+| ID | Name | Evidence tier | Family |
+|----|------|---------------|--------|
 | [T-6001](../techniques/T-6001.md) | Memory Injection | validated | MEM-POISON |
 | [T-6002](../techniques/T-6002.md) | Self-Replicating Memory Entry | validated | MEM-POISON |
 | [T-6003](../techniques/T-6003.md) | Configuration Modification | observed | GATEWAY-EXPLOIT |

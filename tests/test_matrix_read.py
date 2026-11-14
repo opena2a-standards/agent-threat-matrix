@@ -266,8 +266,8 @@ SCRIPT_SHAPE_CASES = [
      "attackClasses[0].techniques[0] is a number, not a string"),
     ("check_technique_pages.py", "no tactics key", shipped_with(("tactics", REMOVE)),
      "the top level has no tactics key"),
-    ("check_technique_pages.py", "a technique with no attackClass",
-     shipped_with(("techniques", 0, "attackClass", REMOVE)), "techniques[0] has no attackClass"),
+    ("check_technique_pages.py", "a technique with no family",
+     shipped_with(("techniques", 0, "family", REMOVE)), "techniques[0] has no family"),
     ("check_technique_pages.py", "a description that is a number",
      shipped_with(("techniques", 0, "description", 5)),
      "techniques[0].description is a number, not a string or null"),
@@ -359,14 +359,14 @@ def test_a_matrix_json_with_the_wrong_shape_is_reported_in_one_line(script, read
 READS = {
     "check_readme_claims.py": {
         None: ("techniques", "tactics", "attackClasses", "version"),
-        "techniques": ("id", "name", "tactic", "attackClass", "evidenceTier", "hmaChecks",
+        "techniques": ("id", "name", "tactic", "family", "evidenceTier", "hmaChecks",
                        "oasbControls", "dvaaValidation"),
         "tactics": ("id", "name", "order"),
         "attackClasses": ("id", "category", "description", "techniques"),
     },
     "check_technique_pages.py": {
         None: ("techniques", "tactics", "dataSources"),
-        "techniques": ("id", "name", "tactic", "attackClass", "description", "dvaaValidation",
+        "techniques": ("id", "name", "tactic", "family", "description", "dvaaValidation",
                        "hmaChecks", "oasbControls", "evidenceTier", "dataSources", "evidence"),
         "tactics": ("id", "name", "order", "description"),
         "dataSources": ("id", "name", "description", "readBy"),
@@ -408,11 +408,11 @@ def test_each_check_passes_on_the_shipped_matrix_json_reduced_to_the_keys_it_rea
 # without the shape line
 OPTIONAL_CASES = [
     ("check_readme_claims.py", "no attackClasses key", shipped_with(("attackClasses", REMOVE))),
-    ("check_readme_claims.py", "a technique with a null tactic, attackClass and evidenceTier",
-     shipped_with(("techniques", 0, "tactic", None), ("techniques", 0, "attackClass", None),
+    ("check_readme_claims.py", "a technique with a null tactic, family and evidenceTier",
+     shipped_with(("techniques", 0, "tactic", None), ("techniques", 0, "family", None),
                   ("techniques", 0, "evidenceTier", None))),
-    ("check_readme_claims.py", "a technique with no tactic, attackClass or evidenceTier",
-     shipped_with(("techniques", 0, "tactic", REMOVE), ("techniques", 0, "attackClass", REMOVE),
+    ("check_readme_claims.py", "a technique with no tactic, family or evidenceTier",
+     shipped_with(("techniques", 0, "tactic", REMOVE), ("techniques", 0, "family", REMOVE),
                   ("techniques", 0, "evidenceTier", REMOVE))),
     ("check_readme_claims.py", "a class with null techniques",
      shipped_with(("attackClasses", 0, "techniques", None))),

@@ -6,14 +6,15 @@ A structured framework for classifying, detecting, and defending against attacks
 
 ## Matrix Overview
 
-Open [`matrix.json`](matrix.json) first. It holds every tactic, technique, attack class and attack path, and [`scripts/validate_matrix.py`](scripts/validate_matrix.py) checks it against its schema in [`schema/`](schema/). Each technique carries these fields:
+Open [`matrix.json`](matrix.json) first. It holds every tactic, technique, family and attack path, and [`scripts/validate_matrix.py`](scripts/validate_matrix.py) checks it against its schema in [`schema/`](schema/). Each technique carries these fields:
 
 | Field | Holds |
 |-------|-------|
 | `id`, `name`, `description` | The technique id (such as `T-2002`), its name and what the attacker does |
 | `tactic` | The tactic id, one of the rows of the table below |
 | `evidenceTier` | `observed`, `validated` or `adapted`, as defined under [Evidence Standard](docs/evidence-tiers.md#evidence-standard) |
-| `attackClass` | The technique's primary attack class, such as `RAG-POISON` |
+| `family` | The technique's family, the attack vector it uses: the id of its entry in the top-level `attackClasses`, such as `RAG-POISON` |
+| `attackClass` | The technique's canonical attack class, such as `injection`: one of the ten classes of [`canonical-classes.json`](canonical-classes.json), the one whose `primary` array lists the technique |
 | `hmaChecks`, `oasbControls` | The HackMyAgent checks that detect it and the OASB controls that defend against it |
 | `dvaaValidation` | The DVAA challenge, scenario or agent that reproduces it in the lab, or `null` |
 | `wildPrevalence`, `wildSampleCount` | The wild prevalence the registry serves for the technique, a percentage from 0 to 100, and its sample count, both 0 where it serves none; the top-level `wildPrevalenceSource` gives the endpoint and the date they were read. The registry computes it from its honeypot telemetry as callbacks per page visit in the technique's category: callbacks divided by page visits, as a percentage rounded to two decimals and capped at 100, and 0 where the category has no page visits. It measures engagement with a honeypot, not a production attack rate. The wildSampleCount the same endpoint served with wildPrevalence, and 0 where it served none: the callbacks plus the page visits behind that wildPrevalence, a whole number. |
@@ -32,7 +33,7 @@ The tactics, in kill chain order:
 | [Exfiltration](tactics/exfiltration.md) | 8 | 6 | Transfer collected data out of target environment |
 | [Impact](tactics/impact.md) | 9 | 6 | Modify data, deploy malicious code, or disrupt services |
 
-**61 techniques** across 9 tactics. **40 attack classes** grouping related techniques. **16 techniques with real-world evidence**. **42 techniques validated in controlled lab environments**. **3 techniques adapted from traditional environments** (marked as such).
+**61 techniques** across 9 tactics. **40 families** grouping related techniques by attack vector. **16 techniques with real-world evidence**. **42 techniques validated in controlled lab environments**. **3 techniques adapted from traditional environments** (marked as such).
 
 The live API at `https://api.oa2a.org/api/v1/threat-matrix` still labels the matrix 1.1 while this repository is at 1.2; the technique and tactic counts agree.
 
@@ -70,14 +71,14 @@ When referencing the framework:
 ## Documentation
 
 - [Overview](docs/overview.md): the matrix's purpose, and what it covers and leaves to MITRE ATLAS, the OWASP Top 10 for LLM and MITRE ATT&CK
-- [Attack classes](docs/attack-classes.md): every attack class with its description and techniques, rendered from `matrix.json`
+- [Families](docs/attack-classes.md): every family with its description and techniques, rendered from `matrix.json`
 - [Cross-framework mapping](docs/cross-framework-mapping.md): what HackMyAgent, DVAA, OASB and the MITRE and OWASP mapping documents provide, and how `python3 scripts/check_readme_claims.py` checks their figures
 - [Attack paths](docs/attack-paths.md): complete kill chain traversals demonstrated in DVAA
 - [Evidence tiers](docs/evidence-tiers.md) and [EVIDENCE_AUDIT.md](EVIDENCE_AUDIT.md): the tier definitions, the evidence standard with each tier's technique count, and every technique's tier justification
 - [Schema](docs/schema.md): what `python3 scripts/validate_matrix.py` checks in `matrix.json`, `technique-ids.json` and the STIX bundle
 - [Data sources](docs/data-sources.md): the data a defender collects to see each technique, the code that reads each source, and the techniques that map none
 - [Use cases](docs/use-cases.md): the situations the matrix answers, the commands for each, and the catalogs that already cover networks and AI systems
-- [CONTRIBUTING.md](CONTRIBUTING.md) and [CHANGELOG.md](CHANGELOG.md): the repository structure, proposing techniques and attack classes, and changes to the matrix and its checks
+- [CONTRIBUTING.md](CONTRIBUTING.md) and [CHANGELOG.md](CHANGELOG.md): the repository structure, proposing techniques and families, and changes to the matrix and its checks
 - Related projects: [HackMyAgent](https://github.com/opena2a-org/hackmyagent) (automated detection), [DVAA](https://github.com/opena2a-org/damn-vulnerable-ai-agent) (lab validation), [OASB](https://oasb.ai) (defensive controls) and [AI Agent Kill Chain](https://github.com/opena2a-org/ai-agent-kill-chain) (the kill chain stages)
 
 ## License

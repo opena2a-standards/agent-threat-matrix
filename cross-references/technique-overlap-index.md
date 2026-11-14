@@ -121,10 +121,10 @@ These techniques sit at the agent infrastructure layer, between the model layer 
 
 ---
 
-## Attack classes
+## Families
 
-Attack classes are listed in [matrix.json](../matrix.json) and in [docs/attack-classes.md](../docs/attack-classes.md).
-The mapping documents in this directory name the classes each framework's items relate
+Families are listed in [matrix.json](../matrix.json) and in [docs/attack-classes.md](../docs/attack-classes.md).
+The mapping documents in this directory name the families each framework's items relate
 to. This index does not repeat those lists.
 
 ---

@@ -8,8 +8,8 @@ Gain control over agent behavior through prompt manipulation or input exploitati
 
 ## Techniques
 
-| ID | Name | Evidence tier | Attack class |
-|----|------|---------------|--------------|
+| ID | Name | Evidence tier | Family |
+|----|------|---------------|--------|
 | [T-2001](../techniques/T-2001.md) | Direct Prompt Injection | observed | SOUL-INJECT |
 | [T-2002](../techniques/T-2002.md) | Indirect Prompt Injection | observed | RAG-POISON |
 | [T-2003](../techniques/T-2003.md) | Role-Play Jailbreak | observed | SOUL-INJECT |

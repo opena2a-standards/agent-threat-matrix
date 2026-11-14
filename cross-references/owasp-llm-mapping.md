@@ -89,11 +89,11 @@ These techniques address attack surfaces at the agent infrastructure layer. Each
 | T-9004 | Multi-Agent Consensus Manipulation | Poisoning voting/consensus mechanisms in multi-agent decision systems |
 | T-9005 | Reputation Poisoning | Manipulating agent output history to damage trust scores |
 
-### Attack classes not named against any OWASP item
+### Families not named against any OWASP item
 
-The following attack classes are not named against any OWASP LLM item in this reading:
+The following families are not named against any OWASP LLM item in this reading:
 
-| Attack Class | Description |
+| Family | Description |
 |-------------|-------------|
 | SOUL-POISON | Malicious instructions injected into governance files (SOUL.md, CLAUDE.md) at write-time |
 | SOUL-DRIFT | Multi-turn sequences gradually eroding behavioral boundaries over conversation turns |

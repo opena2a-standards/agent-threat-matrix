@@ -9,11 +9,11 @@ Each count the README states is then changed by one in a single place and the ch
 must go red, including the counts repeated in the "Use cases" section: the checker used
 to accept a claim when the right number appeared anywhere, so a stale repeat passed
 while the overview copy still matched. The same holds for the per-tactic table, the
-evidence-tier counts and percentages, the "Attack Classes (N)" heading and the HackMyAgent
+evidence-tier counts and percentages, the "Families (N)" heading and the HackMyAgent
 and OASB figures pinned in related-projects.json, which the checker did not read at all,
 so a HackMyAgent check count went stale without failing CI.
 
-The attack-class tables are generated from matrix.json: a reworded description, a
+The family tables are generated from matrix.json: a reworded description, a
 description changed in matrix.json alone, and a missing marker must each go red, and
 ``--fix`` must re-render the block without touching the rest of the README. With a marker
 missing, the two out of order or on two pages, ``--fix`` must write nothing and say so on
@@ -164,7 +164,7 @@ FILES = ("matrix.json", "related-projects.json", "CHANGELOG.md",
          "stix/agent-threat-matrix-bundle.json", "schema/threat-matrix-v1.2.schema.json",
          "scripts/check_readme_claims.py")
 STIX_BUNDLE = "stix/agent-threat-matrix-bundle.json"
-# The attack-class tables moved from README.md to this page, which links up one level.
+# The family tables moved from README.md to this page, which links up one level.
 CLASS_PAGE = "docs/attack-classes.md"
 BEGIN = "<!-- BEGIN GENERATED: attack-class-tables -->"
 END = "<!-- END GENERATED: attack-class-tables -->"
@@ -255,7 +255,11 @@ MUTATIONS = [
      "60 of the 61 also carry a reproducible lab scenario"),
     # Matrix overview.
     ("**61 techniques** across 9 tactics", "**61 techniques** across 10 tactics"),
-    ("**40 attack classes**", "**41 attack classes**"),
+    ("**40 families**", "**41 families**"),
+    # A total stated in prose, inside parentheses as a heading of the family tables
+    # writes its category count, is still read as the total.
+    ("grouping related techniques by attack vector.",
+     "grouping related techniques by attack vector (41 families in all)."),
     ("**16 techniques with real-world evidence**", "**17 techniques with real-world evidence**"),
     ("**42 techniques validated in controlled lab environments**",
      "**43 techniques validated in controlled lab environments**"),
@@ -297,8 +301,8 @@ MUTATIONS = [
     ("| 16 (26%) |", "| 16 (27%) |"),
     ("| 42 (69%) |", "| 43 (69%) |"),
     ("| 3 (5%) |", "| 3 (4%) |"),
-    # Attack Classes: the section heading.
-    ("## Attack Classes (40)", "## Attack Classes (41)"),
+    # Families: the section heading.
+    ("## Families (40)", "## Families (41)"),
     # The HackMyAgent and OASB figures pinned in related-projects.json, in Cross-Framework
     # Mapping and in Related Projects.
     ("(318 static checks, 164 attack payloads)", "(310 static checks, 164 attack payloads)"),
@@ -1163,8 +1167,8 @@ COUNT_LINE_CHARACTERS = [
      "16 of the 61 techniques carry real-world evidence",
      "15 of the 61 tech\N{COMBINING GRAPHEME JOINER}niques carry real-world evidence",
      "U+034F COMBINING GRAPHEME JOINER, a default-ignorable combining mark"),
-    ("U+007F, a control character, between the class count and the noun",
-     "**40 attack classes**", "**41\x7f attack classes**", "U+007F, a control character"),
+    ("U+007F, a control character, between the family count and the noun",
+     "**40 families**", "**41\x7f families**", "U+007F, a control character"),
     ("U+E0080, unassigned, inside techniques",
      "**61 techniques** across 9 tactics", "**62 tech\U000e0080niques** across 9 tactics",
      "U+E0080, an unassigned default-ignorable code point"),
@@ -4430,7 +4434,7 @@ def test_a_reworded_class_description_is_red():
         line = where_of(td, "Misconfigured API gateways")
         r = run_checker(td)
         assert r.returncode == 1, r.stdout
-        assert f"{line}: the attack-class tables differ from matrix.json" in r.stderr, \
+        assert f"{line}: the family tables differ from matrix.json" in r.stderr, \
             r.stderr
     finally:
         shutil.rmtree(td)
@@ -4450,11 +4454,11 @@ def test_a_class_changed_in_matrix_json_is_red_until_fixed():
 
         r = run_checker(td)
         assert r.returncode == 1, r.stdout
-        assert "the attack-class tables differ from matrix.json" in r.stderr, r.stderr
+        assert "the family tables differ from matrix.json" in r.stderr, r.stderr
 
         r = run_checker(td, "--fix")
         assert r.returncode == 0, r.stderr
-        assert "FIXED: rewrote the attack-class tables" in r.stdout
+        assert "FIXED: rewrote the family tables" in r.stdout
         after = (td / CLASS_PAGE).read_text(encoding="utf-8")
         assert "| Rewritten in the data: with a pipe a\\|b |" in after
         assert GATEWAY_DESCRIPTION not in after
@@ -4467,7 +4471,7 @@ def test_a_class_changed_in_matrix_json_is_red_until_fixed():
 
         r = run_checker(td, "--fix")
         assert r.returncode == 0, r.stderr
-        assert "OK: attack-class tables already current" in r.stdout
+        assert "OK: family tables already current" in r.stdout
     finally:
         shutil.rmtree(td)
 
@@ -4479,7 +4483,7 @@ def test_a_missing_class_table_marker_is_red(marker):
         mutate_readme(td, marker, "")
         r = run_checker(td)
         assert r.returncode == 1, r.stdout
-        assert "the attack-class tables need exactly one" in r.stderr, r.stderr
+        assert "the family tables need exactly one" in r.stderr, r.stderr
     finally:
         shutil.rmtree(td)
 
@@ -4509,7 +4513,7 @@ def test_class_table_end_marker_before_begin_is_red():
         end_class_table_marker_on_readme(td)
         r = run_checker(td)
         assert r.returncode == 1, r.stdout
-        assert "the attack-class tables need exactly one" in r.stderr, r.stderr
+        assert "the family tables need exactly one" in r.stderr, r.stderr
     finally:
         shutil.rmtree(td)
 
@@ -4525,11 +4529,11 @@ def test_class_table_markers_on_two_pages_are_red():
 
         r = run_checker(td)
         assert r.returncode == 1, r.stdout
-        assert "the attack-class tables need exactly one" in r.stderr, r.stderr
+        assert "the family tables need exactly one" in r.stderr, r.stderr
 
         r = run_checker(td, "--fix")
         assert r.returncode == 1, r.stdout
-        assert "the attack-class tables need exactly one" in r.stderr, r.stderr
+        assert "the family tables need exactly one" in r.stderr, r.stderr
         for rel, text in before.items():
             assert (td / rel).read_text(encoding="utf-8") == text, rel
     finally:
@@ -4543,7 +4547,7 @@ def test_class_table_markers_on_two_pages_are_red():
     split_class_table_markers,
 ], ids=["no-begin", "no-end", "end-before-begin", "two-pages"])
 def test_fix_says_it_wrote_nothing_when_it_cannot_find_the_class_tables(break_markers):
-    # --fix used to print "OK: attack-class tables already current" here, on the same run
+    # --fix used to print "OK: family tables already current" here, on the same run
     # that then exited 1 because it could not find the tables.
     td = scratch_tree()
     try:
@@ -4551,11 +4555,11 @@ def test_fix_says_it_wrote_nothing_when_it_cannot_find_the_class_tables(break_ma
         pages = {rel: (td / rel).read_text(encoding="utf-8") for rel in readme_pages()}
         r = run_checker(td, "--fix")
         assert r.returncode == 1, r.stdout
-        assert "OK: attack-class tables already current" not in r.stdout, r.stdout
+        assert "OK: family tables already current" not in r.stdout, r.stdout
         assert "FIXED: rewrote" not in r.stdout, r.stdout
-        assert ("NOT FIXED: wrote nothing, as the attack-class tables could not be found"
+        assert ("NOT FIXED: wrote nothing, as the family tables could not be found"
                 in r.stderr), r.stderr
-        assert "the attack-class tables need exactly one" in r.stderr, r.stderr
+        assert "the family tables need exactly one" in r.stderr, r.stderr
         for rel, text in pages.items():
             assert (td / rel).read_text(encoding="utf-8") == text, rel
     finally:
@@ -4584,6 +4588,34 @@ def test_class_table_links_are_written_from_the_page_that_holds_them():
     assert "](attack-classes/GATEWAY-EXPLOIT.md)" in checker.render_class_tables(matrix)
     assert ("](../attack-classes/GATEWAY-EXPLOIT.md)"
             in checker.render_class_tables(matrix, checker.link_base(CLASS_PAGE)))
+
+
+def test_the_family_tables_call_each_entry_a_family():
+    # The tables headed the first column "Class" and counted each category in "classes",
+    # over entries that are families, not canonical attack classes.
+    checker = load_checker()
+    matrix = json.loads((ROOT / "matrix.json").read_text(encoding="utf-8"))
+    lines = checker.render_class_tables(matrix).split("\n")
+    headings = [line for line in lines if line.startswith("### ")]
+    headers = [line for line in lines if line.startswith("| ") and "[" not in line]
+    by_category = {}
+    for cls in matrix["attackClasses"]:
+        by_category[cls["category"]] = by_category.get(cls["category"], 0) + 1
+    assert len(headings) == len(by_category) == len(headers)
+    for heading, n in zip(headings, by_category.values()):
+        assert heading.endswith(f" ({n} {'family' if n == 1 else 'families'})"), heading
+    assert set(headers) == {"| Family | Description | Techniques |"}
+    assert not re.search(r"\bclass(?:es)?\b", "\n".join(headings + headers), re.I)
+
+
+def test_a_heading_of_the_family_tables_is_not_read_as_the_total():
+    checker = load_checker()
+    block = "\n".join([checker.CLASS_BEGIN, "### Governance (11 families)", checker.CLASS_END])
+    text = f"**40 families** in all.\n{block}\n## Families (40)\n"
+    outside = checker.outside_class_block(text)
+    assert outside.count("\n") == text.count("\n")
+    assert re.findall(r"\b(\d+) families\b", outside) == ["40"]
+    assert checker.outside_class_block("no block here\n") == "no block here\n"
 
 
 @pytest.mark.parametrize("args,status,unknown", [

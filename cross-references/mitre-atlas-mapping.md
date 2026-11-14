@@ -19,7 +19,7 @@ The notes for [ATLAS release 2026.08](https://github.com/mitre-atlas/atlas-data/
 | **AI Model Access** (AML.TA0000) | None | None | ATLAS names inference API access, full model access, physical environment access, and access through an AI-enabled product or service. ATM starts at the agent layer above the model and does not model access to the model itself. |
 | **Execution** (AML.TA0005) | Initial Access (Stage 2), Privilege Escalation (Stage 4) | Medium | ATLAS names user execution of unsafe AI artifacts, command and scripting interpreters, LLM prompt injection, AI agent tool invocation, AI agent clickbait and deploying an AI agent. ATM has no Execution tactic: prompt injection sits in Initial Access, and making an agent invoke tools to attacker-chosen effect (capability override, tool parameter injection) sits in Privilege Escalation. |
 | **Persistence** (AML.TA0006) | Persistence (Stage 6) | High | ATLAS names model and training data poisoning, LLM prompt self-replication, RAG poisoning, AI agent context poisoning (memory and thread), modifying AI agent configuration, and AI agent tool and tool data poisoning. ATM names memory injection, self-replicating memory entries, configuration modification, skill/plugin backdoors, scheduled task injection, tool registration persistence and persistent agent state manipulation. |
-| **Privilege Escalation** (AML.TA0012) | Privilege Escalation (Stage 4) | Medium | ATLAS names valid accounts, AI agent tool invocation, LLM jailbreak and escape to host. ATM names capability override, admin impersonation, tool parameter injection, delegation abuse, policy bypass via encoding, safety instruction displacement, and tool impersonation and squatting. Escape to host relates to the sandbox escape attack class listed below. |
+| **Privilege Escalation** (AML.TA0012) | Privilege Escalation (Stage 4) | Medium | ATLAS names valid accounts, AI agent tool invocation, LLM jailbreak and escape to host. ATM names capability override, admin impersonation, tool parameter injection, delegation abuse, policy bypass via encoding, safety instruction displacement, and tool impersonation and squatting. Escape to host relates to the sandbox escape family listed below. |
 | **Defense Evasion** (AML.TA0007) | Initial Access (Stage 2), Privilege Escalation (Stage 4) | Medium | ATLAS names evading AI models, LLM jailbreak, LLM prompt obfuscation, false RAG entry injection, impersonation and masquerading, modifying AI agent configuration, manipulating LLM chat history, delayed execution of LLM instructions, sandbox evasion, and AI supply chain rug pulls and reputation inflation. ATM places evasion inside the tactic it serves: Unicode and encoding bypass, context window exploitation and multi-turn manipulation in Initial Access; policy bypass via encoding and safety instruction displacement in Privilege Escalation. |
 | **Credential Access** (AML.TA0013) | Credential Harvest (Stage 3) | High | ATLAS names unsecured credentials, RAG credential harvesting, credentials from AI agent configuration, OS credential dumping, AI agent tool credential harvesting, exploitation for credential access and stealing web session cookies. ATM names credentials read from system prompts, environment variables, tool responses, agent memory, configuration files and the context window. Both name credentials taken from agent configuration and from tool output. |
 | **Discovery** (AML.TA0008) | Reconnaissance (Stage 1), Collection (Stage 7) | Medium | ATLAS names discovering AI artifacts, model ontology and family, model outputs, LLM hallucinations, LLM system information, enterprise resources and environment, AI agent configuration and AI agent runtime capabilities. ATM names tool discovery and capability mapping in Reconnaissance, and file system enumeration and configuration harvesting in Collection. |
@@ -54,9 +54,9 @@ These are model-layer, ML-pipeline and attacker-side concerns outside the agent 
 
 These are agent-infrastructure attack surfaces that emerge when an ML model is embedded in an autonomous agent system. ATLAS release 2026.09 names some of them at the technique level. Each subsection states the nearest ATLAS names and what ATLAS does not name; "no ATLAS technique names X" means no technique or sub-technique name or description in ATLAS release 2026.09 uses the term.
 
-### Governance attack classes
+### Governance families
 
-| Attack class | Description |
+| Family | Description |
 |-------------|-------------|
 | SOUL-POISON | Malicious instructions injected into governance files (SOUL.md, CLAUDE.md) at write-time |
 | SOUL-DRIFT | Multi-turn sequences gradually eroding behavioral boundaries |
@@ -106,7 +106,7 @@ ATLAS names this layer at the technique level. AI Agent Tool Poisoning (Persiste
 
 ### Sandbox and Runtime Exploitation (agent-specific)
 
-| Attack class | Description |
+| Family | Description |
 |-------------|-------------|
 | NEMO-SANDBOX-ESCAPE | Docker privileged mode, Landlock LSM degradation |
 | NEMO-OPENCLAW-INHERIT | Inherited platform flaws surviving sandboxing |

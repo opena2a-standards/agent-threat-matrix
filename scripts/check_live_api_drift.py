@@ -80,6 +80,31 @@ def readme_findings(readme: str, live: dict, spec: dict) -> list:
     return findings
 
 
+def hollow_classes(live: dict) -> tuple:
+    """(the sorted ids of the classes served with an empty membership while a served
+    technique names one as its family, a note or None).
+
+    A class served with an empty membership while techniques declare it is the exact
+    defect that rendered "0 techniques" on the live /classes page. A technique's family
+    is read from ``family``. A payload with no technique that carries ``family`` was
+    imported while matrix.json still named that field ``attackClass``, a name that now
+    holds the canonical attack class, so there the family is read from ``attackClass``,
+    and the note says so.
+    """
+    techniques = live.get("techniques") or []
+    note = None
+    if any("family" in t for t in techniques):
+        families = {t.get("family") for t in techniques}
+    else:
+        families = {t.get("attackClass") for t in techniques}
+        if techniques:
+            note = ("the live API serves no technique family field, so each technique's "
+                    "attackClass is read as its family, as matrix.json named the field before "
+                    "it was renamed family (pending registry re-import)")
+    declared = {c["id"] for c in (live.get("attackClasses") or []) if c.get("techniques")}
+    return sorted(families - declared - {None}), note
+
+
 def main() -> int:
     with open("matrix.json") as f:
         spec = json.load(f)
@@ -120,11 +145,9 @@ def main() -> int:
         if n_live != n_spec:
             failures.append(f"{coll}: live API has {n_live}, matrix.json has {n_spec}")
 
-    # A class served with an empty membership while techniques declare it is the
-    # exact defect that rendered "0 techniques" on the live /classes page.
-    declared = {c["id"] for c in (live.get("attackClasses") or []) if c.get("techniques")}
-    derived = {t.get("attackClass") for t in (live.get("techniques") or [])}
-    hollow = sorted(derived - declared - {None})
+    hollow, note = hollow_classes(live)
+    if note:
+        notes.append(note)
     if hollow:
         failures.append(
             f"classes with empty techniques[] while techniques declare membership: {', '.join(hollow)}"
@@ -145,7 +168,7 @@ def main() -> int:
     print(
         f"Live registry matches matrix.json{qualifier}: version {spec['version']}, "
         f"{len(spec['tactics'])} tactics, {len(spec['techniques'])} techniques, "
-        f"{len(spec['attackClasses'])} attack classes, {len(spec['attackPaths'])} attack paths."
+        f"{len(spec['attackClasses'])} families, {len(spec['attackPaths'])} attack paths."
     )
     return 0
 
