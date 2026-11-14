@@ -1,8 +1,13 @@
 #!/usr/bin/env python3
 """Regenerate attack-classes/*.md from matrix.json.
 
+Each entry of the top-level attackClasses in matrix.json is a family, and
+attack-classes/ holds one page per family; the directory keeps the name it had
+before the family was told apart from the canonical attack class. The pages
+and the lines this script prints call each entry a family.
+
 matrix.json is canonical; the markdown pages are a rendering of it. The
-original one-time generation (v1.0) was never re-run: 4 later classes had no
+original one-time generation (v1.0) was never re-run: 4 later families had no
 page at all, 17 pages carried empty technique tables while matrix.json
 declared members, and every page stamped a uniform "Severity: Medium" that
 existed nowhere in the data. Regenerating from the data is the fix for the
@@ -10,28 +15,28 @@ class, not the instances. Run this whenever matrix.json changes:
 
     python3 scripts/generate_class_markdown.py
 
-A wording change to a class page belongs in that class's matrix.json
+A wording change to a family page belongs in that family's matrix.json
 description. Ten pages once had their punctuation edited by hand while
 matrix.json kept the old text, so the next regeneration reverted them and
 failed scripts/check_docs_prose.py. ``--check`` writes nothing and exits 1
 when attack-classes/ differs from a fresh rendering (a page that differs, a
-class with no page, or a page for a class that is gone):
+family with no page, or a page for a family that is gone):
 
     python3 scripts/generate_class_markdown.py --check
 
 ``--help`` (or ``-h``) prints the usage and exits 0. Any other argument, such as a
 mistyped ``--chek``, exits 2. Neither writes anything.
 
-The severity line is gone deliberately: matrix.json carries no per-class
+The severity line is gone deliberately: matrix.json carries no per-family
 severity, and a generator default dressed as a measurement is exactly what
 this repo's evidence standard prohibits.
 
-A class page lists BOTH membership views where they differ: the techniques
-whose ``family`` is this class, plus any the class additionally declares in
+A family page lists BOTH membership views where they differ: the techniques
+whose ``family`` is this family, plus any the family additionally declares in
 its techniques[] array (overlapping secondary membership is allowed by the
 schema). A technique's ``attackClass`` is its canonical attack class, one of
 the ten in canonical-classes.json, never an id of attackClasses[], so it
-plays no part in a class page.
+plays no part in a family page.
 """
 
 import argparse
@@ -45,7 +50,7 @@ DESCRIPTION = "Regenerate attack-classes/*.md from matrix.json."
 
 
 def render_pages(matrix: dict) -> dict:
-    """Map each class page file name to the text this matrix renders for it."""
+    """Map each family page file name to the text this matrix renders for it."""
     techniques = {t["id"]: t for t in matrix["techniques"]}
     tactics = {t["id"]: t["name"] for t in matrix["tactics"]}
 
@@ -82,7 +87,7 @@ def render_pages(matrix: dict) -> dict:
         if rows:
             lines += ["| ID | Name | Tactic |", "|----|------|--------|", *rows]
         else:
-            lines.append("No techniques currently map to this class.")
+            lines.append("No techniques currently map to this family.")
         lines += [
             "",
             "## Detection",
@@ -103,21 +108,21 @@ def check(pages: dict, out_dir: str) -> int:
     problems = []
     for fn in sorted(pages):
         if fn not in on_disk:
-            problems.append(f"attack-classes/{fn}: missing (matrix.json declares the class)")
+            problems.append(f"attack-classes/{fn}: missing (matrix.json declares the family)")
             continue
         with open(os.path.join(out_dir, fn), encoding="utf-8") as f:
             if f.read() != pages[fn]:
                 problems.append(f"attack-classes/{fn}: differs from the matrix.json rendering")
     for fn in sorted(on_disk - set(pages)):
-        problems.append(f"attack-classes/{fn}: stale (no such class in matrix.json)")
+        problems.append(f"attack-classes/{fn}: stale (no such family in matrix.json)")
 
     if problems:
-        print(f"FAIL: {len(problems)} attack class page(s) do not match matrix.json:")
+        print(f"FAIL: {len(problems)} family page(s) do not match matrix.json:")
         for p in problems:
             print(f"  - {p}")
-        print("Edit the class in matrix.json, then run: python3 scripts/generate_class_markdown.py")
+        print("Edit the family in matrix.json, then run: python3 scripts/generate_class_markdown.py")
         return 1
-    print(f"OK: {len(pages)} attack class pages match matrix.json.")
+    print(f"OK: {len(pages)} family pages match matrix.json.")
     return 0
 
 
@@ -142,14 +147,14 @@ def main(argv: list) -> int:
         with open(os.path.join(out_dir, fn), "w", encoding="utf-8") as f:
             f.write(text)
 
-    # Remove pages for classes no longer in the data.
+    # Remove pages for families no longer in the data.
     removed = 0
     for fn in os.listdir(out_dir):
         if fn.endswith(".md") and fn not in pages:
             os.remove(os.path.join(out_dir, fn))
             removed += 1
 
-    print(f"Wrote {len(pages)} class pages, removed {removed} stale ones.")
+    print(f"Wrote {len(pages)} family pages, removed {removed} stale ones.")
     return 0
 
 

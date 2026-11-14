@@ -1,6 +1,6 @@
 # Contributing to the AI Agent Threat Matrix
 
-We welcome contributions of new techniques, attack classes, evidence reports, and detection methods.
+We welcome contributions of new techniques, families, evidence reports, and detection methods.
 
 ## Contributing
 
@@ -23,7 +23,7 @@ agent-threat-matrix/
 ├── stix/                     # STIX 2.1 bundle rendered from matrix.json
 ├── tactics/                  # One file per tactic (kill chain stage)
 ├── techniques/               # One file per technique (T-XXXX)
-├── attack-classes/           # One file per attack class
+├── attack-classes/           # One file per family
 ├── cross-references/         # MITRE ATT&CK, ATLAS, OWASP LLM mappings
 ├── docs/                     # Evidence tiers, schema and the reference pages the README links
 ├── CONTRIBUTING.md           # How to propose new techniques
@@ -147,17 +147,20 @@ The pull request that adds a technique to `matrix.json` carries, in the same com
 
 If a technique-grain MITRE ATLAS mapping is ever authored, this two-list partition becomes insufficient: (A) becomes "named in at least one mapping table", (B) "named in none", and C3/C4 are recomputed.
 
-## Proposing a New Attack Class
+## Proposing a New Family
 
-Attack classes group related techniques. To propose a new class:
+A family groups related techniques by the attack vector they use. To propose a new family:
 
 1. Identify 2+ techniques that share a common vulnerability pattern
-2. Add the class to `attackClasses` in `matrix.json` with its name, description, member techniques, and member HMA checks
+2. Add the family to `attackClasses` in `matrix.json` with its name, description, member techniques, and member HMA checks
 3. Write its page by running `python3 scripts/generate_class_markdown.py`
 4. Explain why this grouping is useful for practitioners
 
+A family is not a canonical attack class: those are the ten classes of `canonical-classes.json`,
+and a new technique names one of them in its `attackClass` field.
+
 The pages in `attack-classes/` are rendered from `matrix.json`. To change a page, change the
-class in `matrix.json` and run the generator again; a page edited by hand is overwritten by the
+family in `matrix.json` and run the generator again; a page edited by hand is overwritten by the
 next run. `python3 scripts/generate_class_markdown.py --check` writes nothing and exits 1 when
 a page differs from what `matrix.json` renders.
 
@@ -165,14 +168,14 @@ a page differs from what `matrix.json` renders.
 
 If you find an error in a technique description, evidence citation, or cross-reference mapping, please file an issue with:
 
-- The technique or class ID
+- The technique or family ID
 - What is incorrect
 - What the correct information should be
 - A source for the correction
 
 ## Contributor credit
 
-An accepted contribution is credited to its contributor: a new technique or attack class, new
+An accepted contribution is credited to its contributor: a new technique or family, new
 evidence that changes a technique's tier, or a correction that changes published content. The
 credit is published in `ATTRIBUTION.md` in this repository. The externally-contributed list
 carries, per technique, the contributor's name or handle **exactly as the contributor gives
@@ -216,13 +219,15 @@ python3 scripts/check_docs_prose.py
 ```
 
 It prints `file:line` for each spaced double hyphen, em dash or spaced en dash used as a dash
-in prose, and for each heading or bold label named "Why this exists" or "Why this matters",
-and exits 1 if it finds any. Rewrite the sentence with a period, a comma, a colon or
-parentheses. Code spans, fenced code blocks, HTML comments and table delimiter rows are not
-checked, and neither are `CHANGELOG.md` and test fixture directories. A new file is checked
-before you stage it; a file that git ignores is not checked. For a finding in
-`attack-classes/`, make the fix in the class description in `matrix.json` and regenerate the
-page.
+in prose, for each heading or bold label named "Why this exists" or "Why this matters", and
+for each `attack class` or `attack classes` without `canonical` in front, and exits 1 if it
+finds any. Rewrite a dash with a period, a comma, a colon or parentheses. Write "canonical
+attack class" for one of the ten classes of `canonical-classes.json`, and "family" for an
+entry of `attackClasses` in `matrix.json`. Code spans, fenced code blocks, HTML comments and
+table delimiter rows are not checked, and neither are `CHANGELOG.md` and test fixture
+directories. A new file is checked before you stage it; a file that git ignores is not
+checked. For a finding in `attack-classes/`, make the fix in the family's description in
+`matrix.json` and regenerate the page.
 
 If your pull request touches an evidence tier definition, also run:
 

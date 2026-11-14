@@ -1,13 +1,25 @@
 #!/usr/bin/env python3
-"""Keep dashes and "Why this exists" sections out of the Markdown prose in this repository.
+"""Keep dashes, "Why this exists" sections and families called attack classes out of the
+Markdown prose in this repository.
 
-Two writing rules apply to every Markdown page a reader sees here:
+Three writing rules apply to every Markdown page a reader sees here:
 
 - P1 no spaced double hyphen (``--``), em dash (U+2014) or spaced en dash (U+2013) is used
      as a dash in prose. Rewrite it as the sentence needs: a period, a comma, a colon or
      parentheses. A single hyphen, a hyphenated compound and an unspaced en dash in a range
      are not dashes and are left alone.
 - P2 no heading or bold section label is named "Why this exists" or "Why this matters".
+- P3 "attack class" and "attack classes", in any letter case, stand right after the word
+     "canonical". An attack class is one of the ten classes of canonical-classes.json, and a
+     technique's ``attackClass`` holds one; an entry of the top-level ``attackClasses`` in
+     matrix.json is a family, and a technique's ``family`` names one. So the words are
+     written "canonical attack class" for one of the ten, and "family" for an entry of
+     ``attackClasses``. The two words are read when a hyphen joins them, or spaces and tabs
+     with at most one line break among them, so a phrase wrapped onto the next line is read
+     too; "canonical" may stand at the end of the line before. A hyphenated form inside a
+     path, a file name, an anchor or a longer hyphenated name (``attack-classes/``,
+     ``attack-classes.md``, ``#attack-classes-40``, ``attack-class-tables``) is not prose
+     and is not read.
 
 The checked set is every ``*.md`` and ``*.mdx`` file that git tracks or that is untracked and
 not ignored, so a new file is checked before it is staged (every such file on disk when the
@@ -19,14 +31,16 @@ table delimiter rows are skipped: a ``--`` there is a command-line separator, pr
 table syntax, not punctuation. Fences follow CommonMark in two ways: lines end at ``\\n``,
 ``\\r\\n`` or ``\\r`` only, so backticks after a form feed or U+2028 are not at the start of
 a line; and a run of backticks with another backtick later on its line is an inline code
-span, which opens no fence. VERBATIM lists the lines that quote a recorded source word for
-word, where rewriting the punctuation would misquote it; an entry matches one exact line, so
-an edited line is checked again.
+span, which opens no fence. No phrase is read across the lines skipped between two prose
+lines, or across a blank line. VERBATIM lists the lines that quote a recorded source word for
+word, where rewriting the punctuation or a word would misquote it; an entry matches one exact
+line, so an edited line is checked again.
 
-Exit 0 when both rules hold, 1 otherwise, printing ``file:line`` for each violation and for
-each file that is not valid UTF-8.
+Exit 0 when the three rules hold, 1 otherwise, printing ``file:line`` for each violation and
+for each file that is not valid UTF-8.
 """
 
+import bisect
 import os
 import re
 import subprocess
@@ -60,6 +74,15 @@ DASHES = (
 WHY_HEADING_RE = re.compile(r"^ {0,3}(?:#{1,6}\s*|\*\*|__)\s*why this (?:exists|matters)\b", re.I)
 WHY_SETEXT_RE = re.compile(r"^ {0,3}why this (?:exists|matters)\b", re.I)
 SETEXT_UNDERLINE_RE = re.compile(r"^ {0,3}(?:=+|-+)\s*$")
+# P3: "attack" and "class" or "classes", joined by a hyphen, or by white space with at most
+# one line break in it. A hyphenated form preceded by a slash, a hash, a dot or a hyphen, or
+# followed by a slash, a hyphen or a dot and a letter, is part of a path, a file name, an
+# anchor or a longer name, and is not matched.
+ATTACK_CLASS_RE = re.compile(
+    r"(?<![\w/#.-])attack(?:-|[^\S\n]+|[^\S\n]*\n[^\S\n]*)class(?:es)?(?![\w/-]|\.\w)", re.I)
+CANONICAL = "canonical"
+P3_ADVICE = ('write "family" for an entry of attackClasses in matrix.json, or "canonical '
+             'attack class" for one of the ten classes of canonical-classes.json')
 
 
 def excluded(rel: str) -> bool:
@@ -176,21 +199,69 @@ def prose_lines(text: str):
         yield i + 1, INLINE_CODE_RE.sub(" ", line)
 
 
+def after_canonical(text: str, end: int) -> bool:
+    """True when ``text[:end]`` ends with the word "canonical" and then white space holding at
+    most one line break."""
+    i, breaks = end, 0
+    while i > 0 and text[i - 1].isspace():
+        breaks += text[i - 1] == "\n"
+        i -= 1
+    start = i - len(CANONICAL)
+    return (i < end and breaks <= 1 and start >= 0
+            and text[start:i].lower() == CANONICAL
+            and not (start > 0 and (text[start - 1].isalnum() or text[start - 1] == "_")))
+
+
+def attack_class_failures(rel: str, lines: list, raw: list) -> list:
+    """(line number, failure) for each P3 violation among the prose lines of one file.
+
+    The lines are read as one text, so a phrase wrapped onto the next line is read. Two lines
+    that follow each other in the file are joined by one line break; two between which
+    prose_lines skipped lines (a fence, a comment, front matter) are joined by two, as at a
+    blank line, so no phrase is read across what was skipped."""
+    parts, starts, numbers = [], [], []
+    offset, previous = 0, None
+    for lineno, line in lines:
+        if previous is not None:
+            sep = "\n" if lineno == previous + 1 else "\n\n"
+            parts.append(sep)
+            offset += len(sep)
+        starts.append(offset)
+        numbers.append(lineno)
+        parts.append(line)
+        offset += len(line)
+        previous = lineno
+    text = "".join(parts)
+    found = []
+    for m in ATTACK_CLASS_RE.finditer(text):
+        lineno = numbers[bisect.bisect_right(starts, m.start()) - 1]
+        if (rel, raw[lineno - 1].rstrip()) in VERBATIM or after_canonical(text, m.start()):
+            continue
+        phrase = " ".join(m.group(0).split())
+        found.append((lineno, f"{rel}:{lineno}: P3 \"{phrase}\" without \"{CANONICAL}\" in "
+                              f"front: {P3_ADVICE}"))
+    return found
+
+
 def check_text(rel: str, text: str) -> list:
-    """Return one ``file:line: rule`` string per violation in one Markdown file."""
+    """Return one ``file:line: rule`` string per violation in one Markdown file, in line
+    order."""
     raw = split_lines(text)
+    lines = list(prose_lines(text))
     failures = []
-    for lineno, line in prose_lines(text):
+    for lineno, line in lines:
         if (rel, raw[lineno - 1].rstrip()) in VERBATIM:
             continue
         if not RULE_RE.match(line) and not table_delimiter_row(line):
             for name, pattern in DASHES:
                 if pattern.search(line):
-                    failures.append(f"{rel}:{lineno}: P1 {name} used as a dash in prose")
+                    failures.append((lineno, f"{rel}:{lineno}: P1 {name} used as a dash in prose"))
         nxt = raw[lineno] if lineno < len(raw) else ""
         if WHY_HEADING_RE.match(line) or (WHY_SETEXT_RE.match(line) and SETEXT_UNDERLINE_RE.match(nxt)):
-            failures.append(f"{rel}:{lineno}: P2 section named \"Why this exists/matters\"")
-    return failures
+            failures.append((lineno, f"{rel}:{lineno}: P2 section named \"Why this exists/matters\""))
+    failures += attack_class_failures(rel, lines, raw)
+    failures.sort(key=lambda failure: failure[0])
+    return [message for _, message in failures]
 
 
 def run_checks(root: Path):
@@ -216,7 +287,8 @@ def main() -> int:
         for failure in failures:
             print(f"  - {failure}")
         return 1
-    print(f"OK: {len(files)} Markdown files, no dash used in prose and no \"Why this exists\" section")
+    print(f"OK: {len(files)} Markdown files, no dash used in prose, no \"Why this exists\" "
+          f"section and no attack class without \"{CANONICAL}\" in front")
     return 0
 
 

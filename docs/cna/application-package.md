@@ -153,7 +153,7 @@ this package.
 **Lead with originated coordinated disclosures.** The unit records: NemoClaw, 10 vulnerabilities
 disclosed to NVIDIA PSIRT. This repository corroborates the count: `CHANGELOG.md` lists "NVIDIA
 NemoClaw security assessment (10 confirmed vulnerabilities)" among the v1.0 sources, and
-`EVIDENCE_AUDIT.md` records that the five NemoClaw-specific attack classes "are all backed by the
+`EVIDENCE_AUDIT.md` records that the five NemoClaw-specific families "are all backed by the
 10 confirmed code-level vulnerabilities."
 
 **Do NOT claim CVE-2026-25253.** The unit is explicit: cite `CVE-2026-25253` only as a CVE our
@@ -162,7 +162,7 @@ presented as one. No other file in this repository references `CVE-2026-25253`; 
 only source here, and the unit does not name which tool detects it, so no tool is named.
 
 **Supporting corpus, from this repository** (measured by `scripts/check_readme_claims.py`,
-which is enforced in CI): 9 tactics, 61 techniques and 40 attack classes in `matrix.json`, with
+which is enforced in CI): 9 tactics, 61 techniques and 40 families in `matrix.json`, with
 evidence tiers 16 observed / 42 validated / 3 adapted.
 
 ---
@@ -224,7 +224,7 @@ repository.
 | NemoClaw: 10 vulnerabilities to NVIDIA PSIRT | unit, step 5 |
 | 10 confirmed NemoClaw vulnerabilities | `CHANGELOG.md`, `EVIDENCE_AUDIT.md` |
 | `CVE-2026-25253` is detected, not owned | unit, step 5 (named in no other file in this repo) |
-| 9 tactics / 61 techniques / 40 attack classes; tiers 16/42/3 | `matrix.json`, verified by `scripts/check_readme_claims.py` |
+| 9 tactics / 61 techniques / 40 families; tiers 16/42/3 | `matrix.json`, verified by `scripts/check_readme_claims.py` |
 | ~4-week minimum; onboarding call >=3 weeks out | unit, REALITY (corrected 2026-07-05) |
 | Done when: CNA assigned and listed, weeks out | unit |
 

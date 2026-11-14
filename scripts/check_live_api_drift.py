@@ -168,7 +168,7 @@ def main() -> int:
     print(
         f"Live registry matches matrix.json{qualifier}: version {spec['version']}, "
         f"{len(spec['tactics'])} tactics, {len(spec['techniques'])} techniques, "
-        f"{len(spec['attackClasses'])} attack classes, {len(spec['attackPaths'])} attack paths."
+        f"{len(spec['attackClasses'])} families, {len(spec['attackPaths'])} attack paths."
     )
     return 0
 

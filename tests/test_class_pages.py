@@ -1,12 +1,13 @@
-"""Attack class page generator tests.
+"""Family page generator tests.
 
-attack-classes/*.md is a rendering of matrix.json. Ten pages once had their punctuation
-edited by hand while matrix.json kept the old text, so regenerating them reintroduced the
-dashes and failed scripts/check_docs_prose.py. The committed pages must equal a fresh
-rendering, the rendering must pass the prose check, and ``--check`` must report each way
-the directory can drift from the data (a page that differs, a missing page, a stale page)
-without writing anything. Every run uses a scratch copy so the committed pages are never
-rewritten.
+attack-classes/*.md is a rendering of matrix.json, one page per family, an entry of its
+top-level attackClasses. Ten pages once had their punctuation edited by hand while
+matrix.json kept the old text, so regenerating them reintroduced the dashes and failed
+scripts/check_docs_prose.py. The committed pages must equal a fresh rendering, the
+rendering must pass the prose check, and ``--check`` must report each way the directory can
+drift from the data (a page that differs, a missing page, a stale page) without writing
+anything. The pages and the lines the generator prints call each entry a family, never an
+attack class. Every run uses a scratch copy so the committed pages are never rewritten.
 """
 
 import importlib.util
@@ -90,7 +91,7 @@ def test_check_passes_on_the_shipped_tree():
     try:
         proc = run_generator(td, "--check")
         assert proc.returncode == 0, proc.stdout + proc.stderr
-        assert proc.stdout.startswith(f"OK: {class_count()} attack class pages match matrix.json")
+        assert proc.stdout.startswith(f"OK: {class_count()} family pages match matrix.json")
     finally:
         shutil.rmtree(td)
 
@@ -158,7 +159,7 @@ def test_check_runs_with_docstrings_stripped():
         proc = subprocess.run(["python3", "-OO", str(td / GENERATOR), "--check"],
                               capture_output=True, text=True, timeout=120)
         assert proc.returncode == 0, proc.stdout + proc.stderr
-        assert f"OK: {class_count()} attack class pages match matrix.json." in proc.stdout
+        assert f"OK: {class_count()} family pages match matrix.json." in proc.stdout
     finally:
         shutil.rmtree(td)
 
@@ -170,10 +171,34 @@ def test_check_reports_missing_and_stale_pages():
         (td / "attack-classes" / "NOT-A-CLASS.md").write_text("# gone\n", encoding="utf-8")
         proc = run_generator(td, "--check")
         assert proc.returncode == 1
-        assert "FAIL: 2 attack class page(s)" in proc.stdout
-        assert "attack-classes/SOUL-FORK.md: missing" in proc.stdout
-        assert "attack-classes/NOT-A-CLASS.md: stale" in proc.stdout
+        assert "FAIL: 2 family page(s)" in proc.stdout
+        assert "attack-classes/SOUL-FORK.md: missing (matrix.json declares the family)" in proc.stdout
+        assert "attack-classes/NOT-A-CLASS.md: stale (no such family in matrix.json)" in proc.stdout
+        assert "Edit the family in matrix.json, then run:" in proc.stdout
         assert not (td / "attack-classes" / "SOUL-FORK.md").exists()
         assert (td / "attack-classes" / "NOT-A-CLASS.md").exists()
     finally:
         shutil.rmtree(td)
+
+
+def test_the_generator_writes_family_pages_and_says_so():
+    td = scratch_tree()
+    try:
+        (td / "attack-classes" / "NOT-A-CLASS.md").write_text("# gone\n", encoding="utf-8")
+        proc = run_generator(td)
+        assert proc.returncode == 0, proc.stdout + proc.stderr
+        assert proc.stdout == f"Wrote {class_count()} family pages, removed 1 stale ones.\n"
+    finally:
+        shutil.rmtree(td)
+
+
+def test_a_family_no_technique_names_says_so_as_a_family():
+    matrix = json.loads((ROOT / "matrix.json").read_text())
+    matrix["attackClasses"].append({
+        "id": "EMPTY-FAMILY", "name": "Empty Family", "description": "A family no technique names",
+        "techniques": [], "hmaChecks": [], "category": "governance",
+    })
+    page = GENERATOR_MODULE.render_pages(matrix)["EMPTY-FAMILY.md"]
+    assert "No techniques currently map to this family." in page
+    assert "class" not in page.lower()
+    assert PROSE.check_text("attack-classes/EMPTY-FAMILY.md", page) == []

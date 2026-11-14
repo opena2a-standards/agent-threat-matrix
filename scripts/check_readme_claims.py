@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """Assert every counted claim in README.md and its pages matches matrix.json.
 
-The README states counts (tactics, techniques, attack classes, evidence tiers)
+The README states counts (tactics, techniques, families, evidence tiers)
 and coverage claims (detection, defensive control, lab scenario). Those are
 measurements, not prose, so they are checked here and in CI rather than
-maintained by hand.
+maintained by hand. A family is an entry of matrix.json's top-level attackClasses.
 
 README.md hands its reference text to the pages PAGES lists after it: the purpose and
-scope to docs/overview.md, the attack-class tables to docs/attack-classes.md, the
+scope to docs/overview.md, the family tables to docs/attack-classes.md, the
 cross-framework mapping with the related-project figures to
 docs/cross-framework-mapping.md, and the evidence-tier table to docs/evidence-tiers.md,
 among others. The check reads README.md and those pages
@@ -16,11 +16,13 @@ them, every occurrence on any of them is checked, and each failure names the pag
 line there. A page PAGES lists that does not exist fails the check. Below, "the README"
 is README.md together with those pages.
 
-The attack-class tables are a rendering of matrix.json.attackClasses, held
+The family tables are a rendering of matrix.json.attackClasses, held
 between the BEGIN/END GENERATED markers, both on one page, with each link written
-relative to that page. Typed by hand, they reworded 34 of the 40 class descriptions
+relative to that page. Typed by hand, they reworded 34 of the 40 family descriptions
 and four of them described a different attack. The block must re-render
-byte-identically; run with ``--fix`` to rewrite only that block.
+byte-identically; run with ``--fix`` to rewrite only that block. The tables head the
+family column "Family" and count each category's entries as families: a family is not
+one of the canonical attack classes of canonical-classes.json.
 
 The per-tactic table and the evidence-tier table are measurements over matrix.json too.
 A tactic row is read where a line starts ``| [Name](tactics/<id>.md) | N | N |``, and a
@@ -29,8 +31,9 @@ the last "|", each spaced exactly as shown; a row written any other way is not r
 tactic row read must state the tactic's name, kill chain stage and technique count, and
 each tier row read its technique count and that count as a whole percentage of all
 techniques, rounded half up; a row read that names no tactic or tier, a second row read for
-one, and a tactic or tier with no row read each fail. The "## Attack Classes (N)" heading
-must state the number of attack classes.
+one, and a tactic or tier with no row read each fail. The "## Families (N)" heading must
+state the number of families, and so must "N families" wherever it stands outside the
+family tables, whose headings count the families of one category.
 
 The README also states figures about related projects. Those are measured in the
 other project, so they are pinned in related-projects.json with the release each was
@@ -791,12 +794,13 @@ def table_cell(text):
 
 
 def render_class_tables(matrix, base=""):
-    """The attack-class tables: one per category, in order of first appearance in
-    matrix.json, classes sorted by id. Members are the techniques the class declares
-    plus those whose family is the class, as on the class pages. A technique's
-    attackClass is a canonical class, not a class of these tables, so it is not read.
-    `base` leads each link from the page holding the tables to the repository root
-    ("../" for a page in docs/)."""
+    """The family tables: one per category, in order of first appearance in matrix.json,
+    families sorted by id. Each entry of the top-level attackClasses is a family, and the
+    tables call it one: a heading counts the families of its category, and the first
+    column is headed "Family". Members are the techniques the family declares plus those
+    whose family it is, as on the family pages. A technique's attackClass is a canonical
+    attack class, not an entry of these tables, so it is not read. `base` leads each link
+    from the page holding the tables to the repository root ("../" for a page in docs/)."""
     primary = {}
     for t in matrix["techniques"]:
         primary.setdefault(t.get("family"), set()).add(t["id"])
@@ -808,11 +812,11 @@ def render_class_tables(matrix, base=""):
     sections = []
     for category, classes in by_category.items():
         label = CATEGORY_LABELS.get(category, category.replace("-", " ").title())
-        noun = "class" if len(classes) == 1 else "classes"
+        noun = "family" if len(classes) == 1 else "families"
         lines = [
             f"### {label} ({len(classes)} {noun})",
-            "| Class | Description | Techniques |",
-            "|-------|-------------|------------|",
+            "| Family | Description | Techniques |",
+            "|--------|-------------|------------|",
         ]
         for cls in sorted(classes, key=lambda c: c["id"]):
             members = sorted(set(cls.get("techniques") or []) | primary.get(cls["id"], set()))
@@ -834,6 +838,17 @@ def class_block_span(readme):
     if end < start:
         return None
     return start, end + len(CLASS_END)
+
+
+def outside_class_block(readme):
+    """The README with the generated block, markers included, reduced to its line breaks,
+    so a match offset still converts to its README line number; the README as it is when
+    `class_block_span` finds no block."""
+    span = class_block_span(readme)
+    if span is None:
+        return readme
+    start, end = span
+    return readme[:start] + "\n" * readme.count("\n", start, end) + readme[end:]
 
 
 class Pages:
@@ -887,11 +902,11 @@ def class_block(pages):
 
 
 def check_class_tables(matrix, pages):
-    """Failure lines for the generated attack-class block; empty when it is current."""
+    """Failure lines for the generated family block; empty when it is current."""
     block = class_block(pages)
     if block is None:
         return [
-            f"README.md and the pages in PAGES: the attack-class tables need exactly one "
+            f"README.md and the pages in PAGES: the family tables need exactly one "
             f"'{CLASS_BEGIN}' followed by exactly one '{CLASS_END}', both on one page"
         ]
     page, start, end = block
@@ -901,13 +916,13 @@ def check_class_tables(matrix, pages):
     for i, (h, w) in enumerate(zip(have, want)):
         if h != w:
             return [
-                f"{pages.where(first_line + i)}: the attack-class tables differ from "
+                f"{pages.where(first_line + i)}: the family tables differ from "
                 f"matrix.json (expected \"{w}\"); run python3 scripts/check_readme_claims.py --fix"
             ]
     if len(have) != len(want):
         line = first_line + min(len(have), len(want))
         return [
-            f"{pages.where(line)}: the attack-class tables have {len(have)} lines, matrix.json "
+            f"{pages.where(line)}: the family tables have {len(have)} lines, matrix.json "
             f"renders {len(want)}; run python3 scripts/check_readme_claims.py --fix"
         ]
     return []
@@ -1865,7 +1880,7 @@ def main(argv):
     # exits 0; that run reads and writes nothing either.
     parser = argparse.ArgumentParser(description=DESCRIPTION, allow_abbrev=False)
     parser.add_argument("--fix", action="store_true",
-                        help="rewrite the attack-class tables from matrix.json, on the page "
+                        help="rewrite the family tables from matrix.json, on the page "
                              "that holds them")
     args = parser.parse_args(argv)
 
@@ -1884,14 +1899,14 @@ def main(argv):
         # Without the markers there is no block to rewrite, so nothing is written and the
         # tables are not reported current; the marker failure below ends the run with 1.
         if fixed is None:
-            print("NOT FIXED: wrote nothing, as the attack-class tables could not be found; "
+            print("NOT FIXED: wrote nothing, as the family tables could not be found; "
                   "see the marker failure below", file=sys.stderr)
         elif fixed[1] != pages.texts[pages.names.index(fixed[0])]:
             (ROOT / fixed[0]).write_text(fixed[1], encoding="utf-8")
             pages = Pages(ROOT)
-            print("FIXED: rewrote the attack-class tables from matrix.json")
+            print("FIXED: rewrote the family tables from matrix.json")
         else:
-            print("OK: attack-class tables already current")
+            print("OK: family tables already current")
     readme = pages.text
 
     tactics = matrix["tactics"]
@@ -1954,9 +1969,13 @@ def main(argv):
     count(r"\*\*(\d+) techniques\*\*", [total], "techniques")
     count(r"\b(\d+) tactics and (\d+) techniques\b", [len(tactics), total],
           "tactics and techniques")
-    count(r"\b(\d+) attack classes\b", [len(classes)], "attack classes")
-    count(r"\*\*(\d+) attack classes\*\*", [len(classes)], "attack classes")
-    count(r"(?m)^## Attack Classes \((\d+)\)$", [len(classes)], "attack classes")
+    # Families: the entries of attackClasses. A heading of the family tables counts the
+    # families of one category, and the block is held to its rendering above, so the total
+    # is read on the text outside the block.
+    count_wordings.append(r"\b(\d+) families\b")
+    require(r"\b(\d+) families\b", [len(classes)], "families", text=outside_class_block(readme))
+    count(r"\*\*(\d+) families\*\*", [len(classes)], "families")
+    count(r"(?m)^## Families \((\d+)\)$", [len(classes)], "families")
 
     # Evidence tiers, in the overview wording and in the Use cases wording.
     count(r"\*\*(\d+) techniques with real-world evidence\*\*", [observed], "observed")
@@ -2317,7 +2336,7 @@ def main(argv):
             print(f"  - {f}", file=sys.stderr)
         print(
             f"\nmeasured: {len(tactics)} tactics, {total} techniques, "
-            f"{len(classes)} attack classes, tiers={tiers}, "
+            f"{len(classes)} families, tiers={tiers}, "
             f"detection={with_detection}/{total}, control={with_control}/{total}, "
             f"lab={with_lab}/{total}\npinned: {related_summary}",
             file=sys.stderr,
@@ -2326,7 +2345,7 @@ def main(argv):
 
     print(
         f"README claims match matrix.json: {len(tactics)} tactics, {total} techniques, "
-        f"{len(classes)} attack classes, tiers={tiers}, "
+        f"{len(classes)} families, tiers={tiers}, "
         f"detection={with_detection}/{total}, control={with_control}/{total}, "
         f"lab={with_lab}/{total}; and related-projects.json: {related_summary}"
     )

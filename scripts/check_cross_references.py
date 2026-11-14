@@ -13,7 +13,8 @@ tactic list, which names the ATLAS release it was read from.
 Nine properties:
 
 - C1 every ``T-####`` in cross-references/ exists in matrix.json.
-- C2 every attack-class id in cross-references/ exists in matrix.json.attackClasses.
+- C2 every family id in cross-references/ exists in matrix.json.attackClasses, whose
+     entries are the families.
 - C3 the OWASP-named set (owasp-llm-mapping.md mapping table) and the no-counterpart set
      (technique-overlap-index.md) are DISJOINT.
 - C4 those two sets union to exactly the technique ids in matrix.json.
@@ -557,12 +558,12 @@ def run_checks(root: Path) -> list:
             if tid not in ids:
                 failures.append(f"C1 {path.name}: {tid} is not a technique id in matrix.json")
 
-    # C2 -- every attack-class id referenced exists in matrix.json.attackClasses.
+    # C2 -- every family id referenced exists in matrix.json.attackClasses.
     for path in files:
         text = path.read_text()
         for cid in sorted(class_ids_in(text)):
             if cid not in classes:
-                failures.append(f"C2 {path.name}: {cid} is not an attack-class id in matrix.json")
+                failures.append(f"C2 {path.name}: {cid} is not a family id in matrix.json")
 
     named = parse_owasp_named(owasp_text)          # set A
     no_counterpart = parse_no_counterpart(index_text)  # set B

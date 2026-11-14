@@ -179,9 +179,9 @@ These three tier names are the ones that ship: `evidenceTier` in `matrix.json` t
 
 **Mark evidence tier on each technique page.** This is transparency that MITRE doesn't even do (they mix observed and theoretical without explicit labeling). Our evidence labeling is a differentiator.
 
-### Attack Classes Audit
+### Families Audit
 
-All 40 attack classes contain at least one OBSERVED or VALIDATED technique. No attack class is purely theoretical. The NemoClaw-specific classes (5 classes) are all backed by the 10 confirmed code-level vulnerabilities.
+All 40 families contain at least one OBSERVED or VALIDATED technique. No family is purely theoretical. The NemoClaw-specific families (5 families) are all backed by the 10 confirmed code-level vulnerabilities.
 
 ### Gaps Identified
 
@@ -191,7 +191,7 @@ All 40 attack classes contain at least one OBSERVED or VALIDATED technique. No a
 
 ### What MITRE Would Push Back On
 
-1. "Are your VALIDATED findings just penetration test results against your own deliberately vulnerable system?" Response: Yes, but DVAA is purpose-built with documented vulnerability patterns. Each DVAA agent targets a specific attack class. The validation proves the technique works, not that it's been used by real adversaries.
+1. "Are your VALIDATED findings just penetration test results against your own deliberately vulnerable system?" Response: Yes, but DVAA is purpose-built with documented vulnerability patterns. Each DVAA agent targets a specific family. The validation proves the technique works, not that it's been used by real adversaries.
 
 2. "Your technique IDs don't follow MITRE's format." Response: Intentional. T-XYYY (where X = stage) vs MITRE's TXXXX (sequential). Our format encodes the kill chain stage in the ID, which is more useful for practitioners.
 
