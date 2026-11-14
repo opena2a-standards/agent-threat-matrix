@@ -79,7 +79,7 @@ We do not accept purely theoretical techniques. If you have a plausible attack v
 ## Family
 [The attack vector: which entry of attackClasses in matrix.json it belongs to (see attack-classes/)]
 
-## Attack Class
+## Canonical Attack Class
 [Which of the ten canonical classes of canonical-classes.json it belongs to]
 
 ## Evidence
