@@ -19,12 +19,12 @@ canonical attack class. A line under that old label, ``**Attack Class:**`` or
 ``- Attack Class: [...]``, is read as the Family line it stands for, so it fails as one
 that differs from the data and ``--fix`` rewrites it under the Family label.
 Only two of them were checked until 2026-10-11: when matrix.json moved T-1006 and T-5002
-to A2A-EXPOSE on 2026-08-25, their HMA Checks lines and four References class links kept
+to A2A-EXPOSE on 2026-08-25, their HMA Checks lines and four References family links kept
 the old values while CI stayed green.
 
 The pages under tactics/ carry nothing but data (name, kill chain stage, description and
 a table of the tactic's techniques in matrix.json order), so each must equal its full
-rendering from matrix.json. Their tables kept the same four superseded classes.
+rendering from matrix.json. Their tables kept the same four superseded families.
 
 The ``## Mitigation`` section of a technique page is data too: it lists the OASB controls
 in ``oasbControls``, one line each with the control's OASB-1 title, as in
