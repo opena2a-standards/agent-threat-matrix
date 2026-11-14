@@ -8,8 +8,8 @@ Modify data, deploy malicious code, or disrupt services
 
 ## Techniques
 
-| ID | Name | Evidence tier | Attack class |
-|----|------|---------------|--------------|
+| ID | Name | Evidence tier | Family |
+|----|------|---------------|--------|
 | [T-9001](../techniques/T-9001.md) | Data Manipulation | validated | CODE-INJECTION |
 | [T-9002](../techniques/T-9002.md) | Service Disruption | validated | ORG-SKILL-SPREAD |
 | [T-9003](../techniques/T-9003.md) | Malicious Code Deployment | observed | HEARTBEAT-RCE |

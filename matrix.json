@@ -2,7 +2,7 @@
   "version": "1.2",
   "name": "AI Agent Threat Matrix",
   "created": "2026-03-24",
-  "updated": "2026-11-01",
+  "updated": "2026-11-13",
   "stixNamespace": "d43c7092-69ad-4822-b2cb-a48e459c4580",
   "tactics": [
     {
@@ -67,7 +67,8 @@
       "tactic": "reconnaissance",
       "description": "Discover exposed API endpoints, health checks, and information disclosure routes on target agents",
       "evidenceTier": "observed",
-      "attackClass": "RETROACTIVE-PRIV",
+      "family": "RETROACTIVE-PRIV",
+      "attackClass": "lateral_movement",
       "hmaChecks": [
         "WEBEXPOSE-001",
         "WEBEXPOSE-002",
@@ -124,7 +125,8 @@
       "tactic": "reconnaissance",
       "description": "Enumerate available tools and their schemas via MCP tools/list or equivalent discovery endpoints",
       "evidenceTier": "validated",
-      "attackClass": "MCP-EXPLOIT",
+      "family": "MCP-EXPLOIT",
+      "attackClass": "lateral_movement",
       "hmaChecks": [
         "MCP-011"
       ],
@@ -169,7 +171,8 @@
       "tactic": "reconnaissance",
       "description": "Extract the agent's system prompt to understand its instructions, constraints, and behavioral boundaries",
       "evidenceTier": "validated",
-      "attackClass": "SOUL-INJECT",
+      "family": "SOUL-INJECT",
+      "attackClass": "exfiltration",
       "hmaChecks": [
         "WEBEXPOSE-001"
       ],
@@ -222,7 +225,8 @@
       "tactic": "reconnaissance",
       "description": "Probe the agent to determine its security posture, guardrails, and content filtering strength",
       "evidenceTier": "validated",
-      "attackClass": "RETROACTIVE-PRIV",
+      "family": "RETROACTIVE-PRIV",
+      "attackClass": "policy_violation",
       "hmaChecks": [
         "WEBEXPOSE-001"
       ],
@@ -264,7 +268,8 @@
       "tactic": "reconnaissance",
       "description": "Map the full set of agent capabilities including tools, permissions, and connected services",
       "evidenceTier": "validated",
-      "attackClass": "MCP-EXPLOIT",
+      "family": "MCP-EXPLOIT",
+      "attackClass": "lateral_movement",
       "hmaChecks": [
         "MCP-011",
         "MCP-001"
@@ -303,7 +308,8 @@
       "tactic": "reconnaissance",
       "description": "Discover A2A agent cards to map agent identities, capabilities, and trust relationships",
       "evidenceTier": "observed",
-      "attackClass": "A2A-EXPOSE",
+      "family": "A2A-EXPOSE",
+      "attackClass": "lateral_movement",
       "hmaChecks": [
         "A2A-001",
         "A2A-002"
@@ -352,7 +358,8 @@
       "tactic": "reconnaissance",
       "description": "Probe the agent's context window size and saturation level to prepare overflow attacks",
       "evidenceTier": "validated",
-      "attackClass": "RETROACTIVE-PRIV",
+      "family": "RETROACTIVE-PRIV",
+      "attackClass": "injection",
       "hmaChecks": [
         "WEBEXPOSE-001"
       ],
@@ -377,7 +384,8 @@
       "tactic": "initial-access",
       "description": "Inject malicious instructions directly into agent input to override system prompt behavior",
       "evidenceTier": "observed",
-      "attackClass": "SOUL-INJECT",
+      "family": "SOUL-INJECT",
+      "attackClass": "injection",
       "hmaChecks": [
         "PROMPT-001",
         "PROMPT-002",
@@ -454,7 +462,8 @@
       "tactic": "initial-access",
       "description": "Embed malicious instructions in external data sources consumed by the agent via RAG or tool responses",
       "evidenceTier": "observed",
-      "attackClass": "RAG-POISON",
+      "family": "RAG-POISON",
+      "attackClass": "injection",
       "hmaChecks": [
         "PROMPT-001",
         "RAG-001",
@@ -533,7 +542,8 @@
       "tactic": "initial-access",
       "description": "Use role-play or persona-switching techniques to bypass agent safety instructions",
       "evidenceTier": "observed",
-      "attackClass": "SOUL-INJECT",
+      "family": "SOUL-INJECT",
+      "attackClass": "injection",
       "hmaChecks": [
         "PROMPT-001"
       ],
@@ -589,7 +599,8 @@
       "tactic": "initial-access",
       "description": "Overflow or saturate the context window to displace safety instructions with attacker-controlled content",
       "evidenceTier": "validated",
-      "attackClass": "SOUL-DRIFT",
+      "family": "SOUL-DRIFT",
+      "attackClass": "injection",
       "hmaChecks": [
         "PROMPT-001",
         "PROMPT-002"
@@ -645,7 +656,8 @@
       "tactic": "initial-access",
       "description": "Embed malicious instructions in tool or skill descriptions that execute when the agent processes them",
       "evidenceTier": "validated",
-      "attackClass": "SKILL-FRONTMATTER",
+      "family": "SKILL-FRONTMATTER",
+      "attackClass": "injection",
       "hmaChecks": [
         "SKILL-001",
         "SKILL-004",
@@ -703,7 +715,8 @@
       "tactic": "initial-access",
       "description": "Use Unicode homoglyphs, invisible characters, or encoding tricks to bypass input filters and inject instructions",
       "evidenceTier": "observed",
-      "attackClass": "UNICODE-STEGO",
+      "family": "UNICODE-STEGO",
+      "attackClass": "steganography",
       "hmaChecks": [
         "UNICODE-STEGO-001",
         "UNICODE-STEGO-002",
@@ -787,7 +800,8 @@
       "tactic": "initial-access",
       "description": "Gradually shift agent behavior over multiple conversation turns to bypass single-turn detection",
       "evidenceTier": "validated",
-      "attackClass": "SOUL-INJECT",
+      "family": "SOUL-INJECT",
+      "attackClass": "injection",
       "hmaChecks": [
         "PROMPT-001"
       ],
@@ -831,7 +845,8 @@
       "tactic": "initial-access",
       "description": "Exploit weak boundaries between system and user prompts to override system-level instructions",
       "evidenceTier": "validated",
-      "attackClass": "SOUL-INJECT",
+      "family": "SOUL-INJECT",
+      "attackClass": "injection",
       "hmaChecks": [
         "SOUL-OVERRIDE-001"
       ],
@@ -893,7 +908,8 @@
       "tactic": "credential-harvest",
       "description": "Extract credentials hardcoded or referenced in the agent's system prompt",
       "evidenceTier": "observed",
-      "attackClass": "RETROACTIVE-PRIV",
+      "family": "RETROACTIVE-PRIV",
+      "attackClass": "credential_abuse",
       "hmaChecks": [
         "CRED-001",
         "CRED-002",
@@ -988,7 +1004,8 @@
       "tactic": "credential-harvest",
       "description": "Access environment variables containing API keys, tokens, and connection strings",
       "evidenceTier": "observed",
-      "attackClass": "NEMO-CRED-LEAK",
+      "family": "NEMO-CRED-LEAK",
+      "attackClass": "credential_abuse",
       "hmaChecks": [
         "ENV-001",
         "ENV-002",
@@ -1070,7 +1087,8 @@
       "tactic": "credential-harvest",
       "description": "Capture credentials returned in tool or API responses that pass through the agent's context",
       "evidenceTier": "validated",
-      "attackClass": "RETROACTIVE-PRIV",
+      "family": "RETROACTIVE-PRIV",
+      "attackClass": "credential_abuse",
       "hmaChecks": [
         "CRED-001"
       ],
@@ -1124,7 +1142,8 @@
       "tactic": "credential-harvest",
       "description": "Extract credentials stored in agent memory from previous sessions or conversations",
       "evidenceTier": "validated",
-      "attackClass": "MEM-POISON",
+      "family": "MEM-POISON",
+      "attackClass": "credential_abuse",
       "hmaChecks": [
         "MEM-001",
         "MEM-002",
@@ -1209,7 +1228,8 @@
       "tactic": "credential-harvest",
       "description": "Read configuration files containing credentials via tool access or path traversal",
       "evidenceTier": "observed",
-      "attackClass": "RETROACTIVE-PRIV",
+      "family": "RETROACTIVE-PRIV",
+      "attackClass": "credential_abuse",
       "hmaChecks": [
         "CRED-001",
         "ENV-001",
@@ -1316,7 +1336,8 @@
       "tactic": "credential-harvest",
       "description": "Exploit context window contents to leak credentials that were previously processed by the agent",
       "evidenceTier": "validated",
-      "attackClass": "RETROACTIVE-PRIV",
+      "family": "RETROACTIVE-PRIV",
+      "attackClass": "credential_abuse",
       "hmaChecks": [
         "CRED-001",
         "AGENT-CRED-001"
@@ -1383,7 +1404,8 @@
       "tactic": "privilege-escalation",
       "description": "Override declared capability restrictions to execute unauthorized operations like shell commands",
       "evidenceTier": "validated",
-      "attackClass": "SOUL-DELEGATE",
+      "family": "SOUL-DELEGATE",
+      "attackClass": "privilege_escalation",
       "hmaChecks": [
         "PERM-001",
         "PERM-002",
@@ -1441,7 +1463,8 @@
       "tactic": "privilege-escalation",
       "description": "Impersonate administrator or privileged roles to gain elevated access",
       "evidenceTier": "validated",
-      "attackClass": "AGENT-IMPERSONATE",
+      "family": "AGENT-IMPERSONATE",
+      "attackClass": "privilege_escalation",
       "hmaChecks": [
         "AUTH-001",
         "AUTH-002",
@@ -1511,7 +1534,8 @@
       "tactic": "privilege-escalation",
       "description": "Inject malicious parameters into tool calls to escalate privileges or bypass validation",
       "evidenceTier": "validated",
-      "attackClass": "MCP-EXPLOIT",
+      "family": "MCP-EXPLOIT",
+      "attackClass": "privilege_escalation",
       "hmaChecks": [
         "PERM-001"
       ],
@@ -1554,7 +1578,8 @@
       "tactic": "privilege-escalation",
       "description": "Abuse agent delegation mechanisms to escalate privileges through trusted agent chains",
       "evidenceTier": "validated",
-      "attackClass": "AGENT-IMPERSONATE",
+      "family": "AGENT-IMPERSONATE",
+      "attackClass": "privilege_escalation",
       "hmaChecks": [
         "AUTH-001",
         "AUTH-002",
@@ -1624,7 +1649,8 @@
       "tactic": "privilege-escalation",
       "description": "Use encoding tricks to bypass policy enforcement on tool calls and actions",
       "evidenceTier": "validated",
-      "attackClass": "UNICODE-STEGO",
+      "family": "UNICODE-STEGO",
+      "attackClass": "steganography",
       "hmaChecks": [
         "UNICODE-STEGO-001"
       ],
@@ -1667,7 +1693,8 @@
       "tactic": "privilege-escalation",
       "description": "Displace safety instructions from the active context to remove guardrails",
       "evidenceTier": "validated",
-      "attackClass": "SOUL-DRIFT",
+      "family": "SOUL-DRIFT",
+      "attackClass": "policy_violation",
       "hmaChecks": [
         "PROMPT-001",
         "PROMPT-002"
@@ -1723,7 +1750,8 @@
       "tactic": "lateral-movement",
       "description": "Use agent tools to make server-side requests to internal services not directly accessible",
       "evidenceTier": "validated",
-      "attackClass": "SKILL-EXFIL",
+      "family": "SKILL-EXFIL",
+      "attackClass": "lateral_movement",
       "hmaChecks": [
         "NET-001",
         "NET-002",
@@ -1791,7 +1819,8 @@
       "tactic": "lateral-movement",
       "description": "Pivot from a compromised agent to other agents via A2A protocol connections",
       "evidenceTier": "validated",
-      "attackClass": "A2A-EXPOSE",
+      "family": "A2A-EXPOSE",
+      "attackClass": "lateral_movement",
       "hmaChecks": [
         "A2A-001",
         "A2A-002"
@@ -1851,7 +1880,8 @@
       "tactic": "lateral-movement",
       "description": "Hop between MCP servers using compromised tool access to reach new services",
       "evidenceTier": "validated",
-      "attackClass": "MCP-EXPLOIT",
+      "family": "MCP-EXPLOIT",
+      "attackClass": "lateral_movement",
       "hmaChecks": [
         "MCP-001",
         "MCP-002",
@@ -1917,7 +1947,8 @@
       "tactic": "lateral-movement",
       "description": "Reuse harvested credentials to access additional services and agents",
       "evidenceTier": "observed",
-      "attackClass": "RETROACTIVE-PRIV",
+      "family": "RETROACTIVE-PRIV",
+      "attackClass": "lateral_movement",
       "hmaChecks": [
         "CRED-001"
       ],
@@ -1982,7 +2013,8 @@
       "tactic": "lateral-movement",
       "description": "Pivot through database connections accessible via agent tools to reach new data stores",
       "evidenceTier": "validated",
-      "attackClass": "MCP-EXPLOIT",
+      "family": "MCP-EXPLOIT",
+      "attackClass": "lateral_movement",
       "hmaChecks": [
         "MCP-001",
         "MCP-011"
@@ -2029,7 +2061,8 @@
       "tactic": "lateral-movement",
       "description": "Discover and access internal APIs from the agent's network position",
       "evidenceTier": "validated",
-      "attackClass": "MCP-EXPLOIT",
+      "family": "MCP-EXPLOIT",
+      "attackClass": "lateral_movement",
       "hmaChecks": [
         "NET-001",
         "NET-002",
@@ -2090,7 +2123,8 @@
       "tactic": "persistence",
       "description": "Inject malicious entries into agent memory to persist instructions across sessions",
       "evidenceTier": "validated",
-      "attackClass": "MEM-POISON",
+      "family": "MEM-POISON",
+      "attackClass": "persistence",
       "hmaChecks": [
         "MEM-001",
         "MEM-002",
@@ -2173,7 +2207,8 @@
       "tactic": "persistence",
       "description": "Create memory entries that instruct the agent to re-inject them if removed",
       "evidenceTier": "validated",
-      "attackClass": "MEM-POISON",
+      "family": "MEM-POISON",
+      "attackClass": "persistence",
       "hmaChecks": [
         "MEM-001",
         "MEM-002",
@@ -2255,7 +2290,8 @@
       "tactic": "persistence",
       "description": "Modify agent or gateway configuration files to maintain persistent access",
       "evidenceTier": "observed",
-      "attackClass": "GATEWAY-EXPLOIT",
+      "family": "GATEWAY-EXPLOIT",
+      "attackClass": "persistence",
       "hmaChecks": [
         "GATEWAY-001",
         "GATEWAY-002",
@@ -2339,7 +2375,8 @@
       "tactic": "persistence",
       "description": "Install a backdoored skill or plugin that persists across agent restarts",
       "evidenceTier": "validated",
-      "attackClass": "SKILL-FRONTMATTER",
+      "family": "SKILL-FRONTMATTER",
+      "attackClass": "persistence",
       "hmaChecks": [
         "SKILL-001",
         "SKILL-002",
@@ -2429,7 +2466,8 @@
       "tactic": "persistence",
       "description": "Inject malicious scheduled tasks or heartbeat handlers for persistent execution",
       "evidenceTier": "observed",
-      "attackClass": "HEARTBEAT-RCE",
+      "family": "HEARTBEAT-RCE",
+      "attackClass": "persistence",
       "hmaChecks": [
         "HEARTBEAT-001",
         "HEARTBEAT-002",
@@ -2506,7 +2544,8 @@
       "tactic": "persistence",
       "description": "Register malicious tools that persist in the agent's tool registry across sessions",
       "evidenceTier": "validated",
-      "attackClass": "SKILL-FRONTMATTER",
+      "family": "SKILL-FRONTMATTER",
+      "attackClass": "persistence",
       "hmaChecks": [
         "SKILL-001",
         "SKILL-002",
@@ -2562,7 +2601,8 @@
       "tactic": "collection",
       "description": "Enumerate and read files from the agent's accessible file system via path traversal or tool access",
       "evidenceTier": "validated",
-      "attackClass": "NEMO-SANDBOX-ESCAPE",
+      "family": "NEMO-SANDBOX-ESCAPE",
+      "attackClass": "exfiltration",
       "hmaChecks": [
         "IO-001",
         "IO-002",
@@ -2631,7 +2671,8 @@
       "tactic": "collection",
       "description": "Extract data from databases via SQL injection or authorized database tool access",
       "evidenceTier": "validated",
-      "attackClass": "CODE-INJECTION",
+      "family": "CODE-INJECTION",
+      "attackClass": "exfiltration",
       "hmaChecks": [
         "IO-001",
         "INJ-001",
@@ -2700,7 +2741,8 @@
       "tactic": "collection",
       "description": "Harvest data from connected APIs using the agent's authorized tool access",
       "evidenceTier": "validated",
-      "attackClass": "SKILL-EXFIL",
+      "family": "SKILL-EXFIL",
+      "attackClass": "exfiltration",
       "hmaChecks": [
         "IO-001",
         "IO-002",
@@ -2769,7 +2811,8 @@
       "tactic": "collection",
       "description": "Dump the agent's memory store to extract stored data, credentials, and conversation history",
       "evidenceTier": "validated",
-      "attackClass": "MEM-POISON",
+      "family": "MEM-POISON",
+      "attackClass": "exfiltration",
       "hmaChecks": [
         "MEM-001",
         "MEM-002",
@@ -2840,7 +2883,8 @@
       "tactic": "collection",
       "description": "Harvest configuration files containing credentials, connection strings, and service details",
       "evidenceTier": "observed",
-      "attackClass": "NEMO-CRED-LEAK",
+      "family": "NEMO-CRED-LEAK",
+      "attackClass": "credential_abuse",
       "hmaChecks": [
         "IO-001",
         "ENV-001",
@@ -2934,7 +2978,8 @@
       "tactic": "collection",
       "description": "Discover and extract personally identifiable information from RAG stores and agent data sources",
       "evidenceTier": "validated",
-      "attackClass": "RAG-POISON",
+      "family": "RAG-POISON",
+      "attackClass": "exfiltration",
       "hmaChecks": [
         "RAG-001",
         "RAG-002",
@@ -2995,7 +3040,8 @@
       "tactic": "exfiltration",
       "description": "Exfiltrate collected data via the agent's email sending capability",
       "evidenceTier": "validated",
-      "attackClass": "SKILL-EXFIL",
+      "family": "SKILL-EXFIL",
+      "attackClass": "exfiltration",
       "hmaChecks": [
         "SANDBOX-001",
         "SANDBOX-002",
@@ -3055,7 +3101,8 @@
       "tactic": "exfiltration",
       "description": "Exfiltrate data via HTTP POST requests to attacker-controlled endpoints",
       "evidenceTier": "validated",
-      "attackClass": "SKILL-EXFIL",
+      "family": "SKILL-EXFIL",
+      "attackClass": "exfiltration",
       "hmaChecks": [
         "NET-001",
         "SANDBOX-001",
@@ -3130,7 +3177,8 @@
       "tactic": "exfiltration",
       "description": "Exfiltrate data encoded in DNS queries to bypass network egress controls",
       "evidenceTier": "adapted",
-      "attackClass": "SKILL-EXFIL",
+      "family": "SKILL-EXFIL",
+      "attackClass": "exfiltration",
       "hmaChecks": [
         "NET-001",
         "NET-002",
@@ -3183,7 +3231,8 @@
       "tactic": "exfiltration",
       "description": "Chain multiple tool calls to stage and exfiltrate data through legitimate-looking operations",
       "evidenceTier": "validated",
-      "attackClass": "SKILL-EXFIL",
+      "family": "SKILL-EXFIL",
+      "attackClass": "exfiltration",
       "hmaChecks": [
         "NET-001",
         "SANDBOX-001",
@@ -3263,7 +3312,8 @@
       "tactic": "exfiltration",
       "description": "Exfiltrate data by encoding it in the agent's visible conversation responses",
       "evidenceTier": "validated",
-      "attackClass": "RETROACTIVE-PRIV",
+      "family": "RETROACTIVE-PRIV",
+      "attackClass": "exfiltration",
       "hmaChecks": [
         "SANDBOX-001",
         "SANDBOX-002",
@@ -3316,7 +3366,8 @@
       "tactic": "exfiltration",
       "description": "Exfiltrate data through webhook integrations like Slack, Telegram, or Discord",
       "evidenceTier": "observed",
-      "attackClass": "SKILL-EXFIL",
+      "family": "SKILL-EXFIL",
+      "attackClass": "exfiltration",
       "hmaChecks": [
         "SANDBOX-001",
         "SANDBOX-002",
@@ -3390,7 +3441,8 @@
       "tactic": "impact",
       "description": "Modify, corrupt, or delete data in databases and file systems via agent tools",
       "evidenceTier": "validated",
-      "attackClass": "CODE-INJECTION",
+      "family": "CODE-INJECTION",
+      "attackClass": "policy_violation",
       "hmaChecks": [
         "SUPPLY-001",
         "INTEGRITY-001"
@@ -3440,7 +3492,8 @@
       "tactic": "impact",
       "description": "Disrupt agent services through resource exhaustion, infinite loops, or configuration corruption",
       "evidenceTier": "validated",
-      "attackClass": "ORG-SKILL-SPREAD",
+      "family": "ORG-SKILL-SPREAD",
+      "attackClass": "policy_violation",
       "hmaChecks": [
         "SUPPLY-001"
       ],
@@ -3491,7 +3544,8 @@
       "tactic": "impact",
       "description": "Deploy malicious code or backdoors through agent code execution capabilities",
       "evidenceTier": "observed",
-      "attackClass": "HEARTBEAT-RCE",
+      "family": "HEARTBEAT-RCE",
+      "attackClass": "persistence",
       "hmaChecks": [
         "SUPPLY-001",
         "HEARTBEAT-001"
@@ -3542,7 +3596,8 @@
       "tactic": "impact",
       "description": "Manipulate multi-agent consensus mechanisms to influence collective decision-making",
       "evidenceTier": "adapted",
-      "attackClass": "ORG-SKILL-SPREAD",
+      "family": "ORG-SKILL-SPREAD",
+      "attackClass": "social_engineering",
       "hmaChecks": [
         "SUPPLY-001"
       ],
@@ -3578,7 +3633,8 @@
       "tactic": "impact",
       "description": "Generate malicious or harmful outputs to damage the agent operator's reputation",
       "evidenceTier": "adapted",
-      "attackClass": "ORG-SKILL-SPREAD",
+      "family": "ORG-SKILL-SPREAD",
+      "attackClass": "social_engineering",
       "hmaChecks": [
         "SUPPLY-001"
       ],
@@ -3613,7 +3669,8 @@
       "tactic": "impact",
       "description": "Compromise upstream dependencies, plugins, or MCP servers to affect all downstream agents",
       "evidenceTier": "observed",
-      "attackClass": "NEMO-SUPPLY-CHAIN",
+      "family": "NEMO-SUPPLY-CHAIN",
+      "attackClass": "persistence",
       "hmaChecks": [
         "SUPPLY-001",
         "SUPPLY-002",
@@ -3719,7 +3776,8 @@
       "tactic": "initial-access",
       "description": "Exploit differences in how parsers (JSON, YAML, markdown) interpret the same input to bypass security controls",
       "evidenceTier": "validated",
-      "attackClass": "PARSER-DIFFERENTIAL",
+      "family": "PARSER-DIFFERENTIAL",
+      "attackClass": "injection",
       "hmaChecks": [
         "PARSE-001",
         "PARSE-002",
@@ -3762,7 +3820,8 @@
       "tactic": "privilege-escalation",
       "description": "Impersonate, shadow, or squat on legitimate MCP tools to intercept agent actions or escalate capabilities",
       "evidenceTier": "validated",
-      "attackClass": "FAKETOOL-INJECT",
+      "family": "FAKETOOL-INJECT",
+      "attackClass": "privilege_escalation",
       "hmaChecks": [
         "FAKETOOL-001",
         "FAKETOOL-002",
@@ -3818,7 +3877,8 @@
       "tactic": "persistence",
       "description": "Attacks that persist across agent sessions via memory poisoning, state tampering, and cached context injection",
       "evidenceTier": "validated",
-      "attackClass": "PERSIST-STATE",
+      "family": "PERSIST-STATE",
+      "attackClass": "persistence",
       "hmaChecks": [
         "PERSIST-001",
         "PERSIST-002",
@@ -3867,7 +3927,8 @@
       "tactic": "collection",
       "description": "Attacks targeting the system prompt assembly pipeline where individual components combine into exploitable injections",
       "evidenceTier": "validated",
-      "attackClass": "ASSEMBLY-INJECT",
+      "family": "ASSEMBLY-INJECT",
+      "attackClass": "injection",
       "hmaChecks": [
         "LIFECYCLE-001",
         "LIFECYCLE-002",

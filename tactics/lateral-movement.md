@@ -8,8 +8,8 @@ Pivot from compromised agent to connected services or other agents
 
 ## Techniques
 
-| ID | Name | Evidence tier | Attack class |
-|----|------|---------------|--------------|
+| ID | Name | Evidence tier | Family |
+|----|------|---------------|--------|
 | [T-5001](../techniques/T-5001.md) | SSRF via Tool | validated | SKILL-EXFIL |
 | [T-5002](../techniques/T-5002.md) | A2A Agent Pivoting | validated | A2A-EXPOSE |
 | [T-5003](../techniques/T-5003.md) | MCP Server Hopping | validated | MCP-EXPLOIT |

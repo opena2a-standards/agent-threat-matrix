@@ -3,10 +3,12 @@
 
 canonical-classes.json is authored content: it maps a behavior axis (the ten
 canonical attack classes) onto the technique ids in matrix.json, which carry a
-separate attack-vector axis in ``attackClass``. The two axes are not derivable
+separate attack-vector axis in ``family``. The two axes are not derivable
 from one another, so this script validates the mapping's shape and never
 computes it. There is no ``--fix`` mode for the same reason: a violation here is
-a question for the taxonomy, not a rewrite.
+a question for the taxonomy, not a rewrite. Each technique in matrix.json also
+carries its class in ``attackClass``, a copy of what this mapping says, which V7
+holds to it.
 
 Checks:
 
@@ -18,6 +20,10 @@ Checks:
 - V6 ``matrixVersion`` equals the matrix.json ``version`` and ``matrixCommit`` is the
   40-hex sha of the commit whose matrix.json the mapping maps; an abbreviated sha is
   refused. No git is consulted, so only the shape of the sha is checked
+- V7 every technique in matrix.json carries an ``attackClass`` that is one of the ten
+  class names, and that names the class whose ``primary`` array lists the technique.
+  A technique that no primary array lists, or that more than one lists, is a V3
+  finding and gets no V7 finding for the class it names
 
 Exit 0 when the mapping holds, 1 otherwise, printing one line per violation. A read of
 matrix.json that raises an OSError, a ValueError or a RecursionError (see ``read_matrix``)
@@ -156,6 +162,34 @@ def check_ordering(mapping, errors):
             errors.append(f"V5 {name}: id in both primary and secondary: {tid}")
 
 
+def check_attack_classes(mapping, techniques, errors):
+    """V7: each technique's ``attackClass`` is a class name and the class whose primary
+    array lists the technique. ``techniques`` is the matrix.json array, whose objects
+    ``technique_ids`` has already found to carry a string id."""
+    owners = {}
+    for name in CLASS_NAMES:
+        for tid in mapping.get(name, {}).get("primary", []):
+            owners.setdefault(tid, []).append(name)
+
+    for technique in techniques:
+        tid = technique["id"]
+        if "attackClass" not in technique:
+            errors.append(f"V7 {tid}: matrix.json gives it no attackClass")
+            continue
+        value = technique["attackClass"]
+        if not isinstance(value, str):
+            errors.append(f"V7 {tid}: attackClass is {json_type(value)}, not a string")
+            continue
+        if value not in CLASS_NAMES:
+            errors.append(f"V7 {tid}: attackClass {json.dumps(value)} is not one of the "
+                          f"{len(CLASS_NAMES)} canonical classes")
+            continue
+        listed = owners.get(tid, [])
+        if len(listed) == 1 and value != listed[0]:
+            errors.append(f"V7 {tid}: attackClass {json.dumps(value)} is not "
+                          f"{json.dumps(listed[0])}, the class whose primary array lists it")
+
+
 def check_stamps(data, matrix_version, errors):
     """V6: the mapping names the matrix version and the full commit it maps. An absent
     key is already a V1 finding."""
@@ -274,6 +308,7 @@ def main():
         check_partition(mapping, matrix_ids, errors)
         check_benign(mapping, errors)
         check_ordering(mapping, errors)
+        check_attack_classes(mapping, matrix["techniques"], errors)
 
     if errors:
         for error in errors:

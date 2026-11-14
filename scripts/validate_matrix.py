@@ -23,7 +23,11 @@ Standard library only, no network. Two passes:
 
    - S1 technique ids are unique
    - S2 ``tactic`` names an entry in tactics[]
-   - S3 ``attackClass`` names an entry in attackClasses[]
+   - S3 ``family`` names an entry in attackClasses[]. A technique's ``attackClass``
+        is its canonical attack class, which the schema's ``enum`` limits to the ten
+        classes of canonical-classes.json in the shape pass;
+        scripts/check_canonical_classes.py checks that it is the class whose
+        ``primary`` array lists the technique
    - S4 each ``dataSources`` mapping of a technique names an entry in the top-level
         dataSources[] registry, whose ids are themselves unique, and names a tool
         that the entry's ``readBy`` cites
@@ -516,8 +520,8 @@ def semantic_checks(matrix: dict, readiness: dict, technique_ids_file, pages: di
         tid = technique_label(t, index)
         if t["tactic"] not in tactic_ids:
             errors.append(f"S2 {tid}: tactic {t['tactic']!r} is not in tactics[]")
-        if t["attackClass"] not in class_ids:
-            errors.append(f"S3 {tid}: attackClass {t['attackClass']!r} is not in attackClasses[]")
+        if t["family"] not in class_ids:
+            errors.append(f"S3 {tid}: family {t['family']!r} is not in attackClasses[]")
         for mapping in t.get("dataSources", []):
             source, tool = mapping["source"], mapping["tool"]
             if source not in readers:

@@ -27,9 +27,11 @@ severity, and a generator default dressed as a measurement is exactly what
 this repo's evidence standard prohibits.
 
 A class page lists BOTH membership views where they differ: the techniques
-whose primary attackClass is this class, plus any the class additionally
-declares in its techniques[] array (overlapping secondary membership is
-allowed by the schema).
+whose ``family`` is this class, plus any the class additionally declares in
+its techniques[] array (overlapping secondary membership is allowed by the
+schema). A technique's ``attackClass`` is its canonical attack class, one of
+the ten in canonical-classes.json, never an id of attackClasses[], so it
+plays no part in a class page.
 """
 
 import argparse
@@ -49,11 +51,11 @@ def render_pages(matrix: dict) -> dict:
 
     pages = {}
     for cls in matrix["attackClasses"]:
-        # Union of declared members and primary-class members, declared order
-        # first — a technique's primary class must always list it.
+        # Union of declared members and the techniques of this family, declared
+        # order first: a technique's family must always list it.
         member_ids = list(cls.get("techniques") or [])
         for tid, t in techniques.items():
-            if t.get("attackClass") == cls["id"] and tid not in member_ids:
+            if t.get("family") == cls["id"] and tid not in member_ids:
                 member_ids.append(tid)
 
         rows = []

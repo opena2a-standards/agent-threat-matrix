@@ -5,13 +5,19 @@ matrix.json is canonical. The per-technique pages under techniques/ are hand-wri
 prose, but these lines are data that also lives in matrix.json:
 
 - the ``# T-NNNN: name`` title and the first line under ``## Description``
-- ``**Tactic:**`` and ``**Attack Class:**``
+- ``**Tactic:**`` and ``**Family:**``
 - ``- **DVAA Validation:**`` (absent when matrix.json has no ``dvaaValidation``; the
   Procedure Examples section then reads "No documented procedures yet.")
 - ``- **HMA Checks:**``, ``- **OASB Controls:**`` and ``- **Evidence Tier:**``
-- the two References links, ``- Attack Class: [...]`` and ``- Tactic: [...]``
+- the two References links, ``- Family: [...]`` and ``- Tactic: [...]``
 
 Each must appear once outside fenced code blocks and equal its rendering from the data.
+The two Family lines render the technique's ``family``, the id of its entry in
+``attackClasses``. Until matrix.json named that field ``family``, it was ``attackClass``
+and the pages labelled it Attack Class, while ``attackClass`` now holds the technique's
+canonical attack class. A line under that old label, ``**Attack Class:**`` or
+``- Attack Class: [...]``, is read as the Family line it stands for, so it fails as one
+that differs from the data and ``--fix`` rewrites it under the Family label.
 Only two of them were checked until 2026-10-11: when matrix.json moved T-1006 and T-5002
 to A2A-EXPOSE on 2026-08-25, their HMA Checks lines and four References class links kept
 the old values while CI stayed green.
@@ -53,7 +59,7 @@ matrix.json order, one line each directly under the Tactic link: the entry's typ
 its reference as a link, then its note after a period where it has one, as in
 ``- Evidence: honeypot-telemetry dated 2026-10-19, [<url>](<url>). <note>``. No other line
 of the page outside fenced code blocks starts ``- Evidence: ``, so a page whose technique
-carries no entry has none. The section linked only the technique's attack class and tactic
+carries no entry has none. The section linked only the technique's family and tactic
 pages while the STIX bundle already carried the entries of 26 techniques.
 
 docs/data-sources.md carries nothing but data as well, so it must equal its full rendering
@@ -83,8 +89,8 @@ A read of matrix.json that raises an OSError, a ValueError or a RecursionError (
 checking or writing a page, with ``--fix`` as without it. So is a matrix.json that parses but
 does not hold what this check needs from it (see ``SHAPE``), in the line
 ``FAIL: matrix.json parses but has the wrong shape: <reason>``: an object whose
-``techniques`` array holds objects with a string ``id``, a ``name``, a ``tactic``, an
-``attackClass`` and an ``evidenceTier``, a ``description`` that is absent, null or a string,
+``techniques`` array holds objects with a string ``id``, a ``name``, a ``tactic``, a
+``family`` and an ``evidenceTier``, a ``description`` that is absent, null or a string,
 ``hmaChecks`` and ``oasbControls`` that are each absent, null or an array of strings,
 ``dataSources`` that is absent, null or an array of objects with a string ``source``, ``tool``,
 ``kind`` and ``ref``, and an ``evidence`` that is absent, null or an array of objects, each
@@ -143,8 +149,9 @@ SECTION_RE = re.compile(r"^(?P<line>## .*)$", re.M)
 FIELD_PATTERNS = (
     ("Title", r"^(?P<line># .*)$", lambda t: f"# {t['id']}: {t['name']}"),
     ("Tactic", r"^(?P<line>\*\*Tactic:\*\*.*)$", lambda t: f"**Tactic:** {t['tactic']}"),
-    ("Attack Class", r"^(?P<line>\*\*Attack Class:\*\*.*)$",
-     lambda t: f"**Attack Class:** {t.get('attackClass') or ''}"),
+    # The old label, Attack Class, is matched too: see the module docstring.
+    ("Family", r"^(?P<line>\*\*(?:Family|Attack Class):\*\*.*)$",
+     lambda t: f"**Family:** {t.get('family') or ''}"),
     ("Description", r"^## Description\n\n(?P<line>.*)$", lambda t: t.get("description") or ""),
     (DVAA_LABEL, r"^(?P<line>- \*\*DVAA Validation:\*\*.*)$",
      lambda t: f"- **DVAA Validation:** {t['dvaaValidation']}" if t.get("dvaaValidation") else None),
@@ -154,8 +161,8 @@ FIELD_PATTERNS = (
      lambda t: f"- **OASB Controls:** {', '.join(t.get('oasbControls') or [])}"),
     ("Evidence Tier", r"^(?P<line>- \*\*Evidence Tier:\*\*.*)$",
      lambda t: f"- **Evidence Tier:** {t.get('evidenceTier') or ''}"),
-    ("References attack class", r"^(?P<line>- Attack Class: .*)$",
-     lambda t: f"- Attack Class: [{t.get('attackClass')}](../attack-classes/{t.get('attackClass')}.md)"),
+    ("References family", r"^(?P<line>- (?:Family|Attack Class): .*)$",
+     lambda t: f"- Family: [{t.get('family')}](../attack-classes/{t.get('family')}.md)"),
     ("References tactic", r"^(?P<line>- Tactic: .*)$",
      lambda t: f"- Tactic: [{t['tactic']}](../tactics/{t['tactic']}.md)"),
 )
@@ -642,13 +649,13 @@ def render_tactic_page(tactic: dict, techniques: list[dict]) -> str:
         "",
         "## Techniques",
         "",
-        "| ID | Name | Evidence tier | Attack class |",
-        "|----|------|---------------|--------------|",
+        "| ID | Name | Evidence tier | Family |",
+        "|----|------|---------------|--------|",
     ]
     for t in techniques:
         if t["tactic"] == tactic["id"]:
             lines.append(f"| [{t['id']}](../techniques/{t['id']}.md) | {t['name']} "
-                         f"| {t['evidenceTier']} | {t['attackClass']} |")
+                         f"| {t['evidenceTier']} | {t['family']} |")
     return "\n".join(lines) + "\n"
 
 
@@ -802,7 +809,7 @@ READER_KEYS = ("tool", "repository", "commit", "path", "line")
 # may hold any value, and one joined into a page or spliced into its text must be a string.
 # ``dvaaValidation``, written into a line only when it is set, is not listed.
 SHAPE = (
-    ("techniques", (("id", STRING), ("name", ANY), ("tactic", ANY), ("attackClass", ANY),
+    ("techniques", (("id", STRING), ("name", ANY), ("tactic", ANY), ("family", ANY),
                     ("description", STRING_OR_NULL), ("hmaChecks", STRINGS_OR_NULL),
                     ("oasbControls", STRINGS_OR_NULL), ("evidenceTier", ANY),
                     ("dataSources", MAPPINGS_OR_NULL), ("evidence", ENTRIES_OR_NULL))),

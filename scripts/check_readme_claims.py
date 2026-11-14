@@ -309,7 +309,7 @@ a RecursionError (see ``read_matrix``) is reported in one line on standard error
 checking or writing anything. So is a matrix.json that parses but does not hold what this
 check needs from it (see ``SHAPE``), in the line
 ``matrix.json parses but has the wrong shape: <reason>``: an object whose ``techniques``
-array holds objects with a string ``id`` and ``name`` and a ``tactic``, ``attackClass`` and
+array holds objects with a string ``id`` and ``name`` and a ``tactic``, ``family`` and
 ``evidenceTier`` that are each absent, null or a string, whose ``tactics`` array holds
 objects with a string ``id`` and ``name`` and an ``order``, and whose ``attackClasses``, when
 present, is an array of objects with a string ``id``, ``category`` and ``description`` and
@@ -793,12 +793,13 @@ def table_cell(text):
 def render_class_tables(matrix, base=""):
     """The attack-class tables: one per category, in order of first appearance in
     matrix.json, classes sorted by id. Members are the techniques the class declares
-    plus those whose primary attackClass is the class, as on the class pages. `base`
-    leads each link from the page holding the tables to the repository root ("../" for a
-    page in docs/)."""
+    plus those whose family is the class, as on the class pages. A technique's
+    attackClass is a canonical class, not a class of these tables, so it is not read.
+    `base` leads each link from the page holding the tables to the repository root
+    ("../" for a page in docs/)."""
     primary = {}
     for t in matrix["techniques"]:
-        primary.setdefault(t.get("attackClass"), set()).add(t["id"])
+        primary.setdefault(t.get("family"), set()).add(t["id"])
 
     by_category = {}
     for cls in matrix.get("attackClasses", []):
@@ -1782,7 +1783,7 @@ STRING_OR_NULL, STRINGS_OR_NULL = "a string or null", "an array of strings or nu
 # whether the top level must hold it (an absent attackClasses is read as no classes), and the
 # keys of its objects, with what each must hold. An id is a string, as
 # scripts/check_canonical_classes.py asks, and so is a name, category or description, which
-# the check uses as text. A technique's tactic, attackClass and evidenceTier, which the check
+# the check uses as text. A technique's tactic, family and evidenceTier, which the check
 # groups techniques by, are each absent, null or a string, and a class's techniques, which it
 # sorts beside technique ids, are absent, null or an array of strings. ``order`` is only
 # compared and written as text, so it may hold any value, and so may the top-level
@@ -1790,7 +1791,7 @@ STRING_OR_NULL, STRINGS_OR_NULL = "a string or null", "an array of strings or nu
 # ``hmaChecks``, is not listed.
 SHAPE = (
     ("techniques", True, (("id", STRING), ("name", STRING), ("tactic", STRING_OR_NULL),
-                          ("attackClass", STRING_OR_NULL), ("evidenceTier", STRING_OR_NULL))),
+                          ("family", STRING_OR_NULL), ("evidenceTier", STRING_OR_NULL))),
     ("tactics", True, (("id", STRING), ("name", STRING), ("order", ANY))),
     ("attackClasses", False, (("id", STRING), ("category", STRING), ("description", STRING),
                               ("techniques", STRINGS_OR_NULL))),

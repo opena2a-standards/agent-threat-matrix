@@ -8,8 +8,8 @@ Transfer collected data out of target environment
 
 ## Techniques
 
-| ID | Name | Evidence tier | Attack class |
-|----|------|---------------|--------------|
+| ID | Name | Evidence tier | Family |
+|----|------|---------------|--------|
 | [T-8001](../techniques/T-8001.md) | Email Exfiltration | validated | SKILL-EXFIL |
 | [T-8002](../techniques/T-8002.md) | HTTP Callback | validated | SKILL-EXFIL |
 | [T-8003](../techniques/T-8003.md) | DNS Exfiltration | adapted | SKILL-EXFIL |

@@ -100,7 +100,11 @@ def test_shipped_tree_is_green():
 TECHNIQUE_MUTATIONS = [
     ("T-1006", "Title", "# T-1006: Agent Card Discovery", "# T-1006: Agent Card Lookup"),
     ("T-1006", "Tactic", "**Tactic:** reconnaissance", "**Tactic:** collection"),
-    ("T-1006", "Attack Class", "**Attack Class:** A2A-EXPOSE", "**Attack Class:** AGENT-IMPERSONATE"),
+    ("T-1006", "Family", "**Family:** A2A-EXPOSE", "**Family:** AGENT-IMPERSONATE"),
+    # The label the line carried while matrix.json named the family attackClass, with the
+    # right family and with the technique's canonical class: neither is left standing.
+    ("T-1006", "Family", "**Family:** A2A-EXPOSE", "**Attack Class:** A2A-EXPOSE"),
+    ("T-1006", "Family", "**Family:** A2A-EXPOSE", "**Attack Class:** lateral_movement"),
     ("T-1006", "Description",
      "Discover A2A agent cards to map agent identities, capabilities, and trust relationships",
      "Discover A2A agent cards"),
@@ -109,12 +113,15 @@ TECHNIQUE_MUTATIONS = [
     ("T-1006", "HMA Checks", "- **HMA Checks:** A2A-001, A2A-002", "- **HMA Checks:** AIM-001, AIM-002"),
     ("T-1006", "OASB Controls", "- **OASB Controls:** 7.1, 7.2, 7.3, 7.4", "- **OASB Controls:** 7.1"),
     ("T-1006", "Evidence Tier", "- **Evidence Tier:** observed", "- **Evidence Tier:** validated"),
-    ("T-1006", "References attack class",
-     "- Attack Class: [A2A-EXPOSE](../attack-classes/A2A-EXPOSE.md)",
-     "- Attack Class: [AGENT-IMPERSONATE](../attack-classes/AGENT-IMPERSONATE.md)"),
-    ("T-9006", "References attack class",
-     "- Attack Class: [NEMO-SUPPLY-CHAIN](../attack-classes/NEMO-SUPPLY-CHAIN.md)",
-     "- Attack Class: [ORG-SKILL-SPREAD](../attack-classes/ORG-SKILL-SPREAD.md)"),
+    ("T-1006", "References family",
+     "- Family: [A2A-EXPOSE](../attack-classes/A2A-EXPOSE.md)",
+     "- Family: [AGENT-IMPERSONATE](../attack-classes/AGENT-IMPERSONATE.md)"),
+    ("T-1006", "References family",
+     "- Family: [A2A-EXPOSE](../attack-classes/A2A-EXPOSE.md)",
+     "- Attack Class: [A2A-EXPOSE](../attack-classes/A2A-EXPOSE.md)"),
+    ("T-9006", "References family",
+     "- Family: [NEMO-SUPPLY-CHAIN](../attack-classes/NEMO-SUPPLY-CHAIN.md)",
+     "- Family: [ORG-SKILL-SPREAD](../attack-classes/ORG-SKILL-SPREAD.md)"),
     ("T-1006", "References tactic", "- Tactic: [reconnaissance](../tactics/reconnaissance.md)",
      "- Tactic: [collection](../tactics/collection.md)"),
 ]
@@ -508,13 +515,33 @@ def test_tactic_row_follows_a_class_move_in_the_data(tree):
     matrix_path = tree / "matrix.json"
     matrix = json.loads(matrix_path.read_text(encoding="utf-8"))
     technique = next(t for t in matrix["techniques"] if t["id"] == "T-5002")
-    technique["attackClass"] = "AGENT-IMPERSONATE"
+    technique["family"] = "AGENT-IMPERSONATE"
     matrix_path.write_text(json.dumps(matrix, indent=2), encoding="utf-8")
 
     result = run_checker(tree)
     assert result.returncode == 1
     assert "tactics/lateral-movement.md: line 14 is" in result.stdout
-    assert "T-5002: References attack class line is" in result.stdout
+    assert "T-5002: References family line is" in result.stdout
+
+
+def test_the_tactic_table_heads_its_last_column_family(tree):
+    page = (tree / "tactics" / "lateral-movement.md").read_text(encoding="utf-8")
+    assert "| ID | Name | Evidence tier | Family |" in page.splitlines()
+    assert ("| [T-5002](../techniques/T-5002.md) | A2A Agent Pivoting | validated "
+            "| A2A-EXPOSE |") in page.splitlines()
+
+
+def test_the_canonical_attack_class_is_not_read_as_the_family(tree):
+    # attackClass holds the technique's canonical class, which no page line renders; the
+    # pages render the family. A class change alone leaves every page as it is.
+    matrix_path = tree / "matrix.json"
+    matrix = json.loads(matrix_path.read_text(encoding="utf-8"))
+    technique = next(t for t in matrix["techniques"] if t["id"] == "T-5002")
+    technique["attackClass"] = "persistence"
+    matrix_path.write_text(json.dumps(matrix, indent=2), encoding="utf-8")
+
+    result = run_checker(tree)
+    assert result.returncode == 0, result.stdout
 
 
 # Every technique maps to one or more OASB controls, yet every page said "No documented
@@ -1090,7 +1117,7 @@ def test_a_source_the_vocabulary_does_not_hold_is_red_and_left_alone(tree):
 REFERENCES_SECTION_RE = re.compile(r"^## References\n(.*?)(?=^## |\Z)", re.M | re.S)
 EVIDENCE_LINE_RE = re.compile(r"^- Evidence: .*$", re.M)
 ENDPOINT = "https://api.oa2a.org/api/v1/threat-matrix"
-T2001_LINKS = ["- Attack Class: [SOUL-INJECT](../attack-classes/SOUL-INJECT.md)",
+T2001_LINKS = ["- Family: [SOUL-INJECT](../attack-classes/SOUL-INJECT.md)",
                "- Tactic: [initial-access](../tactics/initial-access.md)"]
 # The DVAA challenge T-2001's dvaaValidation names, L1-03, at the line of its key.
 T2001_CHALLENGE = ("https://github.com/opena2a-org/damn-vulnerable-ai-agent/blob/"

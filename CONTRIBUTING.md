@@ -76,8 +76,11 @@ We do not accept purely theoretical techniques. If you have a plausible attack v
 ## Description
 [What the technique does and why it works]
 
+## Family
+[The attack vector: which entry of attackClasses in matrix.json it belongs to (see attack-classes/)]
+
 ## Attack Class
-[Which attack class this belongs to]
+[Which of the ten canonical classes of canonical-classes.json it belongs to]
 
 ## Evidence
 - **Tier:** Observed / Validated / Adapted

@@ -137,6 +137,35 @@ def test_schema_rejects_an_unknown_technique_field():
     _red(mutate(fn), "matrix.techniques[0]: unexpected property 'foitw'")
 
 
+def test_schema_rejects_a_family_code_as_the_attack_class():
+    # attackClass held the family code of each technique, none of them a canonical class.
+    def fn(root):
+        m = load(root, "matrix.json")
+        m["techniques"][0]["attackClass"] = m["techniques"][0]["family"]
+        dump(root, "matrix.json", m)
+    _red(mutate(fn), "matrix.techniques[0].attackClass: 'RETROACTIVE-PRIV' is not one of "
+                     "['injection', 'exfiltration', 'credential_abuse', 'privilege_escalation', "
+                     "'persistence', 'lateral_movement', 'social_engineering', 'policy_violation', "
+                     "'steganography', 'benign']")
+
+
+@pytest.mark.parametrize("field", ["family", "attackClass"])
+def test_schema_requires_the_family_and_the_attack_class(field):
+    def fn(root):
+        m = load(root, "matrix.json")
+        del m["techniques"][0][field]
+        dump(root, "matrix.json", m)
+    _red(mutate(fn), f"matrix.techniques[0]: missing required property '{field}'")
+
+
+def test_s3_refuses_a_family_that_names_no_entry_of_attack_classes():
+    def fn(root):
+        m = load(root, "matrix.json")
+        m["techniques"][0]["family"] = "NO-SUCH-FAMILY"
+        dump(root, "matrix.json", m)
+    _red(mutate(fn), "S3 T-1001: family 'NO-SUCH-FAMILY' is not in attackClasses[]")
+
+
 def test_schema_rejects_a_bad_attack_mapping_id():
     def fn(root):
         m = load(root, "matrix.json")
