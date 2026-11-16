@@ -101,9 +101,12 @@ Standard library only, no network. Two passes:
    - S19 a ``period`` in ``wildPrevalenceSource`` is a closed period: its ``start``
         and ``end`` are calendar dates, ``start`` is no later than ``end``, and ``end``
         is earlier than the ``read`` date, so the period had ended when it was read
-   - S20 the ``read`` date of ``wildPrevalenceSource`` is a calendar date. The schema's
+   - S20 the ``read`` date of ``wildPrevalenceSource`` is a calendar date no later than
+        today, as S17 requires of the ``read`` of evidence-sources.json. The schema's
         pattern admits a value such as 2026-02-30, and S19 compares a period's ``end``
-        with ``read`` only when ``read`` is a calendar date
+        with ``read`` only when ``read`` is a calendar date. S19 requires the ``end`` to be
+        earlier than ``read``, so a ``read`` later than today would let a period that had
+        not ended by today pass it
 
 Exit 0 when everything holds, 1 otherwise.
 """
@@ -495,7 +498,7 @@ def evidence_findings(technique: dict, tid: str, source: dict, pages: dict, name
 
 
 def semantic_checks(matrix: dict, readiness: dict, technique_ids_file, pages: dict, named: dict,
-                    errors: list) -> str:
+                    today: str, errors: list) -> str:
     """Append one line per semantic failure; return the matrixCommit note for the summary."""
     commit_note = ""
     techniques = matrix["techniques"]
@@ -613,7 +616,7 @@ def semantic_checks(matrix: dict, readiness: dict, technique_ids_file, pages: di
             if tid not in ids:
                 errors.append(f"S9 attackPaths {path['id']}: step {tid} is not a technique id")
     period_findings(matrix["wildPrevalenceSource"], errors)
-    read_findings(matrix["wildPrevalenceSource"], errors)
+    read_findings(matrix["wildPrevalenceSource"], today, errors)
     return commit_note
 
 
@@ -641,12 +644,15 @@ def period_findings(source: dict, errors: list) -> None:
                       f"period had not ended when it was read; values are copied only for a closed period")
 
 
-def read_findings(source: dict, errors: list) -> None:
-    """S20: the date wildPrevalenceSource says the endpoint was read is a calendar date. S19
-    compares a period's end with it only when it is one."""
+def read_findings(source: dict, today: str, errors: list) -> None:
+    """S20: the date wildPrevalenceSource says the endpoint was read is a calendar date no later
+    than today. S19 compares a period's end with it only when it is a calendar date, and a read
+    later than today would let a period that had not ended by today pass that comparison."""
     read = source["read"]
     if not calendar_date(read):
         errors.append(f"S20 wildPrevalenceSource.read: {read!r} is not a calendar date")
+    elif read > today:
+        errors.append(f"S20 wildPrevalenceSource.read: {read} is later than today, {today}")
 
 
 def committed_findings(where: str, committed: str, read: str, errors: list) -> None:
@@ -876,7 +882,7 @@ def main() -> int:
         today = date.today().isoformat()
         source_errors = []
         pages, named = pinned_sources(sources_schema, matrix, today, source_errors)
-        commit_note = semantic_checks(matrix, readiness, technique_ids_file, pages, named, errors)
+        commit_note = semantic_checks(matrix, readiness, technique_ids_file, pages, named, today, errors)
         errors.extend(source_errors)
         freshness_check(matrix, committed_matrix(), today, errors)
         stix_check(errors)
