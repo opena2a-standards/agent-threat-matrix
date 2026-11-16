@@ -47,6 +47,10 @@ def today() -> str:
     return date.today().isoformat()
 
 
+def tomorrow() -> str:
+    return (date.today() + timedelta(days=1)).isoformat()
+
+
 def scratch_copy(source: Path, target: Path) -> Path:
     """Copy FILES and DIRS from the tree at source into target, which holds none of them, and
     take the period out of the copy's wildPrevalenceSource.
@@ -347,6 +351,47 @@ def test_s20_refuses_a_read_date_that_is_not_a_calendar_date(tree, read, period)
 def test_validator_accepts_a_read_on_29_february_of_a_leap_year(tree):
     matrix = load(tree)
     _read_on("2024-02-29", {"start": "2024-01-01", "end": "2024-01-31"})(matrix)
+    dump(tree, matrix)
+    render_stix(tree)
+    proc = run_validator(tree)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+
+
+# Each read is a calendar date later than the day the case runs, and each period ends before
+# its read, so S19 passes it; the last period ends on the day the case runs, so it has not
+# ended. Each value is taken when the case runs.
+S20_LATER = [
+    ("2099 with a period that ends before it", lambda: "2099-01-01",
+     lambda: {"start": "2098-12-01", "end": "2098-12-31"}),
+    ("2099 without a period", lambda: "2099-01-01", lambda: None),
+    ("the day after today", tomorrow, lambda: None),
+    ("the day after today with a period that ends today", tomorrow,
+     lambda: {"start": days_ago(30), "end": today()}),
+]
+
+
+@pytest.mark.parametrize("read,period", [pytest.param(r, p, id=name) for name, r, p in S20_LATER])
+def test_s20_refuses_a_read_date_later_than_today(tree, read, period):
+    read = read()
+    matrix = load(tree)
+    _read_on(read, period())(matrix)
+    dump(tree, matrix)
+    render_stix(tree)
+    proc = run_validator(tree)
+    assert proc.returncode == 1, proc.stdout + proc.stderr
+    assert proc.stderr.splitlines() == [
+        "FAIL: matrix.json does not validate (1 finding(s)):",
+        f"  - S20 wildPrevalenceSource.read: {read} is later than today, {today()}",
+    ], proc.stderr
+
+
+@pytest.mark.parametrize("period", [
+    pytest.param(lambda: None, id="without a period"),
+    pytest.param(lambda: {"start": days_ago(30), "end": days_ago(1)}, id="with a period that ended the day before"),
+])
+def test_validator_accepts_a_read_dated_today(tree, period):
+    matrix = load(tree)
+    _read_on(today(), period())(matrix)
     dump(tree, matrix)
     render_stix(tree)
     proc = run_validator(tree)
