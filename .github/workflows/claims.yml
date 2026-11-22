@@ -23,6 +23,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # validate_matrix.py S11 reads matrix.json at the commit technique-ids.json
+          # names; a shallow clone lacks it and checks only the sha's shape.
+          fetch-depth: 0
 
       - uses: actions/setup-python@v5
         with:
@@ -56,6 +60,29 @@ jobs:
       # about named people, credit is recorded, never guessed.
       - name: Attribution record partitions matrix.json
         run: python3 scripts/check_attribution.py
+
+      # Every page that defines an evidence tier quotes docs/evidence-tiers.md word for word.
+      - name: Evidence tier definitions quote docs/evidence-tiers.md
+        run: python3 scripts/check_evidence_tiers.py
+
+      # matrix.json against its schema and the semantic rules S1 onward, including the
+      # STIX bundle and evidence-gaps.json rendered from it.
+      - name: matrix.json validates
+        run: python3 scripts/validate_matrix.py
+
+      - name: Markdown prose rules
+        run: python3 scripts/check_docs_prose.py
+
+      # The family pages under attack-classes/ are a rendering of matrix.json; --check
+      # writes nothing and fails when they differ from a fresh rendering.
+      - name: Family pages match matrix.json
+        run: python3 scripts/generate_class_markdown.py --check
+
+      - name: Install pytest
+        run: python3 -m pip install pytest
+
+      - name: Tests
+        run: python3 -m pytest -q
 
   live-api-drift:
     # The registry serves this matrix at api.oa2a.org and threats.opena2a.org

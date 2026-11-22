@@ -34,8 +34,8 @@ releases differ, so an entry no review admitted does not pass it.
 `tests/test_crosswalks.py` resolves every `attackMapping` and `atlasMapping` id against the
 snapshot for its framework, so a mapping that names an id absent from the named release fails;
 asserts the unmapped list equals the techniques carrying no mapping; and asserts the notes name
-the release each snapshot records. It is a local test that no workflow runs; run it with
-`python3 -m pytest -q tests/test_crosswalks.py`. The relation on the cross-reference pages
+the release each snapshot records. The Claims workflow runs it with the rest of the tests; run
+it alone with `python3 -m pytest -q tests/test_crosswalks.py`. The relation on the cross-reference pages
 under `cross-references/` is separate: those pages are a tactic-grain analyst reading, while
 these arrays are the technique-grain crosswalk in the data.
 
