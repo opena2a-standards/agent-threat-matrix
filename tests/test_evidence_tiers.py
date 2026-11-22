@@ -164,6 +164,65 @@ def test_a_line_that_ends_the_item_in_commonmark_but_is_no_bullet_with_text_is_r
     assert "Observed reads" not in r.stderr, r.stderr
 
 
+@pytest.mark.parametrize("after", ["-\n", "- \n", "-\t\n", "-   \n", "+\n", "*\n", "* \t\n"],
+                         ids=["bare hyphen", "hyphen and space", "hyphen and tab",
+                              "hyphen and three spaces", "plus", "asterisk",
+                              "asterisk, space and tab"])
+def test_a_bullet_with_no_text_does_not_end_the_definition_whatever_follows_its_marker(
+        tree, after):
+    # An empty bullet is not a bulleted item with text, so it ends nothing: the check reports
+    # the definition as continued, at the empty bullet's line, and does not read the
+    # definition on to the next list item as if the bullet had ended it.
+    line = mutate(tree, "EVIDENCE_AUDIT.md", f"- **OBSERVED**: {OBSERVED}\n",
+                  f"- **OBSERVED**: {OBSERVED}\n{after}")
+    r = run_checker(tree)
+    assert r.returncode == 1
+    assert f"EVIDENCE_AUDIT.md:{line}: Observed continues on line {line + 1};" in r.stderr, \
+        r.stderr
+    assert "Observed reads" not in r.stderr, r.stderr
+
+
+def test_a_bullet_with_text_at_the_same_indent_ends_the_definition_where_an_empty_one_does_not(
+        tree):
+    # The same line with one word of text after its marker ends the definition.
+    mutate(tree, "EVIDENCE_AUDIT.md", f"- **OBSERVED**: {OBSERVED}\n",
+           f"- **OBSERVED**: {OBSERVED}\n- NemoClaw findings\n")
+    r = run_checker(tree)
+    assert r.returncode == 0, r.stderr
+
+
+@pytest.mark.parametrize("blank, skipped", [
+    (" \n", 1), ("\t\n", 1), (" \t \n", 1), ("\t \t\n", 1), ("\n \t\n\t\n", 3),
+], ids=["space", "tab", "space, tab and space", "tab, space and tab", "three lines"])
+def test_a_blank_line_of_spaces_and_tabs_is_skipped_before_the_text_that_continues_the_item(
+        tree, blank, skipped):
+    # Each line before the paragraph holds nothing but spaces and tabs, so each is blank and
+    # the paragraph, indented as far as the label, is the next line that is not.
+    line = mutate(tree, "EVIDENCE_AUDIT.md", f"- **OBSERVED**: {OBSERVED}\n",
+                  f"- **OBSERVED**: {OBSERVED}\n{blank}  (NemoClaw findings)\n")
+    r = run_checker(tree)
+    assert r.returncode == 1
+    assert (f"EVIDENCE_AUDIT.md:{line}: Observed continues on line {line + skipped + 1};"
+            in r.stderr), r.stderr
+
+
+@pytest.mark.parametrize("character", ["\N{NO-BREAK SPACE}", "\f", "\N{EM SPACE}",
+                                       "\N{IDEOGRAPHIC SPACE}", "\x85"],
+                         ids=["no-break space", "form feed", "em space", "ideographic space",
+                              "next line"])
+def test_a_line_holding_other_white_space_is_not_blank_and_continues_the_definition(
+        tree, character):
+    # A blank line holds spaces and tabs only. Any other white space character makes the line
+    # text, which continues the definition on the very next line; read as blank, it would be
+    # skipped, and the paragraph after it, indented as far as the label, would be named.
+    line = mutate(tree, "EVIDENCE_AUDIT.md", f"- **OBSERVED**: {OBSERVED}\n",
+                  f"- **OBSERVED**: {OBSERVED}\n{character}\n  (NemoClaw findings)\n")
+    r = run_checker(tree)
+    assert r.returncode == 1
+    assert f"EVIDENCE_AUDIT.md:{line}: Observed continues on line {line + 1};" in r.stderr, \
+        r.stderr
+
+
 @pytest.mark.parametrize("outer, indent", [
     ("-    Tiers:", "\t "),
     ("100. Tiers:", "\t "),
