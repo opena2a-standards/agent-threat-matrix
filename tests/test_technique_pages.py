@@ -220,6 +220,10 @@ STILL_FENCED = [
      "````markdown\n```\n- **HMA Checks:** AIM-001\n```\n````\n\n"),
     ("a tilde line in a backtick block",
      "```text\n~~~\n- **HMA Checks:** AIM-001\n~~~\n```\n\n"),
+    ("a backtick line in a tilde block",
+     "~~~text\n```\n- **HMA Checks:** AIM-001\n```\n~~~\n\n"),
+    ("a longer backtick line with text after it",
+     "```sh\n````  run\n- **HMA Checks:** AIM-001\n```\n\n"),
     ("a backtick line with an info string",
      "```sh\n```python\n- **HMA Checks:** AIM-001\n```\n\n"),
 ]
@@ -308,9 +312,23 @@ ENDED_BEFORE_THE_DATA_LINE = [
     ("a fence in an item continued by a tab-indented line", "- step\n\n\tmore\n  ```\n"),
 ]
 
+# Fences closed before the data line after them, by a line of the opening character at
+# least as long as the opening run, with nothing after it but spaces, tabs or a carriage
+# return, and up to three spaces before it.
+CLOSED_BEFORE_THE_DATA_LINE = [
+    ("a closing fence as long as the opening one", "```sh\nrun\n```\n"),
+    ("a closing fence longer than the opening one", "```sh\nrun\n`````\n"),
+    ("a tilde fence closed by tildes", "~~~sh\nrun\n~~~~\n"),
+    ("a closing fence followed by spaces", "```sh\nrun\n```   \n"),
+    ("a closing fence followed by a tab", "```sh\nrun\n```\t\n"),
+    ("a closing fence that ends in a carriage return", "```sh\r\nrun\r\n```\r\n"),
+    ("a closing fence indented three spaces", "```sh\nrun\n   ```\n"),
+]
 
-@pytest.mark.parametrize("block", [b for _, b in ENDED_BEFORE_THE_DATA_LINE],
-                         ids=[n for n, _ in ENDED_BEFORE_THE_DATA_LINE])
+
+@pytest.mark.parametrize("block",
+                         [b for _, b in ENDED_BEFORE_THE_DATA_LINE + CLOSED_BEFORE_THE_DATA_LINE],
+                         ids=[n for n, _ in ENDED_BEFORE_THE_DATA_LINE + CLOSED_BEFORE_THE_DATA_LINE])
 def test_a_block_that_ends_before_a_data_line_does_not_hide_it(tree, block):
     page = tree / "techniques" / "T-1006.md"
     text = page.read_text(encoding="utf-8")
