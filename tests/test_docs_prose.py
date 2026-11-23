@@ -255,10 +255,18 @@ def test_failures_of_the_three_rules_are_listed_in_line_order():
     ]
 
 
-def test_many_attack_words_cost_linear_time():
-    started = time.perf_counter()
-    assert len(CHK.check_text("x.md", "attack " * 20000 + "\n" + "canonical attack class " * 20000 + "\n")) == 0
-    assert time.perf_counter() - started < 2.0
+def test_many_attack_words_cost_linear_work():
+    # The checker counts its P3 steps; four times the attack words may cost at most twice
+    # four times the steps, which a cost growing with the square of the words exceeds.
+    def steps(n):
+        CHK.P3_STEPS.clear()
+        text = "attack " * n + "\n" + "canonical attack class " * n + "\n"
+        assert CHK.check_text("x.md", text) == []
+        return CHK.P3_STEPS["steps"]
+
+    small, large = steps(2000), steps(8000)
+    assert small >= 2000
+    assert large <= 2 * 4 * small, (small, large)
 
 
 def test_the_shipped_pages_that_list_families_call_them_families():

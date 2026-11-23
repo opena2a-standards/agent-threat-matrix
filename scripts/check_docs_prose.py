@@ -45,6 +45,7 @@ import os
 import re
 import subprocess
 import sys
+from collections import Counter
 from pathlib import Path, PurePosixPath
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -81,6 +82,10 @@ SETEXT_UNDERLINE_RE = re.compile(r"^ {0,3}(?:=+|-+)\s*$")
 ATTACK_CLASS_RE = re.compile(
     r"(?<![\w/#.-])attack(?:-|[^\S\n]+|[^\S\n]*\n[^\S\n]*)class(?:es)?(?![\w/-]|\.\w)", re.I)
 CANONICAL = "canonical"
+# The steps P3 took since the last clear(): one per candidate phrase the pattern matched and
+# one per character after_canonical read before it. A test reads it to see that the work
+# grows linearly with the number of attack words; nothing printed depends on it.
+P3_STEPS = Counter()
 P3_ADVICE = ('write "family" for an entry of attackClasses in matrix.json, or "canonical '
              'attack class" for one of the ten classes of canonical-classes.json')
 
@@ -207,6 +212,7 @@ def after_canonical(text: str, end: int) -> bool:
         breaks += text[i - 1] == "\n"
         i -= 1
     start = i - len(CANONICAL)
+    P3_STEPS["steps"] += end - i + len(CANONICAL)
     return (i < end and breaks <= 1 and start >= 0
             and text[start:i].lower() == CANONICAL
             and not (start > 0 and (text[start - 1].isalnum() or text[start - 1] == "_")))
@@ -234,6 +240,7 @@ def attack_class_failures(rel: str, lines: list, raw: list) -> list:
     text = "".join(parts)
     found = []
     for m in ATTACK_CLASS_RE.finditer(text):
+        P3_STEPS["steps"] += 1
         lineno = numbers[bisect.bisect_right(starts, m.start()) - 1]
         if (rel, raw[lineno - 1].rstrip()) in VERBATIM or after_canonical(text, m.start()):
             continue
