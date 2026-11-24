@@ -251,6 +251,59 @@ reads a bulleted list item, so write the marker at the margin or under the text 
 item it is nested in, follow it with a space, and keep each definition on one line and
 alone in its list item.
 
+## License of contributions
+
+This repository is licensed under the Apache License 2.0 (see [LICENSE](LICENSE)), and
+contributions are accepted under that licence. By contributing, you agree that your
+contributions are licensed under the Apache License 2.0.
+
+## Sign your work
+
+Every commit of a contribution carries a `Signed-off-by: Name <email>` line, which
+`git commit -s` adds from your git `user.name` and `user.email`:
+
+```
+Signed-off-by: Jane Doe <jane.doe@example.com>
+```
+
+By adding it, you certify the Developer Certificate of Origin 1.1, published at
+[developercertificate.org](https://developercertificate.org):
+
+```text
+Developer's Certificate of Origin 1.1
+
+By making a contribution to this project, I certify that:
+
+(a) The contribution was created in whole or in part by me and I
+    have the right to submit it under the open source license
+    indicated in the file; or
+
+(b) The contribution is based upon previous work that, to the best
+    of my knowledge, is covered under an appropriate open source
+    license and I have the right under that license to submit that
+    work with modifications, whether created in whole or in part
+    by me, under the same open source license (unless I am
+    permitted to submit under a different license), as indicated
+    in the file; or
+
+(c) The contribution was provided directly to me by some other
+    person who certified (a), (b) or (c) and I have not modified
+    it.
+
+(d) I understand and agree that this project and the contribution
+    are public and that a record of the contribution (including all
+    personal information I submit with it, including my sign-off) is
+    maintained indefinitely and may be redistributed consistent with
+    this project or the open source license(s) involved.
+```
+
+To sign off the last commit you have already made, run `git commit --amend -s`. To sign off
+several, run `git rebase --signoff` with the branch you started from as its upstream.
+
+No contributor licence agreement is asked for: the sign-off and the Apache License 2.0 are the
+whole of it. The names and logos of the project are not licensed by the code licence; the
+Apache License 2.0 grants no permission to use them (section 6 of [LICENSE](LICENSE)).
+
 ## Code of Conduct
 
 Contributions must be:
