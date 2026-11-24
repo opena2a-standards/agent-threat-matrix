@@ -20,7 +20,7 @@ ATLAS release 2026.09 does name autonomous agent-to-agent communication (AML.T01
 adversary's coordination of their own agents carrying out an attack, not an attack on a
 victim's multi-agent system, so T-9004 remains unmapped.
 
-Membership is checked by a local test that no workflow runs. Run it with
-`python3 -m pytest -q tests/test_crosswalks.py`: it asserts that the ids in the first column of
+Membership is checked by a test that the Claims workflow runs with the rest of the tests. Run
+it alone with `python3 -m pytest -q tests/test_crosswalks.py`: it asserts that the ids in the first column of
 the table above equal the techniques in `matrix.json` carrying no mapping, so removing a row,
 or adding one for a technique that carries a mapping, fails it.

@@ -68,8 +68,8 @@ check fails when it differs from a fresh rendering:
   `scripts/build_technique_crosswalk.py`: `python3 scripts/check_technique_crosswalk.py`.
 
 Four files under `crosswalks/` hold derived content that no check renders afresh.
-`tests/test_crosswalks.py` guards them; it is a local test that no workflow runs, run with
-`python3 -m pytest -q tests/test_crosswalks.py`. The fourth, the entry-review record, is
+`tests/test_crosswalks.py` guards them; the Claims workflow runs it with the rest of the
+tests, and it runs alone with `python3 -m pytest -q tests/test_crosswalks.py`. The fourth, the entry-review record, is
 also checked in CI:
 
 - the technique list of `crosswalks/unmapped.md`, the ids in the first column of its table,
