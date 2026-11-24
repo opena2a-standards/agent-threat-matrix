@@ -200,8 +200,9 @@ required review count and no code-owner review. That check passes for a pull req
 changes nothing under `.github/`; a pull request that changes a file there needs an
 approving review on its current head commit from one of the accounts named in the
 `approvers` line of `.github/workflows/gate-file-approval.yml`: the GitHub user
-`thebenignhacker`, or `benign-gate-reviewer[bot]`, the bot account of the gate-reviewer
-GitHub App. The check counts an approval from either account the same way. A reader
+`thebenignhacker`, `benign-gate-reviewer[bot]`, the bot account of the gate-reviewer
+GitHub App, or `lication-reviewer[bot]`, the bot account of the CI reviewer GitHub App.
+The check counts an approval from any of these accounts the same way. A reader
 without administration access to this repository can read the required status checks
 with:
 
