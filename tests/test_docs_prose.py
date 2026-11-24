@@ -1,6 +1,7 @@
 """Docs prose checker tests.
 
-scripts/check_docs_prose.py must be green on the shipped tree. Each dash form and each
+scripts/check_docs_prose.py must be green on the shipped tree, and the readme-claims job of
+.github/workflows/claims.yml must run it with its verdict untouched. Each dash form and each
 "Why this exists" heading form is then planted in a fixture string and must be reported at
 its own line, while code, comments, front matter, compounds, ranges and table delimiter rows
 stay unreported. So must each form of "attack class" written without "canonical" in front,
@@ -26,6 +27,7 @@ import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
 CHECKER = ROOT / "scripts" / "check_docs_prose.py"
+WORKFLOW = ROOT / ".github" / "workflows" / "claims.yml"
 
 EM = "—"
 EN = "–"
@@ -49,6 +51,16 @@ def test_shipped_tree_is_green():
     proc = run_checker(CHECKER)
     assert proc.returncode == 0, proc.stdout + proc.stderr
     assert proc.stdout.startswith("OK: ")
+
+
+def test_readme_claims_job_runs_the_checker():
+    wf = WORKFLOW.read_text(encoding="utf-8")
+    assert "continue-on-error" not in wf
+    job = wf.split("\n  readme-claims:", 1)[1].split("\n  live-api-drift:", 1)[0]
+    assert not re.search(r"^\s*if:", job, re.M), "no if: in the readme-claims job"
+    runs = [m.group(1).strip() for m in re.finditer(r"^\s*run:(.*)$", job, re.M)
+            if "check_docs_prose.py" in m.group(1)]
+    assert runs == ["python3 scripts/check_docs_prose.py"], runs
 
 
 def test_each_dash_form_is_reported_at_its_line():
